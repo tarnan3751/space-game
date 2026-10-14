@@ -78,12 +78,16 @@ func setup(catalog: Catalog) -> void:
 func refresh(state: BaseState, selected_id: int, placing: bool, ghost_ok: bool) -> void:
 	_state = state
 	for res: String in _resource_labels:
+		# A resource the base has no storage for yet (antimatter, early on) is hidden.
+		var capacity := state.capacity(res)
+		var panel: Control = _resource_labels[res].get_parent()
+		panel.visible = capacity > 0
 		var rate := state.production_per_hour(res)
 		var rate_text := "   +%s/h" % Format.amount(rate) if rate > 0 else ""
 		_resource_labels[res].text = "%s  %s / %s%s" % [
 			_catalog.resource_name(res),
 			Format.amount(state.resources[res]),
-			Format.amount(state.capacity(res)),
+			Format.amount(capacity),
 			rate_text,
 		]
 	_builders_label.text = "Drones  %d / %d" % [state.builders_free(), state.builders_total()]
