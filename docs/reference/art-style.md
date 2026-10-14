@@ -279,6 +279,8 @@ job; a helper is added, never renamed or removed.
 | `mast(m, foot, height, bulb_radius, bulb)` | a thin `ROD` pole ending in a bulb, which carries the outline the rod is too thin for |
 | `drum(m, radius, height, chamfer, sides, pos, surf, rot)` | a cylinder whose top edge is bevelled `chamfer` wide, turnable: a turret ring, a tilted housing; with 8 sides and `OCTAGON`, an armoured octagon |
 | `torus(m, major, minor, sides, segments, pos, surf, rot)` | a closed ring of round section resting on `pos` (its bottom at `pos.y`): coils, coronas, gyro rings; 10 or more `segments` for a ring that shows |
+| `HULL_LIGHT_ROUND`, `HULL_MID_ROUND`, `HULL_DARK_ROUND`, `GOLD_ROUND` | the hull and gold surfaces smooth shaded, for drums, tanks, collars and caps |
+| `ladder(m, foot, height, width, yaw, surf)` | two rails and a rung every 0.16 up a wall, its face turned `yaw` degrees from +Z; on `ROD`, too thin to ink |
 
 ### Model table
 
@@ -287,6 +289,14 @@ its spinning part, and its top level's body triangles as the gallery counts them
 
 | Type | Signature element | Spin | Top level, body triangles |
 | --- | --- | --- | --- |
+| `command_center` | glass dome ringed in gold on a tall drum over a stepped foundation, a hazard-striped hangar door; wings, a ring of rooms, a violet containment ring and a gold beacon spire as it grows | the comms dish on its pylon | 4,830 |
+| `drone_bay` | landing deck in a hazard ring of cyan lights, a parked drone, a control booth with a gold roof; the drone's body, 0.42 across at 12 sides, is the one exception to the small-part side counts | the beacon on the booth | 1,968 |
+| `metal_extractor` | tripod derrick over a drill, conveyors carrying glowing ore into hoppers, exhaust stacks | the drill string and its top drive | 2,610 |
+| `crystal_harvester` | laser gantry over a cluster of glowing crystal shards | the focusing emitter and its beam | 1,800 |
+| `antimatter_siphon` | coiled torus round a glowing violet core, field pylons leaning in | the torus and its coils | 2,968 |
+| `metal_silo` | squat banded tank with a glowing fill gauge and a ladder; twin tanks from L4 | none | 2,346 |
+| `crystal_silo` | tall hexagonal tank of crystal-lit glass panels under a chamfered lid and a crystal finial | none | 838 |
+| `antimatter_vault` | armoured chamfered cube with a round vault door, violet seams and a containment pylon on each corner | none | 2,824 |
 | `hangar` | barrel-vaulted bays with orange ribs and hazard-striped doors, a glass-cabbed control tower | none | 4,362 |
 | `fabricator` | sawtooth-roofed factory, an orange gantry crane over a loading dock, smokestacks | none | 1,950 |
 | `heavy_fabricator` | armoured hall with orange press arms hammering anvils, a glowing furnace mouth | none | 2,024 |
@@ -320,8 +330,9 @@ its spinning part, and its top level's body triangles as the gallery counts them
   bounds, and a spinning part's whole sweep around its pivot (a turning head or dish must clear
   the footprint at every angle). Height is free. The gallery checks it on every type and level.
 - Every box edge gets a chamfer (0.04 to 0.08 units). Cylinders have 16 to 24 sides, domes 16
-  sides and 6 to 8 rings, rings and dishes 24 segments, all smooth. Nothing is a bare 6-sided
-  prism.
+  sides and 6 to 8 rings, rings and dishes 24 segments, all smooth. Parts under about 0.3 across
+  may use 10 to 12 sides when smooth, and under 0.15 as few as 8; small light domes 3 rings.
+  Nothing is a bare 6-sided prism.
 - Every building: a foundation pad (`CONCRETE_PAD`, a chamfered slab 0.12 high, inset 0.1 from
   the footprint, covering it so the building sits in its cell), one main mass, two to four
   secondary masses, three to six greebles (vents, pipes, lights, antennas, hatches, tanks,
