@@ -116,12 +116,21 @@ built extractor.
 in the catalog, laid out on the grid in rows by category (`"core"`, then
 `catalog.categories`), under a node of its own, with the base's own views hidden. The roster
 does not fit on the grid at once, so rows that do not fit start a new page. Each page gets an
-overview screenshot and each row a close-up, framed through `camera.zoom_at` and `camera.pan`.
+overview screenshot (at the widest zoom, held for 2.1 seconds so that the frame rate, which
+counts the last whole second, covers one with the page already set up, after which it says the
+draw calls and the frame rate there), each row a close-up, and each row's first building a detail
+shot at the closest zoom (camera size 10), where outlines, bands and textures can be read; all
+are framed through `camera.zoom_at` and `camera.pan`. The frame rate is only meaningful when
+nothing else is loading the machine.
 In both modes it checks every model: one or two body `MeshInstance3D` (the static body and the
 spinning part), each with an outline instance beside it on `MaterialKit.ink()` that casts no
 shadow; no vertex's kit layer (`UV2.x`) beyond the kit's last; and the body triangles within the
 budget for its footprint (`docs/reference/art-style.md`, **Budgets**: 600 for 1x1, 2,000 for
-2x2, 3,000 for 3x3, 5,000 for 4x4 and 5x5, 250 for a wall piece).
+2x2, 3,000 for 3x3, 5,000 for 4x4 and 5x5, 250 for a wall piece); and its reach in x and z
+within half its footprint plus 0.15 units (`EXTENT_SLACK`): the static body's bounds, and a
+spinning part's sweep (its vertices' largest distance from the pivot axis plus the pivot's
+offset from the centre), both at the model's scale. A failure says by how much it reaches over;
+nothing checks the height.
 
 `scenarios/view_states.gd` checks the comic style's view states on a fresh base, each with a
 close-up screenshot: the selected Command Center's outlines in gold (and the override cleared on

@@ -1,10 +1,15 @@
 extends HarnessScenario
 ## The model gallery: one BuildingView per building type and level in the catalog, laid out on
-## the grid in category rows, with an overview screenshot of each page of rows and a close-up
-## of each row. Checks every model: one or two body MeshInstance3D (the static body, the
-## spinning part), each with an outline instance beside it on the ink material casting no
-## shadow; every vertex's kit layer (UV2.x) within the kit; and the body triangles within the
-## art style's budget for its footprint (docs/reference/art-style.md, **Budgets**).
+## the grid in category rows, with an overview screenshot of each page of rows (saying the draw
+## calls and the frame rate there), a close-up of each row, and a detail shot of each row's
+## first building at the closest zoom, where outlines, bands and textures can be read.
+##
+## Checks every model: one or two body MeshInstance3D (the static body, the spinning part), each
+## with an outline instance beside it on the ink material casting no shadow; every vertex's kit
+## layer (UV2.x) within the kit; the body triangles within the art style's budget for its
+## footprint (docs/reference/art-style.md, **Budgets**); and its reach in x and z (the body's
+## bounds, a spinning part's sweep around its pivot) within its footprint plus EXTENT_SLACK.
+## Nothing checks the height.
 ##
 ## Rows follow the catalog's categories: "core" (the Command Center), then catalog.categories
 ## in tab order. The views hang under a Node3D of the scenario's own under main, not under
@@ -16,10 +21,16 @@ extends HarnessScenario
 const BUDGETS := {1: 600, 2: 2000, 3: 3000, 4: 5000, 5: 5000}
 const WALL_CATEGORY := "walls"
 const WALL_BUDGET := 250
+## How far past its footprint's edge (world units) a model may reach in x or z.
+const EXTENT_SLACK := 0.15
 ## Cells between models and between rows.
 const GAP := 1
 const OVERVIEW_SIZE := 44.0
 const CLOSE_UP_SIZE := 20.0
+const DETAIL_SIZE := 10.0
+## Seconds the overview is held before the frame rate is read. Performance.TIME_FPS counts the
+## last whole second, so only after two does it cover a second with the page already settled.
+const SETTLE_SECONDS := 2.1
 
 
 func run(main: MainScript) -> void:
@@ -60,7 +71,10 @@ func run(main: MainScript) -> void:
 				names.append("%s %d" % [type, level])
 			say("page %d, %s row at y %d: %s" % [page_index + 1, row["category"], row["y"], ", ".join(names)])
 		_frame(main, main.base_view.cell_to_world(Vector2i(grid.x / 2, grid.y / 2), 0), OVERVIEW_SIZE)
-		await frames(3)
+		await main.get_tree().create_timer(SETTLE_SECONDS).timeout
+		say("page %d overview: %d draw calls, %d fps" % [page_index + 1,
+			Performance.get_monitor(Performance.RENDER_TOTAL_DRAW_CALLS_IN_FRAME),
+			Performance.get_monitor(Performance.TIME_FPS)])
 		await screenshot("page%d-overview" % (page_index + 1))
 		for row_index: int in page.size():
 			var row: Dictionary = page[row_index]
@@ -68,6 +82,14 @@ func run(main: MainScript) -> void:
 			_frame(main, main.base_view.cell_to_world(middle, 0), CLOSE_UP_SIZE)
 			await frames(2)
 			await screenshot("page%d-row%d-%s" % [page_index + 1, row_index + 1, row["category"]])
+		for row_index: int in page.size():
+			var row: Dictionary = page[row_index]
+			var first: Array = (row["models"] as Array)[0]
+			var size: int = first[2]
+			var cell := Vector2i(first[3], int(row["y"]) + (int(row["depth"]) - size) / 2)
+			_frame(main, main.base_view.cell_to_world(cell, size), DETAIL_SIZE)
+			await frames(2)
+			await screenshot("page%d-row%d-%s-detail" % [page_index + 1, row_index + 1, row["category"]])
 		gallery.queue_free()
 		await frames(1)
 
@@ -100,6 +122,8 @@ func _check_budget(entry: Dictionary) -> void:
 	for level: int in range(1, int(entry["levels"]) + 1):
 		var model := BuildingModels.create(type, level, size)
 		var bodies := _bodies(model)
+		var reach := _reach(model, bodies)
+		var bound := size * 0.5 + EXTENT_SLACK
 		var triangles := 0
 		var outlined := 0
 		var top_layer := 0
@@ -113,10 +137,31 @@ func _check_budget(entry: Dictionary) -> void:
 			if _has_outline(body):
 				outlined += 1
 		model.free()
+		var over := "" if reach <= bound else ", over by %.2f" % (reach - bound)
 		check(bodies.size() >= 1 and bodies.size() <= 2 and outlined == bodies.size()
-			and top_layer < MaterialKit.LAYERS.size() and triangles <= limit,
-			"%s %d: %d body instance(s), %d outlined, top kit layer %d, %d triangles (limit %d)"
-			% [type, level, bodies.size(), outlined, top_layer, triangles, limit])
+			and top_layer < MaterialKit.LAYERS.size() and triangles <= limit and reach <= bound,
+			"%s %d: %d body instance(s), %d outlined, top kit layer %d, %d triangles (limit %d), reach %.2f (limit %.2f%s)"
+			% [type, level, bodies.size(), outlined, top_layer, triangles, limit, reach, bound, over])
+
+
+## How far a model reaches from its centre in x or z, in world units: the static bodies' bounds,
+## and a spinning part's sweep (its vertices' largest distance from the pivot axis plus the
+## pivot's offset from the centre), both times the model's scale.
+func _reach(model: Node3D, bodies: Array[MeshInstance3D]) -> float:
+	var reach := 0.0
+	for body: MeshInstance3D in bodies:
+		if body.get_parent() == model:
+			var box := body.mesh.get_aabb()
+			reach = maxf(reach, maxf(maxf(absf(box.position.x), absf(box.end.x)),
+				maxf(absf(box.position.z), absf(box.end.z))))
+		else:
+			var pivot := (body.get_parent() as Node3D).position
+			var sweep := 0.0
+			var vertices: PackedVector3Array = body.mesh.surface_get_arrays(0)[Mesh.ARRAY_VERTEX]
+			for vertex: Vector3 in vertices:
+				sweep = maxf(sweep, Vector2(vertex.x, vertex.z).length())
+			reach = maxf(reach, Vector2(pivot.x, pivot.z).length() + sweep)
+	return reach * model.scale.x
 
 
 ## Whether a body has an outline instance beside it on the ink material, casting no shadow.
