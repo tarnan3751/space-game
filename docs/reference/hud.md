@@ -27,7 +27,7 @@ area (**Safe area**):
 | --- | --- | --- |
 | Top bar | top, `MARGIN` (16) in, a column across the width | First row, from the left: one panel label per resource in catalog order (`"Metal  750 / 1,000   +1,800/h"`, the rate only when above 0), named and coloured from the catalog's `resource_name` and `resource_color` (the text colour when a resource has none), then `"Drones  free / total"` in the accent colour. A resource whose `state.capacity(res)` is 0 is hidden, so antimatter appears once something stores it. |
 | Build bar | bottom, full width | A `PanelContainer` with a row of category tabs over a horizontal `ScrollContainer` strip of entries (**Build menu**). |
-| Place bar | bottom centre | `Cancel` and `Place` (170×72); `Place` is disabled unless the ghost is valid. |
+| Place bar | bottom centre | `Cancel` and `Place` (170×72); `Place` is disabled unless the ghost is valid. While walls are painted it reads `Done` and is always enabled: there is nothing to confirm. |
 | Info panel | bottom centre, 460 wide | Title `"Name   Lv N"` with a `Close` button; detail lines (**Info panel**); the upgrade button; a note under it. |
 | Toast | top centre, 96 down | A centred outlined label that fades out after 1.8 s over 0.6 s. |
 | Reset base | debug builds only (`OS.is_debug_build()`): the top bar's second row, right-aligned | Emits `reset_pressed`. On a row of its own so a long top bar (a Command Center 4 base) never runs under it. |
@@ -38,9 +38,11 @@ buttons take no focus.
 
 ## Refresh
 
-`refresh(state, selected_id, placing, ghost_ok)` is called by `main.gd` every tick, after
-every state change, and on every selection change. It refits the safe area if the device's
-changed (**Safe area**), updates the top bar, then shows exactly one of the three bottom parts:
+`refresh(state, selected_id, placing, ghost_ok, painting)` is called by `main.gd` every tick,
+after every state change, and on every selection change; `painting` is
+`PlacementController.is_painting()`, which turns `Place` into `Done`. It refits the safe area if
+the device's changed (**Safe area**), updates the top bar, then shows exactly one of the three
+bottom parts:
 
 - **placing** → the place bar;
 - **a building selected** (`selected_id` in `state.buildings`) → the info panel;
@@ -48,12 +50,12 @@ changed (**Safe area**), updates the top bar, then shows exactly one of the thre
 
 The build entries are refreshed only while the build bar is shown, and only the selected tab's.
 
-`refresh_placing(state, selected_id, placing, ghost_ok)` takes `placing_changed`, which fires
-when placement begins or ends and on every move of the ghost (`main._on_placing_changed`).
-While the place bar is already shown it only enables or disables `Place`; when placement
-begins or ends it does the full `refresh`, which swaps the bottom part. A ghost drag therefore
-never recomputes the top bar or re-runs `check_can_build` for the menu; they catch up on the
-next state change or tick.
+`refresh_placing(state, selected_id, placing, ghost_ok, painting)` takes `placing_changed`,
+which fires when placement begins or ends and on every move of the ghost
+(`main._on_placing_changed`). While the place bar is already shown it only enables or disables
+`Place`; when placement begins or ends it does the full `refresh`, which swaps the bottom part.
+A ghost drag therefore never recomputes the top bar or re-runs `check_can_build` for the menu;
+they catch up on the next state change or tick.
 
 ## Build menu
 
@@ -140,7 +142,7 @@ that inset stays until the device's safe area changes.
 | Signal | Emitted by | `main.gd` connects it to |
 | --- | --- | --- |
 | `build_pressed(type)` | a build entry | `placement.begin_place` |
-| `confirm_pressed` | Place | `placement.confirm_place` |
+| `confirm_pressed` | Place (Done while painting) | `placement.confirm_place`, which ends paint mode while painting |
 | `cancel_pressed` | Cancel | `placement.cancel_place` |
 | `upgrade_pressed` | the upgrade button | `placement.upgrade_selected` |
 | `close_pressed` | Close | `placement.select(0)` |
@@ -151,8 +153,8 @@ that inset stays until the device's safe area changes.
 Read-only, so a scenario never reads a private member (`tools/harness/README.md`):
 `tab_button(category)` and `entry_button(type)` return the tab's and the entry's `Button`;
 `entry_status(type)` is an entry's third line; `resource_panel(res)` is the top bar's panel for
-a resource; `place_button()` is the place bar's `Place`; `drones_panel()` is the top bar's
-drones panel; `reset_button()` is the debug Reset base button (null in a release build).
+a resource; `place_button()` is the place bar's `Place` (or `Done`); `drones_panel()` is the top
+bar's drones panel; `reset_button()` is the debug Reset base button (null in a release build).
 
 ## Messages
 

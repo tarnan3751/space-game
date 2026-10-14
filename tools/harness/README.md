@@ -69,7 +69,7 @@ through the game layer as the player would, and read the state through `BaseStat
 
 | Through | What |
 |---|---|
-| `main.placement` | `begin_place(type)`, `confirm_place()`, `cancel_place()`, `select(id)`, `upgrade_selected()`, `is_placing()`, `ghost_is_valid()`, `selected_id` |
+| `main.placement` | `begin_place(type)`, `confirm_place()`, `cancel_place()`, `select(id)`, `upgrade_selected()`, `is_placing()`, `is_painting()`, `ghost_is_valid()`, `ghost_cell()`, `selected_id` |
 | `main.world_input` signals | `tapped`, `drag_started`, `dragged`, `drag_ended`, `pinched`, `panned`; emit them to simulate a gesture (`tap_cell` below does) |
 | `main.hud` signals | `build_pressed`, `confirm_pressed`, `cancel_pressed`, `upgrade_pressed`, `close_pressed`, `reset_pressed`; emit them to press a button |
 | `main.hud` queries | `tab_button(category)`, `entry_button(type)`, `entry_status(type)`, `resource_panel(res)`, `place_button()`, `drones_panel()`, `reset_button()` (`docs/reference/hud.md`); `apply_safe_area(inset)` to try a notch-like inset |
@@ -119,3 +119,16 @@ Where a check is about touch routing, a scenario sends real events with
 `Input.parse_input_event` (`InputEventScreenTouch`, `InputEventScreenDrag`): they arrive in
 window pixels, so map a HUD point through `get_viewport().get_final_transform()`. They are
 delivered headless too, so those checks run in both modes.
+
+`scenarios/paint_walls.gd` checks wall painting and the edge scroll on a fresh base: Barrier
+Wall from the menu enters paint mode with Done on the place bar; a drag along a row of twelve
+cells places twelve walls at level 1's cost; a tap places one and a tap on a wall nothing; a
+fast drag across the row fills the cells it jumped and skips the wall; with no metal a drag
+places nothing and shows one toast; the brush is VALID on the wall it just placed and INVALID
+with no metal; a drag held at the right edge scrolls the camera and paints under the finger; a
+drag past the count limit stops there with one toast; Done ends the mode with the walls kept.
+Then the ghost of a 3x3 type and the selected drone bay are each held near
+the right edge: the camera scrolls right, each stays under the finger, and the bay drops there.
+It screenshots the brush, the painted row, the place bar with Done, and the ghost and the bay
+at the edge. A held drag scrolls for a number of frames, so how far depends on the frame rate;
+the checks hold at any distance.

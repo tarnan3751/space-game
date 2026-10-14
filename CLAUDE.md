@@ -15,9 +15,9 @@ of the modules involved. A section named in bold is a heading of this file or of
 ## Status
 
 **Milestone 1 (offline base) is built**: placement, timers, builders, economy, save with offline
-progress, low-poly models built in code. Everything after it is planned;
-`docs/project_overview.md` holds the roadmap (§2.2), the known limitations (§2.3) and the
-decisions (§3). Balance numbers in `data/` are fast dev values, not tuned.
+progress, low-poly models built in code. So is step 2, base polish; everything after it is
+planned. `docs/project_overview.md` holds the roadmap (§2.2), the known limitations (§2.3) and
+the decisions (§3). Balance numbers in `data/` are fast dev values, not tuned.
 
 ## Stack (pinned)
 

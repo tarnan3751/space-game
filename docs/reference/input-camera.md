@@ -52,6 +52,7 @@ building's silhouette is constant and the base stays readable on a phone.
 | `focus` | Kept inside `bounds`, the world x/z rectangle `setup(area)` receives (`BaseView.area()`, the buildable grid). |
 | `ground_point(screen_pos) -> Variant` | Where a screen point hits the y = 0 plane, as a `Vector3`, or `null`. Callers test `typeof(p) == TYPE_VECTOR3`. |
 | `pan(screen_pos, screen_delta)` | Moves `focus` so the ground under the finger follows the finger. |
+| `nudge(world_delta)` | Adds a world offset to `focus`, clamped like every move: the edge scroll's move. |
 | `zoom_at(factor, screen_pos)` | `factor > 1` zooms in; the ground point under `screen_pos` stays put. |
 
 `_apply()` clamps the focus and rebuilds the transform from the fixed basis.
@@ -80,14 +81,16 @@ for a finger it is already tracking and marks it handled.
 ## PlacementController (`placement_controller.gd`)
 
 The only game-layer code that calls `BaseState.apply()`. It interprets the gestures above as
-camera moves, selection, placement and building moves.
+camera moves, selection, placement, wall painting and building moves, and scrolls the camera
+while a drag nears the screen's edge.
 
 | Member | What |
 | --- | --- |
 | `state`, `base_view`, `camera` | Set by `main.gd`. |
 | `clock: Callable` | Returns the unix time in seconds for every command it applies; `main._now` in the game, the harness's clock under the harness. |
 | `selected_id` | The selected building, `0` for none. `select(id)` updates the view's selection tile and emits `selection_changed`. |
-| `placing_type` | The type being placed, `""` when not. `is_placing()`, `ghost_is_valid()`. |
+| `placing_type` | The type being placed, `""` when not. `is_placing()`, `ghost_is_valid()`, `ghost_cell()` (the ghost's top-left cell, the brush's while painting). |
+| `is_painting()` | Placing a one-cell type of `PAINT_CATEGORY` (`"walls"`): the ghost is a brush (**Painting walls**). |
 | `signal selection_changed`, `signal placing_changed` | Selection changed; placement began, ended or the ghost moved. `main.gd` refreshes the HUD on the first and calls `hud.refresh_placing` on the second (`hud.md`, **Refresh**). |
 | `signal command_failed(error)` | A command returned an error code; the HUD shows it as a toast. |
 
@@ -96,14 +99,31 @@ camera moves, selection, placement and building moves.
 cell grid is brightened (`BaseView.set_grid_highlight`); its starting cell is the footprint
 centred on the screen centre's ground point (the grid centre when the centre is off the ground),
 moved to the nearest free spot searching outward in square rings (`_find_free_cell`). While
-placing, a tap moves the ghost so the footprint is centred on the tapped cell, and a drag that
-starts on the ghost carries it (with the grab offset); a drag elsewhere pans. Every move
-(`_set_ghost_cell`) clamps the cell into the grid, asks `state.check_place` and colours the
-footprint VALID or INVALID, and emits `placing_changed`. `confirm_place()` applies
-`{"op": "place", "type", "cell"}` at `clock.call()`, and on success ends placement and selects
-`state.last_added_id`; on failure emits `command_failed`. `cancel_place()` frees the ghost and
-dims the grid again. `refresh()` re-checks the ghost after the state changed (resources,
-builders).
+placing (walls are painted instead, below), a tap moves the ghost so the footprint is centred on
+the tapped cell, and a drag that starts on the ghost carries it (with the grab offset); a drag
+elsewhere pans. Every move (`_set_ghost_cell`) clamps the cell into the grid, asks
+`state.check_place` and colours the footprint VALID or INVALID, and emits `placing_changed`.
+`confirm_place()` applies `{"op": "place", "type", "cell"}` at `clock.call()`, and on success
+ends placement and selects `state.last_added_id`; on failure emits `command_failed`.
+`cancel_place()` ends a ghost or paint drag in progress (a second finger can press Cancel or
+Done), frees the ghost and dims the grid again. `refresh()` re-checks the ghost after the state
+changed (resources, builders).
+
+**Painting walls.** `begin_place(type)` of a one-cell type whose `category_of` is `"walls"`
+enters paint mode: the ghost is a brush (a larger type of that category places normally). A tap
+places a wall on the tapped cell at once, through the same `place` command, and moves the brush
+there. A one-finger drag that starts on the grid is `Drag.PAINT`: it places a wall on the cell
+it starts on, then on every cell the finger crosses, walking the straight line between two drag
+events one orthogonal step at a time (`_paint_to`), so a fast drag leaves no gap and a diagonal
+one is a staircase of touching walls. A drag that starts on the terrain around the grid pans,
+and a two-finger pan still pans. A taken cell is skipped quietly (`blocked`); any other failure
+(`insufficient_resources`, `limit_reached`) emits `command_failed` once a stroke, not once a
+cell, and painting stays on, so the next stroke may succeed. The brush stays at the last cell
+the finger reached. The cell under it is usually the wall it just placed, so its footprint
+follows `check_can_build(type)`, not `check_place`: VALID while another wall can be built,
+INVALID when out of metal or at the count limit; `ghost_is_valid()` reports the same while
+painting. New walls are not selected. There is nothing to confirm: `confirm_place()` (the HUD's
+Done) and `cancel_place()` both end the mode, and the walls stay.
 
 **Selecting and moving.** A tap on a building selects it, a tap on empty ground deselects. Only
 the selected building can be dragged (as in Clash); a drag on anything else pans the camera. A
@@ -113,6 +133,19 @@ colours the footprint by `state.check_move`; on release, if the cell changed, it
 `upgrade_selected()` applies `{"op": "upgrade", "id"}`.
 
 Pinches go to `camera.zoom_at`, two-finger pans and camera drags to `camera.pan`.
+
+**Edge scroll.** A still finger sends no events, so the controller keeps the last finger
+position of a `Drag.GHOST`, `Drag.BUILDING` or `Drag.PAINT` drag and runs `_process` only while
+one is active (`set_process`, off in `_ready` and when the drag ends). Each frame, with the
+finger within `EDGE_MARGIN` (8%) of the viewport's shorter side from an edge, the camera's
+focus moves toward that edge's side through `camera.nudge`, so the view reveals what lies beyond
+it: the depth into the margin (0 at its inner side, 1 at the edge, per axis, so a corner scrolls
+diagonally) times `EDGE_SCROLL_SPEED` (0.6) viewport widths a second, a screen distance turned
+into a ground offset, so the speed scales with zoom.
+When the cell under the finger changes, the drag is followed again through the drag-event path
+with a zero delta, so the ghost, the lifted building or the brush stays under the finger as the
+world slides (and the brush paints the cells it reaches). A frame where that cell is unchanged
+calls nothing in core and allocates nothing.
 
 ## BaseView (`base_view.gd`)
 

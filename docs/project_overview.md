@@ -80,7 +80,7 @@ an attack log, revenge and shields.
 | Save and load | Built | `user://base.json`, version 1; offline progress on load; buildings that no longer fit are dropped |
 | Camera | Built | Fixed isometric orthographic; pan, pinch and wheel zoom; focus clamped to the grid |
 | Touch input | Built | Tap, drag, two-finger pinch and pan; trackpad gestures; HUD gets touches first |
-| Placement | Built | Ghost with valid/invalid footprint, Place/Cancel; select; drag the selected building to move |
+| Placement | Built | Ghost with valid/invalid footprint, Place/Cancel; select; drag the selected building to move; walls painted by tapping and dragging until Done; the camera scrolls while a drag nears the screen edge |
 | HUD | Built | Resources and drones (a resource appears once the base can store it), build menu with category tabs and entries showing cost, count and why one is unavailable, place bar, info panel with every stat and the next level's, toasts, debug reset; laid out inside the safe area |
 | Visuals | Built | Flat-shaded low-poly models per type and level built in code from one palette texture, scaffold while building, regolith ground with a grid that brightens while placing, seeded low-poly terrain with craters and rocks |
 | Tests | Built | Own headless runner; fixture catalog; one test file per core area |
@@ -93,7 +93,7 @@ Balance numbers in `data/` are fast development values, not tuned.
 | Step | What | Status |
 | --- | --- | --- |
 | 1 | Offline base: placement, timers, economy | Built |
-| 2 | Base polish: the building roster, build-menu categories, a third resource (antimatter), low-poly models built in code, HUD category tabs, safe-area margins for notches, painting walls by dragging, edge auto-scroll while dragging | In progress: the roster, the categories, antimatter, the low-poly models, the HUD tabs and the safe-area margins are built; wall painting and edge scroll remain |
+| 2 | Base polish: the building roster, build-menu categories, a third resource (antimatter), low-poly models built in code, HUD category tabs, safe-area margins for notches, painting walls by dragging, edge auto-scroll while dragging | Built |
 | 3 | Seeded PvE expeditions: a field generated from a seed with `SeededRng` (asteroids, deposits, hazards); loot returns into `BaseState` through a new command | Planned |
 | 4 | Deterministic battle sim in `src/core/battle/`: fixed-point integer positions (1 cell = 1000 units), fixed tick; replay = seed + base layout + list of deploy commands; tested headless against AI-built bases; same inputs give byte-identical results | Planned |
 | 5 | Server: Nakama with accounts, base storage and command validation; battles verified by replaying them in headless Godot running the same `src/core` | Planned |
