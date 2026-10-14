@@ -1,4 +1,4 @@
-# Starbase (working title)
+# Space Game (placeholder name)
 
 A mobile space base-builder in the style of Clash of Clans. Players build and upgrade a base,
 send expeditions into procedurally generated fields to gather resources (PvE), and attack

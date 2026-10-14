@@ -1,4 +1,4 @@
-# Starbase
+# Space Game
 
 A Clash-style space base builder for iOS and Android, built with Godot 4.7.
 
