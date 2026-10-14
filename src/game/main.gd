@@ -105,12 +105,14 @@ func _on_state_changed() -> void:
 func _refresh_hud() -> void:
 	if state == null:
 		return
-	hud.refresh(state, placement.selected_id, placement.is_placing(), placement.ghost_is_valid())
+	hud.refresh(state, placement.selected_id, placement.is_placing(), placement.ghost_is_valid(),
+		placement.is_painting())
 
 
 ## Fires on every move of the placement ghost, so the HUD updates only what a move changes.
 func _on_placing_changed() -> void:
-	hud.refresh_placing(state, placement.selected_id, placement.is_placing(), placement.ghost_is_valid())
+	hud.refresh_placing(state, placement.selected_id, placement.is_placing(), placement.ghost_is_valid(),
+		placement.is_painting())
 
 
 func _set_state(new_state: BaseState) -> void:

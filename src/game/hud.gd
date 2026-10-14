@@ -86,7 +86,9 @@ func setup(catalog: Catalog) -> void:
 	_fit_safe_area()
 
 
-func refresh(state: BaseState, selected_id: int, placing: bool, ghost_ok: bool) -> void:
+## `painting`: walls are being painted, so Place reads Done and is always enabled; there is
+## nothing to confirm, and Done ends the mode.
+func refresh(state: BaseState, selected_id: int, placing: bool, ghost_ok: bool, painting: bool) -> void:
 	_state = state
 	# The safe area can move without a resize: turning a phone over moves the notch to the
 	# other side. Every refresh, the 1 s tick's included, checks it.
@@ -109,7 +111,8 @@ func refresh(state: BaseState, selected_id: int, placing: bool, ghost_ok: bool) 
 	var has_selection := selected_id != 0 and state.buildings.has(selected_id)
 	_build_bar.visible = not placing and not has_selection
 	_place_bar.visible = placing
-	_place_button.disabled = not ghost_ok
+	_place_button.text = "Done" if painting else "Place"
+	_place_button.disabled = not ghost_ok and not painting
 	_info_panel.visible = not placing and has_selection
 	if _build_bar.visible:
 		_refresh_entries(state)
@@ -120,11 +123,11 @@ func refresh(state: BaseState, selected_id: int, placing: bool, ghost_ok: bool) 
 ## Placement began, ended or its ghost moved. A move changes only the Place button, so
 ## the top bar and the entries wait for the next state change or tick; a start or an end
 ## swaps the bottom bar, which takes the full refresh.
-func refresh_placing(state: BaseState, selected_id: int, placing: bool, ghost_ok: bool) -> void:
+func refresh_placing(state: BaseState, selected_id: int, placing: bool, ghost_ok: bool, painting: bool) -> void:
 	if placing and _place_bar.visible:
-		_place_button.disabled = not ghost_ok
+		_place_button.disabled = not ghost_ok and not painting
 		return
-	refresh(state, selected_id, placing, ghost_ok)
+	refresh(state, selected_id, placing, ghost_ok, painting)
 
 
 ## Lays every part out inside `inset`, a rect in the HUD's own coordinates (the
