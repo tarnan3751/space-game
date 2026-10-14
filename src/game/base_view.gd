@@ -5,7 +5,7 @@ extends Node3D
 ## unit, grid centred on the origin, cell (x, y) maps to world (x, z).
 ##
 ## The terrain and the rocks are generated from SCENERY_SEED, so every player's base sits in
-## the same landscape. Each is one mesh painted from the Palette: one draw call apiece.
+## the same landscape. Each is one mesh painted from the material kit's rock layer.
 
 const GROUND_SHADER := preload("res://src/game/ground.gdshader")
 const SCENERY_SEED := 7
@@ -19,6 +19,19 @@ const TERRAIN_STEP := 2.0
 const NOISE_CELL := 7.0
 const NOISE_SIZE := 24
 const ROCK_COUNT := 40
+
+## The terrain's faces by height band, from the crater floors up: flat, and not outlined (its
+## relief shows in the bands).
+static var TERRAIN_CRATER := Surf.make(MaterialKit.Layer.ROCK, MaterialKit.CRATER, 1.0, Surf.LIT, false, false)
+static var TERRAIN_LOW := Surf.make(MaterialKit.Layer.ROCK, MaterialKit.GROUND, 1.0, Surf.LIT, false, false)
+static var TERRAIN_MID := Surf.make(MaterialKit.Layer.ROCK, MaterialKit.GROUND.lerp(MaterialKit.ROCK, 0.5),
+	1.0, Surf.LIT, false, false)
+static var TERRAIN_HIGH := Surf.make(MaterialKit.Layer.ROCK, MaterialKit.ROCK, 1.0, Surf.LIT, false, false)
+static var TERRAIN_PEAK := Surf.make(MaterialKit.Layer.ROCK, MaterialKit.ROCK.darkened(0.15), 1.0, Surf.LIT,
+	false, false)
+## The rocks' sides and tops, outlined.
+static var ROCK_SIDE := Surf.make(MaterialKit.Layer.ROCK, MaterialKit.ROCK)
+static var ROCK_TOP := Surf.make(MaterialKit.Layer.ROCK, MaterialKit.ROCK_LIT)
 
 var grid_size: Vector2i = Vector2i.ZERO
 var views: Dictionary[int, BuildingView] = {}
@@ -115,7 +128,7 @@ func _build_ground() -> void:
 	_ground_material = ShaderMaterial.new()
 	_ground_material.shader = GROUND_SHADER
 	_ground_material.set_shader_parameter("grid_size", Vector2(grid_size))
-	_ground_material.set_shader_parameter("base_color", Palette.color("regolith"))
+	_ground_material.set_shader_parameter("base_color", MaterialKit.GROUND)
 	_ground_material.set_shader_parameter("line_strength", GRID_LINES)
 	var plane := PlaneMesh.new()
 	plane.size = Vector2(grid_size)
@@ -208,9 +221,9 @@ static func _rock(mesh: LowPolyMesh, pos: Vector3, radius: float, rng: SeededRng
 	var peak := pos + Vector3(lean.x, height, lean.y)
 	for j: int in sides:
 		var k := (j + 1) % sides
-		mesh.triangle(lower[j], upper[j], upper[k], Palette.surf("rock_dark"))
-		mesh.triangle(lower[j], upper[k], lower[k], Palette.surf("rock_dark"))
-		mesh.triangle(upper[j], peak, upper[k], Palette.surf("rock"))
+		mesh.triangle(lower[j], upper[j], upper[k], ROCK_SIDE)
+		mesh.triangle(lower[j], upper[k], lower[k], ROCK_SIDE)
+		mesh.triangle(upper[j], peak, upper[k], ROCK_TOP)
 
 
 ## Heights: 0 at the grid's edge, rising gently with distance, with value-noise hills and
@@ -249,19 +262,19 @@ func _lattice_value(ix: int, iz: int) -> float:
 	return _noise[posmod(iz, NOISE_SIZE) * NOISE_SIZE + posmod(ix, NOISE_SIZE)]
 
 
-## One terrain face (corners counter-clockwise from above), coloured by its height band.
+## One terrain face (corners counter-clockwise from above), painted by its height band.
 func _terrain_face(mesh: LowPolyMesh, a: Vector3, b: Vector3, c: Vector3) -> void:
 	var centre := (a + b + c) / 3.0
-	var color := "rock_dark"
+	var surf := TERRAIN_PEAK
 	if _crater_dip(centre.x, centre.z) < -0.3:
-		color = "crater"
+		surf = TERRAIN_CRATER
 	elif centre.y < 0.8:
-		color = "regolith"
+		surf = TERRAIN_LOW
 	elif centre.y < 2.0:
-		color = "regolith_dark"
+		surf = TERRAIN_MID
 	elif centre.y < 3.2:
-		color = "rock"
-	mesh.triangle(a, b, c, Palette.surf(color, false))
+		surf = TERRAIN_HIGH
+	mesh.triangle(a, b, c, surf)
 
 
 ## Lattice coordinates along one axis from -TERRAIN_EXTENT to TERRAIN_EXTENT that include

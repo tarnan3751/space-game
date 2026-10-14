@@ -2,8 +2,8 @@ shader_type spatial;
 
 // Buildable ground: regolith with a slight tone variation per cell, and a cell grid that is
 // faint by default and brighter while placing (BaseView.set_grid_highlight sets
-// line_strength). Cells are 1 world unit; the plane is centred on 0. base_color comes from
-// the Palette, so the ground matches the terrain around it.
+// line_strength). Cells are 1 world unit; the plane is centred on 0. base_color is the
+// ground tint of the material kit (MaterialKit.GROUND), as on the terrain around it.
 
 uniform vec4 base_color : source_color = vec4(0.29, 0.26, 0.35, 1.0);
 uniform vec4 line_color : source_color = vec4(0.31, 0.84, 0.9, 1.0);

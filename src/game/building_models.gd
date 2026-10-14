@@ -1,7 +1,7 @@
 class_name BuildingModels
 extends RefCounted
-## Flat-shaded low-poly models built in code from LowPolyMesh parts and painted from the
-## Palette texture, one per building type and level, so the game needs no art assets. The
+## Models built in code from LowPolyMesh parts painted from the material kit (Parts.surf),
+## one per building type and level, so the game needs no art assets. The
 ## contract any model keeps (and an imported one must keep): origin at the footprint centre
 ## on the ground, +Y up, fitting inside size x size cells.
 ##
