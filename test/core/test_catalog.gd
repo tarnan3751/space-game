@@ -19,6 +19,39 @@ func test_shipped_start_layout_fits() -> void:
 	assert_true(state.builders_total() >= 1, "starts with a builder")
 
 
+func test_shipped_costs_fit_reachable_storage() -> void:
+	# Every price must fit in the storage a base can have when the level unlocks: the
+	# Command Center's at that level plus every allowed storage building at its best
+	# allowed level. Otherwise the level could never be bought.
+	var catalog := Catalog.load_default()
+	assert_eq(catalog.load_error, "")
+	for type: String in catalog.types():
+		for level: int in range(1, catalog.max_level(type) + 1):
+			var stats := catalog.level_stats(type, level)
+			var cc := int(stats.get("requires_cc", 1))
+			var cost: Dictionary = stats.get("cost", {})
+			for res: Variant in cost:
+				var reachable := _reachable_storage(catalog, str(res), cc)
+				assert_true(int(cost[res]) <= reachable, "%s level %d costs %d %s; storage at CC %d is %d" % [
+					type, level, int(cost[res]), res, cc, reachable])
+
+
+func test_shipped_curves_never_go_down() -> void:
+	var catalog := Catalog.load_default()
+	assert_eq(catalog.load_error, "")
+	for type: String in catalog.types():
+		for level: int in range(2, catalog.max_level(type) + 1):
+			var before := catalog.level_stats(type, level - 1)
+			var after := catalog.level_stats(type, level)
+			for field: String in ["cost", "produces", "storage"]:
+				for res: String in catalog.resources:
+					assert_true(_amount(after, field, res) >= _amount(before, field, res),
+						"%s level %d %s.%s goes down" % [type, level, field, res])
+			for field: String in ["build_seconds", "hp", "capacity"]:
+				assert_true(int(after.get(field, 0)) >= int(before.get(field, 0)),
+					"%s level %d %s goes down" % [type, level, field])
+
+
 func test_json_numbers_become_ints() -> void:
 	var catalog := Fixtures.catalog()
 	assert_eq(catalog.level_stats("extractor", 1)["build_seconds"], 60)
@@ -256,6 +289,26 @@ func test_validation_reports_levels_of_the_wrong_shape() -> void:
 	for message: String in cases:
 		var error := _error_after(cases[message])
 		assert_true(error.contains(message), "%s: %s" % [message, error])
+
+
+## Storage of `res` a base can reach at Command Center level `cc`.
+static func _reachable_storage(catalog: Catalog, res: String, cc: int) -> int:
+	var total := _amount(catalog.level_stats(Catalog.HQ_TYPE, cc), "storage", res)
+	for type: String in catalog.types():
+		if type == Catalog.HQ_TYPE:
+			continue
+		var best := 0
+		for level: int in range(1, catalog.max_level(type) + 1):
+			var stats := catalog.level_stats(type, level)
+			if int(stats.get("requires_cc", 1)) <= cc:
+				best = maxi(best, _amount(stats, "storage", res))
+		total += catalog.max_count(type, cc) * best
+	return total
+
+
+static func _amount(stats: Dictionary, field: String, res: String) -> int:
+	var amounts: Dictionary = stats.get(field, {})
+	return int(amounts.get(res, 0))
 
 
 ## Loads the fixture data with one change made to its parsed JSON; returns the load error.
