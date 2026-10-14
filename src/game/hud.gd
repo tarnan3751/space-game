@@ -38,6 +38,8 @@ var _catalog: Catalog
 var _root: Control
 ## The last safe area fitted from the device, in the HUD's coordinates.
 var _fitted_area: Rect2 = Rect2()
+## The top bar's rows: the resources and drones, then the debug buttons in debug builds.
+var _top: VBoxContainer
 var _resource_labels: Dictionary[String, Label] = {}
 var _builders_label: Label
 var _build_bar: Control
@@ -304,11 +306,19 @@ static func _seconds(ms: int) -> String:
 # --- Construction ----------------------------------------------------------------
 
 func _build_top_bar() -> void:
+	_top = VBoxContainer.new()
+	_top.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_top.add_theme_constant_override("separation", 10)
+	_root.add_child(_top)
+	_top.set_anchors_preset(Control.PRESET_TOP_WIDE)
+	_top.offset_left = MARGIN
+	_top.offset_right = -MARGIN
+	_top.offset_top = MARGIN
+	_top.offset_bottom = MARGIN
 	var bar := HBoxContainer.new()
 	bar.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	bar.add_theme_constant_override("separation", 10)
-	bar.position = Vector2(MARGIN, MARGIN)
-	_root.add_child(bar)
+	_top.add_child(bar)
 	for res: String in _catalog.resources:
 		var label := _panel_label(bar)
 		label.add_theme_color_override("font_color", Color.from_string(_catalog.resource_color(res), TEXT_COLOR))
@@ -449,17 +459,16 @@ func _build_toast() -> void:
 	_toast.offset_bottom = 96
 
 
-## Debug builds only: start over without digging through user:// for the save file.
+## Debug builds only: start over without digging through user:// for the save file. On a
+## row of its own under the top bar, right-aligned, so a long top bar never runs under it.
 func _build_debug_buttons() -> void:
+	var row := HBoxContainer.new()
+	row.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	row.alignment = BoxContainer.ALIGNMENT_END
+	_top.add_child(row)
 	var reset := _button("Reset base", Vector2(150, 48))
 	reset.pressed.connect(func() -> void: reset_pressed.emit())
-	_root.add_child(reset)
-	reset.set_anchors_preset(Control.PRESET_TOP_RIGHT)
-	reset.grow_horizontal = Control.GROW_DIRECTION_BEGIN
-	reset.offset_left = -MARGIN
-	reset.offset_right = -MARGIN
-	reset.offset_top = MARGIN
-	reset.offset_bottom = MARGIN
+	row.add_child(reset)
 
 
 func _panel_label(parent: Control) -> Label:
