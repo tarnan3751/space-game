@@ -1,15 +1,16 @@
 extends HarnessScenario
 ## Painting walls, and the edge scroll. Barrier Wall from the menu enters paint mode: a drag
-## along a row places a wall on each cell, a tap places one, a fast drag across a wall fills
-## the cells it jumped and skips the wall, a drag with no metal shows one toast, a drag held
-## at the screen's edge keeps painting as the world slides, a drag past the count limit shows
-## one toast, and Done ends the mode with the walls kept. Then the ghost of a 3x3 type and the
-## selected building are each held near the right edge: the camera scrolls right and each
-## keeps following the finger. Last, a building drag that a second finger interrupts by pressing
-## Close, or Reset base, ends there and moves nothing. Gestures are WorldInput's signals, as
-## tap_cell sends them.
+## along a row places a wall on each cell, drawn as one merged mesh of joined pieces, a tap
+## places one, a fast drag across a wall fills the cells it jumped and skips the wall, a drag
+## with no metal shows one toast, a drag held at the screen's edge keeps painting as the world
+## slides, a drag past the count limit shows one toast, and Done ends the mode with the walls
+## kept. Then the ghost of a 3x3 type and the selected building are each held near the right
+## edge: the camera scrolls right and each keeps following the finger. Last, a building drag
+## that a second finger interrupts by pressing Close, or Reset base, ends there and moves
+## nothing. Gestures are WorldInput's signals, as tap_cell sends them.
 
 const WALL := "barrier_wall"
+const WallModels := preload("res://src/game/models/walls.gd")
 ## A fresh base's free cells: the Command Center covers 18-21 x 18-21, the drone bay
 ## 24-25 x 19-20. Every row here is on screen at the starting zoom and clear of the edges.
 const LINE_START := Vector2i(6, 14)
@@ -21,6 +22,7 @@ const EDGE_INSET := 24.0
 const HOLD_FRAMES := 30
 ## Brush holds are shorter, so the walls they paint stay under the count limit.
 const BRUSH_HOLD_FRAMES := 20
+const CLOSE_UP_SIZE := 10.0
 
 ## Every command_failed (every toast) since it was last cleared.
 var _failures: PackedStringArray = PackedStringArray()
@@ -66,7 +68,9 @@ func run(main: MainScript) -> void:
 		"still painting, and the new walls are not selected")
 	check(placement.ghost_cell() == line[-1], "the brush is at the last cell, %s" % placement.ghost_cell())
 	check(placement.ghost_is_valid(), "the brush is VALID on the wall it placed: another can be built")
+	_check_merged_line(main)
 	await screenshot("painted-line")
+	await _close_up(main, line[LINE_LENGTH / 2])
 
 	# A tap places one at once; a tap on a wall places nothing and says nothing.
 	var count := state.count_of(WALL)
@@ -245,6 +249,47 @@ func _interrupted_drag(main: MainScript, building: BuildingState, interrupt: Cal
 	main.world_input.drag_ended.emit(to)
 	await frames(2)
 	return dragging
+
+
+## The row is one merged mesh: an end piece at each end and the rest joined both ways. The
+## outline instance casts no shadow.
+func _check_merged_line(main: MainScript) -> void:
+	var walls: WallMesh = main.base_view.walls
+	var through := WallModels.PLUS_X | WallModels.MINUS_X
+	var expected := _piece_triangles(1, WallModels.PLUS_X) + _piece_triangles(1, WallModels.MINUS_X) \
+		+ (LINE_LENGTH - 2) * _piece_triangles(1, through)
+	var drawn := _triangles(walls.body.mesh)
+	check(drawn == expected, "the row is one merged mesh of its %d pieces (%d triangles, expected %d)" % [
+		LINE_LENGTH, drawn, expected])
+	check(walls.outline.cast_shadow == GeometryInstance3D.SHADOW_CASTING_SETTING_OFF,
+		"the wall outline casts no shadow")
+
+
+static func _piece_triangles(level: int, mask: int) -> int:
+	var vertices: PackedVector3Array = WallModels.piece(level, mask).body[Mesh.ARRAY_VERTEX]
+	return vertices.size() / 3
+
+
+static func _triangles(mesh: Mesh) -> int:
+	var array_mesh := mesh as ArrayMesh
+	if array_mesh == null:
+		return 0
+	var count := 0
+	for surface: int in array_mesh.get_surface_count():
+		var indices := array_mesh.surface_get_array_index_len(surface)
+		count += (indices if indices > 0 else array_mesh.surface_get_array_len(surface)) / 3
+	return count
+
+
+## A screenshot at the closest zoom centred on `cell`; the camera then goes back where it was.
+func _close_up(main: MainScript, cell: Vector2i) -> void:
+	var camera: IsoCamera = main.camera
+	var focus := camera.focus
+	var centre := main.get_viewport().get_visible_rect().size * 0.5
+	camera.zoom_at(camera.size / CLOSE_UP_SIZE, centre)
+	camera.pan(centre, centre - _screen_of(main, cell))
+	await screenshot("painted-line-close")
+	_reset_camera(main, focus)
 
 
 ## Sets metal to what the base can store.

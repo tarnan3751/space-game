@@ -152,14 +152,29 @@ delivered headless too, so those checks run in both modes.
 
 `scenarios/paint_walls.gd` checks wall painting and the edge scroll on a fresh base: Barrier
 Wall from the menu enters paint mode with Done on the place bar; a drag along a row of twelve
-cells places twelve walls at level 1's cost; a tap places one and a tap on a wall nothing; a
-fast drag across the row fills the cells it jumped and skips the wall; with no metal a drag
-places nothing and shows one toast; the brush is VALID on the wall it just placed and INVALID
-with no metal; a drag held at the right edge scrolls the camera and paints under the finger; a
-drag past the count limit stops there with one toast; Done ends the mode with the walls kept.
-Then the ghost of a 3x3 type and the selected drone bay are each held near the right edge: the
-camera scrolls right, each stays under the finger, and the bay drops there. Last, a drag of the
-bay that a second finger interrupts by pressing Close, then Reset base, ends at once and moves
-nothing, on the old base or the new one. It screenshots the brush, the painted row, the place
-bar with Done, and the ghost and the bay at the edge. A held drag scrolls for a number of
-frames, so how far depends on the frame rate; the checks hold at any distance.
+cells places twelve walls at level 1's cost, drawn as one merged wall mesh whose triangles are
+its twelve pieces' (an end piece at each end, ten joined both ways), with an outline instance
+that casts no shadow; a tap places one and a tap on a wall nothing; a fast drag across the row
+fills the cells it jumped and skips the wall; with no metal a drag places nothing and shows one
+toast; the brush is VALID on the wall it just placed and INVALID with no metal; a drag held at
+the right edge scrolls the camera and paints under the finger; a drag past the count limit stops
+there with one toast; Done ends the mode with the walls kept. Then the ghost of a 3x3 type and
+the selected drone bay are each held near the right edge: the camera scrolls right, each stays
+under the finger, and the bay drops there. Last, a drag of the bay that a second finger
+interrupts by pressing Close, then Reset base, ends at once and moves nothing, on the old base
+or the new one. It screenshots the brush, the painted row and a close-up of it at the closest
+zoom, the place bar with Done, and the ghost and the bay at the edge. A held drag scrolls for a
+number of frames, so how far depends on the frame rate; the checks hold at any distance.
+
+`scenarios/wall_junctions.gd` checks walls that connect. It grows a fresh base to Command
+Center 5, paints a straight run, a corner, a T, a cross and a ramp (a run whose walls end at
+levels 1 to 5) by tapping, and upgrades them together to level 3, then 5. At each level it
+checks the merged wall mesh: every wall view hides its model, the mask of a named cell in each
+shape (`WallMesh.mask_at`), every wall's mask against the rule (four-connected, any levels),
+and the mesh's triangles against the sum of its pieces'; and it screenshots the pattern at the
+closest zoom (level 1 also with the paint brush beside it). It checks that a wall's own model,
+which the brush and the gallery show, is the lone post, and that every piece of every level
+and mask is within the 250 body triangles of a wall piece. Last, it selects the cross's centre,
+which stays merged with no gold outline (its own model, whose outlines turn gold, stays hidden),
+and lifts it: the mesh drops it and its neighbours' joints, its own post shows, and carried back
+and dropped it rejoins the cross; screenshots show it selected and in the air.
