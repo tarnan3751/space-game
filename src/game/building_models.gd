@@ -46,7 +46,14 @@ const MODELS := {
 	"railgun": [3, 3],
 	"ion_beam": [2, 2],
 	"orbital_cannon": [4, 2],
+	"proximity_mine": [1, 3],
+	"grav_trap": [1, 2],
+	"flak_mine": [1, 3],
+	"mega_mine": [2, 2],
+	"barrier_wall": [1, 5],
 }
+## The glow strip of a wall, by level.
+const WALL_GLOWS := ["glow_cyan", "glow_green", "glow_magenta", "glow_red", "glow_gold"]
 ## Octagons are turned so their flat sides face along X and Z.
 const OCTAGON := Vector3(0, 22.5, 0)
 ## Where the Command Center's antennae stand, in the order levels add them (degrees).
@@ -190,6 +197,16 @@ static func _build(p: Parts, type: String, level: int) -> void:
 			_ion_beam(p, level)
 		"orbital_cannon":
 			_orbital_cannon(p, level)
+		"proximity_mine":
+			_proximity_mine(p, level)
+		"grav_trap":
+			_grav_trap(p, level)
+		"flak_mine":
+			_flak_mine(p, level)
+		"mega_mine":
+			_mega_mine(p, level)
+		"barrier_wall":
+			_barrier_wall(p, level)
 
 
 # --- Shared parts --------------------------------------------------------------
@@ -802,3 +819,49 @@ static func _orbital_cannon(p: Parts, level: int) -> void:
 			var pylon := _around(1.45, degrees, 0.4)
 			m.prism(0.14, 0.1, 0.8, 4, pylon, "hull_light")
 			m.pyramid(0.16, 0.2, pylon + Vector3(0, 0.8, 0), "glow_blue")
+
+
+# --- Traps (at most 40 triangles) ------------------------------------------------
+
+static func _proximity_mine(p: Parts, level: int) -> void:
+	var m := p.body
+	m.prism(0.38, 0.34, 0.1, 6, Vector3.ZERO, "hull_light")
+	var dots := level + 1
+	for i: int in dots:
+		m.pyramid(0.1, 0.06, _around(0.2, 360.0 * i / dots, 0.1), "glow_gold" if level >= 3 else "glow_red")
+
+
+static func _grav_trap(p: Parts, level: int) -> void:
+	var m := p.body
+	m.box(Vector3(0.76, 0.06, 0.76), Vector3.ZERO, "hull")
+	for corner: Vector2 in [Vector2(-1, -1), Vector2(1, -1), Vector2(-1, 1), Vector2(1, 1)]:
+		m.pyramid(0.14, 0.4, Vector3(corner.x * 0.27, 0.06, corner.y * 0.27), _accent(level, 2, "metal"))
+	m.pyramid(0.24, 0.1, Vector3(0, 0.06, 0), "glow_violet")
+
+
+static func _flak_mine(p: Parts, level: int) -> void:
+	var m := p.body
+	m.prism(0.14, 0.12, 0.15, 4, Vector3.ZERO, "hull_dark")
+	m.orb(0.27, 5, 3, Vector3(0, 0.38, 0), "hull")
+	var dot := "glow_gold" if level >= 3 else "glow_orange"
+	for i: int in mini(level, 2):
+		m.pyramid(0.14, 0.08, _around(0.14 * i, 0, 0.58), dot)
+
+
+static func _mega_mine(p: Parts, level: int) -> void:
+	var m := p.body
+	m.prism(0.8, 0.75, 0.12, 6, Vector3.ZERO, "metal_dark")
+	for offset: float in [-0.3, 0.0, 0.3]:
+		_plate(m, Vector2(0.12, 0.7), Vector3(offset, 0.121, 0), "hazard", 30)
+	for i: int in 3:
+		m.pyramid(0.1, 0.05, _around(0.55, 90 + 120 * i, 0.12), "glow_gold" if level >= 2 else "glow_red")
+
+
+# --- Walls (at most 40 triangles) ------------------------------------------------
+
+static func _barrier_wall(p: Parts, level: int) -> void:
+	var m := p.body
+	var height := 0.5 + 0.06 * level
+	m.box(Vector3(0.86, height, 0.86), Vector3.ZERO, "hull")
+	m.box(Vector3(0.74, 0.22, 0.74), Vector3(0, height, 0), "hull_light")
+	m.box(Vector3(0.76, 0.06, 0.34), Vector3(0, height + 0.2, 0), WALL_GLOWS[level - 1])
