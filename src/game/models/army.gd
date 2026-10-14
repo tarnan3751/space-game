@@ -16,6 +16,12 @@ static var MID_ROUND := Surf.make(MaterialKit.Layer.HULL, MaterialKit.HULL_MID, 
 static var ARMOUR := Surf.make(MaterialKit.Layer.PLATE, MaterialKit.HULL_MID)
 static var DARK_PLATE := Surf.make(MaterialKit.Layer.PLATE, MaterialKit.HULL_DARK)
 static var GOLD_ROUND := Surf.make(MaterialKit.Layer.FLAT, MaterialKit.CORE_GOLD, 1.0, Surf.GLOSSY, true)
+static var PIPE := Surf.make(MaterialKit.Layer.PIPE, MaterialKit.GUNMETAL, 2.0, Surf.LIT, true)
+static var VENT := Surf.make(MaterialKit.Layer.VENT, MaterialKit.HULL_MID)
+static var ROLLER := Surf.make(MaterialKit.Layer.VENT, MaterialKit.ARMY, 2.0)
+static var BELT := Surf.make(MaterialKit.Layer.VENT, MaterialKit.HULL_DARK, 3.0)
+## Yellow heat: a furnace's core, welding sparks.
+static var HOT := Surf.make(MaterialKit.Layer.GLOW, MaterialKit.HAZARD, 1.0, Surf.UNLIT)
 
 
 ## A long vaulted hangar: the main bay with its striped door, the control tower in the back
@@ -106,52 +112,134 @@ static func _vault(m: LowPolyMesh, back: Vector3, width: float, length: float, w
 	m.box(Vector3(door * 0.6, 0.06, 0.04), Vector3(back.x, back.y + height + 0.22, z), GLOW)
 
 
+## A factory block under a sawtooth roof, smokestacks on a furnace box behind it, a conveyor
+## out to a loading dock under an orange gantry crane. More stacks at 3 and 5, a second storey
+## at 4.
 static func build_fabricator(p: Parts, level: int) -> void:
 	var m := p.body
-	var paint := Parts.accent(level, 5, "orange")
-	Parts.slab(m, 3, 0.2)
-	var height := 1.0 + 0.1 * level
-	var body := Vector3(-0.25, 0.2, -0.3)
-	m.box(Vector3(2.0, height, 1.7), body, Parts.surf("hull_light"))
-	m.box(Vector3(2.04, 0.12, 1.74), body + Vector3(0, height * 0.6, 0), Parts.surf(paint))
-	m.box(Vector3(0.8, 0.7, 0.08), Vector3(-0.25, 0.2, 0.56), Parts.surf("window"))
-	var top := 0.2 + height
-	var stack := 1.0 + 0.15 * level
-	m.prism(0.2, 0.17, stack, 6, Vector3(-0.85, top, -0.8), Parts.surf("metal_dark"))
-	m.prism(0.19, 0.19, 0.1, 6, Vector3(-0.85, top + stack - 0.12, -0.8), Parts.surf("glow_orange"))
-	if level >= 2:
-		m.prism(0.16, 0.14, stack * 0.7, 6, Vector3(-0.35, top, -0.85), Parts.surf("metal_dark"))
-		m.prism(0.15, 0.15, 0.08, 6, Vector3(-0.35, top + stack * 0.7 - 0.1, -0.85), Parts.surf("glow_orange"))
-	m.box(Vector3(0.7, 0.3, 0.45), Vector3(0.95, 0.2, 0.15), Parts.surf("hull_dark"))
-	m.box(Vector3(0.7, 0.03, 0.08), Vector3(0.95, 0.5, 0.0), Parts.surf(paint))
-	m.box(Vector3(0.7, 0.03, 0.08), Vector3(0.95, 0.5, 0.3), Parts.surf(paint))
-	m.box(Vector3(0.25, 0.25, 0.25), Vector3(1.05, 0.5, 0.15), Parts.surf("orange"))
-	if level >= 3:
-		m.wedge(Vector3(1.9, 0.35, 0.7), body + Vector3(0.0, height, 0.4), Parts.surf("hull"))
-		m.wedge(Vector3(1.9, 0.35, 0.7), body + Vector3(0.0, height, -0.3), Parts.surf("hull"))
+	var g := Parts.PAD_HEIGHT
+	Parts.foundation(m, 3)
+	var roof := g + 0.8
+	m.box_chamfered(Vector3(1.7, 0.8, 1.6), 0.06, Vector3(-0.45, g, -0.5), Parts.HULL_LIGHT)
+	for z: float in [-0.6, -0.15]:
+		m.wedge(Vector3(1.6, 0.3, 0.45), Vector3(-0.45, roof, z + 0.225), MID_ROUND, Vector3(0, 180, 0))
+		m.box(Vector3(1.45, 0.2, 0.03), Vector3(-0.45, roof + 0.04, z + 0.465), Parts.GLASS)
 	if level >= 4:
-		m.box(Vector3(0.14, 0.9, 0.14), Vector3(0.55, top, -0.8), Parts.surf("hull_dark"))
-		m.strut(Vector3(0.55, top + 0.85, -0.8), Vector3(1.1, top + 0.6, 0.15), 0.1, Parts.surf(paint))
+		var storey := Vector3(-0.45, roof, -0.95)
+		m.box_chamfered(Vector3(1.6, 0.5, 0.65), 0.06, storey, Parts.HULL_LIGHT)
+		m.box(Vector3(1.3, 0.14, 0.03), storey + Vector3(0, 0.22, 0.33), GLOW)
+		m.box_chamfered(Vector3(0.4, 0.14, 0.3), 0.04, storey + Vector3(-0.35, 0.5, 0), VENT)
+	else:
+		m.box_chamfered(Vector3(0.4, 0.14, 0.3), 0.04, Vector3(-0.8, roof, -0.95), VENT)
+	# The front: an orange roller door and windows.
+	m.box_chamfered(Vector3(0.62, 0.56, 0.06), 0.02, Vector3(-0.8, g, 0.32), ROLLER)
+	m.box(Vector3(0.7, 0.05, 0.04), Vector3(-0.8, g + 0.62, 0.32), GLOW)
+	for x: float in [-0.2, 0.17]:
+		m.box_chamfered(Vector3(0.26, 0.24, 0.04), 0.02, Vector3(x, g + 0.32, 0.31), Parts.GLASS)
+	if level >= 2:
+		for x: float in [-1.26, 0.36]:
+			m.box_chamfered(Vector3(0.1, 0.7, 0.1), 0.03, Vector3(x, g, 0.3), ARMOUR)
+	# The conveyor from a hatch in the side wall out over the dock.
+	m.box_chamfered(Vector3(0.06, 0.34, 0.4), 0.02, Vector3(0.42, g + 0.12, -0.15), DARK_PLATE)
+	m.box_chamfered(Vector3(0.9, 0.08, 0.28), 0.02, Vector3(0.85, g + 0.3, -0.15), BELT)
+	for x: float in [0.65, 1.15]:
+		m.box_chamfered(Vector3(0.08, 0.3, 0.2), 0.02, Vector3(x, g, -0.15), Parts.GUNMETAL)
+	m.box_chamfered(Vector3(0.18, 0.16, 0.18), 0.03, Vector3(0.75, g + 0.38, -0.15), ORANGE)
+	# The loading dock and its crates.
+	m.box_chamfered(Vector3(0.8, 0.2, 0.95), 0.04, Vector3(0.9, g, 0.8), ARMOUR)
+	m.box(Vector3(0.8, 0.04, 0.12), Vector3(0.9, g + 0.2, 1.21), Parts.HAZARD)
+	var crates: Array[Vector3] = [Vector3(0.75, 0, 0.55), Vector3(1.05, 0, 0.62), Vector3(0.8, 0, 0.9)]
+	for i: int in mini(level + 1, 3):
+		m.box_chamfered(Vector3(0.22, 0.2, 0.22), 0.03, crates[i] + Vector3(0, g + 0.2, 0), ORANGE)
+	# The gantry crane over the dock.
+	var top := g + 1.25
+	for x: float in [0.57, 1.23]:
+		for z: float in [0.4, 1.2]:
+			m.box_chamfered(Vector3(0.08, top - g - 0.2, 0.08), 0.02, Vector3(x, g + 0.2, z), ORANGE)
+		Parts.beam(m, Vector3(x, top, 0.33), Vector3(x, top, 1.27), 0.1, ORANGE)
+	var bridge := 0.85
+	Parts.beam(m, Vector3(0.5, top + 0.1, bridge), Vector3(1.3, top + 0.1, bridge), 0.1,
+		Parts.GOLD_TRIM if level >= 5 else Parts.HULL_DARK)
+	m.box_chamfered(Vector3(0.2, 0.12, 0.18), 0.03, Vector3(0.9, top - 0.02, bridge), Parts.GUNMETAL)
+	m.prism(0.012, 0.012, 0.35, 8, Vector3(0.9, top - 0.37, bridge), Parts.ROD)
+	m.box_chamfered(Vector3(0.1, 0.06, 0.1), 0.02, Vector3(0.9, top - 0.43, bridge), Parts.HAZARD)
+	# Smokestacks on the furnace box.
+	m.box_chamfered(Vector3(0.75, 0.35, 0.7), 0.05, Vector3(0.92, g, -0.92), DARK_PLATE)
+	var stacks: Array[Vector3] = [
+		Vector3(0.75, 0, -1.08), Vector3(1.1, 0, -0.78), Vector3(1.1, 0, -1.12), Vector3(0.72, 0, -0.72),
+	]
+	var counts: Array[int] = [2, 2, 3, 3, 4]
+	for i: int in counts[level - 1]:
+		var height := 1.2 - 0.18 * i + 0.05 * level
+		_stack(m, stacks[i] + Vector3(0, g + 0.35, 0), 0.13, height, level)
 
 
+## A smokestack standing on `foot`: a ribbed pipe with an orange band and a glowing mouth.
+static func _stack(m: LowPolyMesh, foot: Vector3, radius: float, height: float, level: int) -> void:
+	m.prism(radius, radius * 0.8, height, 16, foot, PIPE)
+	m.ring(radius * 0.8, radius * 1.12, 0.07, 16, foot + Vector3(0, height * 0.55, 0), ORANGE_ROUND)
+	var mouth := foot + Vector3(0, height, 0)
+	m.ring(radius * 0.55, radius * 0.95, 0.06, 16, mouth, GOLD_ROUND if level >= 5 else Parts.GUNMETAL)
+	m.disc(radius * 0.56, 16, mouth + Vector3(0, 0.03, 0), GLOW)
+
+
+## The bulky fabricator: an armoured hall with a furnace in its front, an orange press arm
+## hammering an anvil beside it. A second arm at 2, a chimney cluster at 3.
 static func build_heavy_fabricator(p: Parts, level: int) -> void:
 	var m := p.body
-	var paint := Parts.accent(level, 3, "red")
-	Parts.slab(m, 3, 0.2)
-	var height := 1.3 + 0.15 * level
-	m.box(Vector3(2.4, height, 2.0), Vector3(-0.1, 0.2, -0.2), Parts.surf("hull_dark"))
-	m.box(Vector3(2.44, 0.14, 2.04), Vector3(-0.1, 0.2 + height * 0.7, -0.2), Parts.surf(paint))
-	var top := 0.2 + height
-	m.box(Vector3(1.4, 0.5, 1.2), Vector3(-0.4, top, -0.5), Parts.surf("hull"))
-	m.box(Vector3(1.2, 0.95, 0.08), Vector3(0.1, 0.2, 0.81), Parts.surf("window"))
-	m.box(Vector3(1.2, 0.08, 0.06), Vector3(0.1, 1.2, 0.84), Parts.surf("glow_red"))
-	var stack := 1.1 + 0.2 * level
-	var stacks: Array[float] = [-0.9, 0.55]
+	var g := Parts.PAD_HEIGHT
+	Parts.foundation(m, 3)
+	var hall := Vector3(-0.42, g, -0.42)
+	m.box_chamfered(Vector3(1.76, 1.0, 1.76), 0.08, hall, ARMOUR)
+	m.box_chamfered(Vector3(1.2, 0.4, 1.2), 0.08, hall + Vector3(-0.18, 1.0, -0.18), DARK_PLATE)
+	# Armour slabs down the sides.
+	for z: float in [-1.0, -0.45, 0.1]:
+		m.box_chamfered(Vector3(0.1, 0.8, 0.45), 0.03, Vector3(0.5, g + 0.06, z), ARMOUR)
+	for x: float in [-1.12, 0.22]:
+		m.box_chamfered(Vector3(0.36, 0.8, 0.1), 0.03, Vector3(x, g + 0.06, 0.5), ARMOUR)
 	if level >= 2:
-		stacks.append(-0.2)
-	for x: float in stacks:
-		m.prism(0.22, 0.19, stack, 6, Vector3(x, top, -0.95), Parts.surf("metal_dark"))
-		m.prism(0.21, 0.21, 0.1, 6, Vector3(x, top + stack - 0.12, -0.95), Parts.surf("glow_red"))
+		for x: float in [-1.12, 0.22]:
+			m.box_chamfered(Vector3(0.38, 0.12, 0.14), 0.03, Vector3(x, g + 0.86, 0.5), DARK_PLATE)
+	# The furnace mouth and the glowing slag trough in front of it.
+	var mouth := Vector3(-0.45, g, 0.48)
+	m.box(Vector3(0.6, 0.55, 0.02), mouth, GLOW)
+	m.box(Vector3(0.36, 0.32, 0.02), mouth + Vector3(0, 0, 0.01), HOT)
+	for side: float in [-1.0, 1.0]:
+		m.box_chamfered(Vector3(0.14, 0.62, 0.16), 0.04, mouth + Vector3(side * 0.37, 0, 0.02), DARK_PLATE)
+	m.box_chamfered(Vector3(0.9, 0.16, 0.2), 0.04, mouth + Vector3(0, 0.6, 0.03),
+		Parts.GOLD_TRIM if level >= 3 else DARK_PLATE)
+	m.box_chamfered(Vector3(0.36, 0.06, 0.75), 0.02, mouth + Vector3(0, 0, 0.42), DARK_PLATE)
+	m.box(Vector3(0.2, 0.02, 0.72), mouth + Vector3(0, 0.06, 0.42), GLOW)
+	m.box(Vector3(0.08, 0.02, 0.72), mouth + Vector3(0, 0.07, 0.42), HOT)
+	# The press arms.
+	_press_arm(m, Vector3(-0.15, g + 1.0, 0.1), Vector3(0.88, g, 0.85), level)
+	if level >= 2:
+		_press_arm(m, Vector3(-0.15, g + 1.0, -0.95), Vector3(0.88, g, -0.85), level)
+	# Exhausts: one stack, a cluster of three at 3.
+	_stack(m, Vector3(-0.95, g + 1.4, -0.95), 0.14, 0.55, level)
+	if level >= 3:
+		_stack(m, Vector3(-0.55, g + 1.4, -1.05), 0.12, 0.75, level)
+		_stack(m, Vector3(-1.02, g + 1.4, -0.55), 0.1, 0.4, level)
+
+
+## A press arm: a turret on the hall's roof at `shoulder`, a fat orange boom up to an elbow
+## over an anvil standing at `anvil`, a hydraulic ram down from the elbow to a heavy head.
+static func _press_arm(m: LowPolyMesh, shoulder: Vector3, anvil: Vector3, level: int) -> void:
+	m.prism(0.3, 0.27, 0.24, 16, shoulder, Parts.GUNMETAL)
+	var pivot := shoulder + Vector3(0, 0.36, 0)
+	var elbow := Vector3(anvil.x, shoulder.y + 1.0, anvil.z)
+	m.prism(0.2, 0.2, 0.36, 16, pivot + Vector3(0, 0, -0.18), Parts.GUNMETAL, Vector3(90, 0, 0))
+	Parts.beam(m, pivot, elbow, 0.28, ORANGE, 0.06)
+	Parts.pipe(m, shoulder + Vector3(0.18, 0.24, 0), elbow + Vector3(-0.08, -0.22, 0), 0.06, MID_ROUND)
+	m.prism(0.19, 0.19, 0.34, 16, elbow + Vector3(0, 0, -0.17), Parts.GUNMETAL, Vector3(90, 0, 0))
+	var head := anvil + Vector3(0, 0.66, 0)
+	Parts.pipe(m, elbow, head + Vector3(0, 0.62, 0), 0.12, Parts.GUNMETAL)
+	Parts.pipe(m, head + Vector3(0, 0.3, 0), head + Vector3(0, 0.66, 0), 0.07, MID_ROUND)
+	m.box_chamfered(Vector3(0.46, 0.32, 0.46), 0.07, head, ORANGE)
+	m.box(Vector3(0.48, 0.07, 0.48), head + Vector3(0, 0.04, 0),
+		Parts.GOLD_TRIM if level >= 3 else Parts.HAZARD)
+	m.box_chamfered(Vector3(0.52, 0.3, 0.52), 0.05, anvil, Parts.GUNMETAL)
+	m.box(Vector3(0.54, 0.06, 0.54), anvil + Vector3(0, 0.2, 0), Parts.HAZARD)
 
 
 static func build_research_lab(p: Parts, level: int) -> void:
