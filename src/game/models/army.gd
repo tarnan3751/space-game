@@ -14,14 +14,21 @@ static var GLOW := Surf.make(MaterialKit.Layer.GLOW, MaterialKit.ARMY, 1.0, Surf
 static var HULL_ROUND := Surf.make(MaterialKit.Layer.HULL, MaterialKit.HULL_LIGHT, 1.0, Surf.LIT, true)
 static var MID_ROUND := Surf.make(MaterialKit.Layer.HULL, MaterialKit.HULL_MID, 1.0, Surf.LIT, true)
 static var ARMOUR := Surf.make(MaterialKit.Layer.PLATE, MaterialKit.HULL_MID)
+static var ARMOUR_ROUND := Surf.make(MaterialKit.Layer.PLATE, MaterialKit.HULL_MID, 1.0, Surf.LIT, true)
 static var DARK_PLATE := Surf.make(MaterialKit.Layer.PLATE, MaterialKit.HULL_DARK)
+static var DARK_ROUND := Surf.make(MaterialKit.Layer.PLATE, MaterialKit.HULL_DARK, 1.0, Surf.LIT, true)
 static var GOLD_ROUND := Surf.make(MaterialKit.Layer.FLAT, MaterialKit.CORE_GOLD, 1.0, Surf.GLOSSY, true)
 static var PIPE := Surf.make(MaterialKit.Layer.PIPE, MaterialKit.GUNMETAL, 2.0, Surf.LIT, true)
+static var PIPE_LIGHT := Surf.make(MaterialKit.Layer.PIPE, MaterialKit.HULL_MID, 2.0, Surf.LIT, true)
 static var VENT := Surf.make(MaterialKit.Layer.VENT, MaterialKit.HULL_MID)
 static var ROLLER := Surf.make(MaterialKit.Layer.VENT, MaterialKit.ARMY, 2.0)
 static var BELT := Surf.make(MaterialKit.Layer.VENT, MaterialKit.HULL_DARK, 3.0)
+static var SCREEN := Surf.make(MaterialKit.Layer.SCREEN, MaterialKit.CORE_GLASS)
 ## Yellow heat: a furnace's core, welding sparks.
 static var HOT := Surf.make(MaterialKit.Layer.GLOW, MaterialKit.HAZARD, 1.0, Surf.UNLIT)
+## Nanite goo behind glass, and a screen showing it.
+static var GOO := Surf.make(MaterialKit.Layer.GLASS, MaterialKit.NANITE_GREEN, 1.0, Surf.UNLIT, true)
+static var GOO_SCREEN := Surf.make(MaterialKit.Layer.SCREEN, MaterialKit.NANITE_GREEN)
 
 
 ## A long vaulted hangar: the main bay with its striped door, the control tower in the back
@@ -242,56 +249,150 @@ static func _press_arm(m: LowPolyMesh, shoulder: Vector3, anvil: Vector3, level:
 	m.box(Vector3(0.54, 0.06, 0.54), anvil + Vector3(0, 0.2, 0), Parts.HAZARD)
 
 
+## A lab ring with screens around a central observatory dome, its telescope out of the slit,
+## and a radar dish spinning on a mast in the corner. Antennas at 2 and 4, a second ring at 3.
 static func build_research_lab(p: Parts, level: int) -> void:
 	var m := p.body
-	m.prism(1.42, 1.32, 0.3, 8, Vector3.ZERO, Parts.surf("hull_dark"), Parts.OCTAGON)
-	if level >= 5:
-		m.prism(1.44, 1.42, 0.06, 8, Vector3(0, 0.3, 0), Parts.surf("gold"), Parts.OCTAGON)
-	m.prism(1.05, 1.0, 0.5, 8, Vector3(0, 0.3, 0), Parts.surf("hull_light"), Parts.OCTAGON)
-	m.prism(1.03, 1.03, 0.14, 8, Vector3(0, 0.48, 0), Parts.surf("glow_blue"), Parts.OCTAGON)
-	var dome := 0.85 + 0.05 * level
-	m.dome(0.95, dome, 8, 3, Vector3(0, 0.8, 0), Parts.surf("white"))
-	var post := Vector3(0.82, 0.3, -0.82)
-	var reach := 1.0 + 0.1 * level
-	m.prism(0.08, 0.06, reach, 4, post, Parts.surf("metal"))
-	var dish := 1.3 if level >= 3 else 1.0
-	var aim := Vector3(40, 135, 0)
-	var centre := post + Vector3(0, reach, 0)
+	var g := Parts.PAD_HEIGHT
+	Parts.foundation(m, 3)
+	m.ring(1.08, 1.13, 0.1, 24, Vector3(0, g, 0), ORANGE_ROUND)
 	m.lathe(PackedVector2Array([
-		Vector2(0.06, 0), Vector2(0.45 * dish, 0.18 * dish), Vector2(0.4 * dish, 0.21 * dish), Vector2(0, 0.06),
-	]), 8, centre, Parts.surf("white"), aim)
-	m.cone(0.05, 0.35, 4, centre + LowPolyMesh.turn(Vector3(0, 0.05, 0), aim), Parts.surf("glow_blue"), aim)
+		Vector2(1.08, 0), Vector2(1.08, 0.42), Vector2(1.0, 0.5), Vector2(0.66, 0.5), Vector2(0.66, 0),
+	]), 24, Vector3(0, g, 0), HULL_ROUND)
+	for degrees: float in [5.0, 45.0]:
+		_screen(m, 1.085, degrees, g + 0.15, 0.36, 0.22)
+	m.box_chamfered(Vector3(0.28, 0.34, 0.08), 0.03, Parts.around(1.07, 92, g), DARK_PLATE, Vector3(0, -2, 0))
+	m.box(Vector3(0.34, 0.05, 0.04), Parts.around(1.1, 92, g + 0.38), GLOW, Vector3(0, -2, 0))
+	var drum := 0.75
+	if level >= 3:
+		m.lathe(PackedVector2Array([
+			Vector2(0.95, 0), Vector2(0.95, 0.24), Vector2(0.88, 0.3), Vector2(0.66, 0.3), Vector2(0.66, 0),
+		]), 24, Vector3(0, g + 0.5, 0), MID_ROUND)
+		for degrees: float in [25.0, 65.0]:
+			_screen(m, 0.955, degrees, g + 0.56, 0.3, 0.16)
+		drum = 1.05
+	# The observatory: a drum, a dome with a dark slit and the telescope out of it.
+	m.prism(0.63, 0.63, drum, 24, Vector3(0, g, 0), MID_ROUND)
+	var centre := Vector3(0, g + drum, 0)
+	m.ring(0.62, 0.69, 0.05, 24, centre, GLOW)
+	if level >= 5:
+		m.ring(0.62, 0.68, 0.05, 24, centre - Vector3(0, 0.08, 0), GOLD_ROUND)
+	m.dome(0.62, 0.62, 16, 7, centre, HULL_ROUND)
+	var across := Vector3(0.7071, 0, 0.7071)
+	m.ring(0.6, 0.65, 0.18, 24, centre - across * 0.09, DARK_ROUND, Parts.facing(across))
+	var aim := Vector3(0.42, 0.8, -0.42).normalized()
+	Parts.pipe(m, centre + aim * 0.3, centre + aim * 0.95, 0.1, HULL_ROUND)
+	m.ring(0.07, 0.13, 0.1, 16, centre + aim * 0.85, ORANGE_ROUND, Parts.facing(aim))
+	m.disc(0.085, 16, centre + aim * 0.955, Parts.GLASS, Parts.facing(aim))
+	if level >= 5:
+		m.orb(0.07, 16, 6, centre + Vector3(0, 0.66, 0), GOLD_ROUND)
+	# Antennas on the corners.
 	if level >= 2:
-		var annex := Vector3(-0.85, 0.3, 0.85)
-		m.prism(0.38, 0.35, 0.35, 6, annex, Parts.surf("hull_light"))
-		m.dome(0.36, 0.3, 6, 2, annex + Vector3(0, 0.35, 0), Parts.surf("white"))
+		_antenna(m, Vector3(-0.98, g, -0.98), 1.3)
 	if level >= 4:
-		m.prism(0.22, 0.18, 0.25, 8, Vector3(0, 0.75 + dome, 0), Parts.surf("glow_blue"))
+		_antenna(m, Vector3(-1.0, g, 0.98), 1.0)
+	# The radar mast against the ring, near enough the middle that the spinning dish's sweep
+	# stays inside the footprint; the dish spins.
+	var mast := Vector3(0.85, g, -0.85)
+	m.prism(0.12, 0.11, 0.14, 16, mast, ARMOUR_ROUND)
+	var height := 1.25 + 0.08 * level
+	m.prism(0.08, 0.06, height, 16, mast + Vector3(0, 0.14, 0), Parts.GUNMETAL)
+	p.pivot = mast + Vector3(0, 0.14 + height, 0)
+	p.speed = 0.9
+	var radar := p.spin
+	radar.box_chamfered(Vector3(0.12, 0.16, 0.12), 0.03, Vector3.ZERO, Parts.GUNMETAL)
+	var tilt := Vector3(60, 90, 0)
+	var hub := Vector3(0, 0.14, 0)
+	Parts.dish(radar, 0.38, 0.14, hub, GOLD_ROUND if level >= 5 else HULL_ROUND, tilt)
+	var axis := LowPolyMesh.turn(Vector3.UP, tilt)
+	Parts.pipe(radar, hub + axis * 0.05, hub + axis * 0.32, 0.02, Parts.ROD)
+	radar.orb(0.045, 16, 6, hub + axis * 0.32, GLOW)
 
 
+## A flat screen on a round wall of `radius`, at `degrees` around it, its bottom at `y`.
+static func _screen(m: LowPolyMesh, radius: float, degrees: float, y: float, width: float,
+		height: float) -> void:
+	m.box_chamfered(Vector3(width, height, 0.04), 0.015, Parts.around(radius, degrees, y), SCREEN,
+		Vector3(0, 90 - degrees, 0))
+
+
+## A sensor mast on a little foot: a thin rod with an orange bulb.
+static func _antenna(m: LowPolyMesh, foot: Vector3, height: float) -> void:
+	m.box_chamfered(Vector3(0.18, 0.1, 0.18), 0.03, foot, Parts.GUNMETAL)
+	Parts.mast(m, foot + Vector3(0, 0.1, 0), height, 0.06, GLOW)
+
+
+## Vats of glowing green nanite goo seen through glass bands, round a pump block, with pipes
+## and their elbows running between them. A vat more at each level; gold rims at 4.
 static func build_nanite_foundry(p: Parts, level: int) -> void:
 	var m := p.body
-	Parts.slab(m, 3, 0.2)
-	var vat := Vector3(-0.3, 0.2, -0.3)
+	var g := Parts.PAD_HEIGHT
+	Parts.foundation(m, 3)
+	# The pump block in the middle, with goo screens and a vent.
+	var pump := Vector3(0.1, g, 0.1)
+	m.box_chamfered(Vector3(0.5, 0.45, 0.5), 0.05, pump, Parts.HULL_LIGHT)
+	m.box_chamfered(Vector3(0.3, 0.18, 0.03), 0.01, pump + Vector3(0, 0.16, 0.25), GOO_SCREEN)
+	m.box_chamfered(Vector3(0.03, 0.18, 0.3), 0.01, pump + Vector3(0.25, 0.16, 0), GOO_SCREEN)
+	m.box_chamfered(Vector3(0.3, 0.1, 0.3), 0.03, pump + Vector3(0, 0.45, 0), VENT)
+	# [position, radius, height] of each vat, in the order the levels add them.
+	var vats: Array[Array] = [
+		[Vector3(-0.62, g, -0.62), 0.5, 1.35],
+		[Vector3(0.68, g, -0.72), 0.38, 1.0],
+		[Vector3(-0.72, g, 0.66), 0.38, 0.9],
+		[Vector3(0.78, g, 0.62), 0.32, 0.75],
+		[Vector3(0.02, g, 1.0), 0.26, 0.6],
+	]
+	# An arch of pipe over from the big vat's lid into the next one's.
+	var big: Vector3 = vats[0][0] + Vector3(0.3, 1.33, -0.02)
+	var second: Vector3 = vats[1][0] + Vector3(-0.16, 0.98, 0.01)
+	Parts.pipe_run(m, PackedVector3Array([
+		big, big + Vector3(0, 0.2, 0), Vector3(second.x, big.y + 0.2, second.z), second,
+	]), 0.05, PIPE_LIGHT, 12)
+	for i: int in mini(level + 1, vats.size()):
+		var spot: Vector3 = vats[i][0]
+		var radius: float = vats[i][1]
+		var height: float = vats[i][2]
+		_vat(m, spot, radius, height, level)
+		if i < 3:
+			# Out of the vat's upper shell, down to the pad and along it into the pump.
+			var toward := Vector3(pump.x - spot.x, 0, pump.z - spot.z).normalized()
+			var high := spot + toward * (radius + 0.16) + Vector3(0, height * 0.8, 0)
+			var low := Vector3(high.x, g + 0.1, high.z)
+			Parts.pipe_run(m, PackedVector3Array([
+				spot + toward * (radius - 0.04) + Vector3(0, height * 0.8, 0), high, low,
+				pump + Vector3(0, 0.1, 0) - toward * 0.2,
+			]), 0.05, PIPE_LIGHT, 12)
+		else:
+			# A short pipe across to the vat it stands next to.
+			var next: Vector3 = vats[i - 2][0]
+			var toward := Vector3(next.x - spot.x, 0, next.z - spot.z).normalized()
+			var y := Vector3(0, height * 0.82, 0)
+			Parts.pipe(m, spot + toward * (radius - 0.04) + y, next - toward * 0.2 + y, 0.05, PIPE_LIGHT,
+				12, false)
+
+
+## A vat standing on `foot`: an armoured lower shell, a band of glowing goo behind glass framed
+## by rims, an upper shell with a chamfered lid and an orange cap. The rims are gold at the top
+## level.
+static func _vat(m: LowPolyMesh, foot: Vector3, radius: float, height: float, level: int) -> void:
+	var band := height * 0.4
+	var glass := height * 0.28
+	var rim := radius + 0.035
+	var gold := level >= 4
+	m.lathe(PackedVector2Array([Vector2(radius, 0), Vector2(radius, band - 0.05)]), 16, foot, ARMOUR_ROUND)
 	m.lathe(PackedVector2Array([
-		Vector2(0.75, 0), Vector2(0.72, 1.1), Vector2(0.6, 1.1), Vector2(0.6, 0.95),
-	]), 8, vat, Parts.surf("metal_dark"), Parts.OCTAGON)
-	m.disc(0.6, 8, vat + Vector3(0, 0.95, 0), Parts.surf("glow_green"), Parts.OCTAGON)
-	m.ring(0.73, 0.82, 0.12, 8, vat + Vector3(0, 0.5, 0), Parts.surf("glow_green"), Parts.OCTAGON)
-	if level >= 4:
-		m.ring(0.6, 0.76, 0.06, 8, vat + Vector3(0, 1.1, 0), Parts.surf("gold"), Parts.OCTAGON)
-	var pump := Vector3(0.85, 0.2, 0.75)
-	m.box(Vector3(0.6, 0.55, 0.6), pump, Parts.surf("hull_light"))
-	m.strut(vat + Vector3(0.5, 0.75, 0.5), pump + Vector3(-0.1, 0.4, -0.1), 0.14, Parts.surf("metal"))
-	m.prism(0.08, 0.08, 0.5, 4, pump + Vector3(0.15, 0.55, 0.15), Parts.surf("metal"))
-	if level >= 2:
-		var small := Vector3(0.85, 0.2, -0.85)
-		m.prism(0.35, 0.33, 0.7, 8, small, Parts.surf("metal_dark"), Parts.OCTAGON)
-		m.disc(0.3, 8, small + Vector3(0, 0.701, 0), Parts.surf("glow_green"), Parts.OCTAGON)
-		m.strut(small + Vector3(-0.2, 0.45, 0.1), vat + Vector3(0.6, 0.45, -0.3), 0.12, Parts.surf("metal"))
-	if level >= 3:
-		m.prism(0.15, 0.12, 1.5, 6, Vector3(-1.0, 0.2, 0.9), Parts.surf("hull"))
-		m.strut(Vector3(-0.95, 0.9, 0.85), vat + Vector3(-0.3, 0.9, 0.5), 0.1, Parts.surf("metal"))
+		Vector2(radius, band - 0.05), Vector2(rim, band - 0.05), Vector2(rim, band), Vector2(radius - 0.03, band),
+	]), 16, foot, GOLD_ROUND if gold else ARMOUR_ROUND)
+	m.lathe(PackedVector2Array([Vector2(radius - 0.03, 0), Vector2(radius - 0.03, glass)]), 16,
+		foot + Vector3(0, band, 0), GOO)
+	var upper := band + glass
+	var top := height - upper
+	m.lathe(PackedVector2Array([Vector2(rim, 0), Vector2(rim, 0.05), Vector2(radius, 0.05)]), 16,
+		foot + Vector3(0, upper, 0), GOLD_ROUND if gold else HULL_ROUND)
+	m.lathe(PackedVector2Array([
+		Vector2(radius, 0.05), Vector2(radius, top - 0.08), Vector2(radius - 0.08, top), Vector2(0, top),
+	]), 16, foot + Vector3(0, upper, 0), HULL_ROUND)
+	m.prism(radius * 0.42, radius * 0.34, 0.1, 16, foot + Vector3(0, height, 0), ORANGE_ROUND)
 
 
 static func build_drydock(p: Parts, level: int) -> void:
