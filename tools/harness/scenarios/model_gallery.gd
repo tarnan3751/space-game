@@ -1,8 +1,9 @@
 extends HarnessScenario
 ## The model gallery: one BuildingView per building type and level in the catalog, laid out on
 ## the grid in category rows, with an overview screenshot of each page of rows and a close-up
-## of each row. Checks every model against the budget: at most two MeshInstance3D and at most
-## MAX_TRIANGLES triangles (SMALL_TRIANGLES for traps and walls).
+## of each row. Checks every model against the budget: at most two body MeshInstance3D (the
+## outline instances aside) and at most MAX_TRIANGLES triangles in them (SMALL_TRIANGLES for
+## traps and walls).
 ##
 ## Rows follow the catalog's categories: "core" (the Command Center), then catalog.categories
 ## in tab order. The views hang under a Node3D of the scenario's own under main, not under
@@ -96,18 +97,24 @@ func _check_budget(entry: Dictionary) -> void:
 	var limit := SMALL_TRIANGLES if SMALL_CATEGORIES.has(entry["category"]) else MAX_TRIANGLES
 	for level: int in range(1, int(entry["levels"]) + 1):
 		var model := BuildingModels.create(type, level, entry["size"])
-		var instances := 0
+		var bodies := _bodies(model)
 		var triangles := 0
-		for child: Node in model.get_children():
-			if child is MeshInstance3D:
-				instances += 1
-				var mesh: Mesh = (child as MeshInstance3D).mesh
-				for surface: int in mesh.get_surface_count():
-					var vertices: PackedVector3Array = mesh.surface_get_arrays(surface)[Mesh.ARRAY_VERTEX]
-					triangles += vertices.size() / 3
+		for body: MeshInstance3D in bodies:
+			var vertices: PackedVector3Array = body.mesh.surface_get_arrays(0)[Mesh.ARRAY_VERTEX]
+			triangles += vertices.size() / 3
 		model.free()
-		check(instances >= 1 and instances <= 2 and triangles <= limit,
-			"%s %d: %d mesh instance(s), %d triangles (limit %d)" % [type, level, instances, triangles, limit])
+		check(bodies.size() >= 1 and bodies.size() <= 2 and triangles <= limit,
+			"%s %d: %d body instance(s), %d triangles (limit %d)" % [type, level, bodies.size(), triangles, limit])
+
+
+## The model's body mesh instances (not the outlines), the spinning one included.
+func _bodies(node: Node) -> Array[MeshInstance3D]:
+	var bodies: Array[MeshInstance3D] = []
+	for child: Node in node.get_children():
+		if child is MeshInstance3D and not child.has_meta(BuildingModels.OUTLINE_META):
+			bodies.append(child as MeshInstance3D)
+		bodies.append_array(_bodies(child))
+	return bodies
 
 
 ## Rows of models, category by category, each row as wide as the grid allows:

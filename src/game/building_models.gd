@@ -5,10 +5,12 @@ extends RefCounted
 ## contract any model keeps (and an imported one must keep): origin at the footprint centre
 ## on the ground, +Y up, fitting inside size x size cells.
 ##
-## A model is a Node3D holding one static MeshInstance3D and at most one spinning one, which
-## carries the SPIN_META meta (its speed in radians per second) and turns around Y while the
-## building is finished and idle. The meshes are built once per type and level and shared;
-## the nodes are per view. A level above a type's models shows its top model.
+## A model is a Node3D holding the static body's MeshInstance3D and its ink outline's, and at
+## most one spinning part: a Node3D at the pivot carrying the SPIN_META meta (its speed in
+## radians per second), which turns around Y while the building is finished and idle, with the
+## spinning mesh and its outline under it. So a model has at most four MeshInstance3D, two of
+## them outlines (OUTLINE_META), which cast no shadow. The meshes are built once per type and
+## level and shared; the nodes are per view. A level above a type's models shows its top model.
 ##
 ## Each category shares a look: resources stand on square slabs (tanks, drills), the army on
 ## slabs as halls and domes with big doors, defences on octagonal plinths, traps lie flat and
@@ -20,6 +22,8 @@ extends RefCounted
 ## the helpers they share are on Parts (models/parts.gd).
 
 const SPIN_META := "spin_speed"
+## Set on the outline instances, so a view can tell them from the bodies.
+const OUTLINE_META := "outline"
 
 const CoreModels := preload("res://src/game/models/core.gd")
 const ResourceModels := preload("res://src/game/models/resources.gd")
@@ -71,8 +75,11 @@ static var _warned: Dictionary[String, bool] = {}
 ## A built model's meshes, shared by every view that shows it.
 class Meshes:
 	var body: ArrayMesh
+	## Null when no part is outlined.
+	var outline: ArrayMesh
 	## Null when nothing spins.
 	var spin: ArrayMesh
+	var spin_outline: ArrayMesh
 	var pivot := Vector3.ZERO
 	var speed := 0.0
 
@@ -100,15 +107,13 @@ static func create(type: String, level: int, size: int) -> Node3D:
 		else:
 			CoreModels.build_generic(p, size)
 		meshes = _store(key, p)
-	var body := MeshInstance3D.new()
-	body.mesh = meshes.body
-	root.add_child(body)
+	_add_instances(root, meshes.body, meshes.outline)
 	if meshes.spin != null:
-		var spinner := MeshInstance3D.new()
-		spinner.mesh = meshes.spin
+		var spinner := Node3D.new()
 		spinner.position = meshes.pivot
 		spinner.set_meta(SPIN_META, meshes.speed)
 		root.add_child(spinner)
+		_add_instances(spinner, meshes.spin, meshes.spin_outline)
 	return root
 
 
@@ -121,21 +126,34 @@ static func create_scaffold(size: int) -> Node3D:
 		CoreModels.build_scaffold(p, size)
 		meshes = _store(key, p)
 	var root := Node3D.new()
-	var frame := MeshInstance3D.new()
-	frame.mesh = meshes.body
-	root.add_child(frame)
+	_add_instances(root, meshes.body, meshes.outline)
 	return root
 
 
 static func _store(key: String, p: Parts) -> Meshes:
 	var meshes := Meshes.new()
 	meshes.body = p.body.to_mesh()
+	meshes.outline = p.body.to_outline_mesh()
 	if p.spin.triangle_count() > 0:
 		meshes.spin = p.spin.to_mesh()
+		meshes.spin_outline = p.spin.to_outline_mesh()
 		meshes.pivot = p.pivot
 		meshes.speed = p.speed
 	_cache[key] = meshes
 	return meshes
+
+
+## A body's MeshInstance3D under `parent`, and its outline's beside it (casting no shadow).
+static func _add_instances(parent: Node3D, body: ArrayMesh, outline: ArrayMesh) -> void:
+	var instance := MeshInstance3D.new()
+	instance.mesh = body
+	parent.add_child(instance)
+	if outline != null:
+		var ink := MeshInstance3D.new()
+		ink.mesh = outline
+		ink.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+		ink.set_meta(OUTLINE_META, true)
+		parent.add_child(ink)
 
 
 static func _build(p: Parts, type: String, level: int) -> void:
