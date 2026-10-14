@@ -208,9 +208,9 @@ static func _rock(mesh: LowPolyMesh, pos: Vector3, radius: float, rng: SeededRng
 	var peak := pos + Vector3(lean.x, height, lean.y)
 	for j: int in sides:
 		var k := (j + 1) % sides
-		mesh.triangle(lower[j], upper[j], upper[k], "rock_dark")
-		mesh.triangle(lower[j], upper[k], lower[k], "rock_dark")
-		mesh.triangle(upper[j], peak, upper[k], "rock")
+		mesh.triangle(lower[j], upper[j], upper[k], Palette.surf("rock_dark"))
+		mesh.triangle(lower[j], upper[k], lower[k], Palette.surf("rock_dark"))
+		mesh.triangle(upper[j], peak, upper[k], Palette.surf("rock"))
 
 
 ## Heights: 0 at the grid's edge, rising gently with distance, with value-noise hills and
@@ -261,7 +261,7 @@ func _terrain_face(mesh: LowPolyMesh, a: Vector3, b: Vector3, c: Vector3) -> voi
 		color = "regolith_dark"
 	elif centre.y < 3.2:
 		color = "rock"
-	mesh.triangle(a, b, c, color)
+	mesh.triangle(a, b, c, Palette.surf(color, false))
 
 
 ## Lattice coordinates along one axis from -TERRAIN_EXTENT to TERRAIN_EXTENT that include

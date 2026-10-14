@@ -218,12 +218,12 @@ static func _accent(level: int, top: int, normal: String) -> String:
 
 ## The square slab resource and army buildings stand on.
 static func _slab(m: LowPolyMesh, size: float, height: float) -> void:
-	m.box(Vector3(0.88 * size, height, 0.88 * size), Vector3.ZERO, "hull_dark")
+	m.box(Vector3(0.88 * size, height, 0.88 * size), Vector3.ZERO, Palette.surf("hull_dark"))
 
 
 ## The octagonal plinth defences stand on.
 static func _plinth(m: LowPolyMesh, size: float, height: float) -> void:
-	m.prism(0.47 * size, 0.44 * size, height, 8, Vector3.ZERO, "hull_dark", OCTAGON)
+	m.prism(0.47 * size, 0.44 * size, height, 8, Vector3.ZERO, Palette.surf("hull_dark"), OCTAGON)
 
 
 ## A point on a circle of `radius` around the Y axis, at `degrees` from +X towards +Z.
@@ -241,27 +241,27 @@ static func _plate(m: LowPolyMesh, size: Vector2, pos: Vector3, color: String, y
 		pos + LowPolyMesh.turn(Vector3(-h.x, 0, h.y), turn),
 		pos + LowPolyMesh.turn(Vector3(h.x, 0, h.y), turn),
 		pos + LowPolyMesh.turn(Vector3(h.x, 0, -h.y), turn),
-	]), color)
+	]), Palette.surf(color))
 
 
 static func _scaffold(p: Parts, size: int) -> void:
 	var m := p.body
 	var n := float(size)
 	var half := 0.4 * n
-	m.box(Vector3(0.9 * n, 0.12, 0.9 * n), Vector3.ZERO, "hull_dark")
+	m.box(Vector3(0.9 * n, 0.12, 0.9 * n), Vector3.ZERO, Palette.surf("hull_dark"))
 	for corner: Vector2 in [Vector2(-1, -1), Vector2(1, -1), Vector2(-1, 1), Vector2(1, 1)]:
-		m.box(Vector3(0.12, 1.0, 0.12), Vector3(corner.x * half, 0.12, corner.y * half), "hazard")
+		m.box(Vector3(0.12, 1.0, 0.12), Vector3(corner.x * half, 0.12, corner.y * half), Palette.surf("hazard"))
 	for side: float in [-1.0, 1.0]:
-		m.box(Vector3(0.9 * n, 0.1, 0.1), Vector3(0, 1.05, side * half), "hazard")
-		m.box(Vector3(0.1, 0.1, 0.9 * n), Vector3(side * half, 0.95, 0), "hazard")
-	m.strut(Vector3(-half, 0.12, half), Vector3(half, 1.05, half), 0.08, "hazard")
+		m.box(Vector3(0.9 * n, 0.1, 0.1), Vector3(0, 1.05, side * half), Palette.surf("hazard"))
+		m.box(Vector3(0.1, 0.1, 0.9 * n), Vector3(side * half, 0.95, 0), Palette.surf("hazard"))
+	m.strut(Vector3(-half, 0.12, half), Vector3(half, 1.05, half), 0.08, Palette.surf("hazard"))
 
 
 ## Unknown types: a hull block with a hazard stripe.
 static func _generic(p: Parts, size: int) -> void:
 	var n := float(size)
-	p.body.box(Vector3(0.8 * n, 0.8, 0.8 * n), Vector3.ZERO, "hull_light")
-	p.body.box(Vector3(0.82 * n, 0.14, 0.82 * n), Vector3(0, 0.45, 0), "hazard")
+	p.body.box(Vector3(0.8 * n, 0.8, 0.8 * n), Vector3.ZERO, Palette.surf("hull_light"))
+	p.body.box(Vector3(0.82 * n, 0.14, 0.82 * n), Vector3(0, 0.45, 0), Palette.surf("hazard"))
 
 
 # --- Core ----------------------------------------------------------------------
@@ -270,54 +270,54 @@ static func _command_center(p: Parts, level: int) -> void:
 	var m := p.body
 	var trim := _accent(level, 5, "hull_light")
 	var beacon := "glow_gold" if level >= 5 else "glow_cyan"
-	m.prism(1.8, 1.72, 0.35, 6, Vector3.ZERO, "hull_dark")
-	m.prism(1.72, 1.68, 0.08, 6, Vector3(0, 0.35, 0), trim)
+	m.prism(1.8, 1.72, 0.35, 6, Vector3.ZERO, Palette.surf("hull_dark"))
+	m.prism(1.72, 1.68, 0.08, 6, Vector3(0, 0.35, 0), Palette.surf(trim))
 	for i: int in 6:
-		m.box(Vector3(0.16, 0.1, 0.16), _around(1.42, 30 + 60 * i, 0.43), "glow_cyan")
+		m.box(Vector3(0.16, 0.1, 0.16), _around(1.42, 30 + 60 * i, 0.43), Palette.surf("glow_cyan"))
 	var body_height := 0.9 + 0.18 * level
-	m.prism(1.15, 1.0, body_height, 6, Vector3(0, 0.43, 0), "hull")
+	m.prism(1.15, 1.0, body_height, 6, Vector3(0, 0.43, 0), Palette.surf("hull"))
 	var top := 0.43 + body_height
 	if level >= 2:
-		m.prism(1.1, 1.08, 0.14, 6, Vector3(0, 0.43 + body_height * 0.45, 0), "glow_cyan")
-	m.dome(0.85, 0.7, 8, 3, Vector3(0, top, 0), "metal")
+		m.prism(1.1, 1.08, 0.14, 6, Vector3(0, 0.43 + body_height * 0.45, 0), Palette.surf("glow_cyan"))
+	m.dome(0.85, 0.7, 8, 3, Vector3(0, top, 0), Palette.surf("metal"))
 	var mast := 0.8 + 0.15 * level
-	m.prism(0.06, 0.04, mast, 4, Vector3(0, top + 0.6, 0), "metal")
-	m.orb(0.13, 6, 3, Vector3(0, top + 0.72 + mast, 0), beacon)
+	m.prism(0.06, 0.04, mast, 4, Vector3(0, top + 0.6, 0), Palette.surf("metal"))
+	m.orb(0.13, 6, 3, Vector3(0, top + 0.72 + mast, 0), Palette.surf(beacon))
 	for i: int in level - 1:
 		var degrees: float = ANTENNAE[i]
 		var foot := _around(0.93, degrees, top)
 		var height := 0.5 + 0.12 * i
-		m.prism(0.04, 0.03, height, 4, foot, "metal")
-		m.pyramid(0.1, 0.12, foot + Vector3(0, height, 0), "gold" if level >= 5 else "glow_red")
+		m.prism(0.04, 0.03, height, 4, foot, Palette.surf("metal"))
+		m.pyramid(0.1, 0.12, foot + Vector3(0, height, 0), Palette.surf("gold" if level >= 5 else "glow_red"))
 	if level >= 3:
 		var annex := _around(1.2, -45, 0.43)
-		m.prism(0.45, 0.4, 0.45, 6, annex, "hull")
-		m.dome(0.4, 0.35, 6, 2, annex + Vector3(0, 0.45, 0), "white")
+		m.prism(0.45, 0.4, 0.45, 6, annex, Palette.surf("hull"))
+		m.dome(0.4, 0.35, 6, 2, annex + Vector3(0, 0.45, 0), Palette.surf("white"))
 	if level >= 4:
 		var annex := _around(1.2, 135, 0.43)
-		m.box(Vector3(0.6, 0.55, 0.6), annex, "hull_light", Vector3(0, 45, 0))
-		m.box(Vector3(0.64, 0.12, 0.64), annex + Vector3(0, 0.3, 0), "glow_cyan", Vector3(0, 45, 0))
+		m.box(Vector3(0.6, 0.55, 0.6), annex, Palette.surf("hull_light"), Vector3(0, 45, 0))
+		m.box(Vector3(0.64, 0.12, 0.64), annex + Vector3(0, 0.3, 0), Palette.surf("glow_cyan"), Vector3(0, 45, 0))
 	p.pivot = Vector3(0, top + 0.6 + mast * 0.45, 0)
 	p.speed = 0.8
-	p.spin.box(Vector3(0.9, 0.05, 0.22), Vector3(0.3, 0, 0), "hull_light")
-	p.spin.box(Vector3(0.12, 0.12, 0.28), Vector3(0.75, -0.03, 0), "glow_cyan")
+	p.spin.box(Vector3(0.9, 0.05, 0.22), Vector3(0.3, 0, 0), Palette.surf("hull_light"))
+	p.spin.box(Vector3(0.12, 0.12, 0.28), Vector3(0.75, -0.03, 0), Palette.surf("glow_cyan"))
 
 
 # --- Resources -----------------------------------------------------------------
 
 static func _drone_bay(p: Parts) -> void:
 	var m := p.body
-	m.prism(0.92, 0.88, 0.15, 8, Vector3.ZERO, "hull_dark", OCTAGON)
-	m.ring(0.55, 0.68, 0.04, 12, Vector3(0, 0.15, 0), "hazard")
+	m.prism(0.92, 0.88, 0.15, 8, Vector3.ZERO, Palette.surf("hull_dark"), OCTAGON)
+	m.ring(0.55, 0.68, 0.04, 12, Vector3(0, 0.15, 0), Palette.surf("hazard"))
 	for i: int in 4:
-		m.box(Vector3(0.1, 0.06, 0.1), _around(0.75, 45 + 90 * i, 0.15), "glow_cyan")
+		m.box(Vector3(0.1, 0.06, 0.1), _around(0.75, 45 + 90 * i, 0.15), Palette.surf("glow_cyan"))
 	p.pivot = Vector3(0, 0.95, 0)
 	p.speed = 1.6
 	var drone := p.spin
-	drone.box(Vector3(0.36, 0.12, 0.36), Vector3(0, -0.06, 0), "metal")
-	drone.orb(0.08, 6, 3, Vector3(0, -0.1, 0), "glow_cyan")
+	drone.box(Vector3(0.36, 0.12, 0.36), Vector3(0, -0.06, 0), Palette.surf("metal"))
+	drone.orb(0.08, 6, 3, Vector3(0, -0.1, 0), Palette.surf("glow_cyan"))
 	for corner: Vector2 in [Vector2(-1, -1), Vector2(1, -1), Vector2(-1, 1), Vector2(1, 1)]:
-		drone.box(Vector3(0.18, 0.03, 0.18), Vector3(corner.x * 0.28, 0.0, corner.y * 0.28), "hull_light")
+		drone.box(Vector3(0.18, 0.03, 0.18), Vector3(corner.x * 0.28, 0.0, corner.y * 0.28), Palette.surf("hull_light"))
 
 
 static func _metal_extractor(p: Parts, level: int) -> void:
@@ -326,27 +326,27 @@ static func _metal_extractor(p: Parts, level: int) -> void:
 	_slab(m, 3, 0.3)
 	var height := 1.5 + 0.2 * level
 	var tower := Vector3(-0.75, 0.3, -0.75)
-	m.box(Vector3(0.5, height, 0.5), tower, paint)
-	m.box(Vector3(0.85, 0.35, 0.85), tower + Vector3(0, height, 0), "hull_light")
+	m.box(Vector3(0.5, height, 0.5), tower, Palette.surf(paint))
+	m.box(Vector3(0.85, 0.35, 0.85), tower + Vector3(0, height, 0), Palette.surf("hull_light"))
 	var beam_y := 0.3 + height + 0.1
 	if level >= 3:
 		var left := Vector3(-0.75, 0.3, 1.0)
 		var right := Vector3(1.0, 0.3, -0.75)
-		m.box(Vector3(0.22, height, 0.22), left, paint)
-		m.box(Vector3(0.22, height, 0.22), right, paint)
-		m.strut(Vector3(left.x, beam_y - 0.1, left.z), Vector3(right.x, beam_y - 0.1, right.z), 0.24, "hull_light")
+		m.box(Vector3(0.22, height, 0.22), left, Palette.surf(paint))
+		m.box(Vector3(0.22, height, 0.22), right, Palette.surf(paint))
+		m.strut(Vector3(left.x, beam_y - 0.1, left.z), Vector3(right.x, beam_y - 0.1, right.z), 0.24, Palette.surf("hull_light"))
 	else:
-		m.strut(Vector3(-0.6, beam_y, -0.6), Vector3(0.2, beam_y, 0.2), 0.22, "hull_light")
+		m.strut(Vector3(-0.6, beam_y, -0.6), Vector3(0.2, beam_y, 0.2), 0.22, Palette.surf("hull_light"))
 	if level >= 2:
-		m.dome(0.38, 0.3, 6, 2, Vector3(0.85, 0.3, 0.85), "metal_dark")
+		m.dome(0.38, 0.3, 6, 2, Vector3(0.85, 0.3, 0.85), Palette.surf("metal_dark"))
 	if level >= 4:
-		m.box(Vector3(0.5, 0.45, 0.6), Vector3(-1.0, 0.3, 0.55), "hull")
-		m.box(Vector3(0.14, 0.14, 0.14), tower + Vector3(0.3, height + 0.1, 0.3), "glow_orange")
+		m.box(Vector3(0.5, 0.45, 0.6), Vector3(-1.0, 0.3, 0.55), Palette.surf("hull"))
+		m.box(Vector3(0.14, 0.14, 0.14), tower + Vector3(0.3, height + 0.1, 0.3), Palette.surf("glow_orange"))
 	p.pivot = Vector3(0.12, 0.3, 0.12)
 	p.speed = 3.0
-	p.spin.prism(0.05, 0.3 + 0.03 * level, 0.75, 5, Vector3.ZERO, "metal")
-	p.spin.box(Vector3(0.35, 0.15, 0.35), Vector3(0, 0.75, 0), "metal_dark")
-	p.spin.prism(0.07, 0.07, beam_y - 0.3 - 0.9, 4, Vector3(0, 0.9, 0), "metal_dark")
+	p.spin.prism(0.05, 0.3 + 0.03 * level, 0.75, 5, Vector3.ZERO, Palette.surf("metal"))
+	p.spin.box(Vector3(0.35, 0.15, 0.35), Vector3(0, 0.75, 0), Palette.surf("metal_dark"))
+	p.spin.prism(0.07, 0.07, beam_y - 0.3 - 0.9, 4, Vector3(0, 0.9, 0), Palette.surf("metal_dark"))
 
 
 ## [x, z, height, radius, tilt x, tilt z] of each crystal shard, in the order levels add them.
@@ -369,28 +369,28 @@ static func _crystal_harvester(p: Parts, level: int) -> void:
 		var foot := Vector3(shard[0], 0.25, shard[1])
 		var height: float = shard[2]
 		var radius: float = shard[3]
-		m.cone(radius, height, 4, foot, "glow_magenta", Vector3(shard[4], 0, shard[5]))
-	m.prism(0.16, 0.11, 1.5, 6, Vector3(0, 0.25, 0), _accent(level, 5, "metal_dark"))
+		m.cone(radius, height, 4, foot, Palette.surf("glow_magenta"), Vector3(shard[4], 0, shard[5]))
+	m.prism(0.16, 0.11, 1.5, 6, Vector3(0, 0.25, 0), Palette.surf(_accent(level, 5, "metal_dark")))
 	p.pivot = Vector3(0, 1.75, 0)
 	p.speed = 1.2
-	p.spin.box(Vector3(1.8, 0.08, 0.14), Vector3.ZERO, "hull_light")
-	p.spin.box(Vector3(0.16, 0.16, 0.22), Vector3(0.85, -0.04, 0), "glow_gold" if level >= 5 else "glow_cyan")
+	p.spin.box(Vector3(1.8, 0.08, 0.14), Vector3.ZERO, Palette.surf("hull_light"))
+	p.spin.box(Vector3(0.16, 0.16, 0.22), Vector3(0.85, -0.04, 0), Palette.surf("glow_gold" if level >= 5 else "glow_cyan"))
 
 
 static func _antimatter_siphon(p: Parts, level: int) -> void:
 	var m := p.body
-	m.prism(1.35, 1.2, 0.35, 6, Vector3.ZERO, "hull_dark")
-	m.prism(0.8, 0.7, 0.25, 6, Vector3(0, 0.35, 0), "hull")
+	m.prism(1.35, 1.2, 0.35, 6, Vector3.ZERO, Palette.surf("hull_dark"))
+	m.prism(0.8, 0.7, 0.25, 6, Vector3(0, 0.35, 0), Palette.surf("hull"))
 	var spire := 2.0 + 0.3 * level
-	m.prism(0.3, 0.07, spire, 6, Vector3(0, 0.6, 0), "metal")
-	m.orb(0.14, 6, 3, Vector3(0, 0.65 + spire, 0), "glow_violet")
+	m.prism(0.3, 0.07, spire, 6, Vector3(0, 0.6, 0), Palette.surf("metal"))
+	m.orb(0.14, 6, 3, Vector3(0, 0.65 + spire, 0), Palette.surf("glow_violet"))
 	for degrees: float in [30.0, 150.0, 270.0]:
-		m.strut(_around(1.0, degrees, 0.35), _around(0.2, degrees, 1.5), 0.12, _accent(level, 3, "hull_light"))
+		m.strut(_around(1.0, degrees, 0.35), _around(0.2, degrees, 1.5), 0.12, Palette.surf(_accent(level, 3, "hull_light")))
 	p.pivot = Vector3(0, 1.5, 0)
 	p.speed = 1.4
-	p.spin.ring(0.42, 0.62, 0.14, 8, Vector3.ZERO, "glow_violet")
+	p.spin.ring(0.42, 0.62, 0.14, 8, Vector3.ZERO, Palette.surf("glow_violet"))
 	if level >= 2:
-		p.spin.ring(0.3, 0.44, 0.1, 8, Vector3(0, 0.55, 0), "glow_violet")
+		p.spin.ring(0.3, 0.44, 0.1, 8, Vector3(0, 0.55, 0), Palette.surf("glow_violet"))
 
 
 ## Metal and crystal silos: tanks on a slab, more and taller with each level.
@@ -407,34 +407,34 @@ static func _silo(p: Parts, level: int, body: String, band: String, window: Stri
 	var trim := _accent(level, 5, band)
 	for spot: Vector2 in tanks:
 		var base := Vector3(spot.x, 0.25, spot.y)
-		m.prism(radius, radius, height, 8, base, body)
-		m.dome(radius, 0.3, 8, 2, base + Vector3(0, height, 0), "metal")
-		m.prism(radius + 0.04, radius + 0.04, 0.12, 8, base + Vector3(0, height * 0.6, 0), trim)
+		m.prism(radius, radius, height, 8, base, Palette.surf(body))
+		m.dome(radius, 0.3, 8, 2, base + Vector3(0, height, 0), Palette.surf("metal"))
+		m.prism(radius + 0.04, radius + 0.04, 0.12, 8, base + Vector3(0, height * 0.6, 0), Palette.surf(trim))
 		if window != "":
-			m.box(Vector3(0.1, height - 0.45, 0.22), base + _around(radius, 45, 0.2), window, Vector3(0, -45, 0))
+			m.box(Vector3(0.1, height - 0.45, 0.22), base + _around(radius, 45, 0.2), Palette.surf(window), Vector3(0, -45, 0))
 	if level >= 2:
-		m.strut(Vector3(-0.55, 0.05 + height, 0.55), Vector3(0.55, 0.05 + height, -0.55), 0.16, trim)
+		m.strut(Vector3(-0.55, 0.05 + height, 0.55), Vector3(0.55, 0.05 + height, -0.55), 0.16, Palette.surf(trim))
 
 
 static func _antimatter_vault(p: Parts, level: int) -> void:
 	var m := p.body
 	_slab(m, 3, 0.2)
 	var height := 0.9 + 0.2 * level
-	m.box(Vector3(1.6, height, 1.6), Vector3(0, 0.2, 0), "hull")
-	m.box(Vector3(1.64, 0.07, 1.64), Vector3(0, 0.2 + height * 0.5, 0), "glow_violet")
-	m.box(Vector3(0.08, height, 0.08), Vector3(0.8, 0.2, 0), "glow_violet")
-	m.box(Vector3(0.08, height, 0.08), Vector3(0, 0.2, 0.8), "glow_violet")
+	m.box(Vector3(1.6, height, 1.6), Vector3(0, 0.2, 0), Palette.surf("hull"))
+	m.box(Vector3(1.64, 0.07, 1.64), Vector3(0, 0.2 + height * 0.5, 0), Palette.surf("glow_violet"))
+	m.box(Vector3(0.08, height, 0.08), Vector3(0.8, 0.2, 0), Palette.surf("glow_violet"))
+	m.box(Vector3(0.08, height, 0.08), Vector3(0, 0.2, 0.8), Palette.surf("glow_violet"))
 	var top := 0.2 + height
-	m.box(Vector3(1.2, 0.15, 1.2), Vector3(0, top, 0), "hull_light")
+	m.box(Vector3(1.2, 0.15, 1.2), Vector3(0, top, 0), Palette.surf("hull_light"))
 	if level >= 2:
-		m.disc(0.4, 6, Vector3(0, top + 0.151, 0), "glow_violet")
+		m.disc(0.4, 6, Vector3(0, top + 0.151, 0), Palette.surf("glow_violet"))
 	var pylon := 1.1 + 0.25 * level
 	for corner: Vector2 in [Vector2(-1, -1), Vector2(1, -1), Vector2(-1, 1), Vector2(1, 1)]:
 		var foot := Vector3(corner.x * 1.08, 0.2, corner.y * 1.08)
-		m.prism(0.12, 0.09, pylon, 4, foot, _accent(level, 3, "hull_light"), Vector3(0, 45, 0))
-		m.orb(0.12, 6, 2, foot + Vector3(0, pylon + 0.1, 0), "glow_violet")
+		m.prism(0.12, 0.09, pylon, 4, foot, Palette.surf(_accent(level, 3, "hull_light")), Vector3(0, 45, 0))
+		m.orb(0.12, 6, 2, foot + Vector3(0, pylon + 0.1, 0), Palette.surf("glow_violet"))
 	if level >= 3:
-		m.orb(0.25, 8, 3, Vector3(0, top + 0.6, 0), "glow_violet")
+		m.orb(0.25, 8, 3, Vector3(0, top + 0.6, 0), Palette.surf("glow_violet"))
 
 
 # --- Army ----------------------------------------------------------------------
@@ -444,25 +444,25 @@ static func _hangar(p: Parts, level: int) -> void:
 	_slab(m, 5, 0.15)
 	var height := 1.4 + 0.15 * level
 	var front := 1.0
-	m.box(Vector3(4.0, height, 3.0), Vector3(0, 0.15, -0.5), "hull")
+	m.box(Vector3(4.0, height, 3.0), Vector3(0, 0.15, -0.5), Palette.surf("hull"))
 	var stripe := _accent(level, 5, "hazard")
 	for x: float in [-1.2, 0.0, 1.2]:
-		m.box(Vector3(0.22, 0.04, 2.8), Vector3(x, 0.15 + height, -0.5), stripe)
+		m.box(Vector3(0.22, 0.04, 2.8), Vector3(x, 0.15 + height, -0.5), Palette.surf(stripe))
 	for i: int in 3:
 		_plate(m, Vector2(0.18, 0.7), Vector3(-1.2 + 1.2 * i, 0.151, 1.6), "hazard", 30)
 	var bays := mini(level, 3)
 	var bay := 3.8 / bays
 	for i: int in bays:
 		var x := -1.9 + bay * (i + 0.5)
-		m.box(Vector3(bay - 0.3, height - 0.35, 0.1), Vector3(x, 0.15, front), "window")
-		m.box(Vector3(bay - 0.3, 0.08, 0.08), Vector3(x, height - 0.1, front + 0.02), "glow_orange")
+		m.box(Vector3(bay - 0.3, height - 0.35, 0.1), Vector3(x, 0.15, front), Palette.surf("window"))
+		m.box(Vector3(bay - 0.3, 0.08, 0.08), Vector3(x, height - 0.1, front + 0.02), Palette.surf("glow_orange"))
 	for i: int in bays + 1:
-		m.box(Vector3(0.2, height, 0.2), Vector3(-1.9 + bay * i, 0.15, front), "hull_light")
+		m.box(Vector3(0.2, height, 0.2), Vector3(-1.9 + bay * i, 0.15, front), Palette.surf("hull_light"))
 	if level >= 4:
 		var tower := Vector3(1.5, 0.15, -1.55)
-		m.box(Vector3(0.9, height + 1.0, 0.9), tower, "hull_light")
-		m.box(Vector3(0.94, 0.2, 0.94), tower + Vector3(0, height + 0.6, 0), "glow_blue")
-		m.prism(0.04, 0.03, 0.6, 4, tower + Vector3(0, height + 1.0, 0), "metal")
+		m.box(Vector3(0.9, height + 1.0, 0.9), tower, Palette.surf("hull_light"))
+		m.box(Vector3(0.94, 0.2, 0.94), tower + Vector3(0, height + 0.6, 0), Palette.surf("glow_blue"))
+		m.prism(0.04, 0.03, 0.6, 4, tower + Vector3(0, height + 1.0, 0), Palette.surf("metal"))
 
 
 static func _fabricator(p: Parts, level: int) -> void:
@@ -471,26 +471,26 @@ static func _fabricator(p: Parts, level: int) -> void:
 	_slab(m, 3, 0.2)
 	var height := 1.0 + 0.1 * level
 	var body := Vector3(-0.25, 0.2, -0.3)
-	m.box(Vector3(2.0, height, 1.7), body, "hull_light")
-	m.box(Vector3(2.04, 0.12, 1.74), body + Vector3(0, height * 0.6, 0), paint)
-	m.box(Vector3(0.8, 0.7, 0.08), Vector3(-0.25, 0.2, 0.56), "window")
+	m.box(Vector3(2.0, height, 1.7), body, Palette.surf("hull_light"))
+	m.box(Vector3(2.04, 0.12, 1.74), body + Vector3(0, height * 0.6, 0), Palette.surf(paint))
+	m.box(Vector3(0.8, 0.7, 0.08), Vector3(-0.25, 0.2, 0.56), Palette.surf("window"))
 	var top := 0.2 + height
 	var stack := 1.0 + 0.15 * level
-	m.prism(0.2, 0.17, stack, 6, Vector3(-0.85, top, -0.8), "metal_dark")
-	m.prism(0.19, 0.19, 0.1, 6, Vector3(-0.85, top + stack - 0.12, -0.8), "glow_orange")
+	m.prism(0.2, 0.17, stack, 6, Vector3(-0.85, top, -0.8), Palette.surf("metal_dark"))
+	m.prism(0.19, 0.19, 0.1, 6, Vector3(-0.85, top + stack - 0.12, -0.8), Palette.surf("glow_orange"))
 	if level >= 2:
-		m.prism(0.16, 0.14, stack * 0.7, 6, Vector3(-0.35, top, -0.85), "metal_dark")
-		m.prism(0.15, 0.15, 0.08, 6, Vector3(-0.35, top + stack * 0.7 - 0.1, -0.85), "glow_orange")
-	m.box(Vector3(0.7, 0.3, 0.45), Vector3(0.95, 0.2, 0.15), "hull_dark")
-	m.box(Vector3(0.7, 0.03, 0.08), Vector3(0.95, 0.5, 0.0), paint)
-	m.box(Vector3(0.7, 0.03, 0.08), Vector3(0.95, 0.5, 0.3), paint)
-	m.box(Vector3(0.25, 0.25, 0.25), Vector3(1.05, 0.5, 0.15), "orange")
+		m.prism(0.16, 0.14, stack * 0.7, 6, Vector3(-0.35, top, -0.85), Palette.surf("metal_dark"))
+		m.prism(0.15, 0.15, 0.08, 6, Vector3(-0.35, top + stack * 0.7 - 0.1, -0.85), Palette.surf("glow_orange"))
+	m.box(Vector3(0.7, 0.3, 0.45), Vector3(0.95, 0.2, 0.15), Palette.surf("hull_dark"))
+	m.box(Vector3(0.7, 0.03, 0.08), Vector3(0.95, 0.5, 0.0), Palette.surf(paint))
+	m.box(Vector3(0.7, 0.03, 0.08), Vector3(0.95, 0.5, 0.3), Palette.surf(paint))
+	m.box(Vector3(0.25, 0.25, 0.25), Vector3(1.05, 0.5, 0.15), Palette.surf("orange"))
 	if level >= 3:
-		m.wedge(Vector3(1.9, 0.35, 0.7), body + Vector3(0.0, height, 0.4), "hull")
-		m.wedge(Vector3(1.9, 0.35, 0.7), body + Vector3(0.0, height, -0.3), "hull")
+		m.wedge(Vector3(1.9, 0.35, 0.7), body + Vector3(0.0, height, 0.4), Palette.surf("hull"))
+		m.wedge(Vector3(1.9, 0.35, 0.7), body + Vector3(0.0, height, -0.3), Palette.surf("hull"))
 	if level >= 4:
-		m.box(Vector3(0.14, 0.9, 0.14), Vector3(0.55, top, -0.8), "hull_dark")
-		m.strut(Vector3(0.55, top + 0.85, -0.8), Vector3(1.1, top + 0.6, 0.15), 0.1, paint)
+		m.box(Vector3(0.14, 0.9, 0.14), Vector3(0.55, top, -0.8), Palette.surf("hull_dark"))
+		m.strut(Vector3(0.55, top + 0.85, -0.8), Vector3(1.1, top + 0.6, 0.15), 0.1, Palette.surf(paint))
 
 
 static func _heavy_fabricator(p: Parts, level: int) -> void:
@@ -498,46 +498,46 @@ static func _heavy_fabricator(p: Parts, level: int) -> void:
 	var paint := _accent(level, 3, "red")
 	_slab(m, 3, 0.2)
 	var height := 1.3 + 0.15 * level
-	m.box(Vector3(2.4, height, 2.0), Vector3(-0.1, 0.2, -0.2), "hull_dark")
-	m.box(Vector3(2.44, 0.14, 2.04), Vector3(-0.1, 0.2 + height * 0.7, -0.2), paint)
+	m.box(Vector3(2.4, height, 2.0), Vector3(-0.1, 0.2, -0.2), Palette.surf("hull_dark"))
+	m.box(Vector3(2.44, 0.14, 2.04), Vector3(-0.1, 0.2 + height * 0.7, -0.2), Palette.surf(paint))
 	var top := 0.2 + height
-	m.box(Vector3(1.4, 0.5, 1.2), Vector3(-0.4, top, -0.5), "hull")
-	m.box(Vector3(1.2, 0.95, 0.08), Vector3(0.1, 0.2, 0.81), "window")
-	m.box(Vector3(1.2, 0.08, 0.06), Vector3(0.1, 1.2, 0.84), "glow_red")
+	m.box(Vector3(1.4, 0.5, 1.2), Vector3(-0.4, top, -0.5), Palette.surf("hull"))
+	m.box(Vector3(1.2, 0.95, 0.08), Vector3(0.1, 0.2, 0.81), Palette.surf("window"))
+	m.box(Vector3(1.2, 0.08, 0.06), Vector3(0.1, 1.2, 0.84), Palette.surf("glow_red"))
 	var stack := 1.1 + 0.2 * level
 	var stacks: Array[float] = [-0.9, 0.55]
 	if level >= 2:
 		stacks.append(-0.2)
 	for x: float in stacks:
-		m.prism(0.22, 0.19, stack, 6, Vector3(x, top, -0.95), "metal_dark")
-		m.prism(0.21, 0.21, 0.1, 6, Vector3(x, top + stack - 0.12, -0.95), "glow_red")
+		m.prism(0.22, 0.19, stack, 6, Vector3(x, top, -0.95), Palette.surf("metal_dark"))
+		m.prism(0.21, 0.21, 0.1, 6, Vector3(x, top + stack - 0.12, -0.95), Palette.surf("glow_red"))
 
 
 static func _research_lab(p: Parts, level: int) -> void:
 	var m := p.body
-	m.prism(1.42, 1.32, 0.3, 8, Vector3.ZERO, "hull_dark", OCTAGON)
+	m.prism(1.42, 1.32, 0.3, 8, Vector3.ZERO, Palette.surf("hull_dark"), OCTAGON)
 	if level >= 5:
-		m.prism(1.44, 1.42, 0.06, 8, Vector3(0, 0.3, 0), "gold", OCTAGON)
-	m.prism(1.05, 1.0, 0.5, 8, Vector3(0, 0.3, 0), "hull_light", OCTAGON)
-	m.prism(1.03, 1.03, 0.14, 8, Vector3(0, 0.48, 0), "glow_blue", OCTAGON)
+		m.prism(1.44, 1.42, 0.06, 8, Vector3(0, 0.3, 0), Palette.surf("gold"), OCTAGON)
+	m.prism(1.05, 1.0, 0.5, 8, Vector3(0, 0.3, 0), Palette.surf("hull_light"), OCTAGON)
+	m.prism(1.03, 1.03, 0.14, 8, Vector3(0, 0.48, 0), Palette.surf("glow_blue"), OCTAGON)
 	var dome := 0.85 + 0.05 * level
-	m.dome(0.95, dome, 8, 3, Vector3(0, 0.8, 0), "white")
+	m.dome(0.95, dome, 8, 3, Vector3(0, 0.8, 0), Palette.surf("white"))
 	var post := Vector3(0.82, 0.3, -0.82)
 	var reach := 1.0 + 0.1 * level
-	m.prism(0.08, 0.06, reach, 4, post, "metal")
+	m.prism(0.08, 0.06, reach, 4, post, Palette.surf("metal"))
 	var dish := 1.3 if level >= 3 else 1.0
 	var aim := Vector3(40, 135, 0)
 	var centre := post + Vector3(0, reach, 0)
 	m.lathe(PackedVector2Array([
 		Vector2(0.06, 0), Vector2(0.45 * dish, 0.18 * dish), Vector2(0.4 * dish, 0.21 * dish), Vector2(0, 0.06),
-	]), 8, centre, "white", aim)
-	m.cone(0.05, 0.35, 4, centre + LowPolyMesh.turn(Vector3(0, 0.05, 0), aim), "glow_blue", aim)
+	]), 8, centre, Palette.surf("white"), aim)
+	m.cone(0.05, 0.35, 4, centre + LowPolyMesh.turn(Vector3(0, 0.05, 0), aim), Palette.surf("glow_blue"), aim)
 	if level >= 2:
 		var annex := Vector3(-0.85, 0.3, 0.85)
-		m.prism(0.38, 0.35, 0.35, 6, annex, "hull_light")
-		m.dome(0.36, 0.3, 6, 2, annex + Vector3(0, 0.35, 0), "white")
+		m.prism(0.38, 0.35, 0.35, 6, annex, Palette.surf("hull_light"))
+		m.dome(0.36, 0.3, 6, 2, annex + Vector3(0, 0.35, 0), Palette.surf("white"))
 	if level >= 4:
-		m.prism(0.22, 0.18, 0.25, 8, Vector3(0, 0.75 + dome, 0), "glow_blue")
+		m.prism(0.22, 0.18, 0.25, 8, Vector3(0, 0.75 + dome, 0), Palette.surf("glow_blue"))
 
 
 static func _nanite_foundry(p: Parts, level: int) -> void:
@@ -546,62 +546,62 @@ static func _nanite_foundry(p: Parts, level: int) -> void:
 	var vat := Vector3(-0.3, 0.2, -0.3)
 	m.lathe(PackedVector2Array([
 		Vector2(0.75, 0), Vector2(0.72, 1.1), Vector2(0.6, 1.1), Vector2(0.6, 0.95),
-	]), 8, vat, "metal_dark", OCTAGON)
-	m.disc(0.6, 8, vat + Vector3(0, 0.95, 0), "glow_green", OCTAGON)
-	m.ring(0.73, 0.82, 0.12, 8, vat + Vector3(0, 0.5, 0), "glow_green", OCTAGON)
+	]), 8, vat, Palette.surf("metal_dark"), OCTAGON)
+	m.disc(0.6, 8, vat + Vector3(0, 0.95, 0), Palette.surf("glow_green"), OCTAGON)
+	m.ring(0.73, 0.82, 0.12, 8, vat + Vector3(0, 0.5, 0), Palette.surf("glow_green"), OCTAGON)
 	if level >= 4:
-		m.ring(0.6, 0.76, 0.06, 8, vat + Vector3(0, 1.1, 0), "gold", OCTAGON)
+		m.ring(0.6, 0.76, 0.06, 8, vat + Vector3(0, 1.1, 0), Palette.surf("gold"), OCTAGON)
 	var pump := Vector3(0.85, 0.2, 0.75)
-	m.box(Vector3(0.6, 0.55, 0.6), pump, "hull_light")
-	m.strut(vat + Vector3(0.5, 0.75, 0.5), pump + Vector3(-0.1, 0.4, -0.1), 0.14, "metal")
-	m.prism(0.08, 0.08, 0.5, 4, pump + Vector3(0.15, 0.55, 0.15), "metal")
+	m.box(Vector3(0.6, 0.55, 0.6), pump, Palette.surf("hull_light"))
+	m.strut(vat + Vector3(0.5, 0.75, 0.5), pump + Vector3(-0.1, 0.4, -0.1), 0.14, Palette.surf("metal"))
+	m.prism(0.08, 0.08, 0.5, 4, pump + Vector3(0.15, 0.55, 0.15), Palette.surf("metal"))
 	if level >= 2:
 		var small := Vector3(0.85, 0.2, -0.85)
-		m.prism(0.35, 0.33, 0.7, 8, small, "metal_dark", OCTAGON)
-		m.disc(0.3, 8, small + Vector3(0, 0.701, 0), "glow_green", OCTAGON)
-		m.strut(small + Vector3(-0.2, 0.45, 0.1), vat + Vector3(0.6, 0.45, -0.3), 0.12, "metal")
+		m.prism(0.35, 0.33, 0.7, 8, small, Palette.surf("metal_dark"), OCTAGON)
+		m.disc(0.3, 8, small + Vector3(0, 0.701, 0), Palette.surf("glow_green"), OCTAGON)
+		m.strut(small + Vector3(-0.2, 0.45, 0.1), vat + Vector3(0.6, 0.45, -0.3), 0.12, Palette.surf("metal"))
 	if level >= 3:
-		m.prism(0.15, 0.12, 1.5, 6, Vector3(-1.0, 0.2, 0.9), "hull")
-		m.strut(Vector3(-0.95, 0.9, 0.85), vat + Vector3(-0.3, 0.9, 0.5), 0.1, "metal")
+		m.prism(0.15, 0.12, 1.5, 6, Vector3(-1.0, 0.2, 0.9), Palette.surf("hull"))
+		m.strut(Vector3(-0.95, 0.9, 0.85), vat + Vector3(-0.3, 0.9, 0.5), 0.1, Palette.surf("metal"))
 
 
 static func _drydock(p: Parts, level: int) -> void:
 	var m := p.body
 	_slab(m, 4, 0.15)
 	for z: float in [-0.85, 0.85]:
-		m.box(Vector3(3.2, 0.2, 0.18), Vector3(0, 0.15, z), "metal_dark")
+		m.box(Vector3(3.2, 0.2, 0.18), Vector3(0, 0.15, z), Palette.surf("metal_dark"))
 	for x: float in [-0.9, 0.0, 0.8]:
-		m.box(Vector3(0.3, 0.4, 0.9), Vector3(x, 0.15, 0), "hull_dark")
-	m.box(Vector3(2.3, 0.55, 0.9), Vector3(-0.25, 0.55, 0), "hull_light")
-	m.wedge(Vector3(0.9, 0.55, 0.7), Vector3(1.25, 0.55, 0), "hull_light", Vector3(0, 90, 0))
-	m.box(Vector3(0.6, 0.35, 0.5), Vector3(-0.7, 1.1, 0), "hull")
-	m.box(Vector3(0.62, 0.08, 0.52), Vector3(-0.7, 1.32, 0), "glow_blue")
+		m.box(Vector3(0.3, 0.4, 0.9), Vector3(x, 0.15, 0), Palette.surf("hull_dark"))
+	m.box(Vector3(2.3, 0.55, 0.9), Vector3(-0.25, 0.55, 0), Palette.surf("hull_light"))
+	m.wedge(Vector3(0.9, 0.55, 0.7), Vector3(1.25, 0.55, 0), Palette.surf("hull_light"), Vector3(0, 90, 0))
+	m.box(Vector3(0.6, 0.35, 0.5), Vector3(-0.7, 1.1, 0), Palette.surf("hull"))
+	m.box(Vector3(0.62, 0.08, 0.52), Vector3(-0.7, 1.32, 0), Palette.surf("glow_blue"))
 	for z: float in [-0.22, 0.22]:
-		m.box(Vector3(0.08, 0.22, 0.25), Vector3(-1.42, 0.7, z), "glow_cyan")
+		m.box(Vector3(0.08, 0.22, 0.25), Vector3(-1.42, 0.7, z), Palette.surf("glow_cyan"))
 	var frame := _accent(level, 2, "hazard")
 	var frames: Array[float] = [-1.0, 0.25]
 	if level >= 2:
 		frames.append(1.25)
 	for x: float in frames:
 		for z: float in [-1.15, 1.15]:
-			m.box(Vector3(0.15, 1.7, 0.15), Vector3(x, 0.15, z), frame)
-		m.box(Vector3(0.15, 0.15, 2.45), Vector3(x, 1.85, 0), frame)
+			m.box(Vector3(0.15, 1.7, 0.15), Vector3(x, 0.15, z), Palette.surf(frame))
+		m.box(Vector3(0.15, 0.15, 2.45), Vector3(x, 1.85, 0), Palette.surf(frame))
 
 
 static func _alliance_beacon(p: Parts, level: int) -> void:
 	var m := p.body
-	m.prism(1.3, 1.2, 0.3, 6, Vector3.ZERO, "hull_dark")
-	m.box(Vector3(0.9, 0.3, 0.9), Vector3(0, 0.3, 0), "hull", Vector3(0, 45, 0))
+	m.prism(1.3, 1.2, 0.3, 6, Vector3.ZERO, Palette.surf("hull_dark"))
+	m.box(Vector3(0.9, 0.3, 0.9), Vector3(0, 0.3, 0), Palette.surf("hull"), Vector3(0, 45, 0))
 	var height := 2.0 + 0.3 * level
-	m.prism(0.38, 0.12, height, 4, Vector3(0, 0.6, 0), _accent(level, 3, "hull_light"), Vector3(0, 45, 0))
-	m.box(Vector3(0.6, 0.06, 0.6), Vector3(0, 0.6 + height * 0.4, 0), "hazard", Vector3(0, 45, 0))
+	m.prism(0.38, 0.12, height, 4, Vector3(0, 0.6, 0), Palette.surf(_accent(level, 3, "hull_light")), Vector3(0, 45, 0))
+	m.box(Vector3(0.6, 0.06, 0.6), Vector3(0, 0.6 + height * 0.4, 0), Palette.surf("hazard"), Vector3(0, 45, 0))
 	if level >= 2:
 		for degrees: float in [-45.0, 135.0]:
 			var arm := _around(0.55, degrees, 0.6 + height * 0.6)
-			m.strut(Vector3(0, arm.y, 0), arm, 0.06, "metal")
-			m.disc(0.2, 6, arm, "white", Vector3(0, -degrees, -60))
+			m.strut(Vector3(0, arm.y, 0), arm, 0.06, Palette.surf("metal"))
+			m.disc(0.2, 6, arm, Palette.surf("white"), Vector3(0, -degrees, -60))
 	var beacon := "glow_gold" if level >= 3 else "glow_cyan"
-	m.orb(0.22 + 0.03 * level, 8, 3, Vector3(0, 0.75 + height + 0.1, 0), beacon)
+	m.orb(0.22 + 0.03 * level, 8, 3, Vector3(0, 0.75 + height + 0.1, 0), Palette.surf(beacon))
 
 
 # --- Defence -------------------------------------------------------------------
@@ -609,105 +609,105 @@ static func _alliance_beacon(p: Parts, level: int) -> void:
 static func _laser_turret(p: Parts, level: int) -> void:
 	var m := p.body
 	_plinth(m, 3, 0.45)
-	m.prism(1.0, 0.95, 0.12, 8, Vector3(0, 0.45, 0), "hull", OCTAGON)
+	m.prism(1.0, 0.95, 0.12, 8, Vector3(0, 0.45, 0), Palette.surf("hull"), OCTAGON)
 	p.pivot = Vector3(0, 0.57, 0)
 	p.speed = 0.4
 	var head := p.spin
 	var radius := 0.6 + 0.03 * level
-	head.prism(radius, radius - 0.05, 0.35, 8, Vector3.ZERO, "hull_light")
-	head.dome(radius - 0.05, 0.3, 8, 2, Vector3(0, 0.35, 0), "hull_light")
+	head.prism(radius, radius - 0.05, 0.35, 8, Vector3.ZERO, Palette.surf("hull_light"))
+	head.dome(radius - 0.05, 0.3, 8, 2, Vector3(0, 0.35, 0), Palette.surf("hull_light"))
 	if level >= 5:
-		head.prism(radius + 0.03, radius + 0.03, 0.08, 8, Vector3(0, 0.15, 0), "gold")
+		head.prism(radius + 0.03, radius + 0.03, 0.08, 8, Vector3(0, 0.15, 0), Palette.surf("gold"))
 	if level >= 2:
-		head.box(Vector3(0.5, 0.28, 0.3), Vector3(0, 0.22, radius - 0.1), "hull")
+		head.box(Vector3(0.5, 0.28, 0.3), Vector3(0, 0.22, radius - 0.1), Palette.surf("hull"))
 	if level >= 4:
 		for x: float in [-1.0, 1.0]:
-			head.box(Vector3(0.12, 0.3, 0.5), Vector3(x * (radius + 0.02), 0.05, -0.1), "hull_dark")
+			head.box(Vector3(0.12, 0.3, 0.5), Vector3(x * (radius + 0.02), 0.05, -0.1), Palette.surf("hull_dark"))
 	var length := 0.85 + 0.05 * level
 	var barrels: Array[float] = [0.0]
 	if level >= 3:
 		barrels = [-0.16, 0.16]
 	for x: float in barrels:
-		head.prism(0.09, 0.08, length, 6, Vector3(x, 0.36, 0.25), "metal", Vector3(90, 0, 0))
-		head.orb(0.1, 6, 3, Vector3(x, 0.36, 0.3 + length), "glow_cyan")
+		head.prism(0.09, 0.08, length, 6, Vector3(x, 0.36, 0.25), Palette.surf("metal"), Vector3(90, 0, 0))
+		head.orb(0.1, 6, 3, Vector3(x, 0.36, 0.3 + length), Palette.surf("glow_cyan"))
 
 
 static func _missile_battery(p: Parts, level: int) -> void:
 	var m := p.body
 	_plinth(m, 3, 0.4)
-	m.box(Vector3(0.9, 0.45, 0.9), Vector3(0, 0.4, 0), "hull", Vector3(0, 45, 0))
+	m.box(Vector3(0.9, 0.45, 0.9), Vector3(0, 0.4, 0), Palette.surf("hull"), Vector3(0, 45, 0))
 	var columns := 2 if level < 3 else (3 if level < 5 else 4)
 	var width := columns * 0.38 + 0.2
 	var aim := Vector3(-30, 45, 0)
 	var base := Vector3(0, 0.85, 0)
-	m.box(Vector3(width, 0.85, 1.0), base, "hull_light", aim)
+	m.box(Vector3(width, 0.85, 1.0), base, Palette.surf("hull_light"), aim)
 	m.box(Vector3(width + 0.04, 0.1, 1.04), base + LowPolyMesh.turn(Vector3(0, 0.4, 0), aim),
-		_accent(level, 5, "red"), aim)
+		Palette.surf(_accent(level, 5, "red")), aim)
 	var tube_aim := aim + Vector3(90, 0, 0)
 	for column: int in columns:
 		for row: int in 2:
 			var face := Vector3(-0.19 * (columns - 1) + 0.38 * column, 0.22 + 0.4 * row, 0.5)
 			var mouth := base + LowPolyMesh.turn(face, aim)
-			m.prism(0.14, 0.14, 0.06, 6, mouth, "window", tube_aim)
-			m.cone(0.08, 0.14, 4, mouth, "glow_red", tube_aim)
+			m.prism(0.14, 0.14, 0.06, 6, mouth, Palette.surf("window"), tube_aim)
+			m.cone(0.08, 0.14, 4, mouth, Palette.surf("glow_red"), tube_aim)
 
 
 static func _plasma_mortar(p: Parts, level: int) -> void:
 	var m := p.body
 	_plinth(m, 3, 0.35)
-	m.prism(0.6, 0.55, 0.3, 8, Vector3(0, 0.35, 0), "hull", OCTAGON)
+	m.prism(0.6, 0.55, 0.3, 8, Vector3(0, 0.35, 0), Palette.surf("hull"), OCTAGON)
 	var rim := 1.0 + 0.05 * level
 	var bowl := Vector3(0, 0.65, 0)
 	m.lathe(PackedVector2Array([
 		Vector2(0.6, 0), Vector2(rim, 0.75), Vector2(rim - 0.15, 0.8), Vector2(0.45, 0.25),
-	]), 10, bowl, "metal_dark")
-	m.disc(0.46, 10, bowl + Vector3(0, 0.25, 0), "glow_orange")
-	m.orb(0.32, 6, 3, bowl + Vector3(0, 0.45, 0), "glow_orange")
+	]), 10, bowl, Palette.surf("metal_dark"))
+	m.disc(0.46, 10, bowl + Vector3(0, 0.25, 0), Palette.surf("glow_orange"))
+	m.orb(0.32, 6, 3, bowl + Vector3(0, 0.45, 0), Palette.surf("glow_orange"))
 	if level >= 2:
 		for degrees: float in [0.0, 90.0, 180.0, 270.0]:
-			m.strut(_around(1.05, degrees + 45, 0.35), _around(0.85, degrees + 45, 1.15), 0.12, "hull_light")
+			m.strut(_around(1.05, degrees + 45, 0.35), _around(0.85, degrees + 45, 1.15), 0.12, Palette.surf("hull_light"))
 	if level >= 3:
-		m.ring(rim - 0.15, rim + 0.03, 0.06, 10, bowl + Vector3(0, 0.8, 0), _accent(level, 4, "hazard"))
+		m.ring(rim - 0.15, rim + 0.03, 0.06, 10, bowl + Vector3(0, 0.8, 0), Palette.surf(_accent(level, 4, "hazard")))
 
 
 static func _shield_generator(p: Parts, level: int) -> void:
 	var m := p.body
 	_plinth(m, 3, 0.25)
-	m.prism(0.5, 0.45, 0.2, 8, Vector3(0, 0.25, 0), "hull", OCTAGON)
+	m.prism(0.5, 0.45, 0.2, 8, Vector3(0, 0.25, 0), Palette.surf("hull"), OCTAGON)
 	var top := Vector3(0, 1.6, 0)
 	for degrees: float in [30.0, 150.0, 270.0]:
 		var foot := _around(1.0, degrees, 0.25)
-		m.strut(foot, top, 0.14, "hull_light")
-		m.box(Vector3(0.3, 0.12, 0.3), foot - Vector3(0, 0.02, 0), _accent(level, 4, "hull"))
+		m.strut(foot, top, 0.14, Palette.surf("hull_light"))
+		m.box(Vector3(0.3, 0.12, 0.3), foot - Vector3(0, 0.02, 0), Palette.surf(_accent(level, 4, "hull")))
 	if level >= 2:
-		m.prism(0.3, 0.2, 0.25, 6, top - Vector3(0, 0.1, 0), "metal")
+		m.prism(0.3, 0.2, 0.25, 6, top - Vector3(0, 0.1, 0), Palette.surf("metal"))
 	var radius := 0.5 + 0.06 * level
 	var centre := top + Vector3(0, radius * 0.8, 0)
-	m.orb(radius, 8, 4, centre, "glow_green")
+	m.orb(radius, 8, 4, centre, Palette.surf("glow_green"))
 	if level >= 3:
-		m.ring(radius + 0.05, radius + 0.2, 0.08, 10, centre - Vector3(0, 0.04, 0), "metal")
+		m.ring(radius + 0.05, radius + 0.2, 0.08, 10, centre - Vector3(0, 0.04, 0), Palette.surf("metal"))
 
 
 static func _flak_cannon(p: Parts, level: int) -> void:
 	var m := p.body
 	_plinth(m, 3, 0.4)
-	m.prism(0.5, 0.38, 1.0, 6, Vector3(0, 0.4, 0), "hull")
+	m.prism(0.5, 0.38, 1.0, 6, Vector3(0, 0.4, 0), Palette.surf("hull"))
 	p.pivot = Vector3(0, 1.4, 0)
 	p.speed = 0.5
 	var head := p.spin
-	head.box(Vector3(0.95, 0.6, 0.8), Vector3(0, 0, -0.15), "hull_light")
+	head.box(Vector3(0.95, 0.6, 0.8), Vector3(0, 0, -0.15), Palette.surf("hull_light"))
 	if level >= 4:
-		head.box(Vector3(0.97, 0.1, 0.82), Vector3(0, 0.4, -0.15), "gold")
+		head.box(Vector3(0.97, 0.1, 0.82), Vector3(0, 0.4, -0.15), Palette.surf("gold"))
 	for x: float in [-0.2, 0.2]:
 		for z: float in [-0.05, 0.2]:
 			var muzzle := Vector3(x, 0.45, z) + LowPolyMesh.turn(Vector3(0, 1.3, 0), Vector3(35, 0, 0))
-			head.prism(0.09, 0.07, 1.3, 6, Vector3(x, 0.45, z), "metal", Vector3(35, 0, 0))
-			head.box(Vector3(0.12, 0.1, 0.12), muzzle - Vector3(0, 0.05, 0), "glow_orange")
+			head.prism(0.09, 0.07, 1.3, 6, Vector3(x, 0.45, z), Palette.surf("metal"), Vector3(35, 0, 0))
+			head.box(Vector3(0.12, 0.1, 0.12), muzzle - Vector3(0, 0.05, 0), Palette.surf("glow_orange"))
 	if level >= 2:
-		head.box(Vector3(0.3, 0.2, 0.3), Vector3(0, 0.6, -0.4), "hull_dark")
+		head.box(Vector3(0.3, 0.2, 0.3), Vector3(0, 0.6, -0.4), Palette.surf("hull_dark"))
 	if level >= 3:
 		for x: float in [-0.6, 0.6]:
-			head.prism(0.25, 0.25, 0.24, 8, Vector3(x - 0.12 * signf(x), 0.3, -0.15), "hull_dark",
+			head.prism(0.25, 0.25, 0.24, 8, Vector3(x - 0.12 * signf(x), 0.3, -0.15), Palette.surf("hull_dark"),
 				Vector3(0, 0, -90 * signf(x)))
 
 
@@ -715,146 +715,146 @@ static func _arc_tower(p: Parts, level: int) -> void:
 	var m := p.body
 	_plinth(m, 3, 0.35)
 	var height := 1.4 + 0.15 * level
-	m.prism(0.4, 0.18, height, 6, Vector3(0, 0.35, 0), "hull")
+	m.prism(0.4, 0.18, height, 6, Vector3(0, 0.35, 0), Palette.surf("hull"))
 	var coil := _accent(level, 4, "metal")
 	var coils := 1 + level
 	for i: int in coils:
 		var t := (i + 0.5) / coils
 		var radius := lerpf(0.4, 0.18, t)
-		m.ring(radius, radius + 0.2, 0.08, 6, Vector3(0, 0.35 + height * t, 0), coil)
+		m.ring(radius, radius + 0.2, 0.08, 6, Vector3(0, 0.35 + height * t, 0), Palette.surf(coil))
 	var top := 0.35 + height
-	m.prism(0.12, 0.1, 0.2, 6, Vector3(0, top, 0), "metal_dark")
+	m.prism(0.12, 0.1, 0.2, 6, Vector3(0, top, 0), Palette.surf("metal_dark"))
 	var orb := 0.32 + 0.04 * level
-	m.orb(orb, 8, 4, Vector3(0, top + 0.2 + orb * 0.9, 0), "glow_cyan")
+	m.orb(orb, 8, 4, Vector3(0, top + 0.2 + orb * 0.9, 0), Palette.surf("glow_cyan"))
 
 
 static func _cloaked_sentry(p: Parts, level: int) -> void:
 	var m := p.body
-	m.prism(0.92, 0.85, 0.25, 8, Vector3.ZERO, "hull_dark", OCTAGON)
+	m.prism(0.92, 0.85, 0.25, 8, Vector3.ZERO, Palette.surf("hull_dark"), OCTAGON)
 	if level >= 3:
-		m.prism(0.93, 0.93, 0.05, 8, Vector3(0, 0.18, 0), "gold", OCTAGON)
-	m.prism(0.62, 0.6, 0.06, 8, Vector3(0, 0.25, 0), "hull", OCTAGON)
+		m.prism(0.93, 0.93, 0.05, 8, Vector3(0, 0.18, 0), Palette.surf("gold"), OCTAGON)
+	m.prism(0.62, 0.6, 0.06, 8, Vector3(0, 0.25, 0), Palette.surf("hull"), OCTAGON)
 	for yaw: float in [45.0, -45.0]:
-		m.box(Vector3(1.1, 0.03, 0.06), Vector3(0, 0.31, 0), "glow_cyan", Vector3(0, yaw, 0))
+		m.box(Vector3(1.1, 0.03, 0.06), Vector3(0, 0.31, 0), Palette.surf("glow_cyan"), Vector3(0, yaw, 0))
 	if level >= 2:
-		m.ring(0.6, 0.67, 0.04, 8, Vector3(0, 0.25, 0), "glow_cyan", OCTAGON)
+		m.ring(0.6, 0.67, 0.04, 8, Vector3(0, 0.25, 0), Palette.surf("glow_cyan"), OCTAGON)
 
 
 static func _gravity_well(p: Parts, level: int) -> void:
 	var m := p.body
-	m.prism(0.92, 0.85, 0.2, 8, Vector3.ZERO, "hull_dark", OCTAGON)
+	m.prism(0.92, 0.85, 0.2, 8, Vector3.ZERO, Palette.surf("hull_dark"), OCTAGON)
 	for side: float in [-1.0, 1.0]:
-		m.box(Vector3(0.14, 1.2, 0.14), Vector3(side * 0.48, 0.2, -side * 0.48), _accent(level, 3, "hull_light"),
+		m.box(Vector3(0.14, 1.2, 0.14), Vector3(side * 0.48, 0.2, -side * 0.48), Palette.surf(_accent(level, 3, "hull_light")),
 			Vector3(0, 45, 0))
-		m.box(Vector3(0.2, 0.08, 0.2), Vector3(side * 0.48, 1.4, -side * 0.48), "glow_violet", Vector3(0, 45, 0))
-	m.prism(0.25, 0.18, 0.35, 6, Vector3(0, 0.2, 0), "hull")
-	m.orb(0.15, 6, 3, Vector3(0, 1.0, 0), "glow_violet")
+		m.box(Vector3(0.2, 0.08, 0.2), Vector3(side * 0.48, 1.4, -side * 0.48), Palette.surf("glow_violet"), Vector3(0, 45, 0))
+	m.prism(0.25, 0.18, 0.35, 6, Vector3(0, 0.2, 0), Palette.surf("hull"))
+	m.orb(0.15, 6, 3, Vector3(0, 1.0, 0), Palette.surf("glow_violet"))
 	p.pivot = Vector3(0, 1.0, 0)
 	p.speed = 1.5
-	p.spin.ring(0.45, 0.58, 0.1, 10, Vector3(0, 0, -0.05), "glow_violet", Vector3(90, 0, 0))
+	p.spin.ring(0.45, 0.58, 0.1, 10, Vector3(0, 0, -0.05), Palette.surf("glow_violet"), Vector3(90, 0, 0))
 	if level >= 2:
-		p.spin.ring(0.28, 0.38, 0.08, 8, Vector3(0.04, 0, 0), "glow_violet", Vector3(0, 0, 90))
+		p.spin.ring(0.28, 0.38, 0.08, 8, Vector3(0.04, 0, 0), Palette.surf("glow_violet"), Vector3(0, 0, 90))
 
 
 static func _emp_tower(p: Parts, level: int) -> void:
 	var m := p.body
 	_plinth(m, 3, 0.35)
 	var height := 1.9 + 0.3 * level
-	m.prism(0.5, 0.28, height, 6, Vector3(0, 0.35, 0), "hull")
+	m.prism(0.5, 0.28, height, 6, Vector3(0, 0.35, 0), Palette.surf("hull"))
 	var top := 0.35 + height
-	m.ring(0.28, 0.62, 0.16, 8, Vector3(0, top - 0.35, 0), "hazard")
+	m.ring(0.28, 0.62, 0.16, 8, Vector3(0, top - 0.35, 0), Palette.surf("hazard"))
 	if level >= 2:
-		m.ring(0.38, 0.6, 0.1, 8, Vector3(0, 0.35 + height * 0.45, 0), _accent(level, 3, "hazard"))
-	m.dome(0.3, 0.3, 6, 2, Vector3(0, top, 0), "glow_blue")
+		m.ring(0.38, 0.6, 0.1, 8, Vector3(0, 0.35 + height * 0.45, 0), Palette.surf(_accent(level, 3, "hazard")))
+	m.dome(0.3, 0.3, 6, 2, Vector3(0, top, 0), Palette.surf("glow_blue"))
 	if level >= 3:
 		for degrees: float in [45.0, 135.0, 225.0, 315.0]:
-			m.pyramid(0.12, 0.35, _around(0.5, degrees, top - 0.19), "gold")
+			m.pyramid(0.12, 0.35, _around(0.5, degrees, top - 0.19), Palette.surf("gold"))
 
 
 static func _railgun(p: Parts, level: int) -> void:
 	var m := p.body
 	_plinth(m, 3, 0.35)
-	m.box(Vector3(1.1, 0.5, 1.1), Vector3(0, 0.35, 0), "hull", Vector3(0, 45, 0))
+	m.box(Vector3(1.1, 0.5, 1.1), Vector3(0, 0.35, 0), Palette.surf("hull"), Vector3(0, 45, 0))
 	if level >= 2:
 		for side: float in [-1.0, 1.0]:
-			m.box(Vector3(0.3, 0.4, 0.5), Vector3(side * 0.55, 0.35, side * 0.55), "hull_light", Vector3(0, 45, 0))
+			m.box(Vector3(0.3, 0.4, 0.5), Vector3(side * 0.55, 0.35, side * 0.55), Palette.surf("hull_light"), Vector3(0, 45, 0))
 	var back := Vector3(-0.85, 0.95, 0.85)
 	var muzzle := Vector3(0.95 + 0.05 * level, 1.15, -0.95 - 0.05 * level)
-	m.box(Vector3(0.6, 0.4, 0.6), back + Vector3(0.2, -0.15, -0.2), "hull_dark", Vector3(0, 45, 0))
+	m.box(Vector3(0.6, 0.4, 0.6), back + Vector3(0.2, -0.15, -0.2), Palette.surf("hull_dark"), Vector3(0, 45, 0))
 	var side_offset := Vector3(0.085, 0, 0.085)
 	var rail := _accent(level, 3, "metal")
-	m.strut(back + side_offset, muzzle + side_offset, 0.1, rail)
-	m.strut(back - side_offset, muzzle - side_offset, 0.1, rail)
+	m.strut(back + side_offset, muzzle + side_offset, 0.1, Palette.surf(rail))
+	m.strut(back - side_offset, muzzle - side_offset, 0.1, Palette.surf(rail))
 	for t: float in [0.35, 0.55, 0.75]:
-		m.box(Vector3(0.2, 0.14, 0.2), back.lerp(muzzle, t) - Vector3(0, 0.07, 0), "glow_cyan", Vector3(0, 45, 0))
+		m.box(Vector3(0.2, 0.14, 0.2), back.lerp(muzzle, t) - Vector3(0, 0.07, 0), Palette.surf("glow_cyan"), Vector3(0, 45, 0))
 
 
 static func _ion_beam(p: Parts, level: int) -> void:
 	var m := p.body
-	m.prism(0.9, 0.85, 0.25, 6, Vector3.ZERO, "hull_dark")
+	m.prism(0.9, 0.85, 0.25, 6, Vector3.ZERO, Palette.surf("hull_dark"))
 	var height := 1.1 + 0.3 * level
-	m.prism(0.2, 0.13, height, 6, Vector3(0, 0.25, 0), "hull_light")
+	m.prism(0.2, 0.13, height, 6, Vector3(0, 0.25, 0), Palette.surf("hull_light"))
 	var top := 0.25 + height
-	m.ring(0.13, 0.3, 0.12, 8, Vector3(0, top - 0.1, 0), _accent(level, 2, "metal"))
-	m.orb(0.22, 8, 3, Vector3(0, top + 0.2, 0), "glow_red")
+	m.ring(0.13, 0.3, 0.12, 8, Vector3(0, top - 0.1, 0), Palette.surf(_accent(level, 2, "metal")))
+	m.orb(0.22, 8, 3, Vector3(0, top + 0.2, 0), Palette.surf("glow_red"))
 	if level >= 2:
-		m.cone(0.06, 0.3, 4, Vector3(0, top + 0.38, 0), "gold")
+		m.cone(0.06, 0.3, 4, Vector3(0, top + 0.38, 0), Palette.surf("gold"))
 
 
 static func _orbital_cannon(p: Parts, level: int) -> void:
 	var m := p.body
-	m.prism(1.85, 1.75, 0.4, 8, Vector3.ZERO, "hull_dark", OCTAGON)
-	m.prism(1.25, 1.15, 0.35, 8, Vector3(0, 0.4, 0), "hull", OCTAGON)
-	m.prism(0.4, 0.3, 0.5, 6, Vector3(0, 0.75, 0), "hull_light")
+	m.prism(1.85, 1.75, 0.4, 8, Vector3.ZERO, Palette.surf("hull_dark"), OCTAGON)
+	m.prism(1.25, 1.15, 0.35, 8, Vector3(0, 0.4, 0), Palette.surf("hull"), OCTAGON)
+	m.prism(0.4, 0.3, 0.5, 6, Vector3(0, 0.75, 0), Palette.surf("hull_light"))
 	var dish := 1.2 if level < 2 else 1.4
 	var aim := Vector3(40, 135, 0)
 	var centre := Vector3(0, 1.25, 0)
 	m.lathe(PackedVector2Array([
 		Vector2(0.15, 0), Vector2(dish, 0.45), Vector2(dish - 0.12, 0.5), Vector2(0, 0.15),
-	]), 10, centre, "white", aim)
-	m.cone(0.12, 1.2, 6, centre + LowPolyMesh.turn(Vector3(0, 0.15, 0), aim), "glow_blue", aim)
+	]), 10, centre, Palette.surf("white"), aim)
+	m.cone(0.12, 1.2, 6, centre + LowPolyMesh.turn(Vector3(0, 0.15, 0), aim), Palette.surf("glow_blue"), aim)
 	if level >= 2:
-		m.ring(dish - 0.12, dish + 0.02, 0.06, 10, centre + LowPolyMesh.turn(Vector3(0, 0.45, 0), aim), "gold", aim)
+		m.ring(dish - 0.12, dish + 0.02, 0.06, 10, centre + LowPolyMesh.turn(Vector3(0, 0.45, 0), aim), Palette.surf("gold"), aim)
 		for degrees: float in [45.0, 225.0]:
 			var pylon := _around(1.45, degrees, 0.4)
-			m.prism(0.14, 0.1, 0.8, 4, pylon, "hull_light")
-			m.pyramid(0.16, 0.2, pylon + Vector3(0, 0.8, 0), "glow_blue")
+			m.prism(0.14, 0.1, 0.8, 4, pylon, Palette.surf("hull_light"))
+			m.pyramid(0.16, 0.2, pylon + Vector3(0, 0.8, 0), Palette.surf("glow_blue"))
 
 
 # --- Traps (at most 40 triangles) ------------------------------------------------
 
 static func _proximity_mine(p: Parts, level: int) -> void:
 	var m := p.body
-	m.prism(0.38, 0.34, 0.1, 6, Vector3.ZERO, "hull_light")
+	m.prism(0.38, 0.34, 0.1, 6, Vector3.ZERO, Palette.surf("hull_light"))
 	var dots := level + 1
 	for i: int in dots:
-		m.pyramid(0.1, 0.06, _around(0.2, 360.0 * i / dots, 0.1), "glow_gold" if level >= 3 else "glow_red")
+		m.pyramid(0.1, 0.06, _around(0.2, 360.0 * i / dots, 0.1), Palette.surf("glow_gold" if level >= 3 else "glow_red"))
 
 
 static func _grav_trap(p: Parts, level: int) -> void:
 	var m := p.body
-	m.box(Vector3(0.76, 0.06, 0.76), Vector3.ZERO, "hull")
+	m.box(Vector3(0.76, 0.06, 0.76), Vector3.ZERO, Palette.surf("hull"))
 	for corner: Vector2 in [Vector2(-1, -1), Vector2(1, -1), Vector2(-1, 1), Vector2(1, 1)]:
-		m.pyramid(0.14, 0.4, Vector3(corner.x * 0.27, 0.06, corner.y * 0.27), _accent(level, 2, "metal"))
-	m.pyramid(0.24, 0.1, Vector3(0, 0.06, 0), "glow_violet")
+		m.pyramid(0.14, 0.4, Vector3(corner.x * 0.27, 0.06, corner.y * 0.27), Palette.surf(_accent(level, 2, "metal")))
+	m.pyramid(0.24, 0.1, Vector3(0, 0.06, 0), Palette.surf("glow_violet"))
 
 
 static func _flak_mine(p: Parts, level: int) -> void:
 	var m := p.body
-	m.prism(0.14, 0.12, 0.15, 4, Vector3.ZERO, "hull_dark")
-	m.orb(0.27, 5, 3, Vector3(0, 0.38, 0), "hull")
+	m.prism(0.14, 0.12, 0.15, 4, Vector3.ZERO, Palette.surf("hull_dark"))
+	m.orb(0.27, 5, 3, Vector3(0, 0.38, 0), Palette.surf("hull"))
 	var dot := "glow_gold" if level >= 3 else "glow_orange"
 	for i: int in mini(level, 2):
-		m.pyramid(0.14, 0.08, _around(0.14 * i, 0, 0.58), dot)
+		m.pyramid(0.14, 0.08, _around(0.14 * i, 0, 0.58), Palette.surf(dot))
 
 
 static func _mega_mine(p: Parts, level: int) -> void:
 	var m := p.body
-	m.prism(0.8, 0.75, 0.12, 6, Vector3.ZERO, "metal_dark")
+	m.prism(0.8, 0.75, 0.12, 6, Vector3.ZERO, Palette.surf("metal_dark"))
 	for offset: float in [-0.3, 0.0, 0.3]:
 		_plate(m, Vector2(0.12, 0.7), Vector3(offset, 0.121, 0), "hazard", 30)
 	for i: int in 3:
-		m.pyramid(0.1, 0.05, _around(0.55, 90 + 120 * i, 0.12), "glow_gold" if level >= 2 else "glow_red")
+		m.pyramid(0.1, 0.05, _around(0.55, 90 + 120 * i, 0.12), Palette.surf("glow_gold" if level >= 2 else "glow_red"))
 
 
 # --- Walls (at most 40 triangles) ------------------------------------------------
@@ -862,6 +862,6 @@ static func _mega_mine(p: Parts, level: int) -> void:
 static func _barrier_wall(p: Parts, level: int) -> void:
 	var m := p.body
 	var height := 0.5 + 0.06 * level
-	m.box(Vector3(0.86, height, 0.86), Vector3.ZERO, "hull")
-	m.box(Vector3(0.74, 0.22, 0.74), Vector3(0, height, 0), "hull_light")
-	m.box(Vector3(0.76, 0.06, 0.34), Vector3(0, height + 0.2, 0), WALL_GLOWS[level - 1])
+	m.box(Vector3(0.86, height, 0.86), Vector3.ZERO, Palette.surf("hull"))
+	m.box(Vector3(0.74, 0.22, 0.74), Vector3(0, height, 0), Palette.surf("hull_light"))
+	m.box(Vector3(0.76, 0.06, 0.34), Vector3(0, height + 0.2, 0), Palette.surf(WALL_GLOWS[level - 1]))
