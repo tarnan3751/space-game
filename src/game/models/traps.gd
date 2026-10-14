@@ -12,6 +12,7 @@ static var CASING := Surf.make(MaterialKit.Layer.PLATE, MaterialKit.GUNMETAL, 2.
 static var CASING_MID := Surf.make(MaterialKit.Layer.PLATE, MaterialKit.HULL_MID, 2.0, Surf.LIT, true)
 static var RED := Surf.make(MaterialKit.Layer.GLOW, MaterialKit.DEFENCE, 1.0, Surf.UNLIT, true)
 static var VIOLET := Surf.make(MaterialKit.Layer.GLOW, MaterialKit.ANTIMATTER, 1.0, Surf.UNLIT, true)
+static var YELLOW := Surf.make(MaterialKit.Layer.GLOW, MaterialKit.HAZARD, 1.0, Surf.UNLIT, true)
 ## The vortex's swirl: thin violet strips, too thin for an outline.
 static var SWIRL := Surf.make(MaterialKit.Layer.GLOW, MaterialKit.ANTIMATTER, 1.0, Surf.UNLIT, true, false)
 ## The dark throat of the gravity trap's vortex.
@@ -72,19 +73,44 @@ static func build_grav_trap(p: Parts, level: int) -> void:
 		m.ring(0.13, 0.15, 0.03, 16, hover + Vector3(0, 0.01, 0), VIOLET)
 
 
+## A squat pod banded in hazard stripes with upward barrels round a sensor lens, their bores
+## glowing. A barrel more at each level.
 static func build_flak_mine(p: Parts, level: int) -> void:
 	var m := p.body
-	m.prism(0.14, 0.12, 0.15, 4, Vector3.ZERO, Parts.surf("hull_dark"))
-	m.orb(0.27, 5, 3, Vector3(0, 0.38, 0), Parts.surf("hull"))
-	var dot := "glow_gold" if level >= 3 else "glow_orange"
-	for i: int in mini(level, 2):
-		m.pyramid(0.14, 0.08, Parts.around(0.14 * i, 0, 0.58), Parts.surf(dot))
+	var base := Vector3(0, Parts.PAD_HEIGHT, 0)
+	Parts.foundation(m, 1)
+	Parts.tank(m, 0.26, 0.2, base, CASING, 0.05)
+	m.ring(0.26, 0.275, 0.07, 16, base + Vector3(0, 0.05, 0), HAZARD_FINE)
+	var top := base + Vector3(0, 0.2, 0)
+	var barrels := level + 1
+	for i: int in barrels:
+		var spot := Parts.around(0.15, 135.0 + 360.0 * i / barrels, 0.0) + top
+		m.prism(0.05, 0.05, 0.16, 12, spot, CASING_MID)
+		m.disc(0.032, 12, spot + Vector3(0, 0.161, 0), YELLOW)
+	m.dome(0.075, 0.07, 16, 3, top, Parts.GLASS)
+	if level >= 3:
+		m.ring(0.075, 0.1, 0.025, 16, top, GOLD_ROUND)
 
 
+## A big armoured dome on a hazard band, warning lights round its foot and a fuse cap on its
+## crown. A thicker dome and more lights at 2.
 static func build_mega_mine(p: Parts, level: int) -> void:
 	var m := p.body
-	m.prism(0.8, 0.75, 0.12, 6, Vector3.ZERO, Parts.surf("metal_dark"))
-	for offset: float in [-0.3, 0.0, 0.3]:
-		Parts.plate(m, Vector2(0.12, 0.7), Vector3(offset, 0.121, 0), "hazard", 30)
+	var base := Vector3(0, Parts.PAD_HEIGHT, 0)
+	Parts.foundation(m, 2)
+	m.ring(0.6, 0.72, 0.12, 24, base, HAZARD_FINE)
+	var radius := 0.62 if level < 2 else 0.68
+	var height := 0.42 if level < 2 else 0.54
+	m.dome(radius, height, 24, 6, base + Vector3(0, 0.06, 0), CASING)
+	if level >= 2:
+		m.ring(radius - 0.02, radius + 0.04, 0.05, 24, base + Vector3(0, 0.1, 0), GOLD_ROUND)
+	var lights := 4 if level < 2 else 6
+	for i: int in lights:
+		m.dome(0.06, 0.06, 16, 3, Parts.around(0.67, 45.0 + 360.0 * i / lights, 0.12) + base, RED)
+	var crown := base + Vector3(0, 0.06 + height - 0.02, 0)
+	m.prism(0.13, 0.11, 0.08, 16, crown, CASING_MID)
+	m.dome(0.07, 0.07, 16, 3, crown + Vector3(0, 0.08, 0), RED)
 	for i: int in 3:
-		m.pyramid(0.1, 0.05, Parts.around(0.55, 90 + 120 * i, 0.12), Parts.surf("glow_gold" if level >= 2 else "glow_red"))
+		var degrees := 90.0 + 120.0 * i
+		var foot := Parts.around(0.1, degrees, 0.06) + crown
+		m.cone(0.025, 0.14, 8, foot, CASING_MID, Parts.facing(Parts.around(0.5, degrees, 1.0)))
