@@ -120,8 +120,8 @@ docs/            project_overview.md (scope, status, roadmap, decisions); refere
 scenes/          main.tscn only
 src/core/        catalog, base_state, building_state, base_grid, seeded_rng
 src/game/        main, iso_camera, world_input, placement_controller, base_view,
-                 building_view, building_models, low_poly_mesh, surf, material_kit, hud, format,
-                 toon.gdshader, toon_common.gdshaderinc, ink.gdshader, ground.gdshader
+                 building_view, building_models, wall_mesh, low_poly_mesh, surf, material_kit, hud,
+                 format, toon.gdshader, toon_common.gdshaderinc, ink.gdshader, ground.gdshader
 src/game/models/ parts (the model being built, shared helpers and surfaces), then one file of
                  model builders per category: core, resources, army, defense, traps, walls
 test/core/       test_*.gd (one file per core area)

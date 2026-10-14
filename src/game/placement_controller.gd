@@ -258,6 +258,8 @@ func _on_drag_started(screen_pos: Vector2) -> void:
 		_drag_cell = building.cell
 		_grab_offset = building.cell - cell
 		base_view.dragging_id = building.id
+		# A lifted wall leaves the merged wall mesh at once, and its own post shows.
+		base_view.sync(state)
 
 
 func _on_dragged(screen_pos: Vector2, screen_delta: Vector2) -> void:

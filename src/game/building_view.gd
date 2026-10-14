@@ -43,6 +43,8 @@ var _inked: bool = false
 var _spinners: Array[Node3D] = []
 var _spin_speeds: PackedFloat32Array = PackedFloat32Array()
 var _animate: bool = true
+## BaseView's merged wall mesh draws this building, so its own model is hidden (set_merged).
+var _merged: bool = false
 
 
 ## Call once, before adding to the tree. `level` picks the model (level 1's while it is 0).
@@ -95,7 +97,7 @@ func _ready() -> void:
 
 ## level 0 = first construction (scaffold). busy = constructing or upgrading.
 func show_status(level: int, busy: bool, target_level: int, seconds_left: int) -> void:
-	_model.visible = level >= 1
+	_model.visible = level >= 1 and not _merged
 	_scaffold.visible = level < 1
 	_animate = level >= 1 and not busy
 	_label.visible = busy
@@ -111,6 +113,19 @@ func set_footprint(mode: Footprint) -> void:
 		_footprint_material.albedo_color = FOOTPRINT_COLORS[mode]
 	_selected = mode == Footprint.SELECTED
 	_update_outlines()
+
+
+## A wall that BaseView's merged wall mesh draws hides its model; the footprint tile, the
+## label and the lift stay the view's. The scaffold, shown while the level is 0, is untouched.
+## Its outlines go with the model, so a merged wall shows no gold when it is selected.
+func set_merged(on: bool) -> void:
+	_merged = on
+	_model.visible = not on and not _scaffold.visible
+
+
+## Whether the view draws its own model: finished, and not drawn by the merged wall mesh.
+func is_model_visible() -> bool:
+	return _model.visible
 
 
 ## Raised slightly while being dragged, so it reads as "picked up", with gold outlines (a

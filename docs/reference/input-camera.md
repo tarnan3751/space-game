@@ -1,11 +1,11 @@
 # Input and camera
 
 How `src/game/` turns touches into commands and draws the base: `main.gd`, `IsoCamera`,
-`WorldInput`, `PlacementController`, `BaseView`, `BuildingView` and `BuildingModels`. The HUD is
-in `hud.md`; how the models, the ground and the scenery look (the material kit, `LowPolyMesh`, the
-shaders, the outlines, the view states) is in `art-style.md`. This layer reads `BaseState` and
-never mutates it except through `PlacementController.apply` calls (`CLAUDE.md`, **Architecture
-rules**).
+`WorldInput`, `PlacementController`, `BaseView`, `BuildingView`, `BuildingModels` and
+`WallMesh`. The HUD is in `hud.md`; how the models, the ground and the scenery look (the
+material kit, `LowPolyMesh`, the shaders, the outlines, the view states, the wall pieces) is in
+`art-style.md`. This layer reads `BaseState` and never mutates it except through
+`PlacementController.apply` calls (`CLAUDE.md`, **Architecture rules**).
 
 ## The scene (`main.gd`)
 
@@ -129,8 +129,9 @@ Done) and `cancel_place()` both end the mode, and the walls stay.
 
 **Selecting and moving.** A tap on a building selects it, a tap on empty ground deselects. Only
 the selected building can be dragged (as in Clash); a drag on anything else pans the camera. A
-building drag lifts the view, follows the finger with the grab offset, clamps into the grid and
-colours the footprint by `state.check_move`; on release, if the cell changed, it applies
+building drag re-syncs the view as it starts (so a lifted wall leaves the merged wall mesh at
+once, **Walls**), lifts the view, follows the finger with the grab offset, clamps into the grid
+and colours the footprint by `state.check_move`; on release, if the cell changed, it applies
 `{"op": "move", "id", "cell"}` and then re-syncs the view (which also drops a failed move back).
 `upgrade_selected()` applies `{"op": "upgrade", "id"}`.
 
@@ -160,7 +161,8 @@ the origin, cell (x, y) on world (x, z).
 | `world_to_cell(point)` | The cell under a ground point (floor). |
 | `footprint_cell_at(point, size)` | The top-left cell of a `size` footprint centred as closely as possible on a point (round). |
 | `area()` | The buildable area as a `Rect2` in world x/z; the camera's bounds. |
-| `sync(state)` | Makes `views` match `state.buildings`: frees views whose building is gone, changed type or has a new finished level (except the `dragging_id` view, which keeps its model until it is dropped), creates missing ones, pushes `show_status` to each, and for all but `dragging_id` sets the position, un-lifts, and shows the SELECTED tile on `selected_id`. |
+| `sync(state)` | Makes `views` match `state.buildings`: frees views whose building is gone, changed type or has a new finished level (except the `dragging_id` view, which keeps its model until it is dropped), creates missing ones, pushes `show_status` to each, and for all but `dragging_id` sets the position, un-lifts, and shows the SELECTED tile on `selected_id`. Last it brings the merged wall mesh up to date (`_sync_walls`, **Walls**). |
+| `walls` | The `WallMesh` that draws every finished wall but the dragged one. |
 | `set_grid_highlight(on)` | Brightens the ground's cell lines (`GRID_LINES_PLACING`) or dims them back (`GRID_LINES`); `PlacementController` calls it as placement begins and ends. |
 | `clear()` | Frees every view (used when the state is replaced). |
 
@@ -186,16 +188,18 @@ the origin, cell (x, y) on world (x, z).
 A `BuildingView` is one building's visual: the model for its finished level, a scaffold shown
 instead while `level` is 0, a footprint tile (`Footprint.NONE / SELECTED / VALID / INVALID`, the
 last three translucent cyan, green and red), and a billboard `Label3D` timer ("Building 10s",
-"Lv 2 1m 00s") shown while busy. `setup(id, type, level, size)` builds it for one level (level
-1's model while the level is 0); `building_level` records it, and `BaseView.sync` replaces the
-view when the finished level changes, so a building mid-upgrade shows its current level until
-the upgrade finishes. `show_status(level, busy, target_level, seconds_left)` is what
-`BaseView.sync` pushes each tick. `set_lifted(true)` raises the model by 0.35 while it is
-dragged or is the ghost. A selected or dragged view's outlines turn gold; the placement ghost
-keeps plain ink outlines, and its body takes the valid or invalid tint through `set_ghost(valid)`
-(`art-style.md`, **View states**). The node carrying `BuildingModels.SPIN_META` spins in `_process` while
-the building is finished and idle; a view with nothing to spin turns processing off in `_ready`,
-so walls and traps cost nothing per frame.
+"Lv 2 1m 00s") shown while busy. A wall drawn by the merged wall mesh hides its model
+(`set_merged(true)`, **Walls**) and keeps the rest; `is_model_visible()` says whether the view
+draws its own model. `setup(id, type, level, size)` builds it for one level (level 1's model
+while the level is 0); `building_level` records it, and `BaseView.sync` replaces the view when
+the finished level changes, so a building mid-upgrade shows its current level until the upgrade
+finishes. `show_status(level, busy, target_level, seconds_left)` is what `BaseView.sync` pushes
+each tick. `set_lifted(true)` raises the model by 0.35 while it is dragged or is the ghost. A
+selected or dragged view's outlines turn gold; the placement ghost keeps plain ink outlines, and
+its body takes the valid or invalid tint through `set_ghost(valid)` (`art-style.md`, **View
+states**). The node carrying `BuildingModels.SPIN_META` spins in `_process` while the building
+is finished and idle; a view with nothing to spin turns processing off in `_ready`, so walls and
+traps cost nothing per frame.
 
 `BuildingModels.create(type, level, size)` returns a `Node3D` holding the static body and its
 ink outline, and at most one spinning part (the radar, the drone, the drill, the harvester arm,
@@ -209,6 +213,37 @@ one warning. Meshes are built once per type and level and cached in a static dic
 nodes are per view. `create_scaffold(size)` is one cached, outlined model in hazard stripes. How a
 model is built and what it must keep (the contract, the budgets, the vocabulary) is in
 `art-style.md`, **Models**.
+
+## Walls (`wall_mesh.gd`)
+
+Finished walls are not drawn one model each: they are one merged mesh, a `WallMesh` that
+`BaseView` owns, in which each wall is the piece of its level and neighbour mask, a post plus a
+half-segment toward each orthogonal neighbour that is also a finished wall (the pieces, the mask
+bits and the look per level are in `art-style.md`, **Walls**). Two adjacent walls meet on their
+shared edge and each draws its own level's style, so a painted line reads as one barrier and
+corners, T-junctions and crossings close. Walls connect four-connected, at any levels, never
+diagonally; a wall under upgrade keeps its finished level's piece.
+
+| `WallMesh` member | What |
+| --- | --- |
+| `body`, `outline` | Its two `MeshInstance3D`: the pieces' bodies and their ink outlines. The outline casts no shadow. |
+| `draws(catalog, building)` | Static: whether the merged mesh draws a building, a wall (category `PlacementController.PAINT_CATEGORY`, `"walls"`) with `level >= 1`. Every type of that category is drawn as barrier pieces, so it must be 1x1. |
+| `rebuild(state, skip_id)` | Collects every wall `draws` accepts but `skip_id`, computes each one's mask from the others' cells, and appends each piece's body and outline arrays, moved to its cell, into one `ArrayMesh` for each. The copy is the engine's bulk calls (`Transform3D * PackedVector3Array`, `append_array`), nothing per vertex in script. |
+| `mask_at(cell)` | The mask of the wall drawn on a cell at the last rebuild, `-1` when none is. |
+
+`BaseView.sync` ends with `_sync_walls`: every wall view the mesh draws gets
+`BuildingView.set_merged(true)`, which hides its model but keeps the footprint tile, the label
+and the lift; then the walls drawn, each `(x, y, level)` packed into a `PackedInt64Array` in id
+order, are compared with the last rebuild's, and the mesh is rebuilt only when they differ (a
+wall placed, moved, upgraded or lifted), never on the one-second tick alone. The rebuild is
+deferred to the end of the frame, so a fast paint stroke that places several walls in one drag
+event rebuilds once. The dragged wall (`dragging_id`) is the exception: the mesh skips it and
+its view gets `set_merged(false)`, so its own post follows the finger, lifted with gold outlines
+like any dragged building, while its neighbours lose their joints. The drag's start re-syncs the
+view (`PlacementController`, **Selecting and moving**) and the drop's sync adds it back. A
+selected wall's gold outlines belong to its hidden model, so a merged wall shows its footprint
+tile only. The merged mesh costs a fixed handful of draw calls (the body, the outline, the
+body's shadow) however many walls there are.
 
 ## Format (`format.gd`)
 

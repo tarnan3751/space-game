@@ -48,6 +48,15 @@ func triangle_count() -> int:
 
 ## The body, with the toon material. Call once the parts are added.
 func to_mesh() -> ArrayMesh:
+	var mesh := ArrayMesh.new()
+	mesh.add_surface_from_arrays(Mesh.PRIMITIVE_TRIANGLES, to_arrays())
+	mesh.surface_set_material(0, MaterialKit.toon())
+	return mesh
+
+
+## The body's surface arrays (vertex, normal, UV, UV2, colour), for a caller that merges
+## meshes itself (WallMesh).
+func to_arrays() -> Array:
 	var arrays := []
 	arrays.resize(Mesh.ARRAY_MAX)
 	arrays[Mesh.ARRAY_VERTEX] = _vertices
@@ -55,14 +64,22 @@ func to_mesh() -> ArrayMesh:
 	arrays[Mesh.ARRAY_TEX_UV] = _uvs
 	arrays[Mesh.ARRAY_TEX_UV2] = _uv2s
 	arrays[Mesh.ARRAY_COLOR] = _colors
-	var mesh := ArrayMesh.new()
-	mesh.add_surface_from_arrays(Mesh.PRIMITIVE_TRIANGLES, arrays)
-	mesh.surface_set_material(0, MaterialKit.toon())
-	return mesh
+	return arrays
 
 
 ## The ink outline, with the ink material; null when no part is outlined.
 func to_outline_mesh() -> ArrayMesh:
+	var arrays := to_outline_arrays()
+	if arrays.is_empty():
+		return null
+	var mesh := ArrayMesh.new()
+	mesh.add_surface_from_arrays(Mesh.PRIMITIVE_TRIANGLES, arrays)
+	mesh.surface_set_material(0, MaterialKit.ink())
+	return mesh
+
+
+## The outline's surface arrays (vertex, normal); empty when no part is outlined.
+func to_outline_arrays() -> Array:
 	var vertices := PackedVector3Array()
 	var sums: Dictionary[Vector3i, Vector3] = {}
 	for t: int in _outlined.size():
@@ -74,7 +91,7 @@ func to_outline_mesh() -> ArrayMesh:
 			var sum: Vector3 = sums.get(key, Vector3.ZERO)
 			sums[key] = sum + _face_normals[t] * _corner_angle(i)
 	if vertices.is_empty():
-		return null
+		return []
 	var normals := PackedVector3Array()
 	for vertex: Vector3 in vertices:
 		normals.append(sums[_weld(vertex)].normalized())
@@ -82,10 +99,7 @@ func to_outline_mesh() -> ArrayMesh:
 	arrays.resize(Mesh.ARRAY_MAX)
 	arrays[Mesh.ARRAY_VERTEX] = vertices
 	arrays[Mesh.ARRAY_NORMAL] = normals
-	var mesh := ArrayMesh.new()
-	mesh.add_surface_from_arrays(Mesh.PRIMITIVE_TRIANGLES, arrays)
-	mesh.surface_set_material(0, MaterialKit.ink())
-	return mesh
+	return arrays
 
 
 ## `offset` turned by `rot` (Euler degrees, as for the parts), to place a part on a turned one.

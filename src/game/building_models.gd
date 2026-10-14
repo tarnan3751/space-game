@@ -14,8 +14,8 @@ extends RefCounted
 ##
 ## Each category shares a look: resources stand on square slabs (tanks, drills), the army on
 ## slabs as halls and domes with big doors, defences on octagonal plinths, traps lie flat and
-## walls are blocks. Level 1 is plain, each level adds a part or an accent, the top level
-## carries gold.
+## walls are posts that join their neighbours (models/walls.gd). Level 1 is plain, each level
+## adds a part or an accent, the top level carries gold.
 ##
 ## This file dispatches: each type's builder is a static build_<type>(p: Parts, level) in its
 ## category's file under src/game/models/ (core, resources, army, defense, traps, walls), and

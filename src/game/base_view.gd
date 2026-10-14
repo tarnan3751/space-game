@@ -1,8 +1,9 @@
 class_name BaseView
 extends Node3D
 ## Draws the base: the buildable ground with its cell grid, the terrain and rocks around it,
-## and one BuildingView per building. Also owns the cell <-> world mapping: 1 cell = 1 world
-## unit, grid centred on the origin, cell (x, y) maps to world (x, z).
+## and one BuildingView per building, the finished walls drawn together by one WallMesh. Also
+## owns the cell <-> world mapping: 1 cell = 1 world unit, grid centred on the origin, cell
+## (x, y) maps to world (x, z).
 ##
 ## The terrain and the rocks are generated from SCENERY_SEED, so every player's base sits in
 ## the same landscape. Each is one mesh painted from the material kit (the terrain mostly its
@@ -48,8 +49,14 @@ var views: Dictionary[int, BuildingView] = {}
 var selected_id: int = 0
 ## Building currently being dragged; sync() leaves its position alone.
 var dragging_id: int = 0
+## Every finished wall but the dragged one, in one mesh.
+var walls: WallMesh
 
 var _ground_material: ShaderMaterial
+## The walls `walls` draws, as (x << 32 | y << 16 | level) in id order: unchanged, no rebuild.
+var _wall_signature: PackedInt64Array = PackedInt64Array()
+## The state the pending wall rebuild reads; null when none is pending.
+var _walls_state: BaseState = null
 ## NOISE_SIZE x NOISE_SIZE heights in [0, 1], wrapping.
 var _noise: PackedFloat32Array = PackedFloat32Array()
 ## Each crater as (x, z, radius, depth).
@@ -62,6 +69,9 @@ func setup(size: Vector2i) -> void:
 	var rng := SeededRng.new(SCENERY_SEED)
 	_build_terrain(rng)
 	_build_rocks(rng)
+	walls = WallMesh.new()
+	walls.setup(self)
+	add_child(walls)
 
 
 ## World-space centre of a footprint whose top-left cell is `cell`.
@@ -123,6 +133,31 @@ func sync(state: BaseState) -> void:
 		view.set_lifted(false)
 		var mode := BuildingView.Footprint.SELECTED if id == selected_id else BuildingView.Footprint.NONE
 		view.set_footprint(mode)
+	_sync_walls(state)
+
+
+## The merged mesh draws every finished wall but the dragged one, whose view shows its own post
+## so it can follow the finger. The mesh is rebuilt only when the walls it draws, by cell and
+## level, changed, and at the end of the frame, once however many changed in it (a fast paint
+## stroke places several walls in one drag event).
+func _sync_walls(state: BaseState) -> void:
+	var signature := PackedInt64Array()
+	for id: int in state.buildings:
+		var building: BuildingState = state.buildings[id]
+		var merged := id != dragging_id and WallMesh.draws(state.catalog, building)
+		views[id].set_merged(merged)
+		if merged:
+			signature.append(building.cell.x << 32 | building.cell.y << 16 | building.level)
+	if signature != _wall_signature:
+		_wall_signature = signature
+		if _walls_state == null:
+			_rebuild_walls.call_deferred()
+		_walls_state = state
+
+
+func _rebuild_walls() -> void:
+	walls.rebuild(_walls_state, dragging_id)
+	_walls_state = null
 
 
 func clear() -> void:

@@ -226,7 +226,9 @@ faces are left out of boxes and lathes, since the camera always looks down.
 `sides` goes up to 24 and `rings` to 8 anywhere. `to_mesh()` is the body (VERTEX, NORMAL, UV,
 UV2, COLOR) on `MaterialKit.toon()`, `to_outline_mesh()` the outline on `MaterialKit.ink()` (null
 when nothing is outlined), and `triangle_count()` the body's triangles. Both meshes are unindexed
-triangle lists.
+triangle lists. `to_arrays()` and `to_outline_arrays()` are the same as surface arrays (the
+outline's empty when nothing is outlined), for a caller that merges meshes itself, as `WallMesh`
+does.
 
 - **UVs**: a face's corners in the part's own space, before `pos` and `rot`, projected along the
   dominant axis of its normal, times `uv_scale`. Round parts take U from the angle around their
@@ -278,7 +280,32 @@ zoom are where a model is judged.
 - Spinning parts (radar dishes, turbines, gyros): one per building at most.
 - Scale: a size-2 building stands 1.2 to 2.0 units tall, a 4×4 Command Center up to 3.2.
 - Walls connect: a post plus a half-segment towards each orthogonal neighbour that is also a
-  wall, meeting at the cell boundary, so neighbours of different levels each draw their own.
+  wall, meeting at the cell boundary, so neighbours of different levels each draw their own
+  (**Walls**).
+
+## Walls
+
+`models/walls.gd` builds the wall pieces, one per level and neighbour mask, and `WallMesh`
+(`input-camera.md`, **Walls**) merges the pieces of every finished wall into one mesh. A piece is
+a post on the cell centre and, for each neighbour in its mask, a half-segment from the post to
+that cell edge, lower than the post; two adjacent walls meet on their shared edge, each in its own
+level's style.
+
+The mask has one bit per orthogonal neighbour in cell space, where cell (x, y) is world (x, z);
+`NEIGHBOURS` lists the offsets in bit order:
+
+| Bit | Constant | Neighbour |
+| --- | --- | --- |
+| 1 | `PLUS_X` | cell (x + 1, y), world +x |
+| 2 | `MINUS_X` | cell (x - 1, y), world -x |
+| 4 | `PLUS_Z` | cell (x, y + 1), world +z |
+| 8 | `MINUS_Z` | cell (x, y - 1), world -z |
+
+`piece(level, mask)` builds a piece on first use and keeps its body and outline arrays
+(`to_arrays`, `to_outline_arrays`), 5 levels by 16 masks at most (a higher level shows level
+5's); every piece stays within the 250 body triangles of a wall piece (`wall_junctions` checks
+all 80). `build_barrier_wall`, which `BuildingModels.create("barrier_wall", level, 1)` dispatches
+to, is the lone post (mask 0): the paint brush, a lifted wall and the gallery show it.
 
 ## View states
 
@@ -291,6 +318,11 @@ ends (`BuildingView`).
 | Selected (`set_footprint(SELECTED)`) or lifted (`set_lifted(true)`, while dragged) | the outline instances take `ink_selected` (core gold); the footprint tile shows as before |
 | Placement ghost (`set_ghost(valid)`, from `PlacementController` as its spot is checked) | the body instances take `ghost_valid` or `ghost_invalid`: the toon shader with energy cyan or defence red mixed in at 0.65; the outline stays plain ink, though the ghost is lifted |
 | Under construction | the scaffold, a model like any other, outlined |
+
+A wall drawn by the merged wall mesh hides its own model, outlines included (`set_merged`), so a
+selected merged wall shows its footprint tile and no gold, and the merged outline stays plain ink.
+A dragged wall leaves the mesh and shows its own post, lifted with gold outlines like any dragged
+building; the paint brush is a ghost and keeps plain ink.
 
 ## Ground and scenery
 
@@ -313,4 +345,5 @@ draw once and never cast. Measured with `Performance.RENDER_TOTAL_DRAW_CALLS_IN_
 base is 57 draw calls, as it was before the kit; the model gallery's overview is 360 draw calls on
 page 1 and 171 on page 2 (294 and 157 before), and the render thread's CPU time is about 0.5 ms a
 frame either way. Keep `_process` free of allocation, and keep every building to its four
-instances.
+instances. The finished walls are one merged mesh, a fixed handful of draws however many there
+are (`input-camera.md`, **Walls**).
