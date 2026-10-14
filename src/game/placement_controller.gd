@@ -85,6 +85,11 @@ func is_painting() -> bool:
 	return _painting
 
 
+## The ghost's top-left cell (the brush's while painting); meaningful only while placing.
+func ghost_cell() -> Vector2i:
+	return _ghost_cell
+
+
 # --- Placing ---------------------------------------------------------------------
 
 func begin_place(type: String) -> void:
