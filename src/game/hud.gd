@@ -144,13 +144,13 @@ func apply_safe_area(inset: Rect2) -> void:
 ## with no size (headless) gets the whole rect. It applies only a rect that differs from
 ## the last one it fitted, so an inset the harness applied stays until the device's changes.
 func _fit_safe_area() -> void:
-	var visible := get_viewport().get_visible_rect()
+	var visible_rect := get_viewport().get_visible_rect()
 	var window := Rect2i(DisplayServer.window_get_position(), DisplayServer.window_get_size())
 	var safe := DisplayServer.get_display_safe_area().intersection(window)
-	var area := visible
+	var area := visible_rect
 	if safe.has_area():
-		var scale := visible.size / Vector2(window.size)
-		area = Rect2(Vector2(safe.position - window.position) * scale, Vector2(safe.size) * scale)
+		var ui_scale := visible_rect.size / Vector2(window.size)
+		area = Rect2(Vector2(safe.position - window.position) * ui_scale, Vector2(safe.size) * ui_scale)
 	if area == _fitted_area:
 		return
 	_fitted_area = area
