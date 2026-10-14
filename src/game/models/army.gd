@@ -101,8 +101,8 @@ static func _vault(m: LowPolyMesh, back: Vector3, width: float, length: float, w
 		gable.append(axis + Vector3(radius * cos(angle), radius * sin(angle), length + 0.012))
 	m.polygon(gable, Parts.HULL_LIGHT)
 	for k: int in 3:
-		var z := back.z + length * (0.18 + 0.32 * k)
-		m.ring(radius - 0.02, radius + 0.07, 0.14, 24, Vector3(back.x, axis.y, z), ORANGE_ROUND,
+		var rib_z := back.z + length * (0.18 + 0.32 * k)
+		m.ring(radius - 0.02, radius + 0.07, 0.14, 24, Vector3(back.x, axis.y, rib_z), ORANGE_ROUND,
 			Vector3(90, 0, 0))
 	# The door: leaves with a hazard band, hazard posts, a lintel and a glow strip.
 	var post := door * 0.5 + 0.08

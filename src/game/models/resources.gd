@@ -37,8 +37,8 @@ static func build_drone_bay(p: Parts, _level: int) -> void:
 	for side: float in [-1.0, 1.0]:
 		var rail := top + LowPolyMesh.turn(Vector3(side * 0.13, 0, 0), Vector3(0, 45, 0))
 		m.box_chamfered(Vector3(0.07, 0.06, 0.5), 0.02, rail, Parts.GUNMETAL, Vector3(0, 45, 0))
-		var clamp := top + LowPolyMesh.turn(Vector3(0, 0, side * 0.27), Vector3(0, 45, 0))
-		m.box_chamfered(Vector3(0.16, 0.16, 0.06), 0.02, clamp, Parts.HAZARD, Vector3(0, 45, 0))
+		var clamp_pos := top + LowPolyMesh.turn(Vector3(0, 0, side * 0.27), Vector3(0, 45, 0))
+		m.box_chamfered(Vector3(0.16, 0.16, 0.06), 0.02, clamp_pos, Parts.HAZARD, Vector3(0, 45, 0))
 	_drone(m, top + Vector3(0, 0.06, 0))
 
 	# The control booth on the far corner: a column, a glazed cab, a gold-rimmed roof (its one
@@ -589,23 +589,23 @@ static func build_antimatter_vault(p: Parts, level: int) -> void:
 	Parts.foundation(m, 3)
 	var ground := Parts.PAD_HEIGHT
 	m.box_chamfered(Vector3(2.1, 0.14, 2.1), 0.05, Vector3(0, ground, 0), ARMOUR)
-	var floor := ground + 0.14
+	var floor_y := ground + 0.14
 	var half := VAULT_SIZE * 0.5
-	m.box_chamfered(Vector3(VAULT_SIZE, VAULT_HEIGHT, VAULT_SIZE), VAULT_CHAMFER, Vector3(0, floor, 0), VAULT_ARMOUR)
+	m.box_chamfered(Vector3(VAULT_SIZE, VAULT_HEIGHT, VAULT_SIZE), VAULT_CHAMFER, Vector3(0, floor_y, 0), VAULT_ARMOUR)
 	# Seams: a band round the four faces, and one up each chamfered corner.
 	for k: int in 4:
 		var yaw := Vector3(0, 90 * k, 0)
-		m.box(Vector3(VAULT_SIZE - 2 * VAULT_CHAMFER, 0.05, 0.02), LowPolyMesh.turn(Vector3(0, floor + 0.86, half), yaw), SEAM, yaw)
+		m.box(Vector3(VAULT_SIZE - 2 * VAULT_CHAMFER, 0.05, 0.02), LowPolyMesh.turn(Vector3(0, floor_y + 0.86, half), yaw), SEAM, yaw)
 	for corner: Vector2 in VAULT_CORNERS:
 		var edge := Vector3(corner.x, 0, corner.y) * (half - VAULT_CHAMFER * 0.5)
-		m.box(Vector3(0.05, VAULT_HEIGHT - 0.2, 0.03), edge + Vector3(corner.x, 0, corner.y) * 0.012 + Vector3(0, floor + 0.06, 0),
+		m.box(Vector3(0.05, VAULT_HEIGHT - 0.2, 0.03), edge + Vector3(corner.x, 0, corner.y) * 0.012 + Vector3(0, floor_y + 0.06, 0),
 			SEAM, Vector3(0, rad_to_deg(atan2(corner.x, corner.y)), 0))
-	_vault_door(m, Vector3(0, floor + 0.52, half), gold)
+	_vault_door(m, Vector3(0, floor_y + 0.52, half), gold)
 	# The control screen on the shadowed face.
-	m.box_chamfered(Vector3(0.06, 0.36, 0.56), 0.02, Vector3(half, floor + 0.5, 0), Parts.HULL_DARK)
-	m.box(Vector3(0.02, 0.26, 0.44), Vector3(half + 0.05, floor + 0.55, 0), VAULT_SCREEN)
+	m.box_chamfered(Vector3(0.06, 0.36, 0.56), 0.02, Vector3(half, floor_y + 0.5, 0), Parts.HULL_DARK)
+	m.box(Vector3(0.02, 0.26, 0.44), Vector3(half + 0.05, floor_y + 0.55, 0), VAULT_SCREEN)
 
-	var top := floor + VAULT_HEIGHT
+	var top := floor_y + VAULT_HEIGHT
 	if level >= 2:
 		m.prism(0.72, 0.68, 0.1, 24, Vector3(0, top, 0), Parts.HULL_DARK_ROUND)
 		Parts.torus(m, 0.66, 0.035, 24, 6, Vector3(0, top + 0.065, 0), ANTIMATTER_GLOW)

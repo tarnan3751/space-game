@@ -27,13 +27,13 @@ var smooth: bool = false
 var outline: bool = true
 
 
-static func make(layer: int, tint: Color, uv_scale: float = 1.0, flags: int = LIT,
-		smooth: bool = false, outline: bool = true) -> Surf:
+static func make(new_layer: int, new_tint: Color, new_uv_scale: float = 1.0, new_flags: int = LIT,
+		new_smooth: bool = false, new_outline: bool = true) -> Surf:
 	var surf := Surf.new()
-	surf.layer = layer
-	surf.tint = tint
-	surf.uv_scale = uv_scale
-	surf.flags = flags
-	surf.smooth = smooth
-	surf.outline = outline
+	surf.layer = new_layer
+	surf.tint = new_tint
+	surf.uv_scale = new_uv_scale
+	surf.flags = new_flags
+	surf.smooth = new_smooth
+	surf.outline = new_outline
 	return surf

@@ -117,7 +117,7 @@ static func facing(dir: Vector3) -> Vector3:
 
 ## A round pipe from `from` to `to`, `radius` thick and `sides` round; capped at `to` unless
 ## that end is inside something.
-static func pipe(m: LowPolyMesh, from: Vector3, to: Vector3, radius: float, surf: Surf,
+static func pipe(m: LowPolyMesh, from: Vector3, to: Vector3, radius: float, surface: Surf,
 		sides: int = 16, capped: bool = true) -> void:
 	var length := from.distance_to(to)
 	if length <= 0.0:
@@ -125,47 +125,47 @@ static func pipe(m: LowPolyMesh, from: Vector3, to: Vector3, radius: float, surf
 	var profile := PackedVector2Array([Vector2(radius, 0), Vector2(radius, length)])
 	if capped:
 		profile.append(Vector2(0, length))
-	m.lathe(profile, sides, from, surf, facing(to - from))
+	m.lathe(profile, sides, from, surface, facing(to - from))
 
 
 ## A square beam from `from` to `to`, `width` thick, its edges chamfered `chamfer`: girders,
 ## booms, legs, gantry rails. Its square end is at `from`.
-static func beam(m: LowPolyMesh, from: Vector3, to: Vector3, width: float, surf: Surf,
+static func beam(m: LowPolyMesh, from: Vector3, to: Vector3, width: float, surface: Surf,
 		chamfer: float = 0.03) -> void:
 	var length := from.distance_to(to)
 	if length <= 0.0:
 		return
-	m.box_chamfered(Vector3(width, length, width), chamfer, from, surf, facing(to - from))
+	m.box_chamfered(Vector3(width, length, width), chamfer, from, surface, facing(to - from))
 
 
 ## A pipe through `points`, `sides` round, with a ball elbow a little fatter than the pipe at
 ## each bend.
-static func pipe_run(m: LowPolyMesh, points: PackedVector3Array, radius: float, surf: Surf,
+static func pipe_run(m: LowPolyMesh, points: PackedVector3Array, radius: float, surface: Surf,
 		sides: int = 16) -> void:
 	for i: int in points.size() - 1:
-		pipe(m, points[i], points[i + 1], radius, surf, sides, i == points.size() - 2)
+		pipe(m, points[i], points[i + 1], radius, surface, sides, i == points.size() - 2)
 	for i: int in range(1, points.size() - 1):
-		m.orb(radius * 1.3, sides, 4, points[i], surf)
+		m.orb(radius * 1.3, sides, 4, points[i], surface)
 
 
 ## A round tank standing on `pos`: a wall of `radius` and `height` whose top edge is
 ## chamfered `chamfer` into a flat lid.
-static func tank(m: LowPolyMesh, radius: float, height: float, pos: Vector3, surf: Surf,
+static func tank(m: LowPolyMesh, radius: float, height: float, pos: Vector3, surface: Surf,
 		chamfer: float = 0.06, sides: int = 16) -> void:
 	m.lathe(PackedVector2Array([
 		Vector2(radius, 0), Vector2(radius, height - chamfer), Vector2(radius - chamfer, height),
 		Vector2(0, height),
-	]), sides, pos, surf)
+	]), sides, pos, surface)
 
 
 ## A dish of `radius`, `depth` deep: a bowl opening along +Y before `rot`, the centre of its
 ## back on `pos`. Radar and comms dishes.
-static func dish(m: LowPolyMesh, radius: float, depth: float, pos: Vector3, surf: Surf,
+static func dish(m: LowPolyMesh, radius: float, depth: float, pos: Vector3, surface: Surf,
 		rot: Vector3 = Vector3.ZERO) -> void:
 	m.lathe(PackedVector2Array([
 		Vector2(0, 0), Vector2(radius * 0.55, depth * 0.3), Vector2(radius, depth),
 		Vector2(radius * 0.9, depth), Vector2(radius * 0.5, depth * 0.45), Vector2(0, depth * 0.3),
-	]), 24, pos, surf, rot)
+	]), 24, pos, surface, rot)
 
 
 ## A landing light standing on `pos`, `radius` wide: a squat housing and a glowing lens.
@@ -185,31 +185,31 @@ static func mast(m: LowPolyMesh, foot: Vector3, height: float, bulb_radius: floa
 ## A cylinder whose top edge is bevelled `chamfer` wide, turned by `rot`: a drum, a turret
 ## ring, a tilted housing. With 8 sides and OCTAGON it is an armoured octagon.
 static func drum(m: LowPolyMesh, radius: float, height: float, chamfer: float, sides: int,
-		pos: Vector3, surf: Surf, rot: Vector3 = Vector3.ZERO) -> void:
+		pos: Vector3, surface: Surf, rot: Vector3 = Vector3.ZERO) -> void:
 	m.lathe(PackedVector2Array([
 		Vector2(radius, 0), Vector2(radius, height - chamfer), Vector2(radius - chamfer, height),
 		Vector2(0, height),
-	]), sides, pos, surf, rot)
+	]), sides, pos, surface, rot)
 
 
 ## A ring of round section, `minor` thick around a circle of radius `major`, resting on `pos`
 ## (its bottom at pos.y, like box and prism): a coil, a corona, a gyro ring. Closed, so it
 ## reads at any tilt.
 static func torus(m: LowPolyMesh, major: float, minor: float, sides: int, segments: int,
-		pos: Vector3, surf: Surf, rot: Vector3 = Vector3.ZERO) -> void:
+		pos: Vector3, surface: Surf, rot: Vector3 = Vector3.ZERO) -> void:
 	var profile := PackedVector2Array()
 	for k: int in segments + 1:
 		var angle := TAU * k / segments - PI * 0.5
 		profile.append(Vector2(major + minor * cos(angle), minor + minor * sin(angle)))
-	m.lathe(profile, sides, pos, surf, rot)
+	m.lathe(profile, sides, pos, surface, rot)
 
 
 ## A ladder `height` tall up a wall, `foot` the middle of its feet, its face turned `yaw`
 ## degrees from +Z: two rails and a rung every 0.16.
 static func ladder(m: LowPolyMesh, foot: Vector3, height: float, width: float, yaw: float,
-		surf: Surf) -> void:
+		surface: Surf) -> void:
 	var turn := Vector3(0, yaw, 0)
 	for side: float in [-1.0, 1.0]:
-		m.box(Vector3(0.05, height, 0.05), foot + LowPolyMesh.turn(Vector3(side * width * 0.5, 0, 0), turn), surf, turn)
+		m.box(Vector3(0.05, height, 0.05), foot + LowPolyMesh.turn(Vector3(side * width * 0.5, 0, 0), turn), surface, turn)
 	for k: int in int((height - 0.06) / 0.16):
-		m.box(Vector3(width, 0.035, 0.035), foot + Vector3(0, 0.12 + 0.16 * k, 0), surf, turn)
+		m.box(Vector3(width, 0.035, 0.035), foot + Vector3(0, 0.12 + 0.16 * k, 0), surface, turn)
