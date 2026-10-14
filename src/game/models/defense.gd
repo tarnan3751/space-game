@@ -27,6 +27,7 @@ static var HAZARD_FINE := Surf.make(MaterialKit.Layer.HAZARD, Color.WHITE, 3.0)
 static var GOLD := Surf.make(MaterialKit.Layer.FLAT, MaterialKit.CORE_GOLD, 1.0, Surf.GLOSSY, true)
 ## The gravity well's dark core: glossy, so it catches a hard highlight.
 static var CORE := Surf.make(MaterialKit.Layer.FLAT, MaterialKit.HULL_DARK, 1.0, Surf.GLOSSY, true)
+static var LENS := Surf.make(MaterialKit.Layer.CRYSTAL, MaterialKit.ENERGY, 2.0, Surf.GLOSSY, true)
 static var LASER := _glow(MaterialKit.DEFENCE)
 static var PLASMA := _glow(MaterialKit.ANTIMATTER)
 static var ARC := _glow(MaterialKit.ARC_BLUE)
@@ -363,52 +364,120 @@ static func build_emp_tower(p: Parts, level: int) -> void:
 
 static func build_railgun(p: Parts, level: int) -> void:
 	var m := p.body
-	Parts.plinth(m, 3, 0.35)
-	m.box(Vector3(1.1, 0.5, 1.1), Vector3(0, 0.35, 0), Parts.surf("hull"), Vector3(0, 45, 0))
+	var top := _plinth(m, 3, 1.2, 0.34)
+	Parts.drum(m, 0.86, 0.14, 0.04, 24, Vector3(0, top, 0), SHELL_MID)
+	var deck := Vector3(0, top + 0.14, 0)
+	var heading := Vector3(0, SCREEN_RIGHT, 0)
+	var aim := Vector3(-6, SCREEN_RIGHT, 0)
+	m.box_chamfered(Vector3(0.95, 0.46, 1.1), 0.08, _at(deck, Vector3(0, 0, -0.3), heading), Parts.HULL_LIGHT, heading)
+	m.box_chamfered(Vector3(0.7, 0.3, 0.34), 0.05, _at(deck, Vector3(0, 0.46, -0.62), heading), VENT, heading)
+	m.box(Vector3(0.36, 0.05, 0.02), _at(deck, Vector3(0, 0.6, -0.449), heading), ION, heading)
+	for side: float in [-1.0, 1.0]:
+		m.box_chamfered(Vector3(0.05, 0.3, 0.8), 0.015, _at(deck, Vector3(side * 0.49, 0.08, -0.3), heading), ARMOUR,
+			heading)
+	m.box_chamfered(Vector3(0.6, 0.06, 0.3), 0.02, _at(deck, Vector3(0, 0.46, 0.0), heading), HAZARD_FINE, heading)
+	var length := 1.8 + 0.3 * level
+	var root := _at(deck, Vector3(0, 0.42, -1.0), heading)
+	for side: float in [-1.0, 1.0]:
+		m.box_chamfered(Vector3(0.14, 0.26, length), 0.04, _at(root, Vector3(side * 0.16, 0, length * 0.5), aim),
+			Parts.GUNMETAL, aim)
+		m.box_chamfered(Vector3(0.16, 0.28, 0.16), 0.04, _at(root, Vector3(side * 0.16, -0.01, length - 0.08), aim),
+			GOLD if level >= 3 else ARMOUR, aim)
+	m.box(Vector3(0.14, 0.08, length - 0.5), _at(root, Vector3(0, 0.08, length * 0.5 + 0.15), aim), ION, aim)
+	var collars := int((length - 0.7) / 0.5)
+	for i: int in collars:
+		m.box_chamfered(Vector3(0.56, 0.36, 0.12), 0.03, _at(root, Vector3(0, -0.06, 0.75 + 0.5 * i), aim), DENSE, aim)
+	_bank(m, deck, heading, -1.0)
 	if level >= 2:
-		for side: float in [-1.0, 1.0]:
-			m.box(Vector3(0.3, 0.4, 0.5), Vector3(side * 0.55, 0.35, side * 0.55), Parts.surf("hull_light"), Vector3(0, 45, 0))
-	var back := Vector3(-0.85, 0.95, 0.85)
-	var muzzle := Vector3(0.95 + 0.05 * level, 1.15, -0.95 - 0.05 * level)
-	m.box(Vector3(0.6, 0.4, 0.6), back + Vector3(0.2, -0.15, -0.2), Parts.surf("hull_dark"), Vector3(0, 45, 0))
-	var side_offset := Vector3(0.085, 0, 0.085)
-	var rail := Parts.accent(level, 3, "metal")
-	m.strut(back + side_offset, muzzle + side_offset, 0.1, Parts.surf(rail))
-	m.strut(back - side_offset, muzzle - side_offset, 0.1, Parts.surf(rail))
-	for t: float in [0.35, 0.55, 0.75]:
-		m.box(Vector3(0.2, 0.14, 0.2), back.lerp(muzzle, t) - Vector3(0, 0.07, 0), Parts.surf("glow_cyan"), Vector3(0, 45, 0))
+		_bank(m, deck, heading, 1.0)
+	if level >= 3:
+		for k: int in 3:
+			_cell(m, _at(deck, Vector3(-0.28 + 0.28 * k, 0, -1.18), heading), 0.4, ION, 0.12)
 
 
 static func build_ion_beam(p: Parts, level: int) -> void:
 	var m := p.body
-	m.prism(0.9, 0.85, 0.25, 6, Vector3.ZERO, Parts.surf("hull_dark"))
-	var height := 1.1 + 0.3 * level
-	m.prism(0.2, 0.13, height, 6, Vector3(0, 0.25, 0), Parts.surf("hull_light"))
-	var top := 0.25 + height
-	m.ring(0.13, 0.3, 0.12, 8, Vector3(0, top - 0.1, 0), Parts.surf(Parts.accent(level, 2, "metal")))
-	m.orb(0.22, 8, 3, Vector3(0, top + 0.2, 0), Parts.surf("glow_red"))
-	if level >= 2:
-		m.cone(0.06, 0.3, 4, Vector3(0, top + 0.38, 0), Parts.surf("gold"))
+	var top := _plinth(m, 2, 0.78, 0.2)
+	var head := Vector3(0, top + 0.85, 0)
+	for k: int in 3:
+		var degrees := 105.0 + 120.0 * k
+		var foot := Parts.around(0.6, degrees, top)
+		m.box_chamfered(Vector3(0.18, 0.08, 0.18), 0.03, foot, Parts.GUNMETAL, Vector3(0, -degrees, 0))
+		Parts.pipe_run(m, PackedVector3Array([foot, Parts.around(0.18, degrees, head.y - 0.12)]), 0.05, Parts.GUNMETAL)
+	var aim := Vector3(40, 100, 0)
+	var housing := head - LowPolyMesh.turn(Vector3(0, 0.2, 0), aim)
+	Parts.drum(m, 0.3, 0.34, 0.05, 20, housing, SHELL, aim)
+	m.tube(0.26, 0.34, 0.06, 20, _at(housing, Vector3(0, 0.08, 0), aim), ARMOUR_ROUND, aim)
+	var lens := _at(housing, Vector3(0, 0.3, 0), aim)
+	m.lathe(PackedVector2Array([
+		Vector2(0, 0), Vector2(0.18, 0.04), Vector2(0.3, 0.1), Vector2(0.18, 0.17), Vector2(0, 0.21),
+	]), 20, lens, LENS, aim)
+	var rings := 2 if level < 2 else 4
+	var reach := 0.0
+	for i: int in rings:
+		reach = 0.32 + 0.15 * i
+		Parts.torus(m, 0.26 - 0.035 * i, 0.035, 16 - 2 * i, 10, _at(lens, Vector3(0, reach, 0), aim),
+			GOLD if level >= 2 and i == 0 else SHELL_MID, aim)
+	for k: int in 3:
+		var spoke := _at(lens, Parts.around(0.27, 120.0 * k, 0.1), aim)
+		var spoke_end := _at(lens, Parts.around(0.26 - 0.035 * (rings - 1), 120.0 * k, reach + 0.03), aim)
+		m.prism(0.02, 0.02, spoke.distance_to(spoke_end), 8, spoke, Parts.ROD, Parts.facing(spoke_end - spoke))
+	m.orb(0.07, 12, 6, _at(lens, Vector3(0, reach + 0.12, 0), aim), ION)
 
 
 static func build_orbital_cannon(p: Parts, level: int) -> void:
 	var m := p.body
-	m.prism(1.85, 1.75, 0.4, 8, Vector3.ZERO, Parts.surf("hull_dark"), Parts.OCTAGON)
-	m.prism(1.25, 1.15, 0.35, 8, Vector3(0, 0.4, 0), Parts.surf("hull"), Parts.OCTAGON)
-	m.prism(0.4, 0.3, 0.5, 6, Vector3(0, 0.75, 0), Parts.surf("hull_light"))
-	var dish := 1.2 if level < 2 else 1.4
-	var aim := Vector3(40, 135, 0)
-	var centre := Vector3(0, 1.25, 0)
+	var top := _plinth(m, 4, 1.78, 0.32)
+	Parts.drum(m, 1.38, 0.24, 0.07, 8, Vector3(0, top, 0), DENSE, Parts.OCTAGON)
+	m.ring(1.34, 1.42, 0.07, 8, Vector3(0, top, 0), HAZARD_FINE, Parts.OCTAGON)
+	var bunker := top + 0.24
+	Parts.drum(m, 1.0, 0.16, 0.05, 24, Vector3(0, bunker, 0), SHELL_MID)
+	var deck := bunker + 0.16
+	var yaw := SCREEN_RIGHT + 12.0
+	var heading := Vector3(0, yaw, 0)
+	var aim := Vector3(47, yaw, 0)
+	var trunnion := Vector3(0, deck + 0.36, 0)
+	for side: float in [-1.0, 1.0]:
+		var cheek := LowPolyMesh.turn(Vector3(side * 0.6, 0, 0), heading)
+		m.box_chamfered(Vector3(0.2, 0.78, 1.15), 0.06, Vector3(cheek.x, deck, cheek.z), ARMOUR, heading)
+		m.prism(0.22, 0.22, 0.1, 20, trunnion + LowPolyMesh.turn(Vector3(side * 0.7, 0, 0), heading),
+			GOLD if level >= 2 else Parts.GUNMETAL, heading + Vector3(0, 0, -90 * side))
+	m.box_chamfered(Vector3(0.96, 0.95, 0.96), 0.08, _at(trunnion, Vector3(0, -0.45, 0), aim), Parts.HULL_LIGHT, aim)
+	var length := 1.2 + 0.15 * level
+	var barrel := _at(trunnion, Vector3(0, 0.5, 0), aim)
 	m.lathe(PackedVector2Array([
-		Vector2(0.15, 0), Vector2(dish, 0.45), Vector2(dish - 0.12, 0.5), Vector2(0, 0.15),
-	]), 10, centre, Parts.surf("white"), aim)
-	m.cone(0.12, 1.2, 6, centre + LowPolyMesh.turn(Vector3(0, 0.15, 0), aim), Parts.surf("glow_blue"), aim)
+		Vector2(0.42, 0), Vector2(0.42, 0.22), Vector2(0.32, 0.36), Vector2(0.3, length),
+	]), 24, barrel, Parts.GUNMETAL, aim)
+	m.lathe(PackedVector2Array([
+		Vector2(0.3, 0), Vector2(0.42, 0.06), Vector2(0.42, 0.34), Vector2(0.26, 0.38), Vector2(0.22, 0.3),
+	]), 24, _at(barrel, Vector3(0, length, 0), aim), SHELL, aim)
+	m.disc(0.22, 20, _at(barrel, Vector3(0, length + 0.3, 0), aim), ION, aim)
+	m.tube(0.42, 0.44, 0.08, 24, _at(barrel, Vector3(0, length + 0.12, 0), aim), GOLD if level >= 2 else ARMOUR_ROUND, aim)
+	var coils := 2 + level
+	for i: int in coils:
+		var at := 0.5 + (length - 0.7) * i / (coils - 1)
+		Parts.torus(m, 0.315, 0.04, 24, 10, _at(barrel, Vector3(0, at, 0), aim), ION, aim)
 	if level >= 2:
-		m.ring(dish - 0.12, dish + 0.02, 0.06, 10, centre + LowPolyMesh.turn(Vector3(0, 0.45, 0), aim), Parts.surf("gold"), aim)
-		for degrees: float in [45.0, 225.0]:
-			var pylon := Parts.around(1.45, degrees, 0.4)
-			m.prism(0.14, 0.1, 0.8, 4, pylon, Parts.surf("hull_light"))
-			m.pyramid(0.16, 0.2, pylon + Vector3(0, 0.8, 0), Parts.surf("glow_blue"))
+		Parts.torus(m, 1.0, 0.04, 24, 10, Vector3(0, deck - 0.04, 0), GOLD)
+	var mast := Parts.around(1.3, 135.0, top + 0.24)
+	m.prism(0.08, 0.06, 0.9, 16, mast, Parts.GUNMETAL)
+	var dish := mast + Vector3(0, 0.9, 0)
+	var dish_aim := Vector3(55, SCREEN_RIGHT + 60.0, 0)
+	m.lathe(PackedVector2Array([
+		Vector2(0.08, 0), Vector2(0.48, 0.16), Vector2(0.45, 0.2), Vector2(0, 0.06),
+	]), 24, dish, SHELL, dish_aim)
+	var feed := _at(dish, Vector3(0, 0.06, 0), dish_aim)
+	var horn := _at(dish, Vector3(0, 0.42, 0), dish_aim)
+	m.prism(0.02, 0.02, feed.distance_to(horn), 8, feed, Parts.ROD, Parts.facing(horn - feed))
+	m.orb(0.06, 12, 6, horn, ION)
+	for degrees: float in [45.0, 315.0]:
+		m.box_chamfered(Vector3(0.5, 0.18, 0.04), 0.01, Parts.around(1.3, degrees, top + 0.05), VENT,
+			Vector3(0, 90.0 - degrees, 0))
+	var cells: Array[float] = [45.0, 315.0]
+	if level >= 2:
+		cells.append_array([135.0, 225.0])
+	for degrees: float in cells:
+		_cell(m, Parts.around(2.2, degrees, Parts.PAD_HEIGHT), 0.4, ION)
 
 
 # --- Shared parts --------------------------------------------------------------------
@@ -445,6 +514,12 @@ static func _capacitor(m: LowPolyMesh, pos: Vector3, height: float, top: bool) -
 	m.ring(0.19, 0.225, 0.07, 16, pos + Vector3(0, height * 0.5, 0), EMP)
 	Parts.drum(m, 0.12, 0.08, 0.02, 16, pos + Vector3(0, height, 0), Parts.GUNMETAL)
 	return pos + Vector3(0, height + 0.08, 0)
+
+
+## A bank of three capacitors along one side (`side` -1 or 1) of the railgun's housing.
+static func _bank(m: LowPolyMesh, deck: Vector3, heading: Vector3, side: float) -> void:
+	for k: int in 3:
+		_cell(m, _at(deck, Vector3(side * 0.66, 0, -0.62 + 0.3 * k), heading), 0.4, ION, 0.12)
 
 
 ## The cloaked sentry's gun: a low head on the lid with a short barrel and a red sight.
