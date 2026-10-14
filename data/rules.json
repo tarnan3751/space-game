@@ -38,7 +38,12 @@
     "emp_tower",
     "railgun",
     "ion_beam",
-    "orbital_cannon"
+    "orbital_cannon",
+    "proximity_mine",
+    "grav_trap",
+    "flak_mine",
+    "mega_mine",
+    "barrier_wall"
   ],
   "start": {
     "resources": { "metal": 750, "crystal": 750, "antimatter": 0 },

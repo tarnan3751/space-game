@@ -420,5 +420,76 @@
       { "cost": { "metal": 85000, "crystal": 20000, "antimatter": 300 }, "build_seconds": 1200,
         "hp": 5000, "requires_cc": 5, "damage": 400, "range_cells": 50, "fire_ms": 10000 }
     ]
+  },
+  "proximity_mine": {
+    "name": "Proximity Mine",
+    "size": 1,
+    "category": "traps",
+    "hidden": true,
+    "targets": "ground",
+    "max_count": [0, 2, 4, 6, 6],
+    "levels": [
+      { "cost": { "metal": 400 }, "build_seconds": 10, "requires_cc": 2, "damage": 60,
+        "range_cells": 2 },
+      { "cost": { "metal": 1000 }, "build_seconds": 60, "requires_cc": 3, "damage": 80,
+        "range_cells": 2 },
+      { "cost": { "metal": 2500 }, "build_seconds": 180, "requires_cc": 4, "damage": 100,
+        "range_cells": 2 }
+    ]
+  },
+  "grav_trap": {
+    "name": "Gravity Trap",
+    "size": 1,
+    "category": "traps",
+    "hidden": true,
+    "targets": "ground",
+    "max_count": [0, 0, 2, 4, 6],
+    "levels": [
+      { "cost": { "metal": 2000 }, "build_seconds": 30, "requires_cc": 3, "range_cells": 1 },
+      { "cost": { "metal": 5000 }, "build_seconds": 120, "requires_cc": 4, "range_cells": 1 }
+    ]
+  },
+  "flak_mine": {
+    "name": "Flak Mine",
+    "size": 1,
+    "category": "traps",
+    "hidden": true,
+    "targets": "air",
+    "max_count": [0, 0, 0, 2, 4],
+    "levels": [
+      { "cost": { "metal": 4000 }, "build_seconds": 60, "requires_cc": 4, "damage": 100,
+        "range_cells": 3 },
+      { "cost": { "metal": 10000 }, "build_seconds": 180, "requires_cc": 4, "damage": 130,
+        "range_cells": 3 },
+      { "cost": { "metal": 25000, "antimatter": 20 }, "build_seconds": 360, "requires_cc": 5,
+        "damage": 160, "range_cells": 3 }
+    ]
+  },
+  "mega_mine": {
+    "name": "Mega Mine",
+    "size": 2,
+    "category": "traps",
+    "hidden": true,
+    "targets": "ground",
+    "max_count": [0, 0, 0, 0, 2],
+    "levels": [
+      { "cost": { "metal": 12000, "antimatter": 30 }, "build_seconds": 300, "requires_cc": 5,
+        "damage": 300, "range_cells": 3 },
+      { "cost": { "metal": 30000, "antimatter": 60 }, "build_seconds": 600, "requires_cc": 5,
+        "damage": 400, "range_cells": 3 }
+    ]
+  },
+  "barrier_wall": {
+    "name": "Barrier Wall",
+    "size": 1,
+    "category": "walls",
+    "max_count": [25, 50, 75, 100, 150],
+    "levels": [
+      { "cost": { "metal": 50 }, "build_seconds": 0, "hp": 300 },
+      { "cost": { "metal": 150 }, "build_seconds": 0, "hp": 500, "requires_cc": 2 },
+      { "cost": { "metal": 400 }, "build_seconds": 0, "hp": 800, "requires_cc": 3 },
+      { "cost": { "metal": 1000 }, "build_seconds": 0, "hp": 1300, "requires_cc": 4 },
+      { "cost": { "metal": 2500 }, "build_seconds": 0, "hp": 2000, "requires_cc": 5 }
+    ]
   }
 }
