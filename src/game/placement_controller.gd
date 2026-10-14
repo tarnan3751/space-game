@@ -3,6 +3,10 @@ extends Node
 ## Interprets gestures on the base: camera pan/zoom, selecting buildings, placing new
 ## ones (ghost + confirm, like Clash), and dragging the selected building to move it.
 ## This is the only game-layer code that calls BaseState.apply().
+##
+## While the ghost or a building is dragged with the finger near the screen's edge, the
+## camera scrolls toward that edge and the dragged thing keeps following the finger. Drag
+## positions arrive only as events, so the scroll runs in _process, on only for such drags.
 
 signal selection_changed
 ## Placement started, ended, or the ghost moved.
@@ -10,6 +14,12 @@ signal placing_changed
 signal command_failed(error: String)
 
 enum Drag { NONE, CAMERA, GHOST, BUILDING }
+
+## The edge margin, as a fraction of the viewport's shorter side.
+const EDGE_MARGIN := 0.08
+## The scroll speed at the very edge, in viewport widths per second; it falls off linearly
+## to nothing at the margin's inner side. One viewport width is the visible world width.
+const EDGE_SCROLL_SPEED := 0.6
 
 var state: BaseState
 var base_view: BaseView
@@ -26,6 +36,14 @@ var _drag: Drag = Drag.NONE
 var _drag_id: int = 0
 var _drag_cell: Vector2i = Vector2i.ZERO
 var _grab_offset: Vector2i = Vector2i.ZERO
+## The finger of a ghost or building drag, and the cell under it when the drag was last
+## followed; the edge scroll follows the drag again only when that cell changes.
+var _finger: Vector2 = Vector2.ZERO
+var _finger_cell: Vector2i = Vector2i.ZERO
+
+
+func _ready() -> void:
+	set_process(false)
 
 
 func connect_input(input: WorldInput) -> void:
@@ -78,6 +96,9 @@ func confirm_place() -> void:
 
 
 func cancel_place() -> void:
+	# A ghost drag in progress ends with it: a second finger can press Cancel.
+	if _drag == Drag.GHOST:
+		_set_drag(Drag.NONE)
 	if _ghost != null:
 		_ghost.queue_free()
 		_ghost = null
@@ -128,20 +149,22 @@ func _on_tapped(screen_pos: Vector2) -> void:
 
 
 func _on_drag_started(screen_pos: Vector2) -> void:
-	_drag = Drag.CAMERA
+	_set_drag(Drag.CAMERA)
 	var hit: Variant = _cell_at(screen_pos)
 	if typeof(hit) != TYPE_VECTOR2I:
 		return
 	var cell: Vector2i = hit
+	_finger = screen_pos
+	_finger_cell = cell
 	if is_placing():
 		if _in_footprint(cell, _ghost_cell, _ghost.footprint_size):
-			_drag = Drag.GHOST
+			_set_drag(Drag.GHOST)
 			_grab_offset = _ghost_cell - cell
 		return
 	# Like Clash: only the selected building can be dragged; anything else pans.
 	var building := state.building_at(cell)
 	if building != null and building.id == selected_id:
-		_drag = Drag.BUILDING
+		_set_drag(Drag.BUILDING)
 		_drag_id = building.id
 		_drag_cell = building.cell
 		_grab_offset = building.cell - cell
@@ -156,6 +179,8 @@ func _on_dragged(screen_pos: Vector2, screen_delta: Vector2) -> void:
 	if typeof(hit) != TYPE_VECTOR2I:
 		return
 	var cell: Vector2i = hit
+	_finger = screen_pos
+	_finger_cell = cell
 	if _drag == Drag.GHOST:
 		_set_ghost_cell(cell + _grab_offset)
 	elif _drag == Drag.BUILDING and base_view.views.has(_drag_id):
@@ -177,7 +202,7 @@ func _on_drag_ended(_screen_pos: Vector2) -> void:
 			if error != "":
 				command_failed.emit(error)
 		base_view.sync(state)
-	_drag = Drag.NONE
+	_set_drag(Drag.NONE)
 
 
 func _on_pinched(factor: float, screen_pos: Vector2) -> void:
@@ -188,7 +213,50 @@ func _on_panned(screen_pos: Vector2, screen_delta: Vector2) -> void:
 	camera.pan(screen_pos, screen_delta)
 
 
+# --- Edge scroll -----------------------------------------------------------------
+
+## Runs only during a ghost or building drag (_set_drag). With the finger in the edge
+## margin, the camera moves toward that edge, faster the deeper the finger is in it; once
+## the cell under the finger changes, the drag follows it as a drag event would. A frame
+## where that cell stays the same calls nothing in core and allocates nothing.
+func _process(delta: float) -> void:
+	var screen := get_viewport().get_visible_rect().size
+	var margin := minf(screen.x, screen.y) * EDGE_MARGIN
+	var push := Vector2(_edge_push(_finger.x, screen.x, margin), _edge_push(_finger.y, screen.y, margin))
+	if push == Vector2.ZERO:
+		return
+	# The scroll is a screen distance; the ground points either end of it give the world
+	# offset, so the speed scales with zoom.
+	var from: Variant = camera.ground_point(_finger)
+	var to: Variant = camera.ground_point(_finger + push * (EDGE_SCROLL_SPEED * screen.x * delta))
+	if typeof(from) != TYPE_VECTOR3 or typeof(to) != TYPE_VECTOR3:
+		return
+	var start: Vector3 = from
+	var end: Vector3 = to
+	camera.nudge(end - start)
+	var hit: Variant = _cell_at(_finger)
+	if typeof(hit) == TYPE_VECTOR2I:
+		var cell: Vector2i = hit
+		if cell != _finger_cell:
+			_on_dragged(_finger, Vector2.ZERO)
+
+
+## How far into the margin at either end of `length` the point `at` is: -1 at the start
+## edge, 1 at the end edge, 0 outside the margin.
+static func _edge_push(at: float, length: float, margin: float) -> float:
+	if at < margin:
+		return -minf((margin - at) / margin, 1.0)
+	if at > length - margin:
+		return minf((at - (length - margin)) / margin, 1.0)
+	return 0.0
+
+
 # --- Helpers ---------------------------------------------------------------------
+
+func _set_drag(drag: Drag) -> void:
+	_drag = drag
+	set_process(drag == Drag.GHOST or drag == Drag.BUILDING)
+
 
 func _set_ghost_cell(cell: Vector2i) -> void:
 	_ghost_cell = _clamp_cell(cell, _ghost.footprint_size)
