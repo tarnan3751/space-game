@@ -51,6 +51,8 @@ var _info_title: Label
 var _info_detail: Label
 var _upgrade_button: Button
 var _upgrade_note: Label
+## Between a stat and the next level's: " → " when the theme's font has the arrow, else " > ".
+var _arrow: String = " > "
 var _toast: Label
 var _toast_tween: Tween
 
@@ -62,6 +64,8 @@ func setup(catalog: Catalog) -> void:
 	_root.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	_root.theme = _make_theme()
 	add_child(_root)
+	if _root.get_theme_default_font().has_char(0x2192):
+		_arrow = " → "
 	_build_top_bar()
 	_build_build_bar()
 	_build_place_bar()
@@ -160,23 +164,48 @@ func _refresh_info(state: BaseState, building: BuildingState) -> void:
 	var type := building.type
 	_info_title.text = "%s   Lv %d" % [_catalog.display_name(type), building.level]
 
+	# The current level's stats (level 1's while it is first being built), each with the
+	# next level's value after an arrow where it changes. `next` is {} at the top level,
+	# and level 1 itself while the building is first being built, so no arrow shows then.
 	var lines := PackedStringArray()
 	var stats := _catalog.level_stats(type, maxi(building.level, 1))
+	var next := _catalog.level_stats(type, building.level + 1)
+	if stats.has("hp"):
+		lines.append("Hull %s" % _level_stat(stats, next, "hp"))
 	var production: Dictionary = stats.get("produces", {})
-	var storage: Dictionary = stats.get("storage", {})
+	var next_production: Dictionary = next.get("produces", {})
 	for res: String in _catalog.resources:
 		var produces := int(production.get(res, 0))
 		if produces > 0:
-			lines.append("Produces %s %s/h" % [Format.amount(produces), _catalog.resource_name(res)])
+			var rate := _with_next(Format.amount(produces), Format.amount(int(next_production.get(res, produces))))
+			lines.append("Produces %s %s/h" % [rate, _catalog.resource_name(res)])
+	var storage: Dictionary = stats.get("storage", {})
+	var next_storage: Dictionary = next.get("storage", {})
+	for res: String in _catalog.resources:
 		var stores := int(storage.get(res, 0))
 		if stores > 0:
-			lines.append("Stores %s %s" % [Format.amount(stores), _catalog.resource_name(res)])
+			var held := _with_next(Format.amount(stores), Format.amount(int(next_storage.get(res, stores))))
+			lines.append("Stores %s %s" % [held, _catalog.resource_name(res)])
 	if int(stats.get("builders", 0)) > 0:
-		lines.append("Houses %d drone" % int(stats["builders"]))
+		lines.append("Houses %s drone" % _level_stat(stats, next, "builders"))
+	if stats.has("capacity"):
+		lines.append("Capacity %s" % _level_stat(stats, next, "capacity"))
+	var combat := PackedStringArray()
 	if stats.has("damage"):
-		lines.append("Damage %d   Range %d" % [int(stats["damage"]), int(stats.get("range_cells", 0))])
-	if stats.has("hp"):
-		lines.append("Hull %s" % Format.amount(int(stats["hp"])))
+		combat.append("Damage %s" % _level_stat(stats, next, "damage"))
+	if stats.has("range_cells"):
+		combat.append("Range %s" % _level_stat(stats, next, "range_cells"))
+	if not combat.is_empty():
+		lines.append("   ".join(combat))
+	if stats.has("fire_ms"):
+		var fire_ms := int(stats["fire_ms"])
+		var interval := _with_next(_seconds(fire_ms), _seconds(int(next.get("fire_ms", fire_ms))))
+		lines.append("Fires every %s s" % interval)
+	var targets := _catalog.targets_of(type)
+	if targets != "":
+		lines.append("Targets %s" % ("air and ground" if targets == "both" else targets))
+	if _catalog.is_hidden(type):
+		lines.append("Hidden from attackers")
 	if building.is_busy():
 		var what := "Under construction" if building.level == 0 else "Upgrading to Lv %d" % building.target_level
 		lines.append("%s: %s left" % [what, Format.duration(state.seconds_left(building.id))])
@@ -191,7 +220,6 @@ func _refresh_info(state: BaseState, building: BuildingState) -> void:
 		_upgrade_button.text = "Max level"
 		_upgrade_button.disabled = true
 		return
-	var next := _catalog.level_stats(type, building.level + 1)
 	_upgrade_button.text = "Upgrade to Lv %d   %s   (%s)" % [
 		building.level + 1,
 		Format.cost(next.get("cost", {}), _catalog),
@@ -200,6 +228,22 @@ func _refresh_info(state: BaseState, building: BuildingState) -> void:
 	var error := state.check_upgrade(building.id)
 	_upgrade_button.disabled = error != ""
 	_upgrade_note.text = "" if error == "" else error_text(error)
+
+
+## A whole-number stat of this level, with the next level's after an arrow when it changes.
+func _level_stat(stats: Dictionary, next: Dictionary, field: String) -> String:
+	var value := int(stats[field])
+	return _with_next(Format.amount(value), Format.amount(int(next.get(field, value))))
+
+
+## "600", or "600 → 800" when the next level's value differs.
+func _with_next(value: String, next_value: String) -> String:
+	return value if next_value == value else value + _arrow + next_value
+
+
+## 800 -> "0.8", 5000 -> "5"
+static func _seconds(ms: int) -> String:
+	return ("%.2f" % (ms / 1000.0)).rstrip("0").rstrip(".")
 
 
 # --- Construction ----------------------------------------------------------------
