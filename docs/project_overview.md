@@ -70,7 +70,7 @@ an attack log, revenge and shields.
 | Area | Status | Notes |
 | --- | --- | --- |
 | Catalog and game data | Built | `data/rules.json`, `data/buildings.json`; validated on load; all numbers ints |
-| Building roster | Built | 32 types: the Command Center (levels 1–5) and 31 more in five build-menu categories; metal, crystal and antimatter (from CC 4); one development-scale curve, checked by tests for affordability and for never going down; the flat build bar lists every type |
+| Building roster | Built | 32 types: the Command Center (levels 1–5) and 31 more in five build-menu categories; metal, crystal and antimatter (from CC 4); one development-scale curve, checked by tests for affordability and for never going down; the build bar has a tab per category |
 | Base state: place, move, upgrade | Built | Commands through `BaseState.apply`; `check_*` for the UI; error codes |
 | Timers and builders | Built | Construction and upgrade timers; drone bays supply builders; instant builds skip the builder check |
 | Economy | Built | Per-hour integer rates; remainders carried in resource-seconds; storage caps; busy buildings don't produce |
@@ -81,7 +81,7 @@ an attack log, revenge and shields.
 | Camera | Built | Fixed isometric orthographic; pan, pinch and wheel zoom; focus clamped to the grid |
 | Touch input | Built | Tap, drag, two-finger pinch and pan; trackpad gestures; HUD gets touches first |
 | Placement | Built | Ghost with valid/invalid footprint, Place/Cancel; select; drag the selected building to move |
-| HUD | Built | Resources and drones, build bar, place bar, info panel with upgrade, toasts, debug reset |
+| HUD | Built | Resources and drones (a resource appears once the base can store it), build menu with category tabs and entries showing cost, count and why one is unavailable, place bar, info panel with every stat and the next level's, toasts, debug reset; laid out inside the safe area |
 | Visuals | Built | Flat-shaded low-poly models per type and level built in code from one palette texture, scaffold while building, regolith ground with a grid that brightens while placing, seeded low-poly terrain with craters and rocks |
 | Tests | Built | Own headless runner; fixture catalog; one test file per core area |
 | Tooling | Built | Gate script, landing script, behaviour harness (`tools/`), API dump |
@@ -93,7 +93,7 @@ Balance numbers in `data/` are fast development values, not tuned.
 | Step | What | Status |
 | --- | --- | --- |
 | 1 | Offline base: placement, timers, economy | Built |
-| 2 | Base polish: the building roster, build-menu categories, a third resource (antimatter), low-poly models built in code, HUD category tabs, safe-area margins for notches, painting walls by dragging, edge auto-scroll while dragging | In progress: the roster, the categories, antimatter and the low-poly models are built; HUD tabs, safe-area margins, wall painting and edge scroll remain |
+| 2 | Base polish: the building roster, build-menu categories, a third resource (antimatter), low-poly models built in code, HUD category tabs, safe-area margins for notches, painting walls by dragging, edge auto-scroll while dragging | In progress: the roster, the categories, antimatter, the low-poly models, the HUD tabs and the safe-area margins are built; wall painting and edge scroll remain |
 | 3 | Seeded PvE expeditions: a field generated from a seed with `SeededRng` (asteroids, deposits, hazards); loot returns into `BaseState` through a new command | Planned |
 | 4 | Deterministic battle sim in `src/core/battle/`: fixed-point integer positions (1 cell = 1000 units), fixed tick; replay = seed + base layout + list of deploy commands; tested headless against AI-built bases; same inputs give byte-identical results | Planned |
 | 5 | Server: Nakama with accounts, base storage and command validation; battles verified by replaying them in headless Godot running the same `src/core` | Planned |
@@ -109,8 +109,8 @@ Balance numbers in `data/` are fast development values, not tuned.
 - **The save is local and unversioned beyond `"version": 1`**; the server will hold the base
   later and nothing below `main.gd` changes.
 - `hp`, `damage`, `range_cells`, `fire_ms`, `hidden`, `targets` and `capacity` in
-  `data/buildings.json` are display-only: the HUD shows hull, damage and range where they exist,
-  and none of them drives anything until the battle sim (step 4).
+  `data/buildings.json` are display-only: the HUD's info panel shows each where it exists, and
+  none of them drives anything until the battle sim (step 4).
 
 ## 3. Decisions
 

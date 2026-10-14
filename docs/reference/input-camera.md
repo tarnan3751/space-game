@@ -19,8 +19,9 @@ and `LowPolyMesh`. The HUD is in `hud.md`. This layer reads `BaseState` and neve
 4. The HUD's signals are wired to the controller (`build_pressed` → `begin_place`,
    `confirm_pressed` → `confirm_place`, `cancel_pressed` → `cancel_place`, `upgrade_pressed` →
    `upgrade_selected`, `close_pressed` → `select(0)`, `reset_pressed` → `_reset_base`); the
-   controller's `selection_changed` and `placing_changed` refresh the HUD and `command_failed`
-   shows a toast.
+   controller's `selection_changed` refreshes the HUD, `placing_changed` calls
+   `hud.refresh_placing` (`_on_placing_changed`; a ghost move updates only the Place button),
+   and `command_failed` shows a toast.
 5. The state is loaded or created (`_load_or_create`) and installed (`_set_state`: disconnects
    the old state's `changed`, connects the new one, hands it to the controller, cancels any
    placement and selection, clears and syncs the view).
@@ -87,7 +88,7 @@ camera moves, selection, placement and building moves.
 | `clock: Callable` | Returns the unix time in seconds for every command it applies; `main._now` in the game, the harness's clock under the harness. |
 | `selected_id` | The selected building, `0` for none. `select(id)` updates the view's selection tile and emits `selection_changed`. |
 | `placing_type` | The type being placed, `""` when not. `is_placing()`, `ghost_is_valid()`. |
-| `signal selection_changed`, `signal placing_changed` | Selection changed; placement began, ended or the ghost moved. `main.gd` refreshes the HUD on both. |
+| `signal selection_changed`, `signal placing_changed` | Selection changed; placement began, ended or the ghost moved. `main.gd` refreshes the HUD on the first and calls `hud.refresh_placing` on the second (`hud.md`, **Refresh**). |
 | `signal command_failed(error)` | A command returned an error code; the HUD shows it as a toast. |
 
 **Placing** (`begin_place(type)`): any placement is cancelled and the selection cleared; a
@@ -196,5 +197,5 @@ down. `to_mesh()` returns the mesh with the palette material.
 ## Format (`format.gd`)
 
 Display formatting shared by the views and the HUD: `amount(12345)` → `"12,345"`;
-`duration(75)` → `"1m 15s"`, `duration(4000)` → `"1h 06m"`; `cost({"metal": 150})` →
-`"150 Metal"`, an empty cost → `"Free"`.
+`duration(75)` → `"1m 15s"`, `duration(4000)` → `"1h 06m"`; `cost({"metal": 150}, catalog)` →
+`"150 Metal"`, each resource named by `catalog.resource_name`, an empty cost → `"Free"`.

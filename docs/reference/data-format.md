@@ -91,10 +91,10 @@ Per level:
 | `produces` | core | `{resource: int}` per hour while the building is at this level and idle. |
 | `storage` | core | `{resource: int}` added to the base's capacity while the building is at this level, busy or not. |
 | `builders` | core | Builders (drones) this level supplies. |
-| `capacity` | nothing yet | Army capacity (the Hangar, the Alliance Beacon). Unrelated to `BaseState.capacity(res)`, which is storage. Reserved for the army. |
+| `capacity` | HUD | Army capacity (the Hangar, the Alliance Beacon), shown as "Capacity". Unrelated to `BaseState.capacity(res)`, which is storage. Reserved for the army. |
 | `hp` | HUD | Shown as "Hull". Reserved for the battle sim. |
-| `damage`, `range_cells` | HUD | Shown as "Damage / Range" when `damage` exists. `range_cells` is the reach in cells, a trap's blast radius, or the Shield Generator's bubble radius. Reserved for the battle sim. |
-| `fire_ms` | nothing yet | Milliseconds between shots. Reserved for the battle sim. |
+| `damage`, `range_cells` | HUD | Shown as "Damage N   Range N", each part when the level has it. `range_cells` is the reach in cells, a trap's blast radius, or the Shield Generator's bubble radius. Reserved for the battle sim. |
+| `fire_ms` | HUD | Milliseconds between shots, shown as "Fires every N s". Reserved for the battle sim. |
 
 `builders`, `capacity`, `hp`, `damage`, `range_cells` and `fire_ms` are whole and non-negative
 when present.

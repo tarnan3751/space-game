@@ -72,6 +72,7 @@ through the game layer as the player would, and read the state through `BaseStat
 | `main.placement` | `begin_place(type)`, `confirm_place()`, `cancel_place()`, `select(id)`, `upgrade_selected()`, `is_placing()`, `ghost_is_valid()`, `selected_id` |
 | `main.world_input` signals | `tapped`, `drag_started`, `dragged`, `drag_ended`, `pinched`, `panned`; emit them to simulate a gesture (`tap_cell` below does) |
 | `main.hud` signals | `build_pressed`, `confirm_pressed`, `cancel_pressed`, `upgrade_pressed`, `close_pressed`, `reset_pressed`; emit them to press a button |
+| `main.hud` queries | `tab_button(category)`, `entry_button(type)`, `entry_status(type)`, `resource_panel(res)`, `place_button()`, `drones_panel()`, `reset_button()` (`docs/reference/hud.md`); `apply_safe_area(inset)` to try a notch-like inset |
 | `main.state` | the `BaseState`: `buildings`, `resources`, `capacity()`, `builders_free()`, `seconds_left(id)`, `check_*` |
 | `main.camera`, `main.base_view` | `IsoCamera` and `BaseView`, for cell and screen mapping |
 
@@ -105,3 +106,16 @@ does not fit on the grid at once, so rows that do not fit start a new page. Each
 overview screenshot and each row a close-up, framed through `camera.zoom_at` and `camera.pan`.
 In both modes it checks every model against the budget: at most two `MeshInstance3D` and at
 most 500 triangles, 40 for traps and walls (`category_of`).
+
+`scenarios/hud_menu.gd` checks the HUD on a fresh base: antimatter hidden in the top bar,
+every menu type in exactly one tab and in menu order, an entry's built/max and a locked
+entry's "Needs Command Center N", that taps on a tab and an entry and a drag across the
+strip act on the menu without reaching the world, and that Place follows the ghost onto the
+Command Center and off it. It screenshots each tab, the Command Center's info panel, and the
+HUD under a notch-like inset (44 at the top, 34 at the bottom). Last, it grows the base to
+Command Center 4 with every collector that level allows, fills the storage, and checks that
+antimatter shows and that the debug button clears the Drones panel on the widest top bar.
+Where a check is about touch routing, a scenario sends real events with
+`Input.parse_input_event` (`InputEventScreenTouch`, `InputEventScreenDrag`): they arrive in
+window pixels, so map a HUD point through `get_viewport().get_final_transform()`. They are
+delivered headless too, so those checks run in both modes.
