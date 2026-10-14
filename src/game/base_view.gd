@@ -1,14 +1,24 @@
 class_name BaseView
 extends Node3D
-## Draws the base: ground, grid, scenery and one BuildingView per building.
-## Also owns the cell <-> world mapping: 1 cell = 1 world unit, grid centred on the origin,
-## cell (x, y) maps to world (x, z).
+## Draws the base: the buildable ground with its cell grid, the terrain and rocks around it,
+## and one BuildingView per building. Also owns the cell <-> world mapping: 1 cell = 1 world
+## unit, grid centred on the origin, cell (x, y) maps to world (x, z).
+##
+## The terrain and the rocks are generated from SCENERY_SEED, so every player's base sits in
+## the same landscape. Each is one mesh painted from the Palette: one draw call apiece.
 
 const GROUND_SHADER := preload("res://src/game/ground.gdshader")
 const SCENERY_SEED := 7
 ## Strength of the ground's cell lines, normally and while placing.
 const GRID_LINES := 0.1
 const GRID_LINES_PLACING := 0.45
+## The terrain reaches this far from the centre in X and Z, on a lattice of TERRAIN_STEP.
+const TERRAIN_EXTENT := 90.0
+const TERRAIN_STEP := 2.0
+## Spacing of the value-noise lattice behind the terrain's hills.
+const NOISE_CELL := 7.0
+const NOISE_SIZE := 24
+const ROCK_COUNT := 40
 
 var grid_size: Vector2i = Vector2i.ZERO
 var views: Dictionary[int, BuildingView] = {}
@@ -18,12 +28,18 @@ var selected_id: int = 0
 var dragging_id: int = 0
 
 var _ground_material: ShaderMaterial
+## NOISE_SIZE x NOISE_SIZE heights in [0, 1], wrapping.
+var _noise: PackedFloat32Array = PackedFloat32Array()
+## Each crater as (x, z, radius, depth).
+var _craters: Array[Vector4] = []
 
 
 func setup(size: Vector2i) -> void:
 	grid_size = size
 	_build_ground()
-	_build_scenery()
+	var rng := SeededRng.new(SCENERY_SEED)
+	_build_terrain(rng)
+	_build_rocks(rng)
 
 
 ## World-space centre of a footprint whose top-left cell is `cell`.
@@ -108,39 +124,154 @@ func _build_ground() -> void:
 	ground.material_override = _ground_material
 	add_child(ground)
 
-	var outer_plane := PlaneMesh.new()
-	outer_plane.size = Vector2(grid_size) * 4.0
-	var outer := MeshInstance3D.new()
-	outer.mesh = outer_plane
-	outer.position = Vector3(0, -0.02, 0)
-	outer.material_override = BuildingModels.material(Color("1b1828"))
-	add_child(outer)
 
-
-## Rocks around the buildable area. Seeded, so every player's base looks the same.
-func _build_scenery() -> void:
-	var rng := SeededRng.new(SCENERY_SEED)
-	var rock_material := BuildingModels.material(Color("2c283d"))
-	var half := maxi(grid_size.x, grid_size.y) * 0.5
-	var placed := 0
-	while placed < 60:
+## The land around the grid: a flat-shaded annulus from the grid's edge, where it is pinned to
+## y = 0 so it meets the ground without a seam, out to TERRAIN_EXTENT, coloured by height.
+func _build_terrain(rng: SeededRng) -> void:
+	_noise.resize(NOISE_SIZE * NOISE_SIZE)
+	for i: int in _noise.size():
+		_noise[i] = rng.range_int(0, 1000) / 1000.0
+	var half := Vector2(grid_size) * 0.5
+	for i: int in rng.range_int(3, 5):
 		var angle := TAU * rng.range_int(0, 3599) / 3600.0
-		var distance := half + 2.0 + rng.range_int(0, 1800) / 100.0
-		var radius := 0.4 + rng.range_int(0, 160) / 100.0
+		var radius := rng.range_int(40, 80) / 10.0
+		var distance := maxf(half.x, half.y) + radius * 1.6 + rng.range_int(40, 250) / 10.0
+		_craters.append(Vector4(cos(angle) * distance, sin(angle) * distance, radius,
+			rng.range_int(14, 22) / 10.0))
+
+	var xs := _lattice(-half.x, half.x)
+	var zs := _lattice(-half.y, half.y)
+	var heights := PackedFloat32Array()
+	for z: float in zs:
+		for x: float in xs:
+			heights.append(_terrain_height(x, z))
+	var mesh := LowPolyMesh.new()
+	for j: int in zs.size() - 1:
+		for i: int in xs.size() - 1:
+			if xs[i] >= -half.x and xs[i + 1] <= half.x and zs[j] >= -half.y and zs[j + 1] <= half.y:
+				continue
+			var row := j * xs.size()
+			var a := Vector3(xs[i], heights[row + i], zs[j])
+			var b := Vector3(xs[i + 1], heights[row + i + 1], zs[j])
+			var c := Vector3(xs[i + 1], heights[row + xs.size() + i + 1], zs[j + 1])
+			var d := Vector3(xs[i], heights[row + xs.size() + i], zs[j + 1])
+			# Alternate the diagonals, so the facets do not all lean one way.
+			if (i + j) % 2 == 0:
+				_terrain_face(mesh, a, d, c)
+				_terrain_face(mesh, a, c, b)
+			else:
+				_terrain_face(mesh, a, d, b)
+				_terrain_face(mesh, b, d, c)
+	var terrain := MeshInstance3D.new()
+	terrain.mesh = mesh.to_mesh()
+	# Its relief shows in the flat shading; its shadows would cost a pass for little.
+	terrain.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	add_child(terrain)
+
+
+## Low-poly rocks scattered on the terrain around the grid, all in one mesh.
+func _build_rocks(rng: SeededRng) -> void:
+	var half := Vector2(grid_size) * 0.5
+	var mesh := LowPolyMesh.new()
+	var placed := 0
+	while placed < ROCK_COUNT:
+		var angle := TAU * rng.range_int(0, 3599) / 3600.0
+		var distance := maxf(half.x, half.y) + 2.0 + rng.range_int(0, 2600) / 100.0
+		var radius := 0.4 + rng.range_int(0, 140) / 100.0
 		var x := cos(angle) * distance
 		var z := sin(angle) * distance
 		# The grid is square, so a ring around it still overlaps the corners.
-		if absf(x) < half + radius and absf(z) < half + radius:
+		if absf(x) < half.x + radius and absf(z) < half.y + radius:
 			continue
 		placed += 1
-		var mesh := SphereMesh.new()
-		mesh.radius = radius
-		mesh.height = radius * 1.2
-		mesh.radial_segments = 6
-		mesh.rings = 3
-		var rock := MeshInstance3D.new()
-		rock.mesh = mesh
-		rock.material_override = rock_material
-		rock.position = Vector3(x, 0.0, z)
-		rock.rotation_degrees = Vector3(0, rng.range_int(0, 359), 0)
-		add_child(rock)
+		_rock(mesh, Vector3(x, _terrain_height(x, z) - 0.2 * radius, z), radius, rng)
+	var rocks := MeshInstance3D.new()
+	rocks.mesh = mesh.to_mesh()
+	add_child(rocks)
+
+
+## One rock: a jittered ring on the ground, a narrower one above it and an off-centre peak.
+static func _rock(mesh: LowPolyMesh, pos: Vector3, radius: float, rng: SeededRng) -> void:
+	var sides := rng.range_int(5, 7)
+	var turn := TAU * rng.range_int(0, 359) / 360.0
+	var height := radius * rng.range_int(80, 120) / 100.0
+	var lower := PackedVector3Array()
+	var upper := PackedVector3Array()
+	for j: int in sides:
+		var angle := turn + TAU * j / sides
+		var r := radius * rng.range_int(75, 110) / 100.0
+		lower.append(pos + Vector3(r * cos(angle), 0.0, r * sin(angle)))
+		var r_up := r * rng.range_int(55, 75) / 100.0
+		var y := height * rng.range_int(45, 70) / 100.0
+		upper.append(pos + Vector3(r_up * cos(angle + 0.3), y, r_up * sin(angle + 0.3)))
+	var lean := Vector2(rng.range_int(-20, 20), rng.range_int(-20, 20)) * radius / 100.0
+	var peak := pos + Vector3(lean.x, height, lean.y)
+	for j: int in sides:
+		var k := (j + 1) % sides
+		mesh.triangle(lower[j], upper[j], upper[k], "rock_dark")
+		mesh.triangle(lower[j], upper[k], lower[k], "rock_dark")
+		mesh.triangle(upper[j], peak, upper[k], "rock")
+
+
+## Heights: 0 at the grid's edge, rising gently with distance, with value-noise hills and
+## the craters.
+func _terrain_height(x: float, z: float) -> float:
+	var half := Vector2(grid_size) * 0.5
+	var out := Vector2(maxf(absf(x) - half.x, 0.0), maxf(absf(z) - half.y, 0.0)).length()
+	var hills := 0.65 * _noise_at(x, z) + 0.35 * _noise_at(x * 2.3 + 37.0, z * 2.3 + 11.0)
+	return smoothstep(0.0, 10.0, out) * (hills * 3.2 + out * 0.04 + _crater_dip(x, z))
+
+
+## How much the craters lower (bowls) or raise (rims) the ground at a point.
+func _crater_dip(x: float, z: float) -> float:
+	var dip := 0.0
+	for crater: Vector4 in _craters:
+		var t := Vector2(x - crater.x, z - crater.y).length() / crater.z
+		if t < 1.8:
+			dip += -crater.w * maxf(1.0 - t * t, 0.0) + crater.w * 0.45 * exp(-pow((t - 1.0) / 0.3, 2.0))
+	return dip
+
+
+## Smoothly interpolated lattice noise in [0, 1].
+func _noise_at(x: float, z: float) -> float:
+	var gx := x / NOISE_CELL
+	var gz := z / NOISE_CELL
+	var ix := floori(gx)
+	var iz := floori(gz)
+	var fx := smoothstep(0.0, 1.0, gx - ix)
+	var fz := smoothstep(0.0, 1.0, gz - iz)
+	var top := lerpf(_lattice_value(ix, iz), _lattice_value(ix + 1, iz), fx)
+	var bottom := lerpf(_lattice_value(ix, iz + 1), _lattice_value(ix + 1, iz + 1), fx)
+	return lerpf(top, bottom, fz)
+
+
+func _lattice_value(ix: int, iz: int) -> float:
+	return _noise[posmod(iz, NOISE_SIZE) * NOISE_SIZE + posmod(ix, NOISE_SIZE)]
+
+
+## One terrain face (corners counter-clockwise from above), coloured by its height band.
+func _terrain_face(mesh: LowPolyMesh, a: Vector3, b: Vector3, c: Vector3) -> void:
+	var centre := (a + b + c) / 3.0
+	var color := "rock_dark"
+	if _crater_dip(centre.x, centre.z) < -0.3:
+		color = "crater"
+	elif centre.y < 0.8:
+		color = "regolith"
+	elif centre.y < 2.0:
+		color = "regolith_dark"
+	elif centre.y < 3.2:
+		color = "rock"
+	mesh.triangle(a, b, c, color)
+
+
+## Lattice coordinates along one axis from -TERRAIN_EXTENT to TERRAIN_EXTENT that include
+## both grid edges, `low` and `high`, so the terrain's inner edge lies exactly on them.
+static func _lattice(low: float, high: float) -> PackedFloat32Array:
+	var axis := PackedFloat32Array()
+	for k: int in range(ceili((TERRAIN_EXTENT + low) / TERRAIN_STEP), 0, -1):
+		axis.append(low - k * TERRAIN_STEP)
+	for k: int in ceili((high - low) / TERRAIN_STEP):
+		axis.append(low + k * TERRAIN_STEP)
+	for k: int in ceili((TERRAIN_EXTENT - high) / TERRAIN_STEP) + 1:
+		axis.append(high + k * TERRAIN_STEP)
+	return axis
