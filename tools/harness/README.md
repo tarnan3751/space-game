@@ -127,8 +127,9 @@ fast drag across the row fills the cells it jumped and skips the wall; with no m
 places nothing and shows one toast; the brush is VALID on the wall it just placed and INVALID
 with no metal; a drag held at the right edge scrolls the camera and paints under the finger; a
 drag past the count limit stops there with one toast; Done ends the mode with the walls kept.
-Then the ghost of a 3x3 type and the selected drone bay are each held near
-the right edge: the camera scrolls right, each stays under the finger, and the bay drops there.
-It screenshots the brush, the painted row, the place bar with Done, and the ghost and the bay
-at the edge. A held drag scrolls for a number of frames, so how far depends on the frame rate;
-the checks hold at any distance.
+Then the ghost of a 3x3 type and the selected drone bay are each held near the right edge: the
+camera scrolls right, each stays under the finger, and the bay drops there. Last, a drag of the
+bay that a second finger interrupts by pressing Close, then Reset base, ends at once and moves
+nothing, on the old base or the new one. It screenshots the brush, the painted row, the place
+bar with Done, and the ghost and the bay at the edge. A held drag scrolls for a number of
+frames, so how far depends on the frame rate; the checks hold at any distance.

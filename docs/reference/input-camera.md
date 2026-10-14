@@ -88,7 +88,7 @@ while a drag nears the screen's edge.
 | --- | --- |
 | `state`, `base_view`, `camera` | Set by `main.gd`. |
 | `clock: Callable` | Returns the unix time in seconds for every command it applies; `main._now` in the game, the harness's clock under the harness. |
-| `selected_id` | The selected building, `0` for none. `select(id)` updates the view's selection tile and emits `selection_changed`. |
+| `selected_id` | The selected building, `0` for none. `select(id)` updates the view's selection tile and emits `selection_changed`; a change of selection ends a building drag in progress with no move (a second finger can press Close or Reset base). |
 | `placing_type` | The type being placed, `""` when not. `is_placing()`, `ghost_is_valid()`, `ghost_cell()` (the ghost's top-left cell, the brush's while painting). |
 | `is_painting()` | Placing a one-cell type of `PAINT_CATEGORY` (`"walls"`): the ghost is a brush (**Painting walls**). |
 | `signal selection_changed`, `signal placing_changed` | Selection changed; placement began, ended or the ghost moved. `main.gd` refreshes the HUD on the first and calls `hud.refresh_placing` on the second (`hud.md`, **Refresh**). |

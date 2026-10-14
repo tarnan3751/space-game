@@ -194,6 +194,11 @@ func _paint(cell: Vector2i) -> void:
 func select(id: int) -> void:
 	if id == selected_id:
 		return
+	# A building drag ends with its selection (a second finger can press Close or Reset base),
+	# with no move: the finger lifting later must not move whatever building has that id then.
+	if _drag == Drag.BUILDING:
+		_set_drag(Drag.NONE)
+		base_view.dragging_id = 0
 	selected_id = id
 	base_view.selected_id = id
 	base_view.sync(state)

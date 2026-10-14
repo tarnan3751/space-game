@@ -5,7 +5,9 @@ extends HarnessScenario
 ## at the screen's edge keeps painting as the world slides, a drag past the count limit shows
 ## one toast, and Done ends the mode with the walls kept. Then the ghost of a 3x3 type and the
 ## selected building are each held near the right edge: the camera scrolls right and each
-## keeps following the finger. Gestures are WorldInput's signals, as tap_cell sends them.
+## keeps following the finger. Last, a building drag that a second finger interrupts by pressing
+## Close, or Reset base, ends there and moves nothing. Gestures are WorldInput's signals, as
+## tap_cell sends them.
 
 const WALL := "barrier_wall"
 ## A fresh base's free cells: the Command Center covers 18-21 x 18-21, the drone bay
@@ -33,6 +35,8 @@ func run(main: MainScript) -> void:
 	var cost: Dictionary = catalog.level_stats(WALL, 1).get("cost", {})
 	var wall_cost := int(cost.get("metal", 0))
 	var limit := catalog.max_count(WALL, state.cc_level())
+	# Where a fresh base puts the drone bay, for the Reset base check at the end.
+	var bay_start := _drone_bay(state).cell
 
 	# The menu entry enters paint mode; the place bar offers Done, enabled whatever the brush is on.
 	hud.entry_button(WALL).pressed.emit()
@@ -202,6 +206,45 @@ func run(main: MainScript) -> void:
 	main.world_input.drag_ended.emit(finger)
 	check((bay.cell == under) if drop_ok else (bay.cell != under),
 		"the drop %s at %s" % ["moved it" if drop_ok else "was refused", under])
+
+	# A second finger presses Close while the bay is dragged: the drag ends there, with no move
+	# when the finger lifts, and the edge scroll stops.
+	_reset_camera(main, focus)
+	var bay_cell := bay.cell
+	var dragging: bool = await _interrupted_drag(main, bay, func() -> void: hud.close_pressed.emit())
+	check(not dragging, "Close ended the drag at once")
+	check(bay.cell == bay_cell and view.position.is_equal_approx(main.base_view.cell_to_world(bay_cell, bay_size)),
+		"the drone bay stayed at %s" % bay.cell)
+	# The same through Reset base: the new base's drone bay (with the same id) stays put.
+	dragging = await _interrupted_drag(main, bay, func() -> void: hud.reset_pressed.emit())
+	check(not dragging, "Reset base ended the drag at once")
+	check(_drone_bay(main.state).cell == bay_start,
+		"the new base's drone bay stayed at %s" % _drone_bay(main.state).cell)
+
+
+func _drone_bay(state: BaseState) -> BuildingState:
+	for id: int in state.buildings:
+		if state.buildings[id].type == "drone_bay":
+			return state.buildings[id]
+	return null
+
+
+## Selects `building`, drags it from its cell three cells away, has `interrupt` press a HUD
+## button as a second finger would, and lifts the finger. Returns whether the drag was still
+## going (the edge scroll still processing) after the press.
+func _interrupted_drag(main: MainScript, building: BuildingState, interrupt: Callable) -> bool:
+	main.placement.select(building.id)
+	var from := _screen_of(main, building.cell)
+	var to := _screen_of(main, building.cell + Vector2i(-3, 2))
+	main.world_input.drag_started.emit(from)
+	main.world_input.dragged.emit(to, to - from)
+	await frames(1)
+	interrupt.call()
+	await frames(1)
+	var dragging := main.placement.is_processing()
+	main.world_input.drag_ended.emit(to)
+	await frames(2)
+	return dragging
 
 
 ## Sets metal to what the base can store.
