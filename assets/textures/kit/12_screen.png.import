@@ -1,0 +1,14 @@
+[remap]
+
+importer="image"
+type="Image"
+uid="uid://1lnhiqxg2wq"
+path="res://.godot/imported/12_screen.png-ed1c36de67f8f8e18c8d3d5119b4889d.image"
+
+[deps]
+
+source_file="res://assets/textures/kit/12_screen.png"
+dest_files=["res://.godot/imported/12_screen.png-ed1c36de67f8f8e18c8d3d5119b4889d.image"]
+
+[params]
+

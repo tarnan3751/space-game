@@ -1,0 +1,14 @@
+[remap]
+
+importer="image"
+type="Image"
+uid="uid://v2721b58fer6"
+path="res://.godot/imported/04_vent.png-f0e908ebe0f918295f2aed1cb0f62ccf.image"
+
+[deps]
+
+source_file="res://assets/textures/kit/04_vent.png"
+dest_files=["res://.godot/imported/04_vent.png-f0e908ebe0f918295f2aed1cb0f62ccf.image"]
+
+[params]
+

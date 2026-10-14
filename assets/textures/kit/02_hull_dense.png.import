@@ -1,0 +1,14 @@
+[remap]
+
+importer="image"
+type="Image"
+uid="uid://cq640jhtncldo"
+path="res://.godot/imported/02_hull_dense.png-4770959b04439ed484544fb19a7627c8.image"
+
+[deps]
+
+source_file="res://assets/textures/kit/02_hull_dense.png"
+dest_files=["res://.godot/imported/02_hull_dense.png-4770959b04439ed484544fb19a7627c8.image"]
+
+[params]
+

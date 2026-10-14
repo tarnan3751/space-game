@@ -1,0 +1,14 @@
+[remap]
+
+importer="image"
+type="Image"
+uid="uid://b0e2fwjnapqfh"
+path="res://.godot/imported/05_pipe.png-c5d918de2b98f12fc61301d9bf5d0fe3.image"
+
+[deps]
+
+source_file="res://assets/textures/kit/05_pipe.png"
+dest_files=["res://.godot/imported/05_pipe.png-c5d918de2b98f12fc61301d9bf5d0fe3.image"]
+
+[params]
+

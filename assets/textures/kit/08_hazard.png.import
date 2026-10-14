@@ -1,0 +1,14 @@
+[remap]
+
+importer="image"
+type="Image"
+uid="uid://b6ykulu7jsi2s"
+path="res://.godot/imported/08_hazard.png-c7a0b878f1578628017207cfabd988bf.image"
+
+[deps]
+
+source_file="res://assets/textures/kit/08_hazard.png"
+dest_files=["res://.godot/imported/08_hazard.png-c7a0b878f1578628017207cfabd988bf.image"]
+
+[params]
+

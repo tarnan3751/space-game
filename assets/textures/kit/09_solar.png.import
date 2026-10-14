@@ -1,0 +1,14 @@
+[remap]
+
+importer="image"
+type="Image"
+uid="uid://djktllip0c314"
+path="res://.godot/imported/09_solar.png-21cb5020b471e45ff6a79a2dae20773b.image"
+
+[deps]
+
+source_file="res://assets/textures/kit/09_solar.png"
+dest_files=["res://.godot/imported/09_solar.png-21cb5020b471e45ff6a79a2dae20773b.image"]
+
+[params]
+
