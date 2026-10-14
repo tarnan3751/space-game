@@ -2,6 +2,7 @@
   "command_center": {
     "name": "Command Center",
     "size": 2,
+    "category": "core",
     "max_count": [1, 1],
     "levels": [
       { "cost": {}, "build_seconds": 0, "storage": { "metal": 1000, "crystal": 1000 } },
@@ -11,6 +12,7 @@
   "drone_bay": {
     "name": "Drone Bay",
     "size": 1,
+    "category": "resources",
     "max_count": [2, 3],
     "levels": [
       { "cost": { "metal": 100 }, "build_seconds": 0, "builders": 1 }
@@ -19,6 +21,7 @@
   "extractor": {
     "name": "Extractor",
     "size": 2,
+    "category": "resources",
     "max_count": [2, 4],
     "levels": [
       { "cost": { "crystal": 100 }, "build_seconds": 60, "produces": { "metal": 3600 } },
@@ -28,6 +31,7 @@
   "silo": {
     "name": "Silo",
     "size": 2,
+    "category": "resources",
     "max_count": [1, 2],
     "levels": [
       { "cost": { "metal": 100 }, "build_seconds": 30, "storage": { "metal": 1000 } }
@@ -36,9 +40,59 @@
   "harvester": {
     "name": "Harvester",
     "size": 1,
+    "category": "resources",
     "max_count": [1, 1],
     "levels": [
       { "cost": { "metal": 50 }, "build_seconds": 0, "produces": { "crystal": 1800 } }
+    ]
+  },
+  "siphon": {
+    "name": "Siphon",
+    "size": 1,
+    "category": "resources",
+    "max_count": [1, 1],
+    "levels": [
+      { "cost": { "crystal": 50 }, "build_seconds": 0, "produces": { "antimatter": 3600 },
+        "storage": { "antimatter": 100 } }
+    ]
+  },
+  "hangar": {
+    "name": "Hangar",
+    "size": 2,
+    "category": "army",
+    "max_count": [1, 1],
+    "levels": [
+      { "cost": { "metal": 100 }, "build_seconds": 30, "capacity": 20 },
+      { "cost": { "metal": 200 }, "build_seconds": 60, "requires_cc": 2, "capacity": 30 }
+    ]
+  },
+  "lab": {
+    "name": "Lab",
+    "size": 2,
+    "category": "army",
+    "max_count": [0, 1],
+    "levels": [
+      { "cost": { "metal": 100 }, "build_seconds": 30, "requires_cc": 2 }
+    ]
+  },
+  "mine": {
+    "name": "Mine",
+    "size": 1,
+    "category": "traps",
+    "hidden": true,
+    "targets": "ground",
+    "max_count": [2, 4],
+    "levels": [
+      { "cost": { "metal": 20 }, "build_seconds": 0, "damage": 50, "range_cells": 1 }
+    ]
+  },
+  "wall": {
+    "name": "Wall",
+    "size": 1,
+    "category": "walls",
+    "max_count": [25, 50],
+    "levels": [
+      { "cost": { "metal": 10 }, "build_seconds": 0, "hp": 100 }
     ]
   }
 }

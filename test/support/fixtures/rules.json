@@ -1,9 +1,19 @@
 {
-  "resources": ["metal", "crystal"],
+  "resources": [
+    { "id": "metal", "name": "Metal", "color": "c8d3e0" },
+    { "id": "crystal", "name": "Crystal", "color": "e2a4ff" },
+    { "id": "antimatter", "name": "Antimatter", "color": "b48cff" }
+  ],
+  "categories": [
+    { "id": "resources", "name": "Resources" },
+    { "id": "army", "name": "Army" },
+    { "id": "traps", "name": "Traps" },
+    { "id": "walls", "name": "Walls" }
+  ],
   "grid": { "width": 10, "height": 10 },
-  "menu_order": ["extractor", "harvester", "silo", "drone_bay"],
+  "menu_order": ["extractor", "harvester", "silo", "drone_bay", "siphon", "hangar", "lab", "mine", "wall"],
   "start": {
-    "resources": { "metal": 500, "crystal": 500 },
+    "resources": { "metal": 500, "crystal": 500, "antimatter": 0 },
     "buildings": [
       { "type": "command_center", "cell": [0, 0], "level": 1 },
       { "type": "drone_bay", "cell": [3, 0], "level": 1 }

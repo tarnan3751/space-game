@@ -1,5 +1,15 @@
 {
-  "resources": ["metal", "crystal"],
+  "resources": [
+    { "id": "metal", "name": "Metal", "color": "c8d3e0" },
+    { "id": "crystal", "name": "Crystal", "color": "e2a4ff" }
+  ],
+  "categories": [
+    { "id": "resources", "name": "Resources" },
+    { "id": "army", "name": "Army" },
+    { "id": "defense", "name": "Defence" },
+    { "id": "traps", "name": "Traps" },
+    { "id": "walls", "name": "Walls" }
+  ],
   "grid": { "width": 40, "height": 40 },
   "menu_order": [
     "metal_extractor",

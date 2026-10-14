@@ -56,6 +56,19 @@ func test_instant_buildings_skip_builders_but_respect_limits() -> void:
 	assert_eq(state.apply(_place("harvester", 8, 8), 0), BaseState.ERR_LIMIT)
 
 
+func test_walls_place_instantly_without_a_builder_up_to_their_count() -> void:
+	var state := Fixtures.new_base()
+	assert_eq(state.apply(_place("extractor", 5, 2), 0), "")
+	assert_eq(state.builders_free(), 0, "the only drone is busy")
+	var limit := state.catalog.max_count("wall", 1)
+	for i: int in limit:
+		assert_eq(state.apply(_place("wall", i % 10, 5 + i / 10), 0), "", "wall %d" % i)
+	assert_eq(state.count_of("wall"), limit)
+	assert_eq(state.buildings[state.last_added_id].level, 1, "built at once")
+	assert_eq(state.resources["metal"], 500 - 10 * limit)
+	assert_eq(state.apply(_place("wall", 9, 9), 0), BaseState.ERR_LIMIT)
+
+
 func test_construction_finishes_exactly_at_finish_time() -> void:
 	var state := Fixtures.new_base(1000)
 	state.apply(_place("extractor", 5, 5), 1000)
@@ -152,6 +165,25 @@ func test_load_drops_buildings_that_no_longer_fit() -> void:
 	assert_eq(state.buildings.size(), 2)
 	assert_eq(state.grid.occupant_at(Vector2i(1, 1)), CC_ID)
 	assert_eq(state.count_of("extractor"), 0)
+
+
+func test_save_from_before_the_third_resource_loads() -> void:
+	# The shape every save had before antimatter existed: two resources, version 1.
+	var data := {
+		"version": 1, "now": 100, "next_id": 3,
+		"resources": {"metal": 400, "crystal": 300},
+		"remainders": {"metal": 0, "crystal": 1800},
+		"buildings": [
+			{"id": 1, "type": "command_center", "cell": [0, 0], "level": 1, "target_level": 1, "finish_at": 0},
+			{"id": 2, "type": "drone_bay", "cell": [3, 0], "level": 1, "target_level": 1, "finish_at": 0},
+		],
+	}
+	var state := BaseState.from_dict(Fixtures.catalog(), data)
+	assert_eq(state.buildings.size(), 2)
+	var saved := state.to_dict()
+	assert_eq(saved["resources"], {"metal": 400, "crystal": 300, "antimatter": 0})
+	assert_eq(saved["remainders"], {"metal": 0, "crystal": 1800, "antimatter": 0})
+	assert_eq(saved["version"], 1)
 
 
 func _place(type: String, x: int, y: int) -> Dictionary:

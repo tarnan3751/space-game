@@ -61,3 +61,17 @@ func test_busy_buildings_do_not_produce() -> void:
 	assert_eq(state.production_per_hour("metal"), 0)
 	state.advance_to(60)
 	assert_eq(state.production_per_hour("metal"), 3600)
+
+
+func test_third_resource_produces_and_caps() -> void:
+	# Siphon: instant, 3600 antimatter/h = 1 per second, stores 100. The CC stores none.
+	var state := Fixtures.new_base()
+	assert_eq(state.resources["antimatter"], 0)
+	assert_eq(state.apply({"op": "place", "type": "siphon", "cell": [9, 9]}, 0), "")
+	assert_eq(state.capacity("antimatter"), 100)
+	state.advance_to(60)
+	assert_eq(state.resources["antimatter"], 60)
+	state.advance_to(1000)
+	assert_eq(state.resources["antimatter"], 100)
+	assert_eq(state.resources["metal"], 500, "the other resources are untouched")
+	assert_eq(state.resources["crystal"], 450)

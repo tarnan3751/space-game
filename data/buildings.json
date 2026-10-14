@@ -2,6 +2,7 @@
   "command_center": {
     "name": "Command Center",
     "size": 4,
+    "category": "core",
     "max_count": [1, 1, 1],
     "levels": [
       { "cost": {}, "build_seconds": 0, "hp": 2000,
@@ -15,6 +16,7 @@
   "metal_extractor": {
     "name": "Metal Extractor",
     "size": 3,
+    "category": "resources",
     "max_count": [2, 4, 6],
     "levels": [
       { "cost": { "crystal": 150 }, "build_seconds": 10, "hp": 400,
@@ -28,6 +30,7 @@
   "crystal_harvester": {
     "name": "Crystal Harvester",
     "size": 3,
+    "category": "resources",
     "max_count": [2, 4, 6],
     "levels": [
       { "cost": { "metal": 150 }, "build_seconds": 10, "hp": 400,
@@ -41,6 +44,7 @@
   "metal_silo": {
     "name": "Metal Silo",
     "size": 3,
+    "category": "resources",
     "max_count": [1, 2, 3],
     "levels": [
       { "cost": { "crystal": 300 }, "build_seconds": 30, "hp": 800,
@@ -54,6 +58,7 @@
   "crystal_silo": {
     "name": "Crystal Silo",
     "size": 3,
+    "category": "resources",
     "max_count": [1, 2, 3],
     "levels": [
       { "cost": { "metal": 300 }, "build_seconds": 30, "hp": 800,
@@ -67,6 +72,7 @@
   "drone_bay": {
     "name": "Drone Bay",
     "size": 2,
+    "category": "resources",
     "max_count": [2, 3, 4],
     "levels": [
       { "cost": { "metal": 900 }, "build_seconds": 0, "hp": 250, "builders": 1 }
@@ -75,6 +81,7 @@
   "laser_turret": {
     "name": "Laser Turret",
     "size": 3,
+    "category": "defense",
     "max_count": [1, 2, 4],
     "levels": [
       { "cost": { "metal": 400 }, "build_seconds": 20, "hp": 600,
