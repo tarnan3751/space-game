@@ -18,7 +18,7 @@ which is what they should do. A new container must be IGNORE unless it is meant 
 
 | Part | Where | Contents |
 | --- | --- | --- |
-| Top bar | top-left, `MARGIN` (16) in | One panel label per resource in catalog order, coloured per `RESOURCE_COLORS` (`"Metal  750 / 1,000   +1,800/h"`, the rate only when above 0), then `"Drones  free / total"` in the accent colour. |
+| Top bar | top-left, `MARGIN` (16) in | One panel label per resource in catalog order (`"Metal  750 / 1,000   +1,800/h"`, the rate only when above 0), named and coloured from the catalog's `resource_name` and `resource_color` (the text colour when a resource has none), then `"Drones  free / total"` in the accent colour. |
 | Build bar | bottom, full width | A `PanelContainer` with a horizontal `ScrollContainer` of one 180×84 button per `catalog.menu_order` type: the display name and, on a second line, the level 1 cost or why it cannot be built. |
 | Place bar | bottom centre | `Cancel` and `Place` (170×72); `Place` is disabled unless the ghost is valid. |
 | Info panel | bottom centre, 460 wide | Title `"Name   Lv N"` with a `Close` button; detail lines; the upgrade button; a note under it. |

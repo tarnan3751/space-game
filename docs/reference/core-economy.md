@@ -17,15 +17,21 @@ recursively (`_ints`); everything the catalog hands out is `int`.
 | Member | What |
 | --- | --- |
 | `load_error: String` | Empty when the data validated cleanly, else the problems joined by `; `. `main.gd` refuses to start on a non-empty one. |
-| `resources: PackedStringArray` | The resource names in `rules.resources` order. That order is the order production is paid and the HUD lists them. |
+| `resources: PackedStringArray` | The resource ids in `rules.resources` order. That order is the order production is paid and the HUD lists them. |
+| `resource_name(id)`, `resource_color(id)` | A resource's display name (the id when it has none) and its HUD colour as a hex string (`""` when it has none). Core hands out no `Color`. |
+| `categories: PackedStringArray` | The build-menu category ids in `rules.categories` order, the tab order. |
+| `category_name(id)` | A category's display name, the id when it has none. |
+| `CORE_CATEGORY` | `"core"`, the Command Center's category; never a build-menu category. |
 | `grid_size: Vector2i` | `rules.grid`. |
-| `menu_order: PackedStringArray` | `rules.menu_order`, the build bar's buttons. |
+| `menu_order: PackedStringArray` | `rules.menu_order`: every type but the Command Center, in build-menu order. |
 | `start: Dictionary` | `rules.start`: starting resources and buildings. |
 | `HQ_TYPE` | `"command_center"`, the building whose level gates everything. |
 | `has_type`, `types()`, `display_name`, `size_of` (default 1) | Per-type lookups. |
+| `category_of(type)`, `is_hidden(type)`, `targets_of(type)` | The type's `category`, `hidden` (default `false`) and `targets` (`""` when it has none). The last two are display only until the battle sim. |
 | `max_level(type)` | The number of entries in the type's `levels`. |
 | `level_stats(type, level)` | The stats dictionary for a 1-based level, or `{}` when the type or level does not exist. |
 | `max_count(type, cc_level)` | `max_count[cc_level - 1]`, with `cc_level` clamped into the list; `0` when the list is empty. |
+| `max_cc_level()` | The Command Center's level count, which is the length of every `max_count` list. |
 
 Validation (`_read`, `_validate_building`) is listed in `data-format.md`.
 
@@ -66,8 +72,10 @@ emits `changed`. A failed command changes nothing and charges nothing. The three
 Checks, in the order they are made:
 
 - `check_can_build(type)` (the build bar's question, independent of where): `unknown_type`;
-  `limit_reached` when `count_of(type) >= catalog.max_count(type, cc_level())`; then the level
-  requirements of level 1.
+  `needs_command_center_level` when level 1's `requires_cc` exceeds `cc_level()`;
+  `limit_reached` when `count_of(type) >= catalog.max_count(type, cc_level())`; then the rest
+  of level 1's requirements. The Command Center level comes before the limit, so a type whose
+  `max_count` is 0 at the current level reads as locked, not as maxed.
 - `check_place(type, cell)`: `check_can_build`, then `blocked` unless `grid.is_free(cell, size)`.
 - `check_move(id, cell)`: `unknown_building`; `blocked` unless the footprint is free ignoring the
   building's own cells.

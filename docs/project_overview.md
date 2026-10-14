@@ -69,6 +69,7 @@ an attack log, revenge and shields.
 | Area | Status | Notes |
 | --- | --- | --- |
 | Catalog and game data | Built | `data/rules.json`, `data/buildings.json`; validated on load; all numbers ints |
+| Building roster | Built | 32 types: the Command Center (levels 1–5) and 31 more in five build-menu categories; metal, crystal and antimatter (from CC 4); one development-scale curve, checked by tests for affordability and for never going down; the flat build bar lists every type |
 | Base state: place, move, upgrade | Built | Commands through `BaseState.apply`; `check_*` for the UI; error codes |
 | Timers and builders | Built | Construction and upgrade timers; drone bays supply builders; instant builds skip the builder check |
 | Economy | Built | Per-hour integer rates; remainders carried in resource-seconds; storage caps; busy buildings don't produce |
@@ -91,7 +92,7 @@ Balance numbers in `data/` are fast development values, not tuned.
 | Step | What | Status |
 | --- | --- | --- |
 | 1 | Offline base: placement, timers, economy | Built |
-| 2 | Base polish: walls (1x1, drag-to-paint), building info art, safe-area margins for notches, edge auto-scroll while dragging, real low-poly models in `assets/` | Planned |
+| 2 | Base polish: the building roster, build-menu categories, a third resource (antimatter), real low-poly models in `assets/`, HUD category tabs, safe-area margins for notches, painting walls by dragging, edge auto-scroll while dragging | In progress: the roster, the categories and antimatter are built; models, HUD tabs, safe-area margins, wall painting and edge scroll remain |
 | 3 | Seeded PvE expeditions: a field generated from a seed with `SeededRng` (asteroids, deposits, hazards); loot returns into `BaseState` through a new command | Planned |
 | 4 | Deterministic battle sim in `src/core/battle/`: fixed-point integer positions (1 cell = 1000 units), fixed tick; replay = seed + base layout + list of deploy commands; tested headless against AI-built bases; same inputs give byte-identical results | Planned |
 | 5 | Server: Nakama with accounts, base storage and command validation; battles verified by replaying them in headless Godot running the same `src/core` | Planned |
@@ -105,8 +106,9 @@ Balance numbers in `data/` are fast development values, not tuned.
   come with step 2.
 - **The save is local and unversioned beyond `"version": 1`**; the server will hold the base
   later and nothing below `main.gd` changes.
-- `hp`, `damage`, `range_cells` and `fire_ms` in `data/buildings.json` are shown in the HUD
-  where they exist but drive nothing until the battle sim (step 4).
+- `hp`, `damage`, `range_cells`, `fire_ms`, `hidden`, `targets` and `capacity` in
+  `data/buildings.json` are display-only: the HUD shows hull, damage and range where they exist,
+  and none of them drives anything until the battle sim (step 4).
 
 ## 3. Decisions
 

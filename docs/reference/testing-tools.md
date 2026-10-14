@@ -28,15 +28,17 @@ float 5.0 differ), `assert_true`, `assert_false`.
 Logic tests build their state from the fixture catalog, never `data/`: `const Fixtures :=
 preload("res://test/support/fixtures.gd")`, then `Fixtures.catalog()` or
 `Fixtures.new_base(start_time)` (`data-format.md` describes the fixture base). The one
-exception is `test_catalog.gd`, whose `test_shipped_data_is_valid` and
-`test_shipped_start_layout_fits` load the real `data/` on purpose.
+exception is `test_catalog.gd`, whose `test_shipped_*` tests load the real `data/` on purpose:
+the data is valid, the start layout fits, every level's price fits the storage a base can reach
+when that level unlocks, and no curve (cost, `build_seconds`, `hp`, `produces`, `storage`,
+`capacity`) goes down from one level to the next.
 
 | File | Covers |
 | --- | --- |
 | `test/core/test_base_grid.gd` | Bounds, occupancy, own cells counting as free. |
-| `test/core/test_base_state.gd` | Start layout, place and its refusals, instant buildings, timers, upgrades and their rules, moves, bad commands, the `changed` signal, the clock going backwards, the save round trip, dropping buildings that no longer fit. |
-| `test/core/test_catalog.gd` | The shipped data, int conversion, level and count lookups, validation messages. |
-| `test/core/test_production.gd` | Production starting at completion, carried remainders, tick-size independence, storage caps, caps rising when a silo finishes, busy buildings not producing. |
+| `test/core/test_base_state.gd` | Start layout, place and its refusals, the Command Center level checked before the limit, instant buildings, walls, timers, upgrades and their rules, moves, bad commands, the `changed` signal, the clock going backwards, the save round trip, a save from before the third resource, dropping buildings that no longer fit. |
+| `test/core/test_catalog.gd` | The shipped data (validity, start layout, affordability, curves), int conversion, level, count, resource, category and display-field lookups, one validation message per rule. |
+| `test/core/test_production.gd` | Production starting at completion, carried remainders, tick-size independence, storage caps, caps rising when a silo finishes, busy buildings not producing, a third resource. |
 | `test/core/test_seeded_rng.gd` | The frozen sequences for seeds 1 and 12345, range bounds, the zero seed. **These expected values never change.** |
 
 A core change ships with a test here. A new test file is `test/core/test_<area>.gd`.
