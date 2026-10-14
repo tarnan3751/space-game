@@ -114,6 +114,16 @@ func refresh(state: BaseState, selected_id: int, placing: bool, ghost_ok: bool) 
 		_refresh_info(state, state.buildings[selected_id])
 
 
+## Placement began, ended or its ghost moved. A move changes only the Place button, so
+## the top bar and the entries wait for the next state change or tick; a start or an end
+## swaps the bottom bar, which takes the full refresh.
+func refresh_placing(state: BaseState, selected_id: int, placing: bool, ghost_ok: bool) -> void:
+	if placing and _place_bar.visible:
+		_place_button.disabled = not ghost_ok
+		return
+	refresh(state, selected_id, placing, ghost_ok)
+
+
 ## Lays every part out inside `inset`, a rect in the HUD's own coordinates (the
 ## viewport's visible rect, 1280x720 on a 16:9 screen). The HUD fits the device's safe
 ## area itself; the harness calls this to try a notch-like inset.

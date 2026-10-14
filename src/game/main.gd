@@ -64,7 +64,7 @@ func _ready() -> void:
 	hud.close_pressed.connect(func() -> void: placement.select(0))
 	hud.reset_pressed.connect(_reset_base)
 	placement.selection_changed.connect(_refresh_hud)
-	placement.placing_changed.connect(_refresh_hud)
+	placement.placing_changed.connect(_on_placing_changed)
 	placement.command_failed.connect(hud.show_error)
 
 	_set_state(_load_or_create())
@@ -106,6 +106,11 @@ func _refresh_hud() -> void:
 	if state == null:
 		return
 	hud.refresh(state, placement.selected_id, placement.is_placing(), placement.ghost_is_valid())
+
+
+## Fires on every move of the placement ghost, so the HUD updates only what a move changes.
+func _on_placing_changed() -> void:
+	hud.refresh_placing(state, placement.selected_id, placement.is_placing(), placement.ghost_is_valid())
 
 
 func _set_state(new_state: BaseState) -> void:
