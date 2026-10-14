@@ -97,3 +97,11 @@ needs a query, not a reason to reach in.
 placing a Metal Extractor, confirms it, checks the cost, the drone and the construction
 timer, advances to one second before completion and then past it, and screenshots the
 built extractor.
+
+`scenarios/model_gallery.gd` shows every building model: one `BuildingView` per type and level
+in the catalog, laid out on the grid in rows by category (`"core"`, then
+`catalog.categories`), under a node of its own, with the base's own views hidden. The roster
+does not fit on the grid at once, so rows that do not fit start a new page. Each page gets an
+overview screenshot and each row a close-up, framed through `camera.zoom_at` and `camera.pan`.
+In both modes it checks every model against the budget: at most two `MeshInstance3D` and at
+most 500 triangles, 40 for traps and walls (`category_of`).

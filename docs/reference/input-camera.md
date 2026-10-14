@@ -170,7 +170,8 @@ per type and level and cached in a static dictionary; the nodes are per view. Ea
 shares a look (resources on square slabs, army halls and domes with big doors, defences on
 octagonal plinths, traps nearly flush with the ground, walls as blocks); level 1 is plain, each
 level adds a part or an accent, and the top level carries gold. Budgets: 500 triangles a model,
-40 for traps and walls. `create_scaffold(size)` is one cached mesh in hazard colours. The
+40 for traps and walls; the `model_gallery` harness scenario checks them on every type and level.
+`create_scaffold(size)` is one cached mesh in hazard colours. The
 contract any model keeps, built or imported: origin at the footprint centre on the ground, +Y
 up, fitting inside `size × size` cells.
 
