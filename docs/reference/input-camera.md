@@ -1,18 +1,20 @@
 # Input and camera
 
 How `src/game/` turns touches into commands and draws the base: `main.gd`, `IsoCamera`,
-`WorldInput`, `PlacementController`, `BaseView`, `BuildingView`, `BuildingModels`, `Palette`
-and `LowPolyMesh`. The HUD is in `hud.md`. This layer reads `BaseState` and never mutates it except through
-`PlacementController.apply` calls (`CLAUDE.md`, **Architecture rules**).
+`WorldInput`, `PlacementController`, `BaseView`, `BuildingView` and `BuildingModels`. The HUD is
+in `hud.md`; how the models, the ground and the scenery look (the material kit, `LowPolyMesh`, the
+shaders, the outlines, the view states) is in `art-style.md`. This layer reads `BaseState` and
+never mutates it except through `PlacementController.apply` calls (`CLAUDE.md`, **Architecture
+rules**).
 
 ## The scene (`main.gd`)
 
 `scenes/main.tscn` is one `Node3D` with `main.gd`; everything else is built in `_ready`:
 
 1. `Catalog.load_default()`; a non-empty `load_error` is pushed as an error and the scene stops.
-2. The environment: a `WorldEnvironment` (flat dark background, coloured ambient light, filmic
-   tonemap), a warm sun `DirectionalLight3D` with shadows, and a cool fill light from the other
-   side.
+2. The environment: a `WorldEnvironment` (deep space background, cool ambient light, linear
+   tonemap) and one warm key light, a `DirectionalLight3D` with a hard single-split shadow
+   (`art-style.md`, **Light and shading**).
 3. `BaseView` (ground, scenery, building views), `IsoCamera` (made current), `WorldInput`,
    `Hud`, then `PlacementController`, which is given the view, the camera and the clock
    (`placement.clock = _now`) and connected to the input signals.
@@ -162,22 +164,22 @@ the origin, cell (x, y) on world (x, z).
 | `set_grid_highlight(on)` | Brightens the ground's cell lines (`GRID_LINES_PLACING`) or dims them back (`GRID_LINES`); `PlacementController` calls it as placement begins and ends. |
 | `clear()` | Frees every view (used when the state is replaced). |
 
-`setup(size)` builds the scenery, one draw call per part, the terrain and rocks drawn from
-`SeededRng.new(SCENERY_SEED)` (7) so every player's base sits in the same landscape:
+`setup(size)` builds the scenery, the terrain and rocks drawn from `SeededRng.new(SCENERY_SEED)`
+(7) so every player's base sits in the same landscape; how each is shaded is in `art-style.md`,
+**Ground and scenery**:
 
-- **The ground**: a `PlaneMesh` of the grid's size with `ground.gdshader`: the palette's
-  regolith (`base_color`, from `Palette.color`) with a slight tone variation per cell and a cell
-  grid whose `line_strength` is faint by default and brighter while placing; `grid_size` is a
+- **The ground**: a `PlaneMesh` of the grid's size with `ground.gdshader`: the kit's regolith in
+  the ground tint (`base_color`, `MaterialKit.GROUND`) with a slight tone variation per cell and a
+  cell grid whose `line_strength` is faint by default and brighter while placing; `grid_size` is a
   uniform.
 - **The terrain**: one flat-shaded `ArrayMesh` annulus from the grid's edge out to
   ±`TERRAIN_EXTENT` (90) on a `TERRAIN_STEP` (2) lattice that includes both grid edges. Heights
   come from value noise, rise gently with distance and dip into three to five craters; along the
   grid's edge they are pinned to y = 0, so the terrain meets the ground with no seam. Faces are
-  coloured by height band (regolith, darker regolith, rock, dark rock, crater floors) from the
-  palette. It covers the view at the widest zoom with the focus anywhere on the grid, and casts no
-  shadows.
-- **The rocks**: `ROCK_COUNT` (40) irregular low-poly rocks merged into one mesh, sitting on the
-  terrain, never inside the grid.
+  painted by height band (dust, darker dust, rock, dark rock, crater floors). It covers the view
+  at the widest zoom with the focus anywhere on the grid, and casts no shadows.
+- **The rocks**: `ROCK_COUNT` (40) irregular rocks merged into one mesh with its outline, sitting
+  on the terrain, never inside the grid.
 
 ## BuildingView (`building_view.gd`) and BuildingModels (`building_models.gd`)
 
@@ -189,43 +191,24 @@ last three translucent cyan, green and red), and a billboard `Label3D` timer ("B
 view when the finished level changes, so a building mid-upgrade shows its current level until
 the upgrade finishes. `show_status(level, busy, target_level, seconds_left)` is what
 `BaseView.sync` pushes each tick. `set_lifted(true)` raises the model by 0.35 while it is
-dragged or is the ghost. The node carrying `BuildingModels.SPIN_META` spins in `_process` while
+dragged or is the ghost. A selected or dragged view's outlines turn gold; the placement ghost
+keeps plain ink outlines, and its body takes the valid or invalid tint through `set_ghost(valid)`
+(`art-style.md`, **View states**). The node carrying `BuildingModels.SPIN_META` spins in `_process` while
 the building is finished and idle; a view with nothing to spin turns processing off in `_ready`,
 so walls and traps cost nothing per frame.
 
-`BuildingModels.create(type, level, size)` returns a `Node3D` holding one static
-`MeshInstance3D` and at most one spinning one (the radar, the drone, the drill, the harvester
-arm, the siphon and gravity well rings, the flak and laser heads): at most two draw calls a
-building. The models are flat-shaded low-poly, one per type and level of the 32-type roster;
-`MODELS` gives each type the footprint its models are built for and its level count. A level
-above that shows the top model, a catalog size other than the footprint scales the model, and
-an unknown type gets a hull block with a hazard stripe and one warning. Meshes are built once
-per type and level and cached in a static dictionary; the nodes are per view. Each category
-shares a look (resources on square slabs, army halls and domes with big doors, defences on
-octagonal plinths, traps nearly flush with the ground, walls as blocks); level 1 is plain, each
-level adds a part or an accent, and the top level carries gold. Budgets: 500 triangles a model,
-40 for traps and walls; the `model_gallery` harness scenario checks them on every type and level.
-`create_scaffold(size)` is one cached mesh in hazard colours. The
-contract any model keeps, built or imported: origin at the footprint centre on the ground, +Y
-up, fitting inside `size × size` cells.
-
-## Palette (`palette.gd`) and LowPolyMesh (`low_poly_mesh.gd`)
-
-`Palette` is the one colour table every low-poly mesh is painted from: about 25 named entries
-(hulls, metals, white, window, paints, hazard yellow, gold, the glows, regolith, rock and
-crater tones) laid out in 8×8 cells of an albedo `ImageTexture` generated at run time; the glow
-entries also light their cell of an emission texture, and their albedo is darkened so the light
-does not wash their hue out. `uv(name)` is a cell's centre, `color(name)` the colour itself (the
-ground shader's), and `material()` the one shared `StandardMaterial3D` (albedo and emission
-textures, nearest filtering, roughness 1) on every building, the terrain and the rocks. A
-painted texture later changes this file only.
-
-`LowPolyMesh` accumulates flat-shaded faces into one `ArrayMesh` surface: each face has its own
-vertices and normal and UVs at one palette cell. Parts: `box`, `wedge`, `strut`, `prism`,
-`cone`, `pyramid`, `dome`, `orb`, `ring`, `disc` and the general `lathe`, each placed by the
-centre of its base (an orb's centre) and Euler degrees; `triangle` and `polygon` add single
-faces (the terrain and rocks use them). Bottom faces are left out, since the camera always looks
-down. `to_mesh()` returns the mesh with the palette material.
+`BuildingModels.create(type, level, size)` returns a `Node3D` holding the static body and its
+ink outline, and at most one spinning part (the radar, the drone, the drill, the harvester arm,
+the siphon and gravity well rings, the flak and laser heads) with its outline, under a pivot node
+carrying `SPIN_META`: at most four `MeshInstance3D`, two of them outlines that cast no shadow.
+The models are built in code, one per type and level of the 32-type roster, each type's in its
+category's file under `src/game/models/`; `MODELS` gives each type the footprint its models are
+built for and its level count. A level above that shows the top model, a catalog size other than
+the footprint scales the model, and an unknown type gets a hull block with a hazard stripe and
+one warning. Meshes are built once per type and level and cached in a static dictionary; the
+nodes are per view. `create_scaffold(size)` is one cached, outlined model in hazard stripes. How a
+model is built and what it must keep (the contract, the budgets, the vocabulary) is in
+`art-style.md`, **Models**.
 
 ## Format (`format.gd`)
 

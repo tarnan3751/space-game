@@ -15,8 +15,9 @@ of the modules involved. A section named in bold is a heading of this file or of
 ## Status
 
 **Milestone 1 (offline base) is built**: placement, timers, builders, economy, save with offline
-progress, low-poly models built in code. So is step 2, base polish; everything after it is
-planned. `docs/project_overview.md` holds the roadmap (§2.2), the known limitations (§2.3) and
+progress, models built in code. So is step 2, base polish, and the comic-style kit (toon light,
+ink outlines, a generated material kit) the models are being reworked onto; everything after it
+is planned. `docs/project_overview.md` holds the roadmap (§2.2), the known limitations (§2.3) and
 the decisions (§3). Balance numbers in `data/` are fast dev values, not tuned.
 
 ## Stack (pinned)
@@ -47,6 +48,7 @@ Run `tools/dump_api.sh` once, then look up exact signatures in `.godot-api/`
 | Land a delivered series | `tools/land_series.sh <patch-dir> <base-commit> <tree-hash>` |
 | Run the game (the owner only: it opens the real save) | `$GODOT --path .` |
 | Dump engine API | `tools/dump_api.sh` |
+| Regenerate the material kit's textures (after an import) | `$GODOT --headless --path . -s res://tools/gen_textures.gd` |
 
 **Any Godot run writes files**: the `.godot/` cache, `*.uid` files beside new scripts, and,
 run normally, the save under `user://`. The gate and the harness boot the game on an isolated
@@ -61,7 +63,8 @@ or `data/`.
 |---|---|---|
 | Core and economy: catalog, base state, commands, timers, production, grid, seeded RNG | `src/core/` | `docs/reference/core-economy.md` |
 | Data format: `rules.json`, `buildings.json`, the fixtures, the save file | `data/`, `test/support/fixtures/` | `docs/reference/data-format.md` |
-| Input and camera: the scene, camera, gestures, placement, views, models | `src/game/` (all but `hud.gd`) | `docs/reference/input-camera.md` |
+| Input and camera: the scene, camera, gestures, placement, views | `src/game/` (all but `hud.gd` and the art style's files) | `docs/reference/input-camera.md` |
+| Art style: the look, light, colours, the material kit, `LowPolyMesh`, outlines, models, view states | `src/game/models/`, `src/game/*.gdshader*`, `material_kit.gd`, `surf.gd`, `low_poly_mesh.gd`, `assets/textures/kit/`, `tools/gen_textures.gd` | `docs/reference/art-style.md` |
 | HUD: top bar, build bar, place bar, info panel, toasts | `src/game/hud.gd`, `format.gd` | `docs/reference/hud.md` |
 | Testing and tools: runner, fixtures, gate, harness, landing, API dump | `test/`, `tools/` | `docs/reference/testing-tools.md`, `tools/harness/README.md` |
 
@@ -117,14 +120,17 @@ docs/            project_overview.md (scope, status, roadmap, decisions); refere
 scenes/          main.tscn only
 src/core/        catalog, base_state, building_state, base_grid, seeded_rng
 src/game/        main, iso_camera, world_input, placement_controller, base_view,
-                 building_view, building_models, low_poly_mesh, palette, hud, format,
-                 ground.gdshader
+                 building_view, building_models, low_poly_mesh, surf, material_kit, hud, format,
+                 toon.gdshader, toon_common.gdshaderinc, ink.gdshader, ground.gdshader
+src/game/models/ parts (the model being built, shared helpers and surfaces), then one file of
+                 model builders per category: core, resources, army, defense, traps, walls
 test/core/       test_*.gd (one file per core area)
 test/support/    TestCase base class, fixtures and fixture JSON
-tools/           run_tests.sh, test_runner.gd, gates.sh, land_series.sh, dump_api.sh
+tools/           run_tests.sh, test_runner.gd, gates.sh, land_series.sh, dump_api.sh,
+                 gen_textures.gd
 tools/harness/   driver.gd, scenario.gd, scenarios/, run.sh, README.md (output in out/, gitignored)
 .claude/agents/  scout, researcher, developer, reviewer
-assets/          real models/audio later (Kenney/Quaternius CC0, Blender)
+assets/          textures/kit/ (the material kit, generated); real models/audio later
 server/          Nakama TypeScript runtime later (.gdignore keeps Godot out)
 ```
 
@@ -256,4 +262,6 @@ Constraints:
 
 - Exclude `test/*`, `tools/*`, `server/*` in export presets.
 - If `data/*.json` goes missing in an export, add it to the preset's include filter.
+- The material kit's PNGs under `assets/textures/kit/` are loaded by path (`MaterialKit`), so a
+  preset that exports selected resources only must include them.
 - Commit the `*.uid` files Godot generates next to scripts.

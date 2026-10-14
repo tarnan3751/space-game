@@ -68,6 +68,14 @@ screenshots. `tools/harness/run.sh <scenario>` runs headless (logic checks);
 driver, the clock, the isolation and how to write a scenario; `scenarios/place_and_build.gd` is
 the example.
 
+## The texture generator: `tools/gen_textures.gd`
+
+A headless `SceneTree` script that draws the material kit's sixteen layers into
+`assets/textures/kit/` from one seed, byte-identical run to run:
+`$GODOT --headless --path . -s res://tools/gen_textures.gd`, after an import. The gate does not
+run it; the PNGs are committed. `art-style.md`, **The material kit**, says what each layer holds
+and how to add one.
+
 ## Landing: `tools/land_series.sh`
 
 ```
