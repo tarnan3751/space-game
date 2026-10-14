@@ -217,8 +217,9 @@ normal run the real save), so the main working tree is the coordinator's and sta
 no agent writes to it or its index. A developer or a reviewer works in a `git clone` of its own
 under its scratch directory; there is nothing to install, and the first `tools/gates.sh` run
 imports the project. Two developers may run at once on disjoint areas, under three rules: only
-one **rendered** harness run happens on the machine at a time (headless runs, the gate and the
-tests run any time); the second lane rebases its series onto `main` before delivery; a lane's
+one **rendered** harness run happens on the machine at a time, which `tools/harness/run.sh
+--rendered` enforces with a machine-wide lock, so a lane just runs it and waits (headless runs,
+the gate and the tests run any time); the second lane rebases its series onto `main` before delivery; a lane's
 docs changes stay within its area's reference file, the map only where a status line changes. A
 lane boots the game only through the gate and the harness, which pass `--save-path`; **nobody
 runs the game normally in a clone** (`$GODOT --path .`, headless or not, the editor included),

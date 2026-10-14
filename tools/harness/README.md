@@ -33,14 +33,27 @@ save file. The directory is emptied before each run, so every run starts from a 
 laid out from `data/rules.json`.
 
 **Headless** (`--headless`, the default) renders nothing: `screenshot()` logs that it was
-skipped and the run checks logic only. It is the mode for a gate-style check and the only
-mode two lanes may run at once. **Rendered** (`--rendered`) opens the game window at the
-project's 1280x720 and saves each screenshot from the window's viewport texture. It takes
-the display, so only one rendered run happens on a machine at a time.
+skipped and the run checks logic only. It is the mode for a gate-style check, and any number
+of headless runs may go at once. **Rendered** (`--rendered`) opens the game window at the
+project's 1280x720 and saves each screenshot from the window's viewport texture.
 
-A run exits 0 only when every `check()` passed and Godot logged no `SCRIPT ERROR`. The
-last lines of `log.txt` are `HARNESS PASS: <scenario>` or `HARNESS FAIL: <scenario>, N
-failed check(s)` followed by each failed check.
+Godot stops drawing a window that is fully covered, and a window that is not drawn leaves every
+later screenshot repeating its last frame, so `run.sh` guards rendered runs three ways:
+
+- The window is kept on top (`--always-on-top`), so the terminal that launched it does not
+  cover it.
+- Rendered runs take turns on a machine: `run.sh` holds the lock directory
+  `${TMPDIR:-/tmp}/space-game-harness-rendered.lock` (made with `mkdir`, which is atomic) for
+  the run and removes it on exit, a failure or an interrupt. Another rendered run prints that
+  it is waiting and polls every two seconds for up to twenty minutes, then fails; a lock older
+  than fifteen minutes was left by a run that died and is taken over. A lane just runs `run.sh`
+  and waits. Headless runs take no lock.
+- A rendered run whose screenshots are all byte-identical fails. Two identical in a row print a
+  warning only, since a scenario may mean to show that nothing changed.
+
+A run exits 0 only when every `check()` passed, Godot logged no `SCRIPT ERROR`, and a rendered
+run's screenshots are not all identical. The last lines of `log.txt` are `HARNESS PASS:
+<scenario>` or `HARNESS FAIL: <scenario>, N failed check(s)` followed by each failed check.
 
 ## How a run is isolated
 
