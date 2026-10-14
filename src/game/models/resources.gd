@@ -436,35 +436,131 @@ static func _capacitor(m: LowPolyMesh, pos: Vector3, gold: bool) -> void:
 	m.box_chamfered(Vector3(0.26, 0.05, 0.26), 0.02, pos + Vector3(0, 0.4, 0), Parts.GOLD_TRIM if gold else ANTIMATTER_GLOW)
 
 
+static var TANK := Surf.make(MaterialKit.Layer.PLATE, MaterialKit.HULL_LIGHT, 1.5, Surf.LIT, true)
+## The valve handwheels: too thin for the outline.
+static var WHEEL := Surf.make(MaterialKit.Layer.PLATE, MaterialKit.METAL, 1.0, Surf.LIT, true, false)
+static var GOLD_WHEEL := Surf.make(MaterialKit.Layer.FLAT, MaterialKit.CORE_GOLD, 1.0, Surf.GLOSSY, true, false)
+
+## The metal silo's shell height by level; from L4 it stands as twin tanks.
+const METAL_SILO_HEIGHTS := [0.9, 1.15, 1.4, 1.45, 1.45]
+const TWIN_TANKS := [Vector3(-0.56, 0, 0.56), Vector3(0.56, 0, -0.56)]
+
+
+## A squat riveted tank in plate bands on a round plinth, with an access ladder up its lit
+## side and a glowing metal fill gauge, a hatch and a vent on its domed top. It grows taller
+## to L3, stands as twin tanks joined by a catwalk from L4, and wears gold caps at L5.
 static func build_metal_silo(p: Parts, level: int) -> void:
-	_silo(p, level, "metal", "orange", "")
-
-
-static func build_crystal_silo(p: Parts, level: int) -> void:
-	_silo(p, level, "hull", "hull_light", "glow_magenta")
-
-
-## Metal and crystal silos: tanks on a slab, more and taller with each level.
-static func _silo(p: Parts, level: int, body: String, band: String, window: String) -> void:
 	var m := p.body
-	Parts.slab(m, 3, 0.25)
-	var tanks: Array[Vector2] = [Vector2(-0.55, 0.55), Vector2(0.55, -0.55)]
-	if level >= 3:
-		tanks.push_front(Vector2(-0.6, -0.6))
-	if level >= 4:
-		tanks = [Vector2(-0.6, -0.6), Vector2(0.6, -0.6), Vector2(-0.6, 0.6), Vector2(0.6, 0.6)]
-	var radius := 0.45 if tanks.size() == 2 else 0.42
-	var height := 1.0 + 0.15 * level
-	var trim := Parts.accent(level, 5, band)
-	for spot: Vector2 in tanks:
-		var base := Vector3(spot.x, 0.25, spot.y)
-		m.prism(radius, radius, height, 8, base, Parts.surf(body))
-		m.dome(radius, 0.3, 8, 2, base + Vector3(0, height, 0), Parts.surf("metal"))
-		m.prism(radius + 0.04, radius + 0.04, 0.12, 8, base + Vector3(0, height * 0.6, 0), Parts.surf(trim))
-		if window != "":
-			m.box(Vector3(0.1, height - 0.45, 0.22), base + Parts.around(radius, 45, 0.2), Parts.surf(window), Vector3(0, -45, 0))
-	if level >= 2:
-		m.strut(Vector3(-0.55, 0.05 + height, 0.55), Vector3(0.55, 0.05 + height, -0.55), 0.16, Parts.surf(trim))
+	var gold := level >= 5
+	var height: float = METAL_SILO_HEIGHTS[level - 1]
+	Parts.foundation(m, 3)
+	if level < 4:
+		_metal_tank(m, Vector3(0, Parts.PAD_HEIGHT, 0), 0.95, height, gold)
+		if level >= 3:
+			_valves(m, Vector3(0.62, Parts.PAD_HEIGHT, 0.62), gold)
+		return
+	for spot: Vector3 in TWIN_TANKS:
+		_metal_tank(m, spot + Vector3(0, Parts.PAD_HEIGHT, 0), 0.66, height, gold)
+	var deck := Parts.PAD_HEIGHT + 0.12 + height
+	m.box_chamfered(Vector3(0.3, 0.06, 1.0), 0.02, Vector3(0, deck - 0.02, 0), DECK_PLATE, Vector3(0, 135, 0))
+	for side: float in [-1.0, 1.0]:
+		m.box(Vector3(0.05, 0.12, 1.0), LowPolyMesh.turn(Vector3(side * 0.15, 0, 0), Vector3(0, 135, 0)) + Vector3(0, deck, 0),
+			Parts.ROD, Vector3(0, 135, 0))
+	_valves(m, Vector3(0.66, Parts.PAD_HEIGHT, 0.66), gold)
+
+
+## One metal tank standing at `base`: plinth, banded shell, gauge, ladder, domed top.
+static func _metal_tank(m: LowPolyMesh, base: Vector3, radius: float, height: float, gold: bool) -> void:
+	m.lathe(PackedVector2Array([
+		Vector2(radius + 0.14, 0), Vector2(radius + 0.14, 0.08), Vector2(radius + 0.08, 0.12), Vector2(0, 0.12),
+	]), 24, base, Parts.HULL_DARK_ROUND)
+	var shell := base + Vector3(0, 0.12, 0)
+	m.lathe(PackedVector2Array([Vector2(radius, 0), Vector2(radius, height)]), 24, shell, TANK)
+	var band_y := 0.0
+	var k := 0
+	while band_y < height - 0.2:
+		_band(m, radius, shell + Vector3(0, band_y, 0), METAL_ACCENT_ROUND if k == 1 else Parts.HULL_MID_ROUND)
+		band_y += 0.4
+		k += 1
+	_band(m, radius, shell + Vector3(0, height - 0.08, 0), Parts.GOLD_ROUND if gold else Parts.HULL_MID_ROUND)
+	var top := shell + Vector3(0, height, 0)
+	m.dome(radius, radius * 0.32, 24, 4, top, Parts.GOLD_ROUND if gold else TANK)
+	m.prism(0.15, 0.13, 0.08, 16, top + Vector3(-0.12, radius * 0.3, -0.12), Parts.HULL_MID_ROUND)
+	var vent := top + Vector3(0.2, radius * 0.24, -0.25)
+	Parts.pipe_run(m, PackedVector3Array([vent, vent + Vector3(0, 0.2, 0), vent + Vector3(0.14, 0.2, 0)]), 0.045, Parts.GUNMETAL, 12)
+	# The fill gauge on the camera's right, the ladder on the lit left.
+	var gauge := Parts.around(radius, 15, 0.1) + shell
+	var yaw := Vector3(0, 75, 0)
+	m.box_chamfered(Vector3(0.18, height * 0.74, 0.08), 0.03, gauge, Parts.HULL_DARK, yaw)
+	m.box(Vector3(0.09, height * 0.52, 0.1), gauge + Vector3(0, 0.04, 0), METAL_GLOW, yaw)
+	Parts.ladder(m, Parts.around(radius + 0.06, 118, 0) + shell, height + 0.06, 0.2, 90.0 - 118.0, Parts.ROD)
+
+
+## A plate band round a tank: its outer wall only, the shell fills it from above.
+static func _band(m: LowPolyMesh, radius: float, pos: Vector3, surf: Surf) -> void:
+	m.lathe(PackedVector2Array([Vector2(radius + 0.04, 0), Vector2(radius + 0.04, 0.08)]), 24, pos, surf)
+
+
+## A valve manifold on the near corner: two pipes from the ground with handwheels.
+static func _valves(m: LowPolyMesh, pos: Vector3, gold: bool) -> void:
+	m.box_chamfered(Vector3(0.36, 0.08, 0.36), 0.03, pos, Parts.HULL_DARK, Vector3(0, 45, 0))
+	for side: float in [-1.0, 1.0]:
+		var foot := pos + LowPolyMesh.turn(Vector3(side * 0.1, 0.08, 0), Vector3(0, 45, 0))
+		Parts.pipe_run(m, PackedVector3Array([foot, foot + Vector3(0, 0.26, 0), foot + Vector3(-0.22, 0.26, -0.22)]), 0.05, Parts.GUNMETAL, 12)
+		Parts.torus(m, 0.07, 0.02, 10, 4, foot + Vector3(0, 0.14, 0), GOLD_WHEEL if gold else WHEEL)
+
+
+static var CRYSTAL_PANEL := Surf.make(MaterialKit.Layer.GLASS, MaterialKit.CRYSTAL, 1.0, Surf.GLOSSY)
+
+## The crystal silo's hexagons are turned so a flat face looks at the camera; its container's
+## corner radius and the height of one row of panels (a row per level, plus two).
+const HEXAGON := Vector3(0, -15, 0)
+const CRYSTAL_SILO_RADIUS := 0.86
+const PANEL_ROW := 0.2
+
+
+## A tall hexagonal container of glass panels glowing with the crystal inside, framed by
+## corner posts and bands, under a chamfered lid with a crystal finial, on a hexagonal plinth
+## with a feed pump at its side. It grows a row of panels a level; L5 adds gold on the lid
+## and the bands.
+static func build_crystal_silo(p: Parts, level: int) -> void:
+	var m := p.body
+	var gold := level >= 5
+	Parts.foundation(m, 3)
+	var ground := Parts.PAD_HEIGHT
+	var radius := CRYSTAL_SILO_RADIUS
+	m.lathe(PackedVector2Array([
+		Vector2(1.12, 0), Vector2(1.12, 0.1), Vector2(1.04, 0.18), Vector2(0, 0.18),
+	]), 6, Vector3(0, ground, 0), Parts.HULL_DARK, HEXAGON)
+	var base := ground + 0.18
+	var rows := level + 2
+	var height := rows * PANEL_ROW
+	m.lathe(PackedVector2Array([Vector2(radius, 0), Vector2(radius, height)]), 6, Vector3(0, base, 0), CRYSTAL_PANEL, HEXAGON)
+	for k: int in 6:
+		var degrees := 15.0 + 60.0 * k
+		m.box_chamfered(Vector3(0.13, height, 0.13), 0.03, Parts.around(radius, degrees, base), Parts.HULL_LIGHT,
+			Vector3(0, 90.0 - degrees, 0))
+	for row: int in rows + 1:
+		var band := Parts.GOLD_TRIM if gold and row == rows else (CRYSTAL_ACCENT if row == 0 else Parts.HULL_LIGHT)
+		m.lathe(PackedVector2Array([Vector2(radius + 0.04, 0), Vector2(radius + 0.04, 0.035), Vector2(radius, 0.035)]), 6,
+			Vector3(0, base + row * PANEL_ROW - 0.0175, 0), band, HEXAGON)
+	var lid := base + height + 0.03
+	m.lathe(PackedVector2Array([
+		Vector2(radius + 0.08, 0), Vector2(radius + 0.08, 0.1), Vector2(radius - 0.12, 0.22), Vector2(0, 0.22),
+	]), 6, Vector3(0, lid, 0), Parts.GOLD_TRIM if gold else Parts.HULL_MID, HEXAGON)
+	m.lathe(PackedVector2Array([Vector2(0.24, 0), Vector2(0.24, 0.05), Vector2(0.2, 0.08), Vector2(0, 0.08)]), 6,
+		Vector3(0, lid + 0.22, 0), Parts.HULL_DARK, HEXAGON)
+	_shard(m, Vector3(0, lid + 0.28, 0), 0.46, 0.12, Vector3(0, 15, 0))
+	Parts.landing_light(m, Vector3(0.4, lid + 0.18, 0.24), 0.09, CRYSTAL_GLOW)
+	# A ladder up the face on the camera's right.
+	var apothem := radius * cos(PI / 6.0)
+	Parts.ladder(m, Parts.around(apothem + 0.05, 345, base), height + 0.06, 0.2, 90.0 - 345.0, Parts.ROD)
+
+	# The feed pump on the lit side, piped into the bottom row.
+	var pump := Vector3(-1.08, ground, 0.62)
+	m.box_chamfered(Vector3(0.34, 0.36, 0.42), 0.05, pump, Parts.HULL_MID)
+	m.box(Vector3(0.2, 0.1, 0.44), pump + Vector3(0, 0.2, 0), CRYSTAL_GLOW)
+	Parts.pipe_run(m, PackedVector3Array([pump + Vector3(0.12, 0.26, -0.12), Vector3(-0.66, base + 0.15, 0.36)]), 0.055, Parts.GUNMETAL, 12)
 
 
 static func build_antimatter_vault(p: Parts, level: int) -> void:
