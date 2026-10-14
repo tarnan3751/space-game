@@ -184,3 +184,25 @@ static func landing_light(m: LowPolyMesh, pos: Vector3, radius: float, lens: Sur
 static func mast(m: LowPolyMesh, foot: Vector3, height: float, bulb_radius: float, bulb: Surf) -> void:
 	m.prism(0.03, 0.022, height, 8, foot, ROD)
 	m.orb(bulb_radius, 16, 6, foot + Vector3(0, height, 0), bulb)
+
+
+## A cylinder whose top edge is bevelled `chamfer` wide, turned by `rot`: a drum, a turret
+## ring, a tilted housing. With 8 sides and OCTAGON it is an armoured octagon.
+static func drum(m: LowPolyMesh, radius: float, height: float, chamfer: float, sides: int,
+		pos: Vector3, surf: Surf, rot: Vector3 = Vector3.ZERO) -> void:
+	m.lathe(PackedVector2Array([
+		Vector2(radius, 0), Vector2(radius, height - chamfer), Vector2(radius - chamfer, height),
+		Vector2(0, height),
+	]), sides, pos, surf, rot)
+
+
+## A ring of round section, `minor` thick around a circle of radius `major`, resting on `pos`
+## (its bottom at pos.y, like box and prism): a coil, a corona, a gyro ring. Closed, so it
+## reads at any tilt.
+static func torus(m: LowPolyMesh, major: float, minor: float, sides: int, segments: int,
+		pos: Vector3, surf: Surf, rot: Vector3 = Vector3.ZERO) -> void:
+	var profile := PackedVector2Array()
+	for k: int in segments + 1:
+		var angle := TAU * k / segments - PI * 0.5
+		profile.append(Vector2(major + minor * cos(angle), minor + minor * sin(angle)))
+	m.lathe(profile, sides, pos, surf, rot)
