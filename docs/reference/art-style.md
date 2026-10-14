@@ -194,7 +194,8 @@ is smooth shaded, and whether it is outlined. A `Surf` is shared and never chang
 one per look, keep it in a `static var`, and pass it to every part that looks so.
 
 `Parts` (`models/parts.gd`) names the common ones: `CONCRETE_PAD`, `HULL_LIGHT`, `HULL_MID`,
-`HULL_DARK`, `GUNMETAL` (smooth), `HAZARD`, `GOLD_TRIM` (glossy), `GLASS` (glossy, smooth).
+`HULL_DARK`, `GUNMETAL` (smooth), `HAZARD`, `GOLD_TRIM` (glossy), `GLASS` (glossy, smooth),
+`ROD` (smooth and not outlined, for rods and wires under 0.06 thick: **Ink outlines**).
 `Parts.surf(name)` turns the colour names the first models were written with into kit surfaces
 through its `SURFACES` table (hulls on the hull layer, metals on the plate layer, the glows unlit
 on the glow layer in their accent colour, hazard on the hazard layer); new models pass a `Surf`.
@@ -257,6 +258,44 @@ The `model_gallery` harness scenario lays out every type and level and checks ea
 body instances, each with its outline instance on the ink material casting no shadow, every layer
 within the kit, and the body triangles and the extent within the budgets below. Its detail shots at the closest
 zoom are where a model is judged.
+
+### Shared shapes
+
+The shapes more than one category builds are helpers on `Parts`, for any model file to use. A
+new one goes there under a generic name, after a look at this list for one that already does the
+job; a helper is added, never renamed or removed.
+
+| Helper | What |
+| --- | --- |
+| `PAD_HEIGHT`, `PAD_INSET` | the foundation pad's height (0.12) and its inset from the footprint's edge (0.1) |
+| `foundation(m, size)` | the chamfered concrete pad under the whole footprint of `size` cells, inset `PAD_INSET`, `PAD_HEIGHT` high: what every building stands on |
+| `facing(dir)` | the rotation (Euler degrees, as the parts take it) that turns a part's +Y onto `dir` |
+| `pipe(m, from, to, radius, surf, sides = 16, capped = true)` | one straight round pipe, capped at `to` unless that end is inside something |
+| `pipe_run(m, points, radius, surf, sides = 16)` | a pipe through `points` with a ball elbow at each bend |
+| `beam(m, from, to, width, surf, chamfer = 0.03)` | a chamfered square beam between two points: girders, booms, legs, rails |
+| `tank(m, radius, height, pos, surf, chamfer = 0.06, sides = 16)` | a round tank whose top edge is chamfered into a flat lid |
+| `dish(m, radius, depth, pos, surf, rot)` | a dish opening along +Y before `rot`, the centre of its back on `pos`; 24 segments |
+| `landing_light(m, pos, radius, lens, housing = GUNMETAL)` | a squat housing with a glowing lens dome |
+| `mast(m, foot, height, bulb_radius, bulb)` | a thin `ROD` pole ending in a bulb, which carries the outline the rod is too thin for |
+
+### Model table
+
+One line per type, in roster order: the signature element that names it from across the base,
+its spinning part, and its top level's body triangles as the gallery counts them.
+
+| Type | Signature element | Spin | Top level, body triangles |
+| --- | --- | --- | --- |
+| `hangar` | barrel-vaulted bays with orange ribs and hazard-striped doors, a glass-cabbed control tower | none | 4,362 |
+| `fabricator` | sawtooth-roofed factory, an orange gantry crane over a loading dock, smokestacks | none | 1,950 |
+| `heavy_fabricator` | armoured hall with orange press arms hammering anvils, a glowing furnace mouth | none | 2,024 |
+| `research_lab` | observatory dome with a telescope, in a ring of screens | the radar dish on its mast | 2,704 |
+| `nanite_foundry` | vats with bands of glowing nanite-green goo, piped with ball elbows | none | 2,870 |
+| `drydock` | half-built ship in a cradle under orange gantries, welders throwing sparks | none | 2,946 |
+| `alliance_beacon` | braced transmitter tower with rings of light, a big dish and an emitter orb | none | 2,096 |
+| `proximity_mine` | spiked domed disc on a hazard rim with a red warning light | none | 542 |
+| `grav_trap` | ring emitter round a dark funnel with a violet swirl | none | 580 |
+| `flak_mine` | hazard-banded pod, upward barrels with glowing bores round a lens | none | 574 |
+| `mega_mine` | big armoured dome on a hazard band ringed with red lights | none | 1,214 |
 
 ## Modelling vocabulary and budgets
 
@@ -361,8 +400,8 @@ building; the paint brush is a ghost and keeps plain ink.
 
 A building's body instances draw for the light and into the shadow map; its outline instances
 draw once and never cast. Measured with `Performance.RENDER_TOTAL_DRAW_CALLS_IN_FRAME`: a fresh
-base is 57 draw calls, as it was before the kit; the model gallery's overview is 360 draw calls on
-page 1 and 171 on page 2 (294 and 157 before), and the render thread's CPU time is about 0.5 ms a
-frame either way. Keep `_process` free of allocation, and keep every building to its four
-instances. The finished walls are one merged mesh, a fixed handful of draws however many there
-are (`input-camera.md`, **Walls**).
+base is 57 draw calls, as it was before the kit; the model gallery's overview is 375 draw calls on
+page 1 and 171 on page 2 (294 and 157 before the kit; the research lab's spinning dish adds 15 on
+page 1), and the render thread's CPU time is about 0.5 ms a frame either way. Keep `_process` free
+of allocation, and keep every building to its four instances. The finished walls are one merged
+mesh, a fixed handful of draws however many there are (`input-camera.md`, **Walls**).
