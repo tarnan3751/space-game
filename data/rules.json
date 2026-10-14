@@ -20,6 +20,13 @@
     "metal_silo",
     "crystal_silo",
     "antimatter_vault",
+    "hangar",
+    "fabricator",
+    "heavy_fabricator",
+    "research_lab",
+    "nanite_foundry",
+    "drydock",
+    "alliance_beacon",
     "laser_turret"
   ],
   "start": {

@@ -121,6 +121,114 @@
         "requires_cc": 5, "storage": { "antimatter": 800 } }
     ]
   },
+  "hangar": {
+    "name": "Hangar",
+    "size": 5,
+    "category": "army",
+    "max_count": [1, 1, 2, 2, 3],
+    "levels": [
+      { "cost": { "metal": 200, "crystal": 50 }, "build_seconds": 20, "hp": 250, "capacity": 20 },
+      { "cost": { "metal": 500, "crystal": 120 }, "build_seconds": 60, "hp": 300, "requires_cc": 2,
+        "capacity": 30 },
+      { "cost": { "metal": 1200, "crystal": 300 }, "build_seconds": 180, "hp": 350,
+        "requires_cc": 3, "capacity": 35 },
+      { "cost": { "metal": 3000, "crystal": 800 }, "build_seconds": 420, "hp": 400,
+        "requires_cc": 4, "capacity": 40 },
+      { "cost": { "metal": 8000, "crystal": 2000, "antimatter": 30 }, "build_seconds": 900,
+        "hp": 450, "requires_cc": 5, "capacity": 45 }
+    ]
+  },
+  "fabricator": {
+    "name": "Fabricator",
+    "size": 3,
+    "category": "army",
+    "max_count": [1, 2, 2, 3, 3],
+    "levels": [
+      { "cost": { "metal": 150, "crystal": 40 }, "build_seconds": 20, "hp": 300 },
+      { "cost": { "metal": 400, "crystal": 100 }, "build_seconds": 60, "hp": 360,
+        "requires_cc": 2 },
+      { "cost": { "metal": 1000, "crystal": 250 }, "build_seconds": 180, "hp": 420,
+        "requires_cc": 3 },
+      { "cost": { "metal": 2500, "crystal": 600 }, "build_seconds": 420, "hp": 480,
+        "requires_cc": 4 },
+      { "cost": { "metal": 6000, "crystal": 1500, "antimatter": 30 }, "build_seconds": 900,
+        "hp": 550, "requires_cc": 5 }
+    ]
+  },
+  "heavy_fabricator": {
+    "name": "Heavy Fabricator",
+    "size": 3,
+    "category": "army",
+    "max_count": [0, 0, 0, 1, 2],
+    "levels": [
+      { "cost": { "metal": 10000, "crystal": 2500 }, "build_seconds": 240, "hp": 600,
+        "requires_cc": 4 },
+      { "cost": { "metal": 25000, "crystal": 6000 }, "build_seconds": 600, "hp": 700,
+        "requires_cc": 4 },
+      { "cost": { "metal": 60000, "crystal": 15000, "antimatter": 80 }, "build_seconds": 1200,
+        "hp": 800, "requires_cc": 5 }
+    ]
+  },
+  "research_lab": {
+    "name": "Research Lab",
+    "size": 3,
+    "category": "army",
+    "max_count": [0, 1, 1, 1, 1],
+    "levels": [
+      { "cost": { "metal": 1000, "crystal": 250 }, "build_seconds": 60, "hp": 500,
+        "requires_cc": 2 },
+      { "cost": { "metal": 2500, "crystal": 600 }, "build_seconds": 120, "hp": 550,
+        "requires_cc": 2 },
+      { "cost": { "metal": 6000, "crystal": 1500 }, "build_seconds": 300, "hp": 600,
+        "requires_cc": 3 },
+      { "cost": { "metal": 15000, "crystal": 4000 }, "build_seconds": 600, "hp": 650,
+        "requires_cc": 4 },
+      { "cost": { "metal": 40000, "crystal": 10000, "antimatter": 60 }, "build_seconds": 1200,
+        "hp": 700, "requires_cc": 5 }
+    ]
+  },
+  "nanite_foundry": {
+    "name": "Nanite Foundry",
+    "size": 3,
+    "category": "army",
+    "max_count": [0, 0, 1, 1, 1],
+    "levels": [
+      { "cost": { "metal": 4000, "crystal": 1000 }, "build_seconds": 120, "hp": 500,
+        "requires_cc": 3 },
+      { "cost": { "metal": 10000, "crystal": 2500 }, "build_seconds": 300, "hp": 600,
+        "requires_cc": 3 },
+      { "cost": { "metal": 25000, "crystal": 6000 }, "build_seconds": 600, "hp": 700,
+        "requires_cc": 4 },
+      { "cost": { "metal": 60000, "crystal": 15000, "antimatter": 80 }, "build_seconds": 1200,
+        "hp": 800, "requires_cc": 5 }
+    ]
+  },
+  "drydock": {
+    "name": "Drydock",
+    "size": 4,
+    "category": "army",
+    "max_count": [0, 0, 0, 0, 1],
+    "levels": [
+      { "cost": { "metal": 30000, "crystal": 8000, "antimatter": 100 }, "build_seconds": 900,
+        "hp": 1000, "requires_cc": 5 },
+      { "cost": { "metal": 75000, "crystal": 20000, "antimatter": 250 }, "build_seconds": 1200,
+        "hp": 1200, "requires_cc": 5 }
+    ]
+  },
+  "alliance_beacon": {
+    "name": "Alliance Beacon",
+    "size": 3,
+    "category": "army",
+    "max_count": [0, 0, 1, 1, 1],
+    "levels": [
+      { "cost": { "metal": 5000, "crystal": 1200 }, "build_seconds": 180, "hp": 1000,
+        "requires_cc": 3, "capacity": 10 },
+      { "cost": { "metal": 12000, "crystal": 3000 }, "build_seconds": 600, "hp": 1400,
+        "requires_cc": 4, "capacity": 15 },
+      { "cost": { "metal": 30000, "crystal": 8000, "antimatter": 60 }, "build_seconds": 1200,
+        "hp": 2000, "requires_cc": 5, "capacity": 20 }
+    ]
+  },
   "laser_turret": {
     "name": "Laser Turret",
     "size": 3,
