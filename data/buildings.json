@@ -233,12 +233,192 @@
     "name": "Laser Turret",
     "size": 3,
     "category": "defense",
+    "targets": "ground",
     "max_count": [1, 2, 3, 4, 5],
     "levels": [
-      { "cost": { "metal": 400 }, "build_seconds": 20, "hp": 600,
-        "damage": 12, "range_cells": 7, "fire_ms": 800 },
-      { "cost": { "metal": 1200 }, "build_seconds": 120, "hp": 800,
-        "requires_cc": 2, "damage": 18, "range_cells": 7, "fire_ms": 800 }
+      { "cost": { "metal": 400, "crystal": 100 }, "build_seconds": 20, "hp": 600, "damage": 12,
+        "range_cells": 7, "fire_ms": 800 },
+      { "cost": { "metal": 1000, "crystal": 250 }, "build_seconds": 60, "hp": 800, "requires_cc": 2,
+        "damage": 18, "range_cells": 7, "fire_ms": 800 },
+      { "cost": { "metal": 2500, "crystal": 600 }, "build_seconds": 180, "hp": 1000,
+        "requires_cc": 3, "damage": 24, "range_cells": 7, "fire_ms": 800 },
+      { "cost": { "metal": 6000, "crystal": 1500 }, "build_seconds": 420, "hp": 1250,
+        "requires_cc": 4, "damage": 30, "range_cells": 7, "fire_ms": 800 },
+      { "cost": { "metal": 15000, "crystal": 4000, "antimatter": 50 }, "build_seconds": 900,
+        "hp": 1500, "requires_cc": 5, "damage": 38, "range_cells": 7, "fire_ms": 800 }
+    ]
+  },
+  "missile_battery": {
+    "name": "Missile Battery",
+    "size": 3,
+    "category": "defense",
+    "targets": "both",
+    "max_count": [0, 1, 2, 3, 4],
+    "levels": [
+      { "cost": { "metal": 1000, "crystal": 250 }, "build_seconds": 40, "hp": 400, "requires_cc": 2,
+        "damage": 10, "range_cells": 10, "fire_ms": 1000 },
+      { "cost": { "metal": 2500, "crystal": 600 }, "build_seconds": 120, "hp": 500,
+        "requires_cc": 2, "damage": 14, "range_cells": 10, "fire_ms": 1000 },
+      { "cost": { "metal": 6000, "crystal": 1500 }, "build_seconds": 300, "hp": 600,
+        "requires_cc": 3, "damage": 18, "range_cells": 10, "fire_ms": 1000 },
+      { "cost": { "metal": 15000, "crystal": 4000 }, "build_seconds": 600, "hp": 700,
+        "requires_cc": 4, "damage": 23, "range_cells": 10, "fire_ms": 1000 },
+      { "cost": { "metal": 40000, "crystal": 10000, "antimatter": 50 }, "build_seconds": 1080,
+        "hp": 800, "requires_cc": 5, "damage": 28, "range_cells": 10, "fire_ms": 1000 }
+    ]
+  },
+  "plasma_mortar": {
+    "name": "Plasma Mortar",
+    "size": 3,
+    "category": "defense",
+    "targets": "ground",
+    "max_count": [0, 0, 1, 2, 3],
+    "levels": [
+      { "cost": { "metal": 3000, "crystal": 800 }, "build_seconds": 120, "hp": 400,
+        "requires_cc": 3, "damage": 30, "range_cells": 11, "fire_ms": 5000 },
+      { "cost": { "metal": 8000, "crystal": 2000 }, "build_seconds": 300, "hp": 450,
+        "requires_cc": 3, "damage": 40, "range_cells": 11, "fire_ms": 5000 },
+      { "cost": { "metal": 20000, "crystal": 5000 }, "build_seconds": 600, "hp": 500,
+        "requires_cc": 4, "damage": 50, "range_cells": 11, "fire_ms": 5000 },
+      { "cost": { "metal": 50000, "crystal": 12000, "antimatter": 80 }, "build_seconds": 1200,
+        "hp": 550, "requires_cc": 5, "damage": 65, "range_cells": 11, "fire_ms": 5000 }
+    ]
+  },
+  "shield_generator": {
+    "name": "Shield Generator",
+    "size": 3,
+    "category": "defense",
+    "max_count": [0, 0, 1, 1, 2],
+    "levels": [
+      { "cost": { "metal": 4000, "crystal": 1000 }, "build_seconds": 120, "hp": 2000,
+        "requires_cc": 3, "range_cells": 5 },
+      { "cost": { "metal": 10000, "crystal": 2500 }, "build_seconds": 300, "hp": 2500,
+        "requires_cc": 3, "range_cells": 5 },
+      { "cost": { "metal": 25000, "crystal": 6000 }, "build_seconds": 600, "hp": 3000,
+        "requires_cc": 4, "range_cells": 5 },
+      { "cost": { "metal": 60000, "crystal": 15000, "antimatter": 100 }, "build_seconds": 1200,
+        "hp": 3600, "requires_cc": 5, "range_cells": 5 }
+    ]
+  },
+  "flak_cannon": {
+    "name": "Flak Cannon",
+    "size": 3,
+    "category": "defense",
+    "targets": "air",
+    "max_count": [0, 0, 0, 1, 2],
+    "levels": [
+      { "cost": { "metal": 5000, "crystal": 1200 }, "build_seconds": 240, "hp": 800,
+        "requires_cc": 4, "damage": 50, "range_cells": 10, "fire_ms": 1000 },
+      { "cost": { "metal": 12000, "crystal": 3000 }, "build_seconds": 480, "hp": 900,
+        "requires_cc": 4, "damage": 65, "range_cells": 10, "fire_ms": 1000 },
+      { "cost": { "metal": 30000, "crystal": 8000, "antimatter": 60 }, "build_seconds": 900,
+        "hp": 1000, "requires_cc": 5, "damage": 80, "range_cells": 10, "fire_ms": 1000 },
+      { "cost": { "metal": 75000, "crystal": 20000, "antimatter": 120 }, "build_seconds": 1200,
+        "hp": 1100, "requires_cc": 5, "damage": 100, "range_cells": 10, "fire_ms": 1000 }
+    ]
+  },
+  "arc_tower": {
+    "name": "Arc Tower",
+    "size": 3,
+    "category": "defense",
+    "targets": "both",
+    "max_count": [0, 0, 0, 1, 2],
+    "levels": [
+      { "cost": { "metal": 6000, "crystal": 1500 }, "build_seconds": 240, "hp": 600,
+        "requires_cc": 4, "damage": 15, "range_cells": 7, "fire_ms": 1300 },
+      { "cost": { "metal": 15000, "crystal": 4000 }, "build_seconds": 480, "hp": 650,
+        "requires_cc": 4, "damage": 20, "range_cells": 7, "fire_ms": 1300 },
+      { "cost": { "metal": 35000, "crystal": 9000, "antimatter": 60 }, "build_seconds": 900,
+        "hp": 700, "requires_cc": 5, "damage": 26, "range_cells": 7, "fire_ms": 1300 },
+      { "cost": { "metal": 80000, "crystal": 20000, "antimatter": 120 }, "build_seconds": 1200,
+        "hp": 750, "requires_cc": 5, "damage": 32, "range_cells": 7, "fire_ms": 1300 }
+    ]
+  },
+  "cloaked_sentry": {
+    "name": "Cloaked Sentry",
+    "size": 2,
+    "category": "defense",
+    "hidden": true,
+    "targets": "both",
+    "max_count": [0, 0, 0, 1, 2],
+    "levels": [
+      { "cost": { "metal": 8000, "crystal": 2000 }, "build_seconds": 240, "hp": 600,
+        "requires_cc": 4, "damage": 25, "range_cells": 6, "fire_ms": 600 },
+      { "cost": { "metal": 20000, "crystal": 5000 }, "build_seconds": 600, "hp": 650,
+        "requires_cc": 4, "damage": 32, "range_cells": 6, "fire_ms": 600 },
+      { "cost": { "metal": 50000, "crystal": 12000, "antimatter": 100 }, "build_seconds": 1200,
+        "hp": 700, "requires_cc": 5, "damage": 40, "range_cells": 6, "fire_ms": 600 }
+    ]
+  },
+  "gravity_well": {
+    "name": "Gravity Well",
+    "size": 2,
+    "category": "defense",
+    "targets": "air",
+    "max_count": [0, 0, 0, 0, 1],
+    "levels": [
+      { "cost": { "metal": 15000, "crystal": 4000, "antimatter": 40 }, "build_seconds": 600,
+        "hp": 1000, "requires_cc": 5, "range_cells": 12, "fire_ms": 5000 },
+      { "cost": { "metal": 35000, "crystal": 9000, "antimatter": 80 }, "build_seconds": 900,
+        "hp": 1100, "requires_cc": 5, "range_cells": 12, "fire_ms": 5000 },
+      { "cost": { "metal": 80000, "crystal": 20000, "antimatter": 150 }, "build_seconds": 1200,
+        "hp": 1200, "requires_cc": 5, "range_cells": 12, "fire_ms": 5000 }
+    ]
+  },
+  "emp_tower": {
+    "name": "EMP Tower",
+    "size": 3,
+    "category": "defense",
+    "targets": "ground",
+    "max_count": [0, 0, 0, 0, 1],
+    "levels": [
+      { "cost": { "metal": 12000, "crystal": 3000, "antimatter": 40 }, "build_seconds": 600,
+        "hp": 700, "requires_cc": 5, "damage": 30, "range_cells": 6, "fire_ms": 1100 },
+      { "cost": { "metal": 30000, "crystal": 8000, "antimatter": 80 }, "build_seconds": 900,
+        "hp": 800, "requires_cc": 5, "damage": 40, "range_cells": 6, "fire_ms": 1100 },
+      { "cost": { "metal": 75000, "crystal": 20000, "antimatter": 150 }, "build_seconds": 1200,
+        "hp": 900, "requires_cc": 5, "damage": 50, "range_cells": 6, "fire_ms": 1100 }
+    ]
+  },
+  "railgun": {
+    "name": "Railgun",
+    "size": 3,
+    "category": "defense",
+    "targets": "both",
+    "max_count": [0, 0, 0, 0, 1],
+    "levels": [
+      { "cost": { "metal": 15000, "crystal": 4000, "antimatter": 60 }, "build_seconds": 600,
+        "hp": 1500, "requires_cc": 5, "damage": 20, "range_cells": 14, "fire_ms": 400 },
+      { "cost": { "metal": 35000, "crystal": 9000, "antimatter": 120 }, "build_seconds": 900,
+        "hp": 1900, "requires_cc": 5, "damage": 26, "range_cells": 14, "fire_ms": 400 },
+      { "cost": { "metal": 85000, "crystal": 20000, "antimatter": 250 }, "build_seconds": 1200,
+        "hp": 2400, "requires_cc": 5, "damage": 32, "range_cells": 14, "fire_ms": 400 }
+    ]
+  },
+  "ion_beam": {
+    "name": "Ion Beam",
+    "size": 2,
+    "category": "defense",
+    "targets": "both",
+    "max_count": [0, 0, 0, 0, 1],
+    "levels": [
+      { "cost": { "metal": 30000, "crystal": 8000, "antimatter": 100 }, "build_seconds": 900,
+        "hp": 1500, "requires_cc": 5, "damage": 40, "range_cells": 9, "fire_ms": 500 },
+      { "cost": { "metal": 75000, "crystal": 20000, "antimatter": 250 }, "build_seconds": 1200,
+        "hp": 1800, "requires_cc": 5, "damage": 55, "range_cells": 9, "fire_ms": 500 }
+    ]
+  },
+  "orbital_cannon": {
+    "name": "Orbital Cannon",
+    "size": 4,
+    "category": "defense",
+    "targets": "both",
+    "max_count": [0, 0, 0, 0, 1],
+    "levels": [
+      { "cost": { "metal": 35000, "crystal": 9000, "antimatter": 150 }, "build_seconds": 900,
+        "hp": 4000, "requires_cc": 5, "damage": 300, "range_cells": 50, "fire_ms": 10000 },
+      { "cost": { "metal": 85000, "crystal": 20000, "antimatter": 300 }, "build_seconds": 1200,
+        "hp": 5000, "requires_cc": 5, "damage": 400, "range_cells": 50, "fire_ms": 10000 }
     ]
   }
 }

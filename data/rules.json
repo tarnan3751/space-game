@@ -27,7 +27,18 @@
     "nanite_foundry",
     "drydock",
     "alliance_beacon",
-    "laser_turret"
+    "laser_turret",
+    "missile_battery",
+    "plasma_mortar",
+    "shield_generator",
+    "flak_cannon",
+    "arc_tower",
+    "cloaked_sentry",
+    "gravity_well",
+    "emp_tower",
+    "railgun",
+    "ion_beam",
+    "orbital_cannon"
   ],
   "start": {
     "resources": { "metal": 750, "crystal": 750, "antimatter": 0 },
