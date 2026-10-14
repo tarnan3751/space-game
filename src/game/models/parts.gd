@@ -43,6 +43,12 @@ static var GUNMETAL := Surf.make(MaterialKit.Layer.PLATE, MaterialKit.GUNMETAL, 
 static var HAZARD := Surf.make(MaterialKit.Layer.HAZARD, Color.WHITE)
 static var GOLD_TRIM := Surf.make(MaterialKit.Layer.FLAT, MaterialKit.CORE_GOLD, 1.0, Surf.GLOSSY)
 static var GLASS := Surf.make(MaterialKit.Layer.GLASS, MaterialKit.CORE_GLASS, 1.0, Surf.GLOSSY, true)
+## Smooth versions for round parts (drums, tanks, collars, caps), so the cel bands sweep
+## across them in arcs. Shared: never change one.
+static var HULL_LIGHT_ROUND := Surf.make(MaterialKit.Layer.HULL, MaterialKit.HULL_LIGHT, 1.0, Surf.LIT, true)
+static var HULL_MID_ROUND := Surf.make(MaterialKit.Layer.HULL, MaterialKit.HULL_MID, 1.0, Surf.LIT, true)
+static var HULL_DARK_ROUND := Surf.make(MaterialKit.Layer.HULL, MaterialKit.HULL_DARK, 1.0, Surf.LIT, true)
+static var GOLD_ROUND := Surf.make(MaterialKit.Layer.FLAT, MaterialKit.CORE_GOLD, 1.0, Surf.GLOSSY, true)
 
 static var _surfs: Dictionary[String, Surf] = {}
 
@@ -71,11 +77,6 @@ static func accent(level: int, top: int, normal: String) -> String:
 ## The square slab resource and army buildings stand on.
 static func slab(m: LowPolyMesh, size: float, height: float) -> void:
 	m.box(Vector3(0.88 * size, height, 0.88 * size), Vector3.ZERO, surf("hull_dark"))
-
-
-## The octagonal plinth defences stand on.
-static func plinth(m: LowPolyMesh, size: float, height: float) -> void:
-	m.prism(0.47 * size, 0.44 * size, height, 8, Vector3.ZERO, surf("hull_dark"), OCTAGON)
 
 
 ## A point on a circle of `radius` around the Y axis, at `degrees` from +X towards +Z.
@@ -206,3 +207,14 @@ static func torus(m: LowPolyMesh, major: float, minor: float, sides: int, segmen
 		var angle := TAU * k / segments - PI * 0.5
 		profile.append(Vector2(major + minor * cos(angle), minor + minor * sin(angle)))
 	m.lathe(profile, sides, pos, surf, rot)
+
+
+## A ladder `height` tall up a wall, `foot` the middle of its feet, its face turned `yaw`
+## degrees from +Z: two rails and a rung every 0.16.
+static func ladder(m: LowPolyMesh, foot: Vector3, height: float, width: float, yaw: float,
+		surf: Surf) -> void:
+	var turn := Vector3(0, yaw, 0)
+	for side: float in [-1.0, 1.0]:
+		m.box(Vector3(0.05, height, 0.05), foot + LowPolyMesh.turn(Vector3(side * width * 0.5, 0, 0), turn), surf, turn)
+	for k: int in int((height - 0.06) / 0.16):
+		m.box(Vector3(width, 0.035, 0.035), foot + Vector3(0, 0.12 + 0.16 * k, 0), surf, turn)
