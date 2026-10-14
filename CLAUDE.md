@@ -15,9 +15,9 @@ of the modules involved. A section named in bold is a heading of this file or of
 ## Status
 
 **Milestone 1 (offline base) is built**: placement, timers, builders, economy, save with offline
-progress, placeholder models. Everything after it is planned; `docs/project_overview.md` holds
-the roadmap (§2.2), the known limitations (§2.3) and the decisions (§3). Balance numbers in
-`data/` are fast dev values, not tuned.
+progress, low-poly models built in code. Everything after it is planned;
+`docs/project_overview.md` holds the roadmap (§2.2), the known limitations (§2.3) and the
+decisions (§3). Balance numbers in `data/` are fast dev values, not tuned.
 
 ## Stack (pinned)
 
@@ -117,7 +117,8 @@ docs/            project_overview.md (scope, status, roadmap, decisions); refere
 scenes/          main.tscn only
 src/core/        catalog, base_state, building_state, base_grid, seeded_rng
 src/game/        main, iso_camera, world_input, placement_controller, base_view,
-                 building_view, building_models, hud, format, ground.gdshader
+                 building_view, building_models, low_poly_mesh, palette, hud, format,
+                 ground.gdshader
 test/core/       test_*.gd (one file per core area)
 test/support/    TestCase base class, fixtures and fixture JSON
 tools/           run_tests.sh, test_runner.gd, gates.sh, land_series.sh, dump_api.sh

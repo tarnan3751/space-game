@@ -55,8 +55,9 @@ an attack log, revenge and shields.
 - **Data-driven balance.** Costs, times, rates, caps and the build menu live in JSON that the
   server will load too; rebalancing is a data change, never a code change. Tests use their own
   fixture catalog so rebalancing never breaks them.
-- **Light on the phone.** Fixed orthographic camera, primitive placeholder models, the GL
-  Compatibility renderer, no addons, no per-frame allocation.
+- **Light on the phone.** Fixed orthographic camera, low-poly models built in code from one
+  palette texture (at most two draw calls a building), the GL Compatibility renderer, no addons,
+  no per-frame allocation.
 - **One code path for desktop and phone.** Mouse clicks arrive as touches, so every gesture is
   written once and tested on a Mac before it reaches a device.
 - **Agent-editable.** Scenes are built in code and the project is text, so an agent can read and
@@ -81,7 +82,7 @@ an attack log, revenge and shields.
 | Touch input | Built | Tap, drag, two-finger pinch and pan; trackpad gestures; HUD gets touches first |
 | Placement | Built | Ghost with valid/invalid footprint, Place/Cancel; select; drag the selected building to move |
 | HUD | Built | Resources and drones, build bar, place bar, info panel with upgrade, toasts, debug reset |
-| Visuals | Built | Placeholder primitive models per type, scaffold while building, seeded rocks, grid shader |
+| Visuals | Built | Flat-shaded low-poly models per type and level built in code from one palette texture, scaffold while building, regolith ground with a grid that brightens while placing, seeded low-poly terrain with craters and rocks |
 | Tests | Built | Own headless runner; fixture catalog; one test file per core area |
 | Tooling | Built | Gate script, landing script, behaviour harness (`tools/`), API dump |
 
@@ -92,7 +93,7 @@ Balance numbers in `data/` are fast development values, not tuned.
 | Step | What | Status |
 | --- | --- | --- |
 | 1 | Offline base: placement, timers, economy | Built |
-| 2 | Base polish: the building roster, build-menu categories, a third resource (antimatter), real low-poly models in `assets/`, HUD category tabs, safe-area margins for notches, painting walls by dragging, edge auto-scroll while dragging | In progress: the roster, the categories and antimatter are built; models, HUD tabs, safe-area margins, wall painting and edge scroll remain |
+| 2 | Base polish: the building roster, build-menu categories, a third resource (antimatter), low-poly models built in code, HUD category tabs, safe-area margins for notches, painting walls by dragging, edge auto-scroll while dragging | In progress: the roster, the categories, antimatter and the low-poly models are built; HUD tabs, safe-area margins, wall painting and edge scroll remain |
 | 3 | Seeded PvE expeditions: a field generated from a seed with `SeededRng` (asteroids, deposits, hazards); loot returns into `BaseState` through a new command | Planned |
 | 4 | Deterministic battle sim in `src/core/battle/`: fixed-point integer positions (1 cell = 1000 units), fixed tick; replay = seed + base layout + list of deploy commands; tested headless against AI-built bases; same inputs give byte-identical results | Planned |
 | 5 | Server: Nakama with accounts, base storage and command validation; battles verified by replaying them in headless Godot running the same `src/core` | Planned |
@@ -102,8 +103,9 @@ Balance numbers in `data/` are fast development values, not tuned.
 
 - **The local clock is trusted.** Time comes from the device; changing the device time can cheat
   today. The server will own time (step 5).
-- **Models are placeholders** built from primitives (`BuildingModels`); real low-poly models
-  come with step 2.
+- **Models are built in code** (`BuildingModels`, from `LowPolyMesh` parts painted with the
+  generated `Palette`); imported models in `assets/` or a painted palette texture may replace them
+  later.
 - **The save is local and unversioned beyond `"version": 1`**; the server will hold the base
   later and nothing below `main.gd` changes.
 - `hp`, `damage`, `range_cells`, `fire_ms`, `hidden`, `targets` and `capacity` in

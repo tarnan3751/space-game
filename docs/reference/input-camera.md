@@ -1,8 +1,8 @@
 # Input and camera
 
 How `src/game/` turns touches into commands and draws the base: `main.gd`, `IsoCamera`,
-`WorldInput`, `PlacementController`, `BaseView`, `BuildingView` and `BuildingModels`. The HUD
-is in `hud.md`. This layer reads `BaseState` and never mutates it except through
+`WorldInput`, `PlacementController`, `BaseView`, `BuildingView`, `BuildingModels`, `Palette`
+and `LowPolyMesh`. The HUD is in `hud.md`. This layer reads `BaseState` and never mutates it except through
 `PlacementController.apply` calls (`CLAUDE.md`, **Architecture rules**).
 
 ## The scene (`main.gd`)
@@ -91,7 +91,8 @@ camera moves, selection, placement and building moves.
 | `signal command_failed(error)` | A command returned an error code; the HUD shows it as a toast. |
 
 **Placing** (`begin_place(type)`): any placement is cancelled and the selection cleared; a
-`BuildingView` with id 0 is created as the ghost, lifted; its starting cell is the footprint
+`BuildingView` with id 0 is created as the ghost (level 1's model), lifted, and the ground's
+cell grid is brightened (`BaseView.set_grid_highlight`); its starting cell is the footprint
 centred on the screen centre's ground point (the grid centre when the centre is off the ground),
 moved to the nearest free spot searching outward in square rings (`_find_free_cell`). While
 placing, a tap moves the ghost so the footprint is centred on the tapped cell, and a drag that
@@ -99,8 +100,9 @@ starts on the ghost carries it (with the grab offset); a drag elsewhere pans. Ev
 (`_set_ghost_cell`) clamps the cell into the grid, asks `state.check_place` and colours the
 footprint VALID or INVALID, and emits `placing_changed`. `confirm_place()` applies
 `{"op": "place", "type", "cell"}` at `clock.call()`, and on success ends placement and selects
-`state.last_added_id`; on failure emits `command_failed`. `cancel_place()` frees the ghost.
-`refresh()` re-checks the ghost after the state changed (resources, builders).
+`state.last_added_id`; on failure emits `command_failed`. `cancel_place()` frees the ghost and
+dims the grid again. `refresh()` re-checks the ghost after the state changed (resources,
+builders).
 
 **Selecting and moving.** A tap on a building selects it, a tap on empty ground deselects. Only
 the selected building can be dragged (as in Clash); a drag on anything else pans the camera. A
@@ -122,28 +124,73 @@ the origin, cell (x, y) on world (x, z).
 | `world_to_cell(point)` | The cell under a ground point (floor). |
 | `footprint_cell_at(point, size)` | The top-left cell of a `size` footprint centred as closely as possible on a point (round). |
 | `area()` | The buildable area as a `Rect2` in world x/z; the camera's bounds. |
-| `sync(state)` | Makes `views` match `state.buildings`: frees views whose building is gone or changed type, creates missing ones, pushes `show_status` to each, and for all but `dragging_id` sets the position, un-lifts, and shows the SELECTED tile on `selected_id`. |
+| `sync(state)` | Makes `views` match `state.buildings`: frees views whose building is gone, changed type or has a new finished level (except the `dragging_id` view, which keeps its model until it is dropped), creates missing ones, pushes `show_status` to each, and for all but `dragging_id` sets the position, un-lifts, and shows the SELECTED tile on `selected_id`. |
+| `set_grid_highlight(on)` | Brightens the ground's cell lines (`GRID_LINES_PLACING`) or dims them back (`GRID_LINES`); `PlacementController` calls it as placement begins and ends. |
 | `clear()` | Frees every view (used when the state is replaced). |
 
-`setup(size)` builds the ground: a `PlaneMesh` of the grid's size with `ground.gdshader` (a
-faint cell grid and checker over dark regolith; `grid_size` is a uniform), an outer plane four
-times as large just below it, and 60 scenery rocks placed around the grid with
-`SeededRng.new(SCENERY_SEED)` (7), so every player's base looks the same.
+`setup(size)` builds the scenery, one draw call per part, the terrain and rocks drawn from
+`SeededRng.new(SCENERY_SEED)` (7) so every player's base sits in the same landscape:
+
+- **The ground**: a `PlaneMesh` of the grid's size with `ground.gdshader`: the palette's
+  regolith (`base_color`, from `Palette.color`) with a slight tone variation per cell and a cell
+  grid whose `line_strength` is faint by default and brighter while placing; `grid_size` is a
+  uniform.
+- **The terrain**: one flat-shaded `ArrayMesh` annulus from the grid's edge out to
+  ±`TERRAIN_EXTENT` (90) on a `TERRAIN_STEP` (2) lattice that includes both grid edges. Heights
+  come from value noise, rise gently with distance and dip into three to five craters; along the
+  grid's edge they are pinned to y = 0, so the terrain meets the ground with no seam. Faces are
+  coloured by height band (regolith, darker regolith, rock, dark rock, crater floors) from the
+  palette. It covers the view at the widest zoom with the focus anywhere on the grid, and casts no
+  shadows.
+- **The rocks**: `ROCK_COUNT` (40) irregular low-poly rocks merged into one mesh, sitting on the
+  terrain, never inside the grid.
 
 ## BuildingView (`building_view.gd`) and BuildingModels (`building_models.gd`)
 
-A `BuildingView` is one building's visual: the model, a scaffold shown instead while `level`
-is 0, a footprint tile (`Footprint.NONE / SELECTED / VALID / INVALID`, the last three
-translucent cyan, green and red), and a billboard `Label3D` timer ("Building 10s", "Lv 2 1m
-00s") shown while busy. `show_status(level, busy, target_level, seconds_left)` is what
+A `BuildingView` is one building's visual: the model for its finished level, a scaffold shown
+instead while `level` is 0, a footprint tile (`Footprint.NONE / SELECTED / VALID / INVALID`, the
+last three translucent cyan, green and red), and a billboard `Label3D` timer ("Building 10s",
+"Lv 2 1m 00s") shown while busy. `setup(id, type, level, size)` builds it for one level (level
+1's model while the level is 0); `building_level` records it, and `BaseView.sync` replaces the
+view when the finished level changes, so a building mid-upgrade shows its current level until
+the upgrade finishes. `show_status(level, busy, target_level, seconds_left)` is what
 `BaseView.sync` pushes each tick. `set_lifted(true)` raises the model by 0.35 while it is
-dragged or is the ghost. Nodes carrying `BuildingModels.SPIN_META` spin in `_process` while the
-building is finished and idle.
+dragged or is the ghost. The node carrying `BuildingModels.SPIN_META` spins in `_process` while
+the building is finished and idle; a view with nothing to spin turns processing off in `_ready`,
+so walls and traps cost nothing per frame.
 
-`BuildingModels.create(type, size)` builds the placeholder from primitives, one per type
-(unknown types get a box), and `create_scaffold(size)` the construction frame. Materials are
-cached per colour and glow in a static dictionary. The contract any real model must keep:
-origin at the footprint centre on the ground, +Y up, fitting inside `size × size` cells.
+`BuildingModels.create(type, level, size)` returns a `Node3D` holding one static
+`MeshInstance3D` and at most one spinning one (the radar, the drone, the drill, the harvester
+arm, the siphon and gravity well rings, the flak and laser heads): at most two draw calls a
+building. The models are flat-shaded low-poly, one per type and level of the 32-type roster;
+`MODELS` gives each type the footprint its models are built for and its level count. A level
+above that shows the top model, a catalog size other than the footprint scales the model, and
+an unknown type gets a hull block with a hazard stripe and one warning. Meshes are built once
+per type and level and cached in a static dictionary; the nodes are per view. Each category
+shares a look (resources on square slabs, army halls and domes with big doors, defences on
+octagonal plinths, traps nearly flush with the ground, walls as blocks); level 1 is plain, each
+level adds a part or an accent, and the top level carries gold. Budgets: 500 triangles a model,
+40 for traps and walls. `create_scaffold(size)` is one cached mesh in hazard colours. The
+contract any model keeps, built or imported: origin at the footprint centre on the ground, +Y
+up, fitting inside `size × size` cells.
+
+## Palette (`palette.gd`) and LowPolyMesh (`low_poly_mesh.gd`)
+
+`Palette` is the one colour table every low-poly mesh is painted from: about 25 named entries
+(hulls, metals, white, window, paints, hazard yellow, gold, the glows, regolith, rock and
+crater tones) laid out in 8×8 cells of an albedo `ImageTexture` generated at run time; the glow
+entries also light their cell of an emission texture, and their albedo is darkened so the light
+does not wash their hue out. `uv(name)` is a cell's centre, `color(name)` the colour itself (the
+ground shader's), and `material()` the one shared `StandardMaterial3D` (albedo and emission
+textures, nearest filtering, roughness 1) on every building, the terrain and the rocks. A
+painted texture later changes this file only.
+
+`LowPolyMesh` accumulates flat-shaded faces into one `ArrayMesh` surface: each face has its own
+vertices and normal and UVs at one palette cell. Parts: `box`, `wedge`, `strut`, `prism`,
+`cone`, `pyramid`, `dome`, `orb`, `ring`, `disc` and the general `lathe`, each placed by the
+centre of its base (an orb's centre) and Euler degrees; `triangle` and `polygon` add single
+faces (the terrain and rocks use them). Bottom faces are left out, since the camera always looks
+down. `to_mesh()` returns the mesh with the palette material.
 
 ## Format (`format.gd`)
 
