@@ -56,6 +56,18 @@ func test_instant_buildings_skip_builders_but_respect_limits() -> void:
 	assert_eq(state.apply(_place("harvester", 8, 8), 0), BaseState.ERR_LIMIT)
 
 
+func test_a_type_locked_by_the_command_center_reads_as_locked_not_maxed() -> void:
+	# The lab needs CC 2, and max_count at CC 1 is 0: the level gate is reported first.
+	var state := Fixtures.new_base()
+	assert_eq(state.check_can_build("lab"), BaseState.ERR_CC_LEVEL)
+	assert_eq(state.apply(_place("lab", 5, 5), 0), BaseState.ERR_CC_LEVEL)
+	state.apply({"op": "upgrade", "id": CC_ID}, 0)
+	state.advance_to(100)
+	assert_eq(state.check_can_build("lab"), "")
+	assert_eq(state.apply(_place("lab", 5, 5), 100), "")
+	assert_eq(state.check_can_build("lab"), BaseState.ERR_LIMIT)
+
+
 func test_walls_place_instantly_without_a_builder_up_to_their_count() -> void:
 	var state := Fixtures.new_base()
 	assert_eq(state.apply(_place("extractor", 5, 2), 0), "")

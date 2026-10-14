@@ -90,12 +90,17 @@ func apply(command: Dictionary, at_time: int) -> String:
 
 
 ## Everything about building a new `type` except where it goes. The build menu uses this.
+## The Command Center level is checked before the limit, so a type it has not unlocked yet
+## (max_count 0 at this level) reads as locked rather than maxed.
 func check_can_build(type: String) -> String:
 	if not catalog.has_type(type):
 		return ERR_UNKNOWN_TYPE
+	var stats := catalog.level_stats(type, 1)
+	if int(stats.get("requires_cc", 1)) > cc_level():
+		return ERR_CC_LEVEL
 	if count_of(type) >= catalog.max_count(type, cc_level()):
 		return ERR_LIMIT
-	return _check_level_requirements(catalog.level_stats(type, 1))
+	return _check_level_requirements(stats)
 
 
 func check_place(type: String, cell: Vector2i) -> String:
