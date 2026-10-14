@@ -89,61 +89,264 @@ static func _beacon(s: LowPolyMesh) -> void:
 	s.prism(0.11, 0.08, 0.05, 12, Vector3(0, 0.19, 0), Parts.HULL_DARK_ROUND)
 
 
+## Each resource building's accent (a lit plate) and its emissive, in its resource's colour.
+static var METAL_ACCENT := Surf.make(MaterialKit.Layer.PLATE, MaterialKit.METAL)
+static var METAL_ACCENT_ROUND := Surf.make(MaterialKit.Layer.PLATE, MaterialKit.METAL, 1.0, Surf.LIT, true)
+static var METAL_GLOW := Surf.make(MaterialKit.Layer.GLOW, MaterialKit.METAL, 1.0, Surf.UNLIT, true)
+static var METAL_ORE := Surf.make(MaterialKit.Layer.CRYSTAL, MaterialKit.METAL, 2.0)
+static var CRYSTAL_ACCENT := Surf.make(MaterialKit.Layer.PLATE, MaterialKit.CRYSTAL)
+## The emitter's prongs: too thin for the outline.
+static var CRYSTAL_PRONG := Surf.make(MaterialKit.Layer.PLATE, MaterialKit.CRYSTAL, 1.0, Surf.LIT, false, false)
+static var CRYSTAL_GLOW := Surf.make(MaterialKit.Layer.GLOW, MaterialKit.CRYSTAL, 1.0, Surf.UNLIT, true)
+static var CRYSTAL_SHARD := Surf.make(MaterialKit.Layer.CRYSTAL, MaterialKit.CRYSTAL, 1.5, Surf.GLOSSY)
+## A laser beam: too thin for the outline.
+static var CRYSTAL_BEAM := Surf.make(MaterialKit.Layer.GLOW, MaterialKit.CRYSTAL, 1.0, Surf.UNLIT, true, false)
+static var LEG := Surf.make(MaterialKit.Layer.PLATE, MaterialKit.HULL_MID)
+static var BELT := Surf.make(MaterialKit.Layer.VENT, MaterialKit.GUNMETAL, 3.0)
+static var STACK := Surf.make(MaterialKit.Layer.PIPE, MaterialKit.HULL_MID, 2.0, Surf.LIT, true)
+static var SOOT := Surf.make(MaterialKit.Layer.FLAT, MaterialKit.INK)
+static var ENGINE_VENT := Surf.make(MaterialKit.Layer.VENT, MaterialKit.HULL_DARK, 2.0)
+static var ROCK := Surf.make(MaterialKit.Layer.ROCK, MaterialKit.ROCK_LIT)
+static var DRILL_BIT := Surf.make(MaterialKit.Layer.PIPE, MaterialKit.HULL_LIGHT, 3.0, Surf.LIT, true)
+static var ARMOUR := Surf.make(MaterialKit.Layer.PLATE, MaterialKit.HULL_DARK)
+static var PYLON_ARMOUR := Surf.make(MaterialKit.Layer.PLATE, MaterialKit.HULL_MID)
+
+## The metal extractor's drill axis, its derrick's legs (degrees around the axis, meeting
+## LEG_TOP from the axis under the crown), the derrick's height by level, and the share of the
+## legs' height the drill's top drive reaches (low enough that its sweep clears the legs).
+const DRILL := Vector3(-0.3, 0, -0.3)
+const DERRICK_LEGS := [80.0, 200.0, 320.0]
+const DERRICK_HEIGHTS := [1.65, 1.75, 1.95, 2.05, 2.15]
+const LEG_TOP := 0.22
+const DRIVE_TOP := 0.75
+const BRACE := 0.42
+## Its hoppers (the second from L4, each fed by a conveyor from the collar), the height of a
+## hopper's rim, and the exhaust stacks on its engine house by level:
+## [x, z, height above the roof].
+const HOPPERS := [Vector3(-0.82, 0, 0.8), Vector3(0.55, 0, 0.95)]
+const HOPPER_RIM := 0.72
+const ENGINE_HOUSE := Vector3(0.8, 0, 0.05)
+const STACKS := [[0.95, -0.15, 0.7], [0.98, 0.25, 0.85], [0.62, -0.2, 0.55]]
+
+
+## A drill rig: a tripod derrick over a spinning drill head, a conveyor carrying ore up into
+## a hopper with a metal accent strip and glowing ore, and an engine house with exhaust
+## stacks. L2 adds a stack and armour, L3 a bigger derrick with braces and a winch, L4 a
+## second hopper and a third stack, L5 gold trim.
 static func build_metal_extractor(p: Parts, level: int) -> void:
 	var m := p.body
-	var paint := Parts.accent(level, 5, "orange")
-	Parts.slab(m, 3, 0.3)
-	var height := 1.5 + 0.2 * level
-	var tower := Vector3(-0.75, 0.3, -0.75)
-	m.box(Vector3(0.5, height, 0.5), tower, Parts.surf(paint))
-	m.box(Vector3(0.85, 0.35, 0.85), tower + Vector3(0, height, 0), Parts.surf("hull_light"))
-	var beam_y := 0.3 + height + 0.1
+	var gold := level >= 5
+	var height: float = DERRICK_HEIGHTS[level - 1]
+	Parts.foundation(m, 3)
+	var ground := Parts.PAD_HEIGHT
+	m.lathe(PackedVector2Array([
+		Vector2(0.48, 0), Vector2(0.48, 0.12), Vector2(0.42, 0.18), Vector2(0.3, 0.18),
+		Vector2(0.3, 0.1), Vector2(0, 0.1),
+	]), 24, DRILL + Vector3(0, ground, 0), Parts.GOLD_ROUND if gold else Parts.HULL_DARK_ROUND)
+
+	# The derrick: three legs on foot plates leaning in to a crown block.
+	var leg_width := 0.1 if level < 3 else 0.14
+	var crown := DRILL + Vector3(0, height - 0.04, 0)
+	var feet: Array[Vector3] = []
+	var tops: Array[Vector3] = []
+	for degrees: float in DERRICK_LEGS:
+		var foot := DRILL + Parts.around(0.95, degrees, ground)
+		var top := DRILL + Parts.around(LEG_TOP, degrees, height)
+		feet.append(foot)
+		tops.append(top)
+		m.box_chamfered(Vector3(0.24, 0.06, 0.24), 0.02, foot, Parts.HULL_DARK, Vector3(0, 90.0 - degrees, 0))
+		m.strut(foot, top, leg_width, LEG)
 	if level >= 3:
-		var left := Vector3(-0.75, 0.3, 1.0)
-		var right := Vector3(1.0, 0.3, -0.75)
-		m.box(Vector3(0.22, height, 0.22), left, Parts.surf(paint))
-		m.box(Vector3(0.22, height, 0.22), right, Parts.surf(paint))
-		m.strut(Vector3(left.x, beam_y - 0.1, left.z), Vector3(right.x, beam_y - 0.1, right.z), 0.24, Parts.surf("hull_light"))
-	else:
-		m.strut(Vector3(-0.6, beam_y, -0.6), Vector3(0.2, beam_y, 0.2), 0.22, Parts.surf("hull_light"))
+		# Braces from leg to leg, BRACE of the way up.
+		for k: int in 3:
+			var a := feet[k].lerp(tops[k], BRACE)
+			var b := feet[(k + 1) % 3].lerp(tops[(k + 1) % 3], BRACE)
+			m.strut(a, b, 0.08, LEG)
+	m.box_chamfered(Vector3(0.6, 0.26, 0.6), 0.05, crown, Parts.HULL_LIGHT)
+	m.box(Vector3(0.62, 0.07, 0.62), crown + Vector3(0, 0.07, 0), METAL_ACCENT)
+	if gold:
+		m.box_chamfered(Vector3(0.64, 0.06, 0.64), 0.02, crown + Vector3(0, 0.26, 0), Parts.GOLD_TRIM)
+	if level >= 3:
+		m.tube(0, 0.08, 0.36, 16, crown + Vector3(0.18, 0.36, -0.06), Parts.GUNMETAL, Vector3(0, 0, 90))
+	Parts.landing_light(m, crown + Vector3(0.14, 0.26, 0.14), 0.09, METAL_GLOW)
+
+	# The hoppers, each with a conveyor from the collar up over its rim.
+	for k: int in 2 if level >= 4 else 1:
+		var hopper: Vector3 = HOPPERS[k]
+		var heading := (hopper - DRILL).normalized()
+		_hopper(m, hopper + Vector3(0, ground, 0), gold)
+		_belt(m, DRILL + heading * 0.32 + Vector3(0, ground + 0.2, 0),
+			hopper - heading * 0.2 + Vector3(0, ground + HOPPER_RIM + 0.14, 0))
+
+	# The engine house and its stacks.
+	var house := ENGINE_HOUSE + Vector3(0, ground, 0)
+	m.box_chamfered(Vector3(0.66, 0.5, 0.8), 0.06, house, Parts.HULL_LIGHT)
+	m.box(Vector3(0.4, 0.24, 0.04), house + Vector3(0, 0.12, 0.4), ENGINE_VENT)
+	m.box_chamfered(Vector3(0.7, 0.08, 0.84), 0.03, house + Vector3(0, 0.5, 0), Parts.GOLD_TRIM if gold else Parts.HULL_MID)
 	if level >= 2:
-		m.dome(0.38, 0.3, 6, 2, Vector3(0.85, 0.3, 0.85), Parts.surf("metal_dark"))
-	if level >= 4:
-		m.box(Vector3(0.5, 0.45, 0.6), Vector3(-1.0, 0.3, 0.55), Parts.surf("hull"))
-		m.box(Vector3(0.14, 0.14, 0.14), tower + Vector3(0.3, height + 0.1, 0.3), Parts.surf("glow_orange"))
-	p.pivot = Vector3(0.12, 0.3, 0.12)
+		m.box_chamfered(Vector3(0.72, 0.18, 0.86), 0.04, house, ARMOUR)
+	var stacks := 1 + (1 if level >= 2 else 0) + (1 if level >= 4 else 0)
+	for k: int in stacks:
+		var stack: Array = STACKS[k]
+		var stack_height: float = stack[2]
+		_stack(m, Vector3(stack[0], house.y + 0.58, stack[1]), stack_height, gold)
+
+	p.pivot = DRILL + Vector3(0, ground + 0.1, 0)
 	p.speed = 3.0
-	p.spin.prism(0.05, 0.3 + 0.03 * level, 0.75, 5, Vector3.ZERO, Parts.surf("metal"))
-	p.spin.box(Vector3(0.35, 0.15, 0.35), Vector3(0, 0.75, 0), Parts.surf("metal_dark"))
-	p.spin.prism(0.07, 0.07, beam_y - 0.3 - 0.9, 4, Vector3(0, 0.9, 0), Parts.surf("metal_dark"))
+	_drill(p.spin, crown.y - p.pivot.y, ground + DRIVE_TOP * (height - ground) - p.pivot.y, gold)
 
 
-## [x, z, height, radius, tilt x, tilt z] of each crystal shard, in the order levels add them.
+## A square hopper on four legs, a metal accent strip round its rim and glowing ore heaped in it.
+static func _hopper(m: LowPolyMesh, pos: Vector3, gold: bool) -> void:
+	for corner: Vector2 in [Vector2(-1, -1), Vector2(1, -1), Vector2(-1, 1), Vector2(1, 1)]:
+		m.box_chamfered(Vector3(0.07, 0.32, 0.07), 0.02, pos + Vector3(corner.x * 0.17, 0, corner.y * 0.17), Parts.GUNMETAL)
+	var bin := pos + Vector3(0, HOPPER_RIM - 0.46, 0)
+	m.lathe(PackedVector2Array([
+		Vector2(0.12, 0), Vector2(0.42, 0.34), Vector2(0.42, 0.46), Vector2(0.36, 0.46),
+		Vector2(0.36, 0.38), Vector2(0, 0.38),
+	]), 4, bin, Parts.HULL_MID, Vector3(0, 45, 0))
+	m.lathe(PackedVector2Array([Vector2(0.43, 0), Vector2(0.43, 0.08), Vector2(0.36, 0.08)]), 4,
+		bin + Vector3(0, 0.36, 0), Parts.GOLD_TRIM if gold else METAL_ACCENT, Vector3(0, 45, 0))
+	m.pyramid(0.48, 0.14, bin + Vector3(0, 0.38, 0), METAL_ORE)
+
+
+## A conveyor from `from` up to `to`: a belt between two rails, glowing ore on it, a trestle
+## under its middle.
+static func _belt(m: LowPolyMesh, from: Vector3, to: Vector3) -> void:
+	var along := to - from
+	var run := Vector2(along.x, along.z)
+	var rot := Vector3(-rad_to_deg(atan2(along.y, run.length())), rad_to_deg(atan2(along.x, along.z)), 0)
+	var length := along.length()
+	var middle := (from + to) * 0.5
+	m.box_chamfered(Vector3(0.26, 0.05, length), 0.015, middle, BELT, rot)
+	for side: float in [-1.0, 1.0]:
+		m.box_chamfered(Vector3(0.06, 0.1, length), 0.02, middle + LowPolyMesh.turn(Vector3(side * 0.15, -0.02, 0), rot), Parts.HULL_MID, rot)
+	for t: float in [0.25, 0.55, 0.85]:
+		m.box_chamfered(Vector3(0.12, 0.08, 0.12), 0.03, from.lerp(to, t) + LowPolyMesh.turn(Vector3(0, 0.05, 0), rot),
+			METAL_GLOW, rot + Vector3(0, 30 * t, 0))
+	var foot := Vector3(middle.x, Parts.PAD_HEIGHT, middle.z)
+	m.box(Vector3(0.08, middle.y - foot.y, 0.08), foot, Parts.GUNMETAL)
+
+
+## An exhaust stack: a collar, a ribbed pipe, a lipped mouth with soot inside.
+static func _stack(m: LowPolyMesh, pos: Vector3, height: float, gold: bool) -> void:
+	m.prism(0.14, 0.13, 0.08, 16, pos - Vector3(0, 0.04, 0), Parts.HULL_DARK_ROUND)
+	m.prism(0.09, 0.09, height, 16, pos, STACK)
+	m.ring(0.07, 0.12, 0.08, 16, pos + Vector3(0, height, 0), Parts.GOLD_ROUND if gold else Parts.HULL_DARK_ROUND)
+	m.disc(0.07, 16, pos + Vector3(0, height + 0.04, 0), SOOT)
+
+
+## The drill string that spins round the collar: a ribbed bit, auger flights, a square kelly
+## `length` tall up into the crown, and a finned round top drive whose top is at `drive_top`.
+static func _drill(s: LowPolyMesh, length: float, drive_top: float, gold: bool) -> void:
+	s.lathe(PackedVector2Array([
+		Vector2(0.04, -0.04), Vector2(0.18, 0.08), Vector2(0.27, 0.16), Vector2(0.27, 0.24),
+		Vector2(0.16, 0.3), Vector2(0, 0.3),
+	]), 16, Vector3.ZERO, DRILL_BIT)
+	for k: int in 3:
+		s.box_chamfered(Vector3(0.44, 0.05, 0.16), 0.02, Vector3(0, 0.36 + 0.14 * k, 0),
+			Parts.GOLD_TRIM if gold else Parts.HULL_LIGHT, Vector3(10, 60 * k, 0))
+	s.box_chamfered(Vector3(0.12, length - 0.2, 0.12), 0.03, Vector3(0, 0.2, 0), Parts.GUNMETAL)
+	var drive := Vector3(0, drive_top - 0.28, 0)
+	s.lathe(PackedVector2Array([
+		Vector2(0.15, 0), Vector2(0.15, 0.24), Vector2(0.12, 0.28), Vector2(0, 0.28),
+	]), 16, drive, Parts.HULL_MID_ROUND)
+	s.lathe(PackedVector2Array([Vector2(0.16, 0), Vector2(0.16, 0.07)]), 16, drive + Vector3(0, 0.15, 0), METAL_ACCENT_ROUND)
+	for k: int in 4:
+		s.box_chamfered(Vector3(0.06, 0.2, 0.08), 0.02, drive + Parts.around(0.17, 90 * k + 45, 0.02), Parts.HULL_DARK,
+			Vector3(0, 45 - 90 * k, 0))
+
+
+## [x, z, height, radius, tilt x, tilt z] of each crystal shard, in the order levels add them:
+## two per level from three at L1, taller the later they come.
 const SHARDS := [
-	[-0.55, 0.45, 1.5, 0.3, 12, -10],
-	[0.6, -0.4, 1.3, 0.26, -12, 12],
-	[0.55, 0.7, 1.1, 0.24, 14, 14],
-	[-0.75, -0.5, 1.2, 0.25, -10, -14],
-	[1.0, 0.15, 0.9, 0.2, 0, 18],
-	[-0.1, 1.0, 0.95, 0.2, 18, 0],
-	[0.15, -1.0, 0.85, 0.2, -16, 0],
+	[0.0, 0.0, 1.05, 0.2, 0, 0],
+	[-0.3, 0.22, 0.75, 0.15, 10, -16],
+	[0.28, -0.2, 0.7, 0.14, -14, 14],
+	[0.3, 0.32, 0.6, 0.13, 18, 16],
+	[-0.38, -0.28, 0.72, 0.14, -16, -14],
+	[0.05, 0.45, 0.62, 0.12, 24, 4],
+	[0.48, 0.05, 0.66, 0.12, 2, 24],
+	[-0.5, 0.02, 0.6, 0.12, 0, -22],
+	[-0.02, -0.5, 0.64, 0.12, -24, 0],
+	[0.42, 0.42, 0.5, 0.1, 20, 20],
+	[-0.42, 0.42, 0.52, 0.1, 20, -20],
 ]
+## The gantry's two legs, either side of the cluster across the camera's view, and the
+## height of its beam by level.
+const GANTRY_LEGS := [Vector3(-0.98, 0, 0.98), Vector3(0.98, 0, -0.98)]
+const GANTRY_HEIGHTS := [1.9, 1.95, 2.0, 2.05, 2.1]
 
 
+## A laser cutting gantry over a cluster of crystal shards on a rock bed, its focusing emitter
+## turning under the beam and firing a glowing beam into the tallest shard. Every level adds
+## two shards and the shards grow; L3 adds a containment ring round the cluster, L4 glowing
+## pylons on it, L5 gold trim.
 static func build_crystal_harvester(p: Parts, level: int) -> void:
 	var m := p.body
-	Parts.slab(m, 3, 0.25)
-	for i: int in 2 + level:
+	var gold := level >= 5
+	Parts.foundation(m, 3)
+	var ground := Parts.PAD_HEIGHT
+	m.dome(0.8, 0.22, 8, 2, Vector3(0, ground, 0), ROCK)
+	var growth := 1.0 + 0.05 * (level - 1)
+	for i: int in 1 + 2 * level:
 		var shard: Array = SHARDS[i]
-		var foot := Vector3(shard[0], 0.25, shard[1])
-		var height: float = shard[2]
+		var foot := Vector3(shard[0], ground + 0.12, shard[1])
+		var shard_height: float = shard[2]
 		var radius: float = shard[3]
-		m.cone(radius, height, 4, foot, Parts.surf("glow_magenta"), Vector3(shard[4], 0, shard[5]))
-	m.prism(0.16, 0.11, 1.5, 6, Vector3(0, 0.25, 0), Parts.surf(Parts.accent(level, 5, "metal_dark")))
-	p.pivot = Vector3(0, 1.75, 0)
-	p.speed = 1.2
-	p.spin.box(Vector3(1.8, 0.08, 0.14), Vector3.ZERO, Parts.surf("hull_light"))
-	p.spin.box(Vector3(0.16, 0.16, 0.22), Vector3(0.85, -0.04, 0), Parts.surf("glow_gold" if level >= 5 else "glow_cyan"))
+		_shard(m, foot, shard_height * growth, radius, Vector3(shard[4], 15 * i, shard[5]))
+	if level >= 3:
+		m.ring(0.86, 0.98, 0.16, 24, Vector3(0, ground, 0), Parts.GOLD_ROUND if gold else Parts.HULL_MID_ROUND)
+		m.ring(0.88, 0.96, 0.03, 24, Vector3(0, ground + 0.16, 0), CRYSTAL_GLOW)
+	if level >= 4:
+		for k: int in 4:
+			var post := Parts.around(0.92, 90 * k, ground)
+			m.box_chamfered(Vector3(0.14, 0.42, 0.14), 0.03, post, Parts.HULL_LIGHT, Vector3(0, -90 * k, 0))
+			m.orb(0.07, 12, 6, post + Vector3(0, 0.5, 0), CRYSTAL_GLOW)
+
+	# The gantry: two legs on feet, a beam across with a crystal accent stripe, a carriage.
+	var beam_y: float = GANTRY_HEIGHTS[level - 1]
+	var yaw := Vector3(0, 45, 0)
+	for leg: Vector3 in GANTRY_LEGS:
+		var foot := leg + Vector3(0, ground, 0)
+		m.box_chamfered(Vector3(0.42, 0.14, 0.42), 0.04, foot, Parts.HULL_DARK, yaw)
+		m.box_chamfered(Vector3(0.24, beam_y - ground, 0.24), 0.05, foot, Parts.HULL_LIGHT, yaw)
+		m.box(Vector3(0.26, 0.1, 0.26), foot + Vector3(0, 0.3, 0), Parts.HAZARD, yaw)
+	var beam := Vector3(0, beam_y, 0)
+	m.box_chamfered(Vector3(2.96, 0.24, 0.3), 0.05, beam, Parts.GOLD_TRIM if gold else Parts.HULL_LIGHT, yaw)
+	m.box(Vector3(2.4, 0.08, 0.32), beam + Vector3(0, 0.08, 0), CRYSTAL_ACCENT, yaw)
+	m.box_chamfered(Vector3(0.44, 0.2, 0.44), 0.05, beam + Vector3(0, -0.06, 0), Parts.HULL_MID, yaw)
+	m.box(Vector3(0.6, 0.12, 0.06), beam + LowPolyMesh.turn(Vector3(0, 0.06, 0.17), yaw), Parts.HAZARD, yaw)
+	# A power box at the left leg's foot.
+	m.box_chamfered(Vector3(0.3, 0.32, 0.22), 0.04, Vector3(-0.55, ground, 1.15), Parts.HULL_MID, Vector3(0, 0, 0))
+	m.box(Vector3(0.18, 0.14, 0.03), Vector3(-0.55, ground + 0.1, 1.26), CRYSTAL_GLOW)
+
+	var tallest := ground + 0.12 + float(SHARDS[0][2]) * growth
+	p.pivot = beam + Vector3(0, -0.06, 0)
+	p.speed = 1.6
+	_emitter(p.spin, p.pivot.y - tallest, gold)
+
+
+## A crystal shard: a six-sided column with a pointed tip, tilted, its facets glowing within.
+static func _shard(m: LowPolyMesh, foot: Vector3, height: float, radius: float, rot: Vector3) -> void:
+	m.lathe(PackedVector2Array([
+		Vector2(radius * 0.85, 0), Vector2(radius, height * 0.2), Vector2(radius, height * 0.7),
+		Vector2(0, height),
+	]), 6, foot, CRYSTAL_SHARD, rot)
+
+
+## The focusing emitter under the gantry: a hub with three prongs round a glowing lens, and
+## the beam from the lens `reach` down to the tallest shard.
+static func _emitter(s: LowPolyMesh, reach: float, gold: bool) -> void:
+	s.prism(0.16, 0.12, 0.1, 16, Vector3(0, -0.1, 0), Parts.GOLD_ROUND if gold else Parts.HULL_DARK_ROUND)
+	s.cone(0.12, 0.16, 16, Vector3(0, -0.1, 0), Parts.HULL_MID_ROUND, Vector3(180, 0, 0))
+	for k: int in 3:
+		var root := Parts.around(0.12, 120 * k, -0.1)
+		var tip := Parts.around(0.07, 120 * k, -0.36)
+		s.strut(root, Parts.around(0.2, 120 * k, -0.22), 0.05, CRYSTAL_PRONG)
+		s.strut(Parts.around(0.2, 120 * k, -0.22), tip, 0.05, CRYSTAL_PRONG)
+	s.orb(0.07, 12, 6, Vector3(0, -0.3, 0), CRYSTAL_GLOW)
+	s.prism(0.035, 0.035, reach - 0.3, 8, Vector3(0, -reach, 0), CRYSTAL_BEAM)
 
 
 static func build_antimatter_siphon(p: Parts, level: int) -> void:
