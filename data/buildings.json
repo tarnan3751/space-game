@@ -3,86 +3,129 @@
     "name": "Command Center",
     "size": 4,
     "category": "core",
-    "max_count": [1, 1, 1],
+    "max_count": [1, 1, 1, 1, 1],
     "levels": [
-      { "cost": {}, "build_seconds": 0, "hp": 2000,
-        "storage": { "metal": 1000, "crystal": 1000 } },
-      { "cost": { "metal": 800 }, "build_seconds": 120, "hp": 3000,
+      { "cost": {}, "build_seconds": 0, "hp": 2000, "storage": { "metal": 1000, "crystal": 1000 } },
+      { "cost": { "metal": 1500 }, "build_seconds": 120, "hp": 3000,
         "storage": { "metal": 2500, "crystal": 2500 } },
-      { "cost": { "metal": 2000, "crystal": 1000 }, "build_seconds": 600, "hp": 4200,
-        "requires_cc": 2, "storage": { "metal": 5000, "crystal": 5000 } }
-    ]
-  },
-  "metal_extractor": {
-    "name": "Metal Extractor",
-    "size": 3,
-    "category": "resources",
-    "max_count": [2, 4, 6],
-    "levels": [
-      { "cost": { "crystal": 150 }, "build_seconds": 10, "hp": 400,
-        "produces": { "metal": 1800 } },
-      { "cost": { "crystal": 400 }, "build_seconds": 60, "hp": 500,
-        "produces": { "metal": 3600 } },
-      { "cost": { "crystal": 1200 }, "build_seconds": 300, "hp": 650,
-        "requires_cc": 2, "produces": { "metal": 7200 } }
-    ]
-  },
-  "crystal_harvester": {
-    "name": "Crystal Harvester",
-    "size": 3,
-    "category": "resources",
-    "max_count": [2, 4, 6],
-    "levels": [
-      { "cost": { "metal": 150 }, "build_seconds": 10, "hp": 400,
-        "produces": { "crystal": 1800 } },
-      { "cost": { "metal": 400 }, "build_seconds": 60, "hp": 500,
-        "produces": { "crystal": 3600 } },
-      { "cost": { "metal": 1200 }, "build_seconds": 300, "hp": 650,
-        "requires_cc": 2, "produces": { "crystal": 7200 } }
-    ]
-  },
-  "metal_silo": {
-    "name": "Metal Silo",
-    "size": 3,
-    "category": "resources",
-    "max_count": [1, 2, 3],
-    "levels": [
-      { "cost": { "crystal": 300 }, "build_seconds": 30, "hp": 800,
-        "storage": { "metal": 1500 } },
-      { "cost": { "crystal": 900 }, "build_seconds": 120, "hp": 1000,
-        "requires_cc": 2, "storage": { "metal": 3500 } },
-      { "cost": { "crystal": 2000 }, "build_seconds": 600, "hp": 1300,
-        "requires_cc": 3, "storage": { "metal": 7000 } }
-    ]
-  },
-  "crystal_silo": {
-    "name": "Crystal Silo",
-    "size": 3,
-    "category": "resources",
-    "max_count": [1, 2, 3],
-    "levels": [
-      { "cost": { "metal": 300 }, "build_seconds": 30, "hp": 800,
-        "storage": { "crystal": 1500 } },
-      { "cost": { "metal": 900 }, "build_seconds": 120, "hp": 1000,
-        "requires_cc": 2, "storage": { "crystal": 3500 } },
-      { "cost": { "metal": 2000 }, "build_seconds": 600, "hp": 1300,
-        "requires_cc": 3, "storage": { "crystal": 7000 } }
+      { "cost": { "metal": 4000, "crystal": 1500 }, "build_seconds": 600, "hp": 4200,
+        "requires_cc": 2, "storage": { "metal": 5000, "crystal": 5000 } },
+      { "cost": { "metal": 10000, "crystal": 4000 }, "build_seconds": 1800, "hp": 5500,
+        "requires_cc": 3, "storage": { "metal": 10000, "crystal": 10000, "antimatter": 200 } },
+      { "cost": { "metal": 25000, "crystal": 10000 }, "build_seconds": 3600, "hp": 7000,
+        "requires_cc": 4, "storage": { "metal": 20000, "crystal": 20000, "antimatter": 500 } }
     ]
   },
   "drone_bay": {
     "name": "Drone Bay",
     "size": 2,
     "category": "resources",
-    "max_count": [2, 3, 4],
+    "max_count": [2, 3, 4, 5, 5],
     "levels": [
       { "cost": { "metal": 900 }, "build_seconds": 0, "hp": 250, "builders": 1 }
+    ]
+  },
+  "metal_extractor": {
+    "name": "Metal Extractor",
+    "size": 3,
+    "category": "resources",
+    "max_count": [2, 3, 4, 5, 6],
+    "levels": [
+      { "cost": { "crystal": 150 }, "build_seconds": 10, "hp": 400, "produces": { "metal": 1800 } },
+      { "cost": { "crystal": 400 }, "build_seconds": 30, "hp": 500, "requires_cc": 2,
+        "produces": { "metal": 3000 } },
+      { "cost": { "crystal": 1000 }, "build_seconds": 90, "hp": 650, "requires_cc": 3,
+        "produces": { "metal": 4500 } },
+      { "cost": { "crystal": 2500 }, "build_seconds": 240, "hp": 800, "requires_cc": 4,
+        "produces": { "metal": 6500 } },
+      { "cost": { "crystal": 6000 }, "build_seconds": 600, "hp": 1000, "requires_cc": 5,
+        "produces": { "metal": 9000 } }
+    ]
+  },
+  "crystal_harvester": {
+    "name": "Crystal Harvester",
+    "size": 3,
+    "category": "resources",
+    "max_count": [2, 3, 4, 5, 6],
+    "levels": [
+      { "cost": { "metal": 150 }, "build_seconds": 10, "hp": 400, "produces": { "crystal": 1800 } },
+      { "cost": { "metal": 400 }, "build_seconds": 30, "hp": 500, "requires_cc": 2,
+        "produces": { "crystal": 3000 } },
+      { "cost": { "metal": 1000 }, "build_seconds": 90, "hp": 650, "requires_cc": 3,
+        "produces": { "crystal": 4500 } },
+      { "cost": { "metal": 2500 }, "build_seconds": 240, "hp": 800, "requires_cc": 4,
+        "produces": { "crystal": 6500 } },
+      { "cost": { "metal": 6000 }, "build_seconds": 600, "hp": 1000, "requires_cc": 5,
+        "produces": { "crystal": 9000 } }
+    ]
+  },
+  "antimatter_siphon": {
+    "name": "Antimatter Siphon",
+    "size": 3,
+    "category": "resources",
+    "max_count": [0, 0, 0, 1, 2],
+    "levels": [
+      { "cost": { "crystal": 10000 }, "build_seconds": 240, "hp": 600, "requires_cc": 4,
+        "produces": { "antimatter": 20 } },
+      { "cost": { "crystal": 25000 }, "build_seconds": 600, "hp": 750, "requires_cc": 4,
+        "produces": { "antimatter": 40 } },
+      { "cost": { "crystal": 60000, "antimatter": 100 }, "build_seconds": 1200, "hp": 900,
+        "requires_cc": 5, "produces": { "antimatter": 70 } }
+    ]
+  },
+  "metal_silo": {
+    "name": "Metal Silo",
+    "size": 3,
+    "category": "resources",
+    "max_count": [1, 2, 2, 3, 3],
+    "levels": [
+      { "cost": { "crystal": 300 }, "build_seconds": 20, "hp": 800, "storage": { "metal": 1500 } },
+      { "cost": { "crystal": 800 }, "build_seconds": 60, "hp": 1000, "requires_cc": 2,
+        "storage": { "metal": 3500 } },
+      { "cost": { "crystal": 2000 }, "build_seconds": 180, "hp": 1300, "requires_cc": 3,
+        "storage": { "metal": 7000 } },
+      { "cost": { "crystal": 5000 }, "build_seconds": 420, "hp": 1600, "requires_cc": 4,
+        "storage": { "metal": 14000 } },
+      { "cost": { "crystal": 12000 }, "build_seconds": 900, "hp": 2000, "requires_cc": 5,
+        "storage": { "metal": 25000 } }
+    ]
+  },
+  "crystal_silo": {
+    "name": "Crystal Silo",
+    "size": 3,
+    "category": "resources",
+    "max_count": [1, 2, 2, 3, 3],
+    "levels": [
+      { "cost": { "metal": 300 }, "build_seconds": 20, "hp": 800, "storage": { "crystal": 1500 } },
+      { "cost": { "metal": 800 }, "build_seconds": 60, "hp": 1000, "requires_cc": 2,
+        "storage": { "crystal": 3500 } },
+      { "cost": { "metal": 2000 }, "build_seconds": 180, "hp": 1300, "requires_cc": 3,
+        "storage": { "crystal": 7000 } },
+      { "cost": { "metal": 5000 }, "build_seconds": 420, "hp": 1600, "requires_cc": 4,
+        "storage": { "crystal": 14000 } },
+      { "cost": { "metal": 12000 }, "build_seconds": 900, "hp": 2000, "requires_cc": 5,
+        "storage": { "crystal": 25000 } }
+    ]
+  },
+  "antimatter_vault": {
+    "name": "Antimatter Vault",
+    "size": 3,
+    "category": "resources",
+    "max_count": [0, 0, 0, 1, 1],
+    "levels": [
+      { "cost": { "metal": 12000 }, "build_seconds": 240, "hp": 1500, "requires_cc": 4,
+        "storage": { "antimatter": 100 } },
+      { "cost": { "metal": 30000 }, "build_seconds": 600, "hp": 1900, "requires_cc": 4,
+        "storage": { "antimatter": 300 } },
+      { "cost": { "metal": 75000, "antimatter": 150 }, "build_seconds": 1200, "hp": 2400,
+        "requires_cc": 5, "storage": { "antimatter": 800 } }
     ]
   },
   "laser_turret": {
     "name": "Laser Turret",
     "size": 3,
     "category": "defense",
-    "max_count": [1, 2, 4],
+    "max_count": [1, 2, 3, 4, 5],
     "levels": [
       { "cost": { "metal": 400 }, "build_seconds": 20, "hp": 600,
         "damage": 12, "range_cells": 7, "fire_ms": 800 },
