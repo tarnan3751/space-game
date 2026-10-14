@@ -112,8 +112,13 @@ server/          Nakama TypeScript runtime later (.gdignore keeps Godot out)
 
 ## Seeing the game
 
-Claude can't see the screen. After visual or input changes, ask the user for a screenshot.
-Or set up godot-mcp-runtime (screenshots, simulated input, live GDScript), after reviewing its source.
+Claude drives the running game through the `godot` MCP server
+([tugcantopaloglu/godot-mcp](https://github.com/tugcantopaloglu/godot-mcp), cloned and built at
+`~/Development/godot-mcp`, registered in Claude Code's local config, not in this repo).
+`run_project` launches the game, then `game_*` tools take screenshots, simulate taps, drags and
+touch gestures, read logs and evaluate GDScript in the live scene tree. While it runs, the MCP
+injects a `McpInteractionServer` autoload (TCP on 127.0.0.1:9090) and removes it on stop; never
+commit it. Prefer the MCP over asking the user for screenshots.
 Headless (`--headless`) runs catch script errors but render nothing.
 
 ## Roadmap
