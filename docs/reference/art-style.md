@@ -277,6 +277,8 @@ job; a helper is added, never renamed or removed.
 | `dish(m, radius, depth, pos, surf, rot)` | a dish opening along +Y before `rot`, the centre of its back on `pos`; 24 segments |
 | `landing_light(m, pos, radius, lens, housing = GUNMETAL)` | a squat housing with a glowing lens dome |
 | `mast(m, foot, height, bulb_radius, bulb)` | a thin `ROD` pole ending in a bulb, which carries the outline the rod is too thin for |
+| `drum(m, radius, height, chamfer, sides, pos, surf, rot)` | a cylinder whose top edge is bevelled `chamfer` wide, turnable: a turret ring, a tilted housing; with 8 sides and `OCTAGON`, an armoured octagon |
+| `torus(m, major, minor, sides, segments, pos, surf, rot)` | a closed ring of round section resting on `pos` (its bottom at `pos.y`): coils, coronas, gyro rings; 10 or more `segments` for a ring that shows |
 
 ### Model table
 
@@ -292,6 +294,18 @@ its spinning part, and its top level's body triangles as the gallery counts them
 | `nanite_foundry` | vats with bands of glowing nanite-green goo, piped with ball elbows | none | 2,870 |
 | `drydock` | half-built ship in a cradle under orange gantries, welders throwing sparks | none | 2,946 |
 | `alliance_beacon` | braced transmitter tower with rings of light, a big dish and an emitter orb | none | 2,096 |
+| `laser_turret` | domed head on the red-belted plinth, twin barrels ending in red emitters | the head | 2,722 |
+| `missile_battery` | tilted box launcher of red-tipped tubes (4, 6 at L3, 9 at L4) with a hazard band | none | 2,174 |
+| `plasma_mortar` | fat short barrel rising from a caged violet plasma chamber on a heavy ring | none | 2,782 |
+| `shield_generator` | cyan energy orb held over an emitter dome by three coil arms | none | 2,914 |
+| `flak_cannon` | barrels angled at the sky on a tall bell mount | the radar dish on its mast | 2,900 |
+| `arc_tower` | tesla coil of white insulator skirts under an arc-blue sphere; twin coils at L4 | none | 2,794 |
+| `cloaked_sentry` | low dark hexagonal pod with a lid gun and a dim cyan shimmer ring | none | 854 |
+| `gravity_well` | dark core floating over a violet well, ringed by gyro rings | the rotor over the core | 1,978 |
+| `emp_tower` | yellow core in a bar cage atop a stepped tower ringed by capacitor cans | none | 2,854 |
+| `railgun` | two long rails across the screen with a cyan strip between them, capacitor banks | none | 2,088 |
+| `ion_beam` | big crystal lens and focusing rings on a tripod | none | 1,964 |
+| `orbital_cannon` | massive gunmetal barrel aimed at the sky with cyan coils, on a two-tier bunker | none | 4,496 |
 | `proximity_mine` | spiked domed disc on a hazard rim with a red warning light | none | 542 |
 | `grav_trap` | ring emitter round a dark funnel with a violet swirl | none | 580 |
 | `flak_mine` | hazard-banded pod, upward barrels with glowing bores round a lens | none | 574 |

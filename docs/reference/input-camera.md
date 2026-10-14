@@ -203,8 +203,9 @@ traps cost nothing per frame.
 
 `BuildingModels.create(type, level, size)` returns a `Node3D` holding the static body and its
 ink outline, and at most one spinning part (the radar, the drone, the drill, the harvester arm,
-the siphon and gravity well rings, the flak and laser heads) with its outline, under a pivot node
-carrying `SPIN_META`: at most four `MeshInstance3D`, two of them outlines that cast no shadow.
+the siphon and gravity well rings, the laser head, the flak radar) with its outline, under a
+pivot node carrying `SPIN_META`: at most four `MeshInstance3D`, two of them outlines that cast no
+shadow.
 The models are built in code, one per type and level of the 32-type roster, each type's in its
 category's file under `src/game/models/`; `MODELS` gives each type the footprint its models are
 built for and its level count. A level above that shows the top model, a catalog size other than
