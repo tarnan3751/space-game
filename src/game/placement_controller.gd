@@ -53,7 +53,7 @@ func begin_place(type: String) -> void:
 	placing_type = type
 	var size := state.catalog.size_of(type)
 	_ghost = BuildingView.new()
-	_ghost.setup(0, type, size)
+	_ghost.setup(0, type, 1, size)
 	_ghost.set_lifted(true)
 	base_view.add_child(_ghost)
 	var start := Vector2i(state.grid.width / 2, state.grid.height / 2)

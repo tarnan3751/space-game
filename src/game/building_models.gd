@@ -19,7 +19,8 @@ const HAZARD := Color("f2c94c")
 static var _materials: Dictionary = {}
 
 
-static func create(type: String, size: int) -> Node3D:
+## The placeholders do not vary with the level yet.
+static func create(type: String, _level: int, size: int) -> Node3D:
 	var root := Node3D.new()
 	var s := float(size)
 	match type:

@@ -15,6 +15,8 @@ const LIFT_HEIGHT := 0.35
 
 var building_id: int = 0
 var building_type: String = ""
+## The finished level the model shows; 0 while the building is first being constructed.
+var building_level: int = 0
 var footprint_size: int = 1
 
 var _model: Node3D
@@ -23,16 +25,18 @@ var _footprint: MeshInstance3D
 var _footprint_material: StandardMaterial3D
 var _label: Label3D
 var _spinners: Array[Node3D] = []
+var _spin_speeds: PackedFloat32Array = PackedFloat32Array()
 var _animate: bool = true
 
 
-## Call once, before adding to the tree.
-func setup(id: int, type: String, size: int) -> void:
+## Call once, before adding to the tree. `level` picks the model (level 1's while it is 0).
+func setup(id: int, type: String, level: int, size: int) -> void:
 	building_id = id
 	building_type = type
+	building_level = level
 	footprint_size = size
 
-	_model = BuildingModels.create(type, size)
+	_model = BuildingModels.create(type, maxi(level, 1), size)
 	add_child(_model)
 	_collect_spinners(_model)
 	_scaffold = BuildingModels.create_scaffold(size)
@@ -65,6 +69,12 @@ func setup(id: int, type: String, size: int) -> void:
 	show_status(1, false, 1, 0)
 
 
+func _ready() -> void:
+	# Nothing to animate (walls, traps) costs nothing per frame. Not in setup(): entering the
+	# tree turns processing on for any script with _process.
+	set_process(not _spinners.is_empty())
+
+
 ## level 0 = first construction (scaffold). busy = constructing or upgrading.
 func show_status(level: int, busy: bool, target_level: int, seconds_left: int) -> void:
 	_model.visible = level >= 1
@@ -92,12 +102,13 @@ func set_lifted(lifted: bool) -> void:
 func _process(delta: float) -> void:
 	if not _animate:
 		return
-	for spinner: Node3D in _spinners:
-		spinner.rotate_y(float(spinner.get_meta(BuildingModels.SPIN_META)) * delta)
+	for i: int in _spinners.size():
+		_spinners[i].rotate_y(_spin_speeds[i] * delta)
 
 
 func _collect_spinners(node: Node) -> void:
 	for child: Node in node.get_children():
 		if child is Node3D and child.has_meta(BuildingModels.SPIN_META):
 			_spinners.append(child as Node3D)
+			_spin_speeds.append(float(child.get_meta(BuildingModels.SPIN_META)))
 		_collect_spinners(child)

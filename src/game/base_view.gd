@@ -52,7 +52,10 @@ func sync(state: BaseState) -> void:
 	for id: int in views.keys():
 		var stale: bool = not state.buildings.has(id)
 		if not stale:
-			stale = views[id].building_type != state.buildings[id].type
+			var building: BuildingState = state.buildings[id]
+			# A new finished level gets its model; a dragged view keeps its own until dropped.
+			stale = views[id].building_type != building.type \
+				or (views[id].building_level != building.level and id != dragging_id)
 		if stale:
 			views[id].queue_free()
 			views.erase(id)
@@ -62,7 +65,7 @@ func sync(state: BaseState) -> void:
 		var view: BuildingView = views.get(id)
 		if view == null:
 			view = BuildingView.new()
-			view.setup(id, building.type, state.catalog.size_of(building.type))
+			view.setup(id, building.type, building.level, state.catalog.size_of(building.type))
 			add_child(view)
 			views[id] = view
 		view.show_status(building.level, building.is_busy(), building.target_level, state.seconds_left(id))
