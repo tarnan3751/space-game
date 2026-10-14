@@ -352,7 +352,9 @@ func _set_drag(drag: Drag) -> void:
 func _set_ghost_cell(cell: Vector2i) -> void:
 	_ghost_cell = _clamp_cell(cell, _ghost.footprint_size)
 	_ghost.position = base_view.cell_to_world(_ghost_cell, _ghost.footprint_size)
-	_ghost.set_footprint(BuildingView.Footprint.VALID if ghost_is_valid() else BuildingView.Footprint.INVALID)
+	var valid := ghost_is_valid()
+	_ghost.set_footprint(BuildingView.Footprint.VALID if valid else BuildingView.Footprint.INVALID)
+	_ghost.set_ghost(valid)
 	placing_changed.emit()
 
 

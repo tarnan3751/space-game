@@ -123,6 +123,11 @@ shadow; no vertex's kit layer (`UV2.x`) beyond the kit's last; and the body tria
 budget for its footprint (`docs/reference/art-style.md`, **Budgets**: 600 for 1x1, 2,000 for
 2x2, 3,000 for 3x3, 5,000 for 4x4 and 5x5, 250 for a wall piece).
 
+`scenarios/view_states.gd` checks the comic style's view states on a fresh base, each with a
+close-up screenshot: the selected Command Center's outlines in gold (and the override cleared on
+deselecting), the placement ghost's body tinted valid on a free spot and invalid on the Command
+Center with its outline left plain ink, and a new building's scaffold. It first says the fresh base's draw calls and frame rate.
+
 `scenarios/hud_menu.gd` checks the HUD on a fresh base: antimatter hidden in the top bar,
 every menu type in exactly one tab and in menu order, an entry's built/max and a locked
 entry's "Needs Command Center N", that taps on a tab and an entry and a drag across the

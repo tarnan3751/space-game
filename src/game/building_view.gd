@@ -3,6 +3,12 @@ extends Node3D
 ## Visual for one building: its model (or a scaffold while first being built), a
 ## footprint tile for selection/placement feedback, and a floating timer label.
 ## Holds no game state; BaseView and PlacementController push state into it.
+##
+## The meshes are shared, so a state shows by overriding an instance's material with another
+## shared one from MaterialKit, never a new material: a selected or lifted building's outlines
+## turn core gold (ink_selected) until both end, when the override is cleared (null); a
+## placement ghost keeps plain ink outlines, lifted as it is, and its bodies take the valid or
+## invalid ghost tint (set_ghost) for as long as it lives.
 
 enum Footprint { NONE, SELECTED, VALID, INVALID }
 
@@ -24,6 +30,16 @@ var _scaffold: Node3D
 var _footprint: MeshInstance3D
 var _footprint_material: StandardMaterial3D
 var _label: Label3D
+## The models' and the scaffold's mesh instances: bodies and ink outlines.
+var _bodies: Array[MeshInstance3D] = []
+var _outlines: Array[MeshInstance3D] = []
+var _selected: bool = false
+var _lifted: bool = false
+## A placement ghost's body tint (set_ghost), null for any other view. A ghost's outlines stay
+## plain ink though it is lifted.
+var _ghost_tint: Material = null
+## Whether the outlines carry the selected ink now.
+var _inked: bool = false
 var _spinners: Array[Node3D] = []
 var _spin_speeds: PackedFloat32Array = PackedFloat32Array()
 var _animate: bool = true
@@ -41,6 +57,8 @@ func setup(id: int, type: String, level: int, size: int) -> void:
 	_collect_spinners(_model)
 	_scaffold = BuildingModels.create_scaffold(size)
 	add_child(_scaffold)
+	_collect_meshes(_model)
+	_collect_meshes(_scaffold)
 
 	var plane := PlaneMesh.new()
 	# Full footprint plus a small rim, so it shows around the model's base slab.
@@ -86,17 +104,35 @@ func show_status(level: int, busy: bool, target_level: int, seconds_left: int) -
 		_label.text = "%s  %s" % [what, Format.duration(seconds_left)]
 
 
+## The footprint tile; SELECTED also inks the outlines in gold.
 func set_footprint(mode: Footprint) -> void:
 	_footprint.visible = mode != Footprint.NONE
 	if mode != Footprint.NONE:
 		_footprint_material.albedo_color = FOOTPRINT_COLORS[mode]
+	_selected = mode == Footprint.SELECTED
+	_update_outlines()
 
 
-## Raised slightly while being dragged, so it reads as "picked up".
+## Raised slightly while being dragged, so it reads as "picked up", with gold outlines (a
+## ghost's stay plain).
 func set_lifted(lifted: bool) -> void:
 	var height := LIFT_HEIGHT if lifted else 0.0
 	_model.position = Vector3(0, height, 0)
 	_scaffold.position = Vector3(0, height, 0)
+	_lifted = lifted
+	_update_outlines()
+
+
+## Marks the view as a placement ghost and tints its bodies for a spot it can (valid) or cannot
+## take; its outlines stay plain ink.
+func set_ghost(valid: bool) -> void:
+	var material := MaterialKit.ghost_valid() if valid else MaterialKit.ghost_invalid()
+	if material == _ghost_tint:
+		return
+	_ghost_tint = material
+	_update_outlines()
+	for body: MeshInstance3D in _bodies:
+		body.set_surface_override_material(0, material)
 
 
 func _process(delta: float) -> void:
@@ -104,6 +140,26 @@ func _process(delta: float) -> void:
 		return
 	for i: int in _spinners.size():
 		_spinners[i].rotate_y(_spin_speeds[i] * delta)
+
+
+func _update_outlines() -> void:
+	var inked := (_selected or _lifted) and _ghost_tint == null
+	if inked == _inked:
+		return
+	_inked = inked
+	var material: Material = MaterialKit.ink_selected() if inked else null
+	for outline: MeshInstance3D in _outlines:
+		outline.set_surface_override_material(0, material)
+
+
+func _collect_meshes(node: Node) -> void:
+	for child: Node in node.get_children():
+		if child is MeshInstance3D:
+			if child.has_meta(BuildingModels.OUTLINE_META):
+				_outlines.append(child as MeshInstance3D)
+			else:
+				_bodies.append(child as MeshInstance3D)
+		_collect_meshes(child)
 
 
 func _collect_spinners(node: Node) -> void:
