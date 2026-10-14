@@ -29,6 +29,8 @@ static var HOT := Surf.make(MaterialKit.Layer.GLOW, MaterialKit.HAZARD, 1.0, Sur
 ## Nanite goo behind glass, and a screen showing it.
 static var GOO := Surf.make(MaterialKit.Layer.GLASS, MaterialKit.NANITE_GREEN, 1.0, Surf.UNLIT, true)
 static var GOO_SCREEN := Surf.make(MaterialKit.Layer.SCREEN, MaterialKit.NANITE_GREEN)
+## A welder's arc.
+static var WELD := Surf.make(MaterialKit.Layer.GLOW, MaterialKit.ENERGY, 1.0, Surf.UNLIT, true)
 
 
 ## A long vaulted hangar: the main bay with its striped door, the control tower in the back
@@ -395,40 +397,149 @@ static func _vat(m: LowPolyMesh, foot: Vector3, radius: float, height: float, le
 	m.prism(radius * 0.42, radius * 0.34, 0.1, 16, foot + Vector3(0, height, 0), ORANGE_ROUND)
 
 
+## A drydock: an orange gantry crane over a cradle holding a half-built ship, its nose plated,
+## its stern still bare ribs, welders glowing where the gantries reach down. A bigger, more
+## plated hull and a third gantry at 2.
 static func build_drydock(p: Parts, level: int) -> void:
 	var m := p.body
-	Parts.slab(m, 4, 0.15)
-	for z: float in [-0.85, 0.85]:
-		m.box(Vector3(3.2, 0.2, 0.18), Vector3(0, 0.15, z), Parts.surf("metal_dark"))
-	for x: float in [-0.9, 0.0, 0.8]:
-		m.box(Vector3(0.3, 0.4, 0.9), Vector3(x, 0.15, 0), Parts.surf("hull_dark"))
-	m.box(Vector3(2.3, 0.55, 0.9), Vector3(-0.25, 0.55, 0), Parts.surf("hull_light"))
-	m.wedge(Vector3(0.9, 0.55, 0.7), Vector3(1.25, 0.55, 0), Parts.surf("hull_light"), Vector3(0, 90, 0))
-	m.box(Vector3(0.6, 0.35, 0.5), Vector3(-0.7, 1.1, 0), Parts.surf("hull"))
-	m.box(Vector3(0.62, 0.08, 0.52), Vector3(-0.7, 1.32, 0), Parts.surf("glow_blue"))
-	for z: float in [-0.22, 0.22]:
-		m.box(Vector3(0.08, 0.22, 0.25), Vector3(-1.42, 0.7, z), Parts.surf("glow_cyan"))
-	var frame := Parts.accent(level, 2, "hazard")
-	var frames: Array[float] = [-1.0, 0.25]
+	var g := Parts.PAD_HEIGHT
+	Parts.foundation(m, 4)
+	# The cradle: rails along the dock and hazard chocks under the hull.
+	for z: float in [-0.45, 0.45]:
+		m.box_chamfered(Vector3(3.5, 0.08, 0.16), 0.03, Vector3(0, g, z), Parts.GUNMETAL)
+	for x: float in [-1.15, -0.35, 0.45, 1.2]:
+		m.box_chamfered(Vector3(0.24, 0.36, 0.86), 0.04, Vector3(x, g, 0), Parts.HAZARD)
+	# The hull lies along X, nose to +X. [distance from the stern, radius] down its profile.
+	var scale := 1.0 if level < 2 else 1.08
+	var stern := -1.65
+	var axis_y := g + 0.36 + 0.55 * scale
+	var profile := PackedVector2Array([
+		Vector2(0.38, 0), Vector2(0.52, 0.35), Vector2(0.56, 1.0), Vector2(0.54, 1.7),
+		Vector2(0.44, 2.45), Vector2(0.24, 3.05), Vector2(0, 3.3),
+	])
+	var plated_from := 1.7 if level < 2 else 1.0
+	var plated := PackedVector2Array()
+	for point: Vector2 in profile:
+		if point.y >= plated_from:
+			plated.append(Vector2(point.x * scale, point.y - plated_from))
+	# Round parts lie along +X: their axis, +Y, turned onto +X.
+	var lie := Vector3(0, 0, -90)
+	m.lathe(plated, 24, Vector3(stern + plated_from, axis_y, 0), HULL_ROUND, lie)
+	m.ring(0.46 * scale, 0.56 * scale, 0.12, 24, Vector3(stern + 2.3, axis_y, 0), ORANGE_ROUND, lie)
+	var canopy := Vector3(stern + 2.55, axis_y + 0.36 * scale, 0)
+	m.dome(0.2, 0.14, 16, 4, canopy, Parts.GLASS, Vector3(0, 0, -20))
+	# Bare ribs aft of the plating, with a keel, a spine and stringers through them.
+	var x := stern + 0.12
+	while x < stern + plated_from - 0.05:
+		var radius := _hull_radius(profile, x - stern) * scale
+		m.ring(radius - 0.07, radius, 0.08, 24, Vector3(x, axis_y, 0), ARMOUR_ROUND, lie)
+		x += 0.34
+	var aft := Vector3(stern + 0.05, axis_y, 0)
+	var fore := Vector3(stern + plated_from + 0.05, axis_y, 0)
+	for offset: Vector3 in [Vector3(0, -0.5, 0), Vector3(0, 0.5, 0), Vector3(0, 0, 0.5), Vector3(0, 0, -0.5)]:
+		Parts.beam(m, aft + offset * scale, fore + offset * scale, 0.06, Parts.GUNMETAL, 0.015)
+	# The reactor glowing inside the bare ribs; engine bells on the stern at 2.
+	m.orb(0.2, 16, 6, Vector3(stern + 0.75, axis_y, 0), GLOW)
 	if level >= 2:
-		frames.append(1.25)
-	for x: float in frames:
-		for z: float in [-1.15, 1.15]:
-			m.box(Vector3(0.15, 1.7, 0.15), Vector3(x, 0.15, z), Parts.surf(frame))
-		m.box(Vector3(0.15, 0.15, 2.45), Vector3(x, 1.85, 0), Parts.surf(frame))
+		for z: float in [-0.2, 0.2]:
+			m.prism(0.1, 0.17, 0.22, 16, Vector3(stern + 0.1, axis_y - 0.1, z), Parts.GUNMETAL, -lie)
+	# The gantries, each with a welder reaching down to the hull.
+	var top := g + 1.95
+	var gantries: Array[float] = [-0.85, 0.55]
+	if level >= 2:
+		gantries.append(1.45)
+	for gx: float in gantries:
+		for z: float in [-1.6, 1.6]:
+			m.box_chamfered(Vector3(0.24, 0.12, 0.24), 0.03, Vector3(gx, g, z), DARK_PLATE)
+			m.box_chamfered(Vector3(0.14, top - g - 0.12, 0.14), 0.03, Vector3(gx, g + 0.12, z), ORANGE)
+		Parts.beam(m, Vector3(gx, top, -1.7), Vector3(gx, top, 1.7), 0.18,
+			Parts.GOLD_TRIM if level >= 2 else ORANGE, 0.04)
+		var trolley := Vector3(gx, top - 0.16, 0.25)
+		m.box_chamfered(Vector3(0.22, 0.14, 0.26), 0.03, trolley, Parts.GUNMETAL)
+		var surface := axis_y + _hull_radius(profile, gx - stern) * scale
+		var tip := Vector3(gx, surface + 0.16, 0.25)
+		Parts.pipe(m, trolley, tip, 0.03, Parts.ROD)
+		_weld(m, Vector3(gx, surface + 0.04, 0.25))
+	# The control booth in the front corner.
+	var booth := Vector3(-1.45, g, 1.4)
+	m.box_chamfered(Vector3(0.5, 0.45, 0.4), 0.05, booth, Parts.HULL_LIGHT)
+	m.box_chamfered(Vector3(0.4, 0.16, 0.03), 0.01, booth + Vector3(0, 0.24, 0.2), Parts.GLASS)
+	Parts.mast(m, booth + Vector3(0.12, 0.45, -0.08), 0.35, 0.05, GLOW)
 
 
+## A welding point on the hull: a glowing arc with hot sparks flying off it.
+static func _weld(m: LowPolyMesh, spot: Vector3) -> void:
+	m.orb(0.08, 16, 6, spot, WELD)
+	var sparks: Array[Vector3] = [
+		Vector3(1, 0.7, 0.3), Vector3(-0.4, 0.8, 0.9), Vector3(0.2, 0.6, -1), Vector3(-1, 0.5, -0.2),
+	]
+	for spark: Vector3 in sparks:
+		m.cone(0.025, 0.18, 8, spot + spark.normalized() * 0.06, HOT, Parts.facing(spark))
+
+
+## The radius of the hull's `profile` at `along` from the stern, between its points.
+static func _hull_radius(profile: PackedVector2Array, along: float) -> float:
+	for i: int in profile.size() - 1:
+		var a := profile[i]
+		var b := profile[i + 1]
+		if along <= b.y:
+			return lerpf(a.x, b.x, clampf((along - a.y) / (b.y - a.y), 0.0, 1.0))
+	return 0.0
+
+
+## A transmitter tower: four legs tapering to an emitter orb, braced, ringed with lights, a
+## big dish on its flank. Taller with a ring of lights more at each level.
 static func build_alliance_beacon(p: Parts, level: int) -> void:
 	var m := p.body
-	m.prism(1.3, 1.2, 0.3, 6, Vector3.ZERO, Parts.surf("hull_dark"))
-	m.box(Vector3(0.9, 0.3, 0.9), Vector3(0, 0.3, 0), Parts.surf("hull"), Vector3(0, 45, 0))
-	var height := 2.0 + 0.3 * level
-	m.prism(0.38, 0.12, height, 4, Vector3(0, 0.6, 0), Parts.surf(Parts.accent(level, 3, "hull_light")), Vector3(0, 45, 0))
-	m.box(Vector3(0.6, 0.06, 0.6), Vector3(0, 0.6 + height * 0.4, 0), Parts.surf("hazard"), Vector3(0, 45, 0))
-	if level >= 2:
-		for degrees: float in [-45.0, 135.0]:
-			var arm := Parts.around(0.55, degrees, 0.6 + height * 0.6)
-			m.strut(Vector3(0, arm.y, 0), arm, 0.06, Parts.surf("metal"))
-			m.disc(0.2, 6, arm, Parts.surf("white"), Vector3(0, -degrees, -60))
-	var beacon := "glow_gold" if level >= 3 else "glow_cyan"
-	m.orb(0.22 + 0.03 * level, 8, 3, Vector3(0, 0.75 + height + 0.1, 0), Parts.surf(beacon))
+	var g := Parts.PAD_HEIGHT
+	var gold := level >= 3
+	Parts.foundation(m, 3)
+	m.box_chamfered(Vector3(1.9, 0.22, 1.9), 0.06, Vector3(0, g, 0), ARMOUR)
+	var foot := g + 0.22
+	m.box_chamfered(Vector3(1.3, 0.14, 1.3), 0.05, Vector3(0, foot, 0), Parts.HULL_DARK)
+	foot += 0.14
+	var height := 1.0 + 0.21 * level
+	var top := foot + height
+	var base := 0.5
+	var crown := 0.13
+	var corners: Array[Vector2] = [Vector2(1, 1), Vector2(1, -1), Vector2(-1, -1), Vector2(-1, 1)]
+	for c: Vector2 in corners:
+		Parts.beam(m, Vector3(c.x * base, foot, c.y * base), Vector3(c.x * crown, top, c.y * crown), 0.12,
+			Parts.HULL_LIGHT)
+	# Cross braces between the rings.
+	var stops := PackedFloat32Array([0.0])
+	for i: int in level:
+		stops.append(float(i + 1) / (level + 1))
+	stops.append(1.0)
+	for k: int in stops.size() - 1:
+		var lower := stops[k]
+		var upper := stops[k + 1]
+		for i: int in 4:
+			var a := corners[i]
+			var b := corners[(i + 1) % 4]
+			var wl := lerpf(base, crown, lower)
+			var wu := lerpf(base, crown, upper)
+			m.strut(Vector3(a.x * wl, foot + height * lower, a.y * wl),
+				Vector3(b.x * wu, foot + height * upper, b.y * wu), 0.04, Parts.ROD)
+	# The rings of lights.
+	for k: int in range(1, stops.size() - 1):
+		var y := foot + height * stops[k]
+		var radius := lerpf(base, crown, stops[k]) * 1.42 + 0.1
+		m.ring(radius - 0.12, radius, 0.08, 24, Vector3(0, y - 0.04, 0), ARMOUR_ROUND)
+		m.ring(radius, radius + 0.035, 0.05, 24, Vector3(0, y - 0.025, 0), GLOW)
+	# The big dish on the tower's flank, facing out to the right.
+	var mount := foot + height * 0.32
+	var flank := lerpf(base, crown, 0.32)
+	Parts.beam(m, Vector3(flank, mount, 0), Vector3(flank + 0.28, mount, 0), 0.1, Parts.GUNMETAL)
+	var tilt := Vector3(55, 90, 0)
+	var dish_centre := Vector3(flank + 0.28, mount, 0)
+	Parts.dish(m, 0.62, 0.24, dish_centre, GOLD_ROUND if gold else HULL_ROUND, tilt)
+	var axis := LowPolyMesh.turn(Vector3.UP, tilt)
+	Parts.pipe(m, dish_centre + axis * 0.1, dish_centre + axis * 0.55, 0.025, Parts.ROD)
+	m.orb(0.06, 16, 6, dish_centre + axis * 0.55, GLOW)
+	# The emitter at the top: a collar, the orb and a spike.
+	m.prism(0.2, 0.16, 0.12, 16, Vector3(0, top, 0), GOLD_ROUND if gold else Parts.GUNMETAL)
+	m.ring(0.2, 0.3, 0.06, 24, Vector3(0, top + 0.12, 0), ORANGE_ROUND)
+	var orb := 0.17 + 0.02 * level
+	m.orb(orb, 16, 8, Vector3(0, top + 0.12 + orb, 0), GLOW)
+	m.cone(0.05, 0.22, 16, Vector3(0, top + 0.1 + orb * 2, 0), GOLD_ROUND if gold else Parts.GUNMETAL)
