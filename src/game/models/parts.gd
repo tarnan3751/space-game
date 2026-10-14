@@ -74,11 +74,6 @@ static func accent(level: int, top: int, normal: String) -> String:
 	return "gold" if level >= top else normal
 
 
-## The square slab resource and army buildings stand on.
-static func slab(m: LowPolyMesh, size: float, height: float) -> void:
-	m.box(Vector3(0.88 * size, height, 0.88 * size), Vector3.ZERO, surf("hull_dark"))
-
-
 ## A point on a circle of `radius` around the Y axis, at `degrees` from +X towards +Z.
 static func around(radius: float, degrees: float, y: float) -> Vector3:
 	var angle := deg_to_rad(degrees)

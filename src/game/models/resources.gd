@@ -1,6 +1,7 @@
 extends RefCounted
-## Models of the resource buildings: the drone bay, the collectors and the storage, standing
-## on square slabs (tanks, drills).
+## Models of the resource buildings: the drone bay, the collectors and the storage, each on
+## the concrete foundation pad. Each carries its resource's colour (metal, crystal,
+## antimatter) as its accent and its glow; the drone bay's is energy cyan, the HUD's drones.
 ##
 ## BuildingModels calls one static build_<type>(p: Parts, level: int) per type.
 
@@ -563,22 +564,100 @@ static func build_crystal_silo(p: Parts, level: int) -> void:
 	Parts.pipe_run(m, PackedVector3Array([pump + Vector3(0.12, 0.26, -0.12), Vector3(-0.66, base + 0.15, 0.36)]), 0.055, Parts.GUNMETAL, 12)
 
 
+static var VAULT_ARMOUR := Surf.make(MaterialKit.Layer.PLATE, MaterialKit.HULL_MID)
+static var VAULT_DOOR := Surf.make(MaterialKit.Layer.PLATE, MaterialKit.HULL_LIGHT, 1.0, Surf.LIT, true)
+static var LID := Surf.make(MaterialKit.Layer.PLATE, MaterialKit.HULL_MID, 1.5, Surf.LIT, true)
+static var VAULT_SCREEN := Surf.make(MaterialKit.Layer.SCREEN, MaterialKit.ANTIMATTER, 3.0)
+static var VENT_CAP := Surf.make(MaterialKit.Layer.VENT, MaterialKit.HULL_MID, 3.0)
+## A glow seam: thin enough to need no outline.
+static var SEAM := Surf.make(MaterialKit.Layer.GLOW, MaterialKit.ANTIMATTER, 1.0, Surf.UNLIT, false, false)
+
+## The antimatter vault's armoured cube, and its containment pylons' corners.
+const VAULT_SIZE := 1.7
+const VAULT_HEIGHT := 1.15
+const VAULT_CHAMFER := 0.14
+const VAULT_CORNERS := [Vector2(-1, -1), Vector2(1, -1), Vector2(-1, 1), Vector2(1, 1)]
+
+
+## A heavy chamfered armoured cube on a skirt, violet glow seams round it and up its corners,
+## a round vault door with a handwheel facing the lit side, a control screen on the other,
+## and a containment pylon on each corner. L2 adds an armoured domed lid and bigger pylons, L3
+## bigger pylons again and gold trim.
 static func build_antimatter_vault(p: Parts, level: int) -> void:
 	var m := p.body
-	Parts.slab(m, 3, 0.2)
-	var height := 0.9 + 0.2 * level
-	m.box(Vector3(1.6, height, 1.6), Vector3(0, 0.2, 0), Parts.surf("hull"))
-	m.box(Vector3(1.64, 0.07, 1.64), Vector3(0, 0.2 + height * 0.5, 0), Parts.surf("glow_violet"))
-	m.box(Vector3(0.08, height, 0.08), Vector3(0.8, 0.2, 0), Parts.surf("glow_violet"))
-	m.box(Vector3(0.08, height, 0.08), Vector3(0, 0.2, 0.8), Parts.surf("glow_violet"))
-	var top := 0.2 + height
-	m.box(Vector3(1.2, 0.15, 1.2), Vector3(0, top, 0), Parts.surf("hull_light"))
+	var gold := level >= 3
+	Parts.foundation(m, 3)
+	var ground := Parts.PAD_HEIGHT
+	m.box_chamfered(Vector3(2.1, 0.14, 2.1), 0.05, Vector3(0, ground, 0), ARMOUR)
+	var floor := ground + 0.14
+	var half := VAULT_SIZE * 0.5
+	m.box_chamfered(Vector3(VAULT_SIZE, VAULT_HEIGHT, VAULT_SIZE), VAULT_CHAMFER, Vector3(0, floor, 0), VAULT_ARMOUR)
+	# Seams: a band round the four faces, and one up each chamfered corner.
+	for k: int in 4:
+		var yaw := Vector3(0, 90 * k, 0)
+		m.box(Vector3(VAULT_SIZE - 2 * VAULT_CHAMFER, 0.05, 0.02), LowPolyMesh.turn(Vector3(0, floor + 0.86, half), yaw), SEAM, yaw)
+	for corner: Vector2 in VAULT_CORNERS:
+		var edge := Vector3(corner.x, 0, corner.y) * (half - VAULT_CHAMFER * 0.5)
+		m.box(Vector3(0.05, VAULT_HEIGHT - 0.2, 0.03), edge + Vector3(corner.x, 0, corner.y) * 0.012 + Vector3(0, floor + 0.06, 0),
+			SEAM, Vector3(0, rad_to_deg(atan2(corner.x, corner.y)), 0))
+	_vault_door(m, Vector3(0, floor + 0.52, half), gold)
+	# The control screen on the shadowed face.
+	m.box_chamfered(Vector3(0.06, 0.36, 0.56), 0.02, Vector3(half, floor + 0.5, 0), Parts.HULL_DARK)
+	m.box(Vector3(0.02, 0.26, 0.44), Vector3(half + 0.05, floor + 0.55, 0), VAULT_SCREEN)
+
+	var top := floor + VAULT_HEIGHT
 	if level >= 2:
-		m.disc(0.4, 6, Vector3(0, top + 0.151, 0), Parts.surf("glow_violet"))
-	var pylon := 1.1 + 0.25 * level
-	for corner: Vector2 in [Vector2(-1, -1), Vector2(1, -1), Vector2(-1, 1), Vector2(1, 1)]:
-		var foot := Vector3(corner.x * 1.08, 0.2, corner.y * 1.08)
-		m.prism(0.12, 0.09, pylon, 4, foot, Parts.surf(Parts.accent(level, 3, "hull_light")), Vector3(0, 45, 0))
-		m.orb(0.12, 6, 2, foot + Vector3(0, pylon + 0.1, 0), Parts.surf("glow_violet"))
-	if level >= 3:
-		m.orb(0.25, 8, 3, Vector3(0, top + 0.6, 0), Parts.surf("glow_violet"))
+		m.prism(0.72, 0.68, 0.1, 24, Vector3(0, top, 0), Parts.HULL_DARK_ROUND)
+		Parts.torus(m, 0.66, 0.035, 24, 6, Vector3(0, top + 0.065, 0), ANTIMATTER_GLOW)
+		m.dome(0.62, 0.3, 24, 5, Vector3(0, top + 0.1, 0), LID)
+		for k: int in 4:
+			var degrees := 45.0 + 90.0 * k
+			m.box_chamfered(Vector3(0.14, 0.2, 0.26), 0.03, Parts.around(0.6, degrees, top + 0.04),
+				Parts.GOLD_TRIM if gold else Parts.HULL_MID, Vector3(0, 90.0 - degrees, 0))
+		m.prism(0.18, 0.16, 0.06, 16, Vector3(0, top + 0.38, 0), Parts.HULL_DARK_ROUND)
+		m.disc(0.12, 16, Vector3(0, top + 0.441, 0), ANTIMATTER_GLOW)
+	else:
+		m.box_chamfered(Vector3(0.7, 0.1, 0.7), 0.04, Vector3(0, top, 0), Parts.HULL_DARK)
+		m.box(Vector3(0.5, 0.02, 0.5), Vector3(0, top + 0.1, 0), ANTIMATTER_GLOW)
+	for k: int in 2:
+		m.box_chamfered(Vector3(0.3, 0.08, 0.16), 0.02, Vector3(-0.5 + k, top, -0.62), VENT_CAP)
+
+	var width := 0.24 + 0.05 * level
+	var pylon_height := 0.85 + 0.2 * level
+	for corner: Vector2 in VAULT_CORNERS:
+		_containment_pylon(m, Vector3(corner.x * 1.06, ground + 0.14, corner.y * 1.06), width, pylon_height, gold)
+
+
+## The vault door: a round plate in a rim, a hub and a three-spoke handwheel, violet lock
+## lights round it.
+static func _vault_door(m: LowPolyMesh, centre: Vector3, gold: bool) -> void:
+	var facing := Vector3(90, 0, 0)
+	m.tube(0, 0.4, 0.06, 24, centre, VAULT_DOOR, facing)
+	Parts.torus(m, 0.42, 0.05, 24, 10, centre + Vector3(0, 0, -0.01), Parts.GOLD_ROUND if gold else Parts.GUNMETAL, facing)
+	m.tube(0, 0.1, 0.08, 16, centre + Vector3(0, 0, 0.06), Parts.HULL_DARK_ROUND, facing)
+	for k: int in 3:
+		var spoke := Vector3(cos(PI * k / 3), sin(PI * k / 3), 0) * 0.24
+		m.strut(centre + Vector3(0, 0, 0.11) - spoke, centre + Vector3(0, 0, 0.11) + spoke, 0.05, Parts.ROD)
+	for k: int in 6:
+		var angle := TAU * (k + 0.5) / 6
+		m.box(Vector3(0.06, 0.06, 0.04), centre + Vector3(cos(angle) * 0.32, sin(angle) * 0.32 - 0.03, 0.05), ANTIMATTER_GLOW)
+
+
+## A containment pylon: an armoured column on a foot with its glowing containment cell bared
+## between two bars, under a cap whose emitter leans in towards the vault.
+static func _containment_pylon(m: LowPolyMesh, foot: Vector3, width: float, height: float, gold: bool) -> void:
+	var square := Vector3(0, 45, 0)
+	m.box_chamfered(Vector3(width + 0.14, 0.12, width + 0.14), 0.04, foot, Parts.HULL_DARK)
+	m.box_chamfered(Vector3(width, height * 0.36, width), 0.04, foot, PYLON_ARMOUR, square)
+	m.prism(width * 0.36, width * 0.36, height * 0.34, 16, foot + Vector3(0, height * 0.36, 0), ANTIMATTER_GLOW)
+	for side: float in [-1.0, 1.0]:
+		m.box(Vector3(0.05, height * 0.34, 0.05), foot + LowPolyMesh.turn(Vector3(side * width * 0.4, height * 0.36, 0), square),
+			Parts.ROD, square)
+	m.box_chamfered(Vector3(width, height * 0.3, width), 0.04, foot + Vector3(0, height * 0.7, 0), PYLON_ARMOUR, square)
+	var cap := foot + Vector3(0, height, 0)
+	m.box_chamfered(Vector3(width + 0.08, 0.08, width + 0.08), 0.03, cap, Parts.GOLD_TRIM if gold else Parts.HULL_DARK, square)
+	var inward := Vector3(-foot.x, 0, -foot.z).normalized()
+	var lean := Vector3(40, rad_to_deg(atan2(inward.x, inward.z)), 0)
+	var horn := cap + Vector3(0, 0.08, 0)
+	m.prism(0.07, 0.05, 0.24, 16, horn, Parts.HULL_MID_ROUND, lean)
+	m.box_chamfered(Vector3(0.1, 0.06, 0.1), 0.02, horn + LowPolyMesh.turn(Vector3(0, 0.24, 0), lean), ANTIMATTER_GLOW, lean)
