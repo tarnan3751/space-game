@@ -63,6 +63,7 @@ var _upgrade_note: Label
 var _arrow: String = " > "
 var _toast: Label
 var _toast_tween: Tween
+var _reset_button: Button
 
 
 func setup(catalog: Catalog) -> void:
@@ -171,6 +172,39 @@ func show_error(code: String) -> void:
 
 static func error_text(code: String) -> String:
 	return str(ERROR_TEXT.get(code, code))
+
+
+# --- Queries for the harness -----------------------------------------------------
+
+func tab_button(category: String) -> Button:
+	return _tab_buttons[category]
+
+
+func entry_button(type: String) -> Button:
+	return _entries[type]
+
+
+## An entry's third line: built/max, or why it cannot be built.
+func entry_status(type: String) -> String:
+	return _entry_status[type].text
+
+
+## The top bar's panel for one resource; hidden while the base cannot store it.
+func resource_panel(res: String) -> Control:
+	return _resource_labels[res].get_parent()
+
+
+func place_button() -> Button:
+	return _place_button
+
+
+func drones_panel() -> Control:
+	return _builders_label.get_parent()
+
+
+## The debug Reset base button; null in a release build.
+func reset_button() -> Button:
+	return _reset_button
 
 
 # --- Refresh helpers -------------------------------------------------------------
@@ -469,6 +503,7 @@ func _build_debug_buttons() -> void:
 	var reset := _button("Reset base", Vector2(150, 48))
 	reset.pressed.connect(func() -> void: reset_pressed.emit())
 	row.add_child(reset)
+	_reset_button = reset
 
 
 func _panel_label(parent: Control) -> Label:
