@@ -1,9 +1,10 @@
 extends HarnessScenario
 ## The model gallery: one BuildingView per building type and level in the catalog, laid out on
 ## the grid in category rows, with an overview screenshot of each page of rows and a close-up
-## of each row. Checks every model against the budget: at most two body MeshInstance3D (the
-## outline instances aside) and at most MAX_TRIANGLES triangles in them (SMALL_TRIANGLES for
-## traps and walls).
+## of each row. Checks every model: one or two body MeshInstance3D (the static body, the
+## spinning part), each with an outline instance beside it on the ink material casting no
+## shadow; every vertex's kit layer (UV2.x) within the kit; and the body triangles within the
+## art style's budget for its footprint (docs/reference/art-style.md, **Budgets**).
 ##
 ## Rows follow the catalog's categories: "core" (the Command Center), then catalog.categories
 ## in tab order. The views hang under a Node3D of the scenario's own under main, not under
@@ -11,9 +12,10 @@ extends HarnessScenario
 ## hidden meanwhile. The whole roster does not fit on the grid at once, so rows that do not fit
 ## start a new page.
 
-const SMALL_CATEGORIES := ["traps", "walls"]
-const MAX_TRIANGLES := 500
-const SMALL_TRIANGLES := 40
+## Body triangles a model may have, by footprint size; a wall piece has WALL_BUDGET.
+const BUDGETS := {1: 600, 2: 2000, 3: 3000, 4: 5000, 5: 5000}
+const WALL_CATEGORY := "walls"
+const WALL_BUDGET := 250
 ## Cells between models and between rows.
 const GAP := 1
 const OVERVIEW_SIZE := 44.0
@@ -24,8 +26,7 @@ func run(main: MainScript) -> void:
 	var roster := _roster(main)
 	var categories := _categories(main)
 	check(not roster.is_empty(), "the catalog has building types")
-	for small: String in SMALL_CATEGORIES:
-		check(categories.has(small), "the catalog has the %s category" % small)
+	check(categories.has(WALL_CATEGORY), "the catalog has the %s category" % WALL_CATEGORY)
 	for entry: Dictionary in roster:
 		_check_budget(entry)
 
@@ -94,17 +95,38 @@ func _categories(main: MainScript) -> PackedStringArray:
 
 func _check_budget(entry: Dictionary) -> void:
 	var type: String = entry["type"]
-	var limit := SMALL_TRIANGLES if SMALL_CATEGORIES.has(entry["category"]) else MAX_TRIANGLES
+	var size: int = entry["size"]
+	var limit: int = WALL_BUDGET if entry["category"] == WALL_CATEGORY else BUDGETS[mini(size, 5)]
 	for level: int in range(1, int(entry["levels"]) + 1):
-		var model := BuildingModels.create(type, level, entry["size"])
+		var model := BuildingModels.create(type, level, size)
 		var bodies := _bodies(model)
 		var triangles := 0
+		var outlined := 0
+		var top_layer := 0
 		for body: MeshInstance3D in bodies:
-			var vertices: PackedVector3Array = body.mesh.surface_get_arrays(0)[Mesh.ARRAY_VERTEX]
+			var arrays := body.mesh.surface_get_arrays(0)
+			var vertices: PackedVector3Array = arrays[Mesh.ARRAY_VERTEX]
 			triangles += vertices.size() / 3
+			var layers: PackedVector2Array = arrays[Mesh.ARRAY_TEX_UV2]
+			for layer: Vector2 in layers:
+				top_layer = maxi(top_layer, roundi(layer.x))
+			if _has_outline(body):
+				outlined += 1
 		model.free()
-		check(bodies.size() >= 1 and bodies.size() <= 2 and triangles <= limit,
-			"%s %d: %d body instance(s), %d triangles (limit %d)" % [type, level, bodies.size(), triangles, limit])
+		check(bodies.size() >= 1 and bodies.size() <= 2 and outlined == bodies.size()
+			and top_layer < MaterialKit.LAYERS.size() and triangles <= limit,
+			"%s %d: %d body instance(s), %d outlined, top kit layer %d, %d triangles (limit %d)"
+			% [type, level, bodies.size(), outlined, top_layer, triangles, limit])
+
+
+## Whether a body has an outline instance beside it on the ink material, casting no shadow.
+func _has_outline(body: MeshInstance3D) -> bool:
+	for sibling: Node in body.get_parent().get_children():
+		if sibling is MeshInstance3D and sibling.has_meta(BuildingModels.OUTLINE_META):
+			var outline := sibling as MeshInstance3D
+			return outline.mesh.surface_get_material(0) == MaterialKit.ink() \
+				and outline.cast_shadow == GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	return false
 
 
 ## The model's body mesh instances (not the outlines), the spinning one included.

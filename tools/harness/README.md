@@ -104,8 +104,11 @@ in the catalog, laid out on the grid in rows by category (`"core"`, then
 `catalog.categories`), under a node of its own, with the base's own views hidden. The roster
 does not fit on the grid at once, so rows that do not fit start a new page. Each page gets an
 overview screenshot and each row a close-up, framed through `camera.zoom_at` and `camera.pan`.
-In both modes it checks every model against the budget: at most two `MeshInstance3D` and at
-most 500 triangles, 40 for traps and walls (`category_of`).
+In both modes it checks every model: one or two body `MeshInstance3D` (the static body and the
+spinning part), each with an outline instance beside it on `MaterialKit.ink()` that casts no
+shadow; no vertex's kit layer (`UV2.x`) beyond the kit's last; and the body triangles within the
+budget for its footprint (`docs/reference/art-style.md`, **Budgets**: 600 for 1x1, 2,000 for
+2x2, 3,000 for 3x3, 5,000 for 4x4 and 5x5, 250 for a wall piece).
 
 `scenarios/hud_menu.gd` checks the HUD on a fresh base: antimatter hidden in the top bar,
 every menu type in exactly one tab and in menu order, an entry's built/max and a locked
