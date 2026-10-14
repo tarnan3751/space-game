@@ -163,29 +163,27 @@ static func _save_path_from_args() -> String:
 	return DEFAULT_SAVE_PATH
 
 
+## The comic style's light (docs/reference/art-style.md, **Light and shading**): deep space
+## behind, a cool ambient for the sides the sun misses, and one warm key light whose hard,
+## single-split shadow the toon shader quantises into its shadow band. Linear tonemapping, so the
+## accent colours come out as picked.
 func _build_environment() -> void:
 	var environment := Environment.new()
 	environment.background_mode = Environment.BG_COLOR
-	environment.background_color = Color("07060f")
+	environment.background_color = MaterialKit.SPACE
 	environment.ambient_light_source = Environment.AMBIENT_SOURCE_COLOR
-	environment.ambient_light_color = Color("8a86b8")
-	environment.ambient_light_energy = 0.55
-	environment.tonemap_mode = Environment.TONE_MAPPER_FILMIC
+	environment.ambient_light_color = MaterialKit.AMBIENT
+	environment.ambient_light_energy = 0.35
+	environment.tonemap_mode = Environment.TONE_MAPPER_LINEAR
 	var world_environment := WorldEnvironment.new()
 	world_environment.environment = environment
 	add_child(world_environment)
 
 	var sun := DirectionalLight3D.new()
 	sun.rotation_degrees = Vector3(-55.0, -30.0, 0.0)
-	sun.light_color = Color("fff1dc")
-	sun.light_energy = 1.1
+	sun.light_color = MaterialKit.SUN
+	sun.light_energy = 1.0
 	sun.shadow_enabled = true
+	sun.directional_shadow_mode = DirectionalLight3D.SHADOW_ORTHOGONAL
 	sun.directional_shadow_max_distance = 80.0
 	add_child(sun)
-
-	# Cool fill from the other side, like light bouncing off a nearby planet.
-	var fill := DirectionalLight3D.new()
-	fill.rotation_degrees = Vector3(-25.0, 150.0, 0.0)
-	fill.light_color = Color("5fa8ff")
-	fill.light_energy = 0.35
-	add_child(fill)

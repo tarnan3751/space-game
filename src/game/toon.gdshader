@@ -1,4 +1,5 @@
 shader_type spatial;
+render_mode ambient_light_disabled;
 
 // The body of every kit mesh (MaterialKit.toon): the layer of the kit each vertex names in
 // UV2.x, multiplied by its tint (the vertex colour, stored sRGB; the renderer hands it to the

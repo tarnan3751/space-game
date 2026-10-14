@@ -5,7 +5,8 @@ extends Node3D
 ## unit, grid centred on the origin, cell (x, y) maps to world (x, z).
 ##
 ## The terrain and the rocks are generated from SCENERY_SEED, so every player's base sits in
-## the same landscape. Each is one mesh painted from the material kit's rock layer.
+## the same landscape. Each is one mesh painted from the material kit (the terrain mostly its
+## regolith, the rocks its rock layer); the rocks also have their ink outline.
 
 const GROUND_SHADER := preload("res://src/game/ground.gdshader")
 const SCENERY_SEED := 7
@@ -19,16 +20,24 @@ const TERRAIN_STEP := 2.0
 const NOISE_CELL := 7.0
 const NOISE_SIZE := 24
 const ROCK_COUNT := 40
+## Texture repeats per world unit on the terrain: the dust large (a craterlet about every two
+## cells), the rock grain finer.
+const TERRAIN_DUST_UV := 0.3
+const TERRAIN_ROCK_UV := 0.5
 
-## The terrain's faces by height band, from the crater floors up: flat, and not outlined (its
-## relief shows in the bands).
-static var TERRAIN_CRATER := Surf.make(MaterialKit.Layer.ROCK, MaterialKit.CRATER, 1.0, Surf.LIT, false, false)
-static var TERRAIN_LOW := Surf.make(MaterialKit.Layer.ROCK, MaterialKit.GROUND, 1.0, Surf.LIT, false, false)
-static var TERRAIN_MID := Surf.make(MaterialKit.Layer.ROCK, MaterialKit.GROUND.lerp(MaterialKit.ROCK, 0.5),
-	1.0, Surf.LIT, false, false)
-static var TERRAIN_HIGH := Surf.make(MaterialKit.Layer.ROCK, MaterialKit.ROCK, 1.0, Surf.LIT, false, false)
-static var TERRAIN_PEAK := Surf.make(MaterialKit.Layer.ROCK, MaterialKit.ROCK.darkened(0.15), 1.0, Surf.LIT,
+## The terrain's faces by height band, from the crater floors up: flat and not outlined (its
+## relief shows in the bands). The ring reads as quiet dust on the regolith layer, with the rock
+## layer's grain and cracks only on the two highest bands and in the craters.
+static var TERRAIN_CRATER := Surf.make(MaterialKit.Layer.ROCK, MaterialKit.CRATER, TERRAIN_ROCK_UV, Surf.LIT,
 	false, false)
+static var TERRAIN_LOW := Surf.make(MaterialKit.Layer.REGOLITH, MaterialKit.GROUND, TERRAIN_DUST_UV, Surf.LIT,
+	false, false)
+static var TERRAIN_MID := Surf.make(MaterialKit.Layer.REGOLITH, MaterialKit.GROUND.lerp(MaterialKit.ROCK, 0.5),
+	TERRAIN_DUST_UV, Surf.LIT, false, false)
+static var TERRAIN_HIGH := Surf.make(MaterialKit.Layer.ROCK, MaterialKit.ROCK, TERRAIN_ROCK_UV, Surf.LIT,
+	false, false)
+static var TERRAIN_PEAK := Surf.make(MaterialKit.Layer.ROCK, MaterialKit.ROCK.darkened(0.15), TERRAIN_ROCK_UV,
+	Surf.LIT, false, false)
 ## The rocks' sides and tops, outlined.
 static var ROCK_SIDE := Surf.make(MaterialKit.Layer.ROCK, MaterialKit.ROCK)
 static var ROCK_TOP := Surf.make(MaterialKit.Layer.ROCK, MaterialKit.ROCK_LIT)
@@ -129,6 +138,8 @@ func _build_ground() -> void:
 	_ground_material.shader = GROUND_SHADER
 	_ground_material.set_shader_parameter("grid_size", Vector2(grid_size))
 	_ground_material.set_shader_parameter("base_color", MaterialKit.GROUND)
+	_ground_material.set_shader_parameter("kit", MaterialKit.texture())
+	_ground_material.set_shader_parameter("layer", float(MaterialKit.Layer.REGOLITH))
 	_ground_material.set_shader_parameter("line_strength", GRID_LINES)
 	var plane := PlaneMesh.new()
 	plane.size = Vector2(grid_size)
@@ -201,6 +212,10 @@ func _build_rocks(rng: SeededRng) -> void:
 	var rocks := MeshInstance3D.new()
 	rocks.mesh = mesh.to_mesh()
 	add_child(rocks)
+	var outline := MeshInstance3D.new()
+	outline.mesh = mesh.to_outline_mesh()
+	outline.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	add_child(outline)
 
 
 ## One rock: a jittered ring on the ground, a narrower one above it and an off-centre peak.

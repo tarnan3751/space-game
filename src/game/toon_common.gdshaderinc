@@ -6,9 +6,10 @@
 // under the ink outline, which does that job.
 //
 // The Compatibility renderer adds the shadow-casting key light in a pass of its own, already
-// tonemapped and in sRGB, on top of the ambient light and the emission. The band values are
-// therefore tuned by eye for the art style's three tones (lit 1.0, mid 0.78, shadow 0.55 and
-// cool), not taken as linear factors.
+// tonemapped and in sRGB, on top of the ambient light and the emission. Ambient light added
+// that way lifts every band (most of all in blue) by more than the shadow band's whole tone, so
+// the shaders that include this file set render_mode ambient_light_disabled and the bands below
+// carry the whole lit colour: each band's tone is then exact for every tint.
 
 // UV2.y: 0 lit, 1 unlit (emissive), 2 glossy.
 const float FLAG_UNLIT = 1.0;
@@ -18,17 +19,20 @@ const float FLAG_GLOSSY = 2.0;
 const float LIT_EDGE = 0.55;
 const float SHADOW_EDGE = 0.15;
 const float BAND_SOFTNESS = 0.02;
-// The key light's share in each band.
-const vec3 BAND_LIT = vec3(0.62);
-const vec3 BAND_MID = vec3(0.4);
-const vec3 BAND_SHADOW = vec3(0.12) * vec3(0.82, 0.84, 1.0);
+// The key light's share in each band, linear: the art style's sRGB tones of the albedo (lit 1.0,
+// mid 0.78, shadow 0.55 in the cool tint (0.82, 0.84, 1.0)) raised to 2.2, the shadow band's
+// cool tint divided by the key light's warm colour (FFF4E0) so it stays cool, and the shadow
+// band nudged up by eye to make up for the halftone dots in it.
+const vec3 BAND_LIT = vec3(1.0);
+const vec3 BAND_MID = vec3(0.58);
+const vec3 BAND_SHADOW = vec3(0.29) * vec3(0.64, 0.67, 1.0) / vec3(1.0, 0.905, 0.745);
 
 // The halftone: a dot grid turned 45 degrees, its period in pixels at 720p (scaled with the
-// viewport height), the share of each cell a dot covers, and how much of the shadow band's
-// light a dot takes away.
+// viewport height), the share of each cell a dot covers, and how much of the shadow band a dot
+// takes away (linear: 0.12 of its sRGB tone).
 const float HALFTONE_PERIOD = 4.0;
 const float HALFTONE_COVERAGE = 0.35;
-const float HALFTONE_DARKEN = 0.6;
+const float HALFTONE_DARKEN = 0.245;
 
 // Cel specular: the threshold on NdotH, and the strength of the white disc.
 const float SPECULAR_EDGE = 0.92;
