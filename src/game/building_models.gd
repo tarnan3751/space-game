@@ -34,6 +34,18 @@ const MODELS := {
 	"nanite_foundry": [3, 4],
 	"drydock": [4, 2],
 	"alliance_beacon": [3, 3],
+	"laser_turret": [3, 5],
+	"missile_battery": [3, 5],
+	"plasma_mortar": [3, 4],
+	"shield_generator": [3, 4],
+	"flak_cannon": [3, 4],
+	"arc_tower": [3, 4],
+	"cloaked_sentry": [2, 3],
+	"gravity_well": [2, 3],
+	"emp_tower": [3, 3],
+	"railgun": [3, 3],
+	"ion_beam": [2, 2],
+	"orbital_cannon": [4, 2],
 }
 ## Octagons are turned so their flat sides face along X and Z.
 const OCTAGON := Vector3(0, 22.5, 0)
@@ -154,6 +166,30 @@ static func _build(p: Parts, type: String, level: int) -> void:
 			_drydock(p, level)
 		"alliance_beacon":
 			_alliance_beacon(p, level)
+		"laser_turret":
+			_laser_turret(p, level)
+		"missile_battery":
+			_missile_battery(p, level)
+		"plasma_mortar":
+			_plasma_mortar(p, level)
+		"shield_generator":
+			_shield_generator(p, level)
+		"flak_cannon":
+			_flak_cannon(p, level)
+		"arc_tower":
+			_arc_tower(p, level)
+		"cloaked_sentry":
+			_cloaked_sentry(p, level)
+		"gravity_well":
+			_gravity_well(p, level)
+		"emp_tower":
+			_emp_tower(p, level)
+		"railgun":
+			_railgun(p, level)
+		"ion_beam":
+			_ion_beam(p, level)
+		"orbital_cannon":
+			_orbital_cannon(p, level)
 
 
 # --- Shared parts --------------------------------------------------------------
@@ -166,6 +202,11 @@ static func _accent(level: int, top: int, normal: String) -> String:
 ## The square slab resource and army buildings stand on.
 static func _slab(m: LowPolyMesh, size: float, height: float) -> void:
 	m.box(Vector3(0.88 * size, height, 0.88 * size), Vector3.ZERO, "hull_dark")
+
+
+## The octagonal plinth defences stand on.
+static func _plinth(m: LowPolyMesh, size: float, height: float) -> void:
+	m.prism(0.47 * size, 0.44 * size, height, 8, Vector3.ZERO, "hull_dark", OCTAGON)
 
 
 ## A point on a circle of `radius` around the Y axis, at `degrees` from +X towards +Z.
@@ -544,3 +585,220 @@ static func _alliance_beacon(p: Parts, level: int) -> void:
 			m.disc(0.2, 6, arm, "white", Vector3(0, -degrees, -60))
 	var beacon := "glow_gold" if level >= 3 else "glow_cyan"
 	m.orb(0.22 + 0.03 * level, 8, 3, Vector3(0, 0.75 + height + 0.1, 0), beacon)
+
+
+# --- Defence -------------------------------------------------------------------
+
+static func _laser_turret(p: Parts, level: int) -> void:
+	var m := p.body
+	_plinth(m, 3, 0.45)
+	m.prism(1.0, 0.95, 0.12, 8, Vector3(0, 0.45, 0), "hull", OCTAGON)
+	p.pivot = Vector3(0, 0.57, 0)
+	p.speed = 0.4
+	var head := p.spin
+	var radius := 0.6 + 0.03 * level
+	head.prism(radius, radius - 0.05, 0.35, 8, Vector3.ZERO, "hull_light")
+	head.dome(radius - 0.05, 0.3, 8, 2, Vector3(0, 0.35, 0), "hull_light")
+	if level >= 5:
+		head.prism(radius + 0.03, radius + 0.03, 0.08, 8, Vector3(0, 0.15, 0), "gold")
+	if level >= 2:
+		head.box(Vector3(0.5, 0.28, 0.3), Vector3(0, 0.22, radius - 0.1), "hull")
+	if level >= 4:
+		for x: float in [-1.0, 1.0]:
+			head.box(Vector3(0.12, 0.3, 0.5), Vector3(x * (radius + 0.02), 0.05, -0.1), "hull_dark")
+	var length := 0.85 + 0.05 * level
+	var barrels: Array[float] = [0.0]
+	if level >= 3:
+		barrels = [-0.16, 0.16]
+	for x: float in barrels:
+		head.prism(0.09, 0.08, length, 6, Vector3(x, 0.36, 0.25), "metal", Vector3(90, 0, 0))
+		head.orb(0.1, 6, 3, Vector3(x, 0.36, 0.3 + length), "glow_cyan")
+
+
+static func _missile_battery(p: Parts, level: int) -> void:
+	var m := p.body
+	_plinth(m, 3, 0.4)
+	m.box(Vector3(0.9, 0.45, 0.9), Vector3(0, 0.4, 0), "hull", Vector3(0, 45, 0))
+	var columns := 2 if level < 3 else (3 if level < 5 else 4)
+	var width := columns * 0.38 + 0.2
+	var aim := Vector3(-30, 45, 0)
+	var base := Vector3(0, 0.85, 0)
+	m.box(Vector3(width, 0.85, 1.0), base, "hull_light", aim)
+	m.box(Vector3(width + 0.04, 0.1, 1.04), base + LowPolyMesh.turn(Vector3(0, 0.4, 0), aim),
+		_accent(level, 5, "red"), aim)
+	var tube_aim := aim + Vector3(90, 0, 0)
+	for column: int in columns:
+		for row: int in 2:
+			var face := Vector3(-0.19 * (columns - 1) + 0.38 * column, 0.22 + 0.4 * row, 0.5)
+			var mouth := base + LowPolyMesh.turn(face, aim)
+			m.prism(0.14, 0.14, 0.06, 6, mouth, "window", tube_aim)
+			m.cone(0.08, 0.14, 4, mouth, "glow_red", tube_aim)
+
+
+static func _plasma_mortar(p: Parts, level: int) -> void:
+	var m := p.body
+	_plinth(m, 3, 0.35)
+	m.prism(0.6, 0.55, 0.3, 8, Vector3(0, 0.35, 0), "hull", OCTAGON)
+	var rim := 1.0 + 0.05 * level
+	var bowl := Vector3(0, 0.65, 0)
+	m.lathe(PackedVector2Array([
+		Vector2(0.6, 0), Vector2(rim, 0.75), Vector2(rim - 0.15, 0.8), Vector2(0.45, 0.25),
+	]), 10, bowl, "metal_dark")
+	m.disc(0.46, 10, bowl + Vector3(0, 0.25, 0), "glow_orange")
+	m.orb(0.32, 6, 3, bowl + Vector3(0, 0.45, 0), "glow_orange")
+	if level >= 2:
+		for degrees: float in [0.0, 90.0, 180.0, 270.0]:
+			m.strut(_around(1.05, degrees + 45, 0.35), _around(0.85, degrees + 45, 1.15), 0.12, "hull_light")
+	if level >= 3:
+		m.ring(rim - 0.15, rim + 0.03, 0.06, 10, bowl + Vector3(0, 0.8, 0), _accent(level, 4, "hazard"))
+
+
+static func _shield_generator(p: Parts, level: int) -> void:
+	var m := p.body
+	_plinth(m, 3, 0.25)
+	m.prism(0.5, 0.45, 0.2, 8, Vector3(0, 0.25, 0), "hull", OCTAGON)
+	var top := Vector3(0, 1.6, 0)
+	for degrees: float in [30.0, 150.0, 270.0]:
+		var foot := _around(1.0, degrees, 0.25)
+		m.strut(foot, top, 0.14, "hull_light")
+		m.box(Vector3(0.3, 0.12, 0.3), foot - Vector3(0, 0.02, 0), _accent(level, 4, "hull"))
+	if level >= 2:
+		m.prism(0.3, 0.2, 0.25, 6, top - Vector3(0, 0.1, 0), "metal")
+	var radius := 0.5 + 0.06 * level
+	var centre := top + Vector3(0, radius * 0.8, 0)
+	m.orb(radius, 8, 4, centre, "glow_green")
+	if level >= 3:
+		m.ring(radius + 0.05, radius + 0.2, 0.08, 10, centre - Vector3(0, 0.04, 0), "metal")
+
+
+static func _flak_cannon(p: Parts, level: int) -> void:
+	var m := p.body
+	_plinth(m, 3, 0.4)
+	m.prism(0.5, 0.38, 1.0, 6, Vector3(0, 0.4, 0), "hull")
+	p.pivot = Vector3(0, 1.4, 0)
+	p.speed = 0.5
+	var head := p.spin
+	head.box(Vector3(0.95, 0.6, 0.8), Vector3(0, 0, -0.15), "hull_light")
+	if level >= 4:
+		head.box(Vector3(0.97, 0.1, 0.82), Vector3(0, 0.4, -0.15), "gold")
+	for x: float in [-0.2, 0.2]:
+		for z: float in [-0.05, 0.2]:
+			var muzzle := Vector3(x, 0.45, z) + LowPolyMesh.turn(Vector3(0, 1.3, 0), Vector3(35, 0, 0))
+			head.prism(0.09, 0.07, 1.3, 6, Vector3(x, 0.45, z), "metal", Vector3(35, 0, 0))
+			head.box(Vector3(0.12, 0.1, 0.12), muzzle - Vector3(0, 0.05, 0), "glow_orange")
+	if level >= 2:
+		head.box(Vector3(0.3, 0.2, 0.3), Vector3(0, 0.6, -0.4), "hull_dark")
+	if level >= 3:
+		for x: float in [-0.6, 0.6]:
+			head.prism(0.25, 0.25, 0.24, 8, Vector3(x - 0.12 * signf(x), 0.3, -0.15), "hull_dark",
+				Vector3(0, 0, -90 * signf(x)))
+
+
+static func _arc_tower(p: Parts, level: int) -> void:
+	var m := p.body
+	_plinth(m, 3, 0.35)
+	var height := 1.4 + 0.15 * level
+	m.prism(0.4, 0.18, height, 6, Vector3(0, 0.35, 0), "hull")
+	var coil := _accent(level, 4, "metal")
+	var coils := 1 + level
+	for i: int in coils:
+		var t := (i + 0.5) / coils
+		var radius := lerpf(0.4, 0.18, t)
+		m.ring(radius, radius + 0.2, 0.08, 6, Vector3(0, 0.35 + height * t, 0), coil)
+	var top := 0.35 + height
+	m.prism(0.12, 0.1, 0.2, 6, Vector3(0, top, 0), "metal_dark")
+	var orb := 0.32 + 0.04 * level
+	m.orb(orb, 8, 4, Vector3(0, top + 0.2 + orb * 0.9, 0), "glow_cyan")
+
+
+static func _cloaked_sentry(p: Parts, level: int) -> void:
+	var m := p.body
+	m.prism(0.92, 0.85, 0.25, 8, Vector3.ZERO, "hull_dark", OCTAGON)
+	if level >= 3:
+		m.prism(0.93, 0.93, 0.05, 8, Vector3(0, 0.18, 0), "gold", OCTAGON)
+	m.prism(0.62, 0.6, 0.06, 8, Vector3(0, 0.25, 0), "hull", OCTAGON)
+	for yaw: float in [45.0, -45.0]:
+		m.box(Vector3(1.1, 0.03, 0.06), Vector3(0, 0.31, 0), "glow_cyan", Vector3(0, yaw, 0))
+	if level >= 2:
+		m.ring(0.6, 0.67, 0.04, 8, Vector3(0, 0.25, 0), "glow_cyan", OCTAGON)
+
+
+static func _gravity_well(p: Parts, level: int) -> void:
+	var m := p.body
+	m.prism(0.92, 0.85, 0.2, 8, Vector3.ZERO, "hull_dark", OCTAGON)
+	for side: float in [-1.0, 1.0]:
+		m.box(Vector3(0.14, 1.2, 0.14), Vector3(side * 0.48, 0.2, -side * 0.48), _accent(level, 3, "hull_light"),
+			Vector3(0, 45, 0))
+		m.box(Vector3(0.2, 0.08, 0.2), Vector3(side * 0.48, 1.4, -side * 0.48), "glow_violet", Vector3(0, 45, 0))
+	m.prism(0.25, 0.18, 0.35, 6, Vector3(0, 0.2, 0), "hull")
+	m.orb(0.15, 6, 3, Vector3(0, 1.0, 0), "glow_violet")
+	p.pivot = Vector3(0, 1.0, 0)
+	p.speed = 1.5
+	p.spin.ring(0.45, 0.58, 0.1, 10, Vector3(0, 0, -0.05), "glow_violet", Vector3(90, 0, 0))
+	if level >= 2:
+		p.spin.ring(0.28, 0.38, 0.08, 8, Vector3(0.04, 0, 0), "glow_violet", Vector3(0, 0, 90))
+
+
+static func _emp_tower(p: Parts, level: int) -> void:
+	var m := p.body
+	_plinth(m, 3, 0.35)
+	var height := 1.9 + 0.3 * level
+	m.prism(0.5, 0.28, height, 6, Vector3(0, 0.35, 0), "hull")
+	var top := 0.35 + height
+	m.ring(0.28, 0.62, 0.16, 8, Vector3(0, top - 0.35, 0), "hazard")
+	if level >= 2:
+		m.ring(0.38, 0.6, 0.1, 8, Vector3(0, 0.35 + height * 0.45, 0), _accent(level, 3, "hazard"))
+	m.dome(0.3, 0.3, 6, 2, Vector3(0, top, 0), "glow_blue")
+	if level >= 3:
+		for degrees: float in [45.0, 135.0, 225.0, 315.0]:
+			m.pyramid(0.12, 0.35, _around(0.5, degrees, top - 0.19), "gold")
+
+
+static func _railgun(p: Parts, level: int) -> void:
+	var m := p.body
+	_plinth(m, 3, 0.35)
+	m.box(Vector3(1.1, 0.5, 1.1), Vector3(0, 0.35, 0), "hull", Vector3(0, 45, 0))
+	if level >= 2:
+		for side: float in [-1.0, 1.0]:
+			m.box(Vector3(0.3, 0.4, 0.5), Vector3(side * 0.55, 0.35, side * 0.55), "hull_light", Vector3(0, 45, 0))
+	var back := Vector3(-0.85, 0.95, 0.85)
+	var muzzle := Vector3(0.95 + 0.05 * level, 1.15, -0.95 - 0.05 * level)
+	m.box(Vector3(0.6, 0.4, 0.6), back + Vector3(0.2, -0.15, -0.2), "hull_dark", Vector3(0, 45, 0))
+	var side_offset := Vector3(0.085, 0, 0.085)
+	var rail := _accent(level, 3, "metal")
+	m.strut(back + side_offset, muzzle + side_offset, 0.1, rail)
+	m.strut(back - side_offset, muzzle - side_offset, 0.1, rail)
+	for t: float in [0.35, 0.55, 0.75]:
+		m.box(Vector3(0.2, 0.14, 0.2), back.lerp(muzzle, t) - Vector3(0, 0.07, 0), "glow_cyan", Vector3(0, 45, 0))
+
+
+static func _ion_beam(p: Parts, level: int) -> void:
+	var m := p.body
+	m.prism(0.9, 0.85, 0.25, 6, Vector3.ZERO, "hull_dark")
+	var height := 1.1 + 0.3 * level
+	m.prism(0.2, 0.13, height, 6, Vector3(0, 0.25, 0), "hull_light")
+	var top := 0.25 + height
+	m.ring(0.13, 0.3, 0.12, 8, Vector3(0, top - 0.1, 0), _accent(level, 2, "metal"))
+	m.orb(0.22, 8, 3, Vector3(0, top + 0.2, 0), "glow_red")
+	if level >= 2:
+		m.cone(0.06, 0.3, 4, Vector3(0, top + 0.38, 0), "gold")
+
+
+static func _orbital_cannon(p: Parts, level: int) -> void:
+	var m := p.body
+	m.prism(1.85, 1.75, 0.4, 8, Vector3.ZERO, "hull_dark", OCTAGON)
+	m.prism(1.25, 1.15, 0.35, 8, Vector3(0, 0.4, 0), "hull", OCTAGON)
+	m.prism(0.4, 0.3, 0.5, 6, Vector3(0, 0.75, 0), "hull_light")
+	var dish := 1.2 if level < 2 else 1.4
+	var aim := Vector3(40, 135, 0)
+	var centre := Vector3(0, 1.25, 0)
+	m.lathe(PackedVector2Array([
+		Vector2(0.15, 0), Vector2(dish, 0.45), Vector2(dish - 0.12, 0.5), Vector2(0, 0.15),
+	]), 10, centre, "white", aim)
+	m.cone(0.12, 1.2, 6, centre + LowPolyMesh.turn(Vector3(0, 0.15, 0), aim), "glow_blue", aim)
+	if level >= 2:
+		m.ring(dish - 0.12, dish + 0.02, 0.06, 10, centre + LowPolyMesh.turn(Vector3(0, 0.45, 0), aim), "gold", aim)
+		for degrees: float in [45.0, 225.0]:
+			var pylon := _around(1.45, degrees, 0.4)
+			m.prism(0.14, 0.1, 0.8, 4, pylon, "hull_light")
+			m.pyramid(0.16, 0.2, pylon + Vector3(0, 0.8, 0), "glow_blue")
