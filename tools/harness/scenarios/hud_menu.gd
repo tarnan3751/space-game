@@ -84,11 +84,11 @@ func run(main: MainScript) -> void:
 	check(not main.placement.is_placing(), "the drag pressed no entry")
 
 	# A tap on an entry still presses it, and swaps the build bar for the place bar.
-	await _open_tab(hud, catalog.category_of("barrier_wall"))
-	await _tap(main, hud.entry_button("barrier_wall").get_global_rect().get_center())
-	check(main.placement.placing_type == "barrier_wall", "a tap on Barrier Wall began placing it")
+	await _open_tab(hud, catalog.category_of("metal_extractor"))
+	await _tap(main, hud.entry_button("metal_extractor").get_global_rect().get_center())
+	check(main.placement.placing_type == "metal_extractor", "a tap on Metal Extractor began placing it")
 	check(_world_touches == 0, "no touch on the menu reached the world (%d did)" % _world_touches)
-	check(hud.place_button().is_visible_in_tree() and not hud.entry_button("barrier_wall").is_visible_in_tree(),
+	check(hud.place_button().is_visible_in_tree() and not hud.entry_button("metal_extractor").is_visible_in_tree(),
 		"the place bar replaced the build bar")
 
 	# Moving the ghost updates Place: onto the Command Center it is disabled, off it enabled.
@@ -101,15 +101,16 @@ func run(main: MainScript) -> void:
 	await frames(2)
 	check(not main.placement.ghost_is_valid() and hud.place_button().disabled,
 		"Place is disabled with the ghost on the Command Center")
+	# A tap centres the 3x3 footprint on the tapped cell.
 	var free_cell := cc.cell - Vector2i(3, 0)
-	check(state.grid.is_free(free_cell, 1), "cell %s is free" % free_cell)
+	check(state.grid.is_free(free_cell - Vector2i.ONE, 3), "the footprint around %s is free" % free_cell)
 	tap_cell(main, free_cell)
 	await frames(2)
 	check(main.placement.ghost_is_valid() and not hud.place_button().disabled,
 		"Place is enabled with the ghost on a free cell")
 	main.placement.cancel_place()
 	await frames(2)
-	check(hud.entry_button("barrier_wall").is_visible_in_tree() and not hud.place_button().is_visible_in_tree(),
+	check(hud.entry_button("metal_extractor").is_visible_in_tree() and not hud.place_button().is_visible_in_tree(),
 		"cancelling brings the build bar back")
 
 	# The Command Center's info panel.
@@ -127,7 +128,7 @@ func run(main: MainScript) -> void:
 	await frames(2)
 	check(hud.resource_panel("metal").get_global_rect().position.y >= NOTCH_TOP + Hud.MARGIN,
 		"the top bar sits below the inset's top")
-	check(hud.entry_button("barrier_wall").get_global_rect().end.y <= inset.end.y - Hud.MARGIN,
+	check(hud.entry_button("metal_extractor").get_global_rect().end.y <= inset.end.y - Hud.MARGIN,
 		"the build bar sits above the inset's bottom")
 	await screenshot("notch-build-bar")
 
