@@ -77,9 +77,10 @@ probes unless the diff gives you a reason.
    - **Touch routing.** `WorldInput` works through `_unhandled_input`; any HUD `Control` that is
      not `MOUSE_FILTER_IGNORE` blocks touches to the world, so a new layout container must be
      IGNORE and a new button must not sit over empty screen space it does not need.
-   - **Mobile cost.** Draw calls (a mesh per building part is the placeholder's cost; a change
-     should not multiply it), allocations in `_process` (no `new()`, no string formatting, no
-     array building per frame), work per tick that scales with the base.
+   - **Mobile cost.** Draw calls (a building is one static mesh plus at most one spinning part,
+     the ground, the terrain and the rocks one draw each; a change should not multiply that),
+     allocations in `_process` (no `new()`, no string formatting, no array building per frame),
+     work per tick that scales with the base.
 2. **Conformance to the plan and the brief.** Anything the change does that was not asked for —
    including things that look like improvements — is a finding. The coordinator decides whether to
    keep it; your job is to make it visible.
