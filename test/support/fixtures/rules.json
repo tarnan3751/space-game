@@ -1,0 +1,12 @@
+{
+  "resources": ["metal", "crystal"],
+  "grid": { "width": 10, "height": 10 },
+  "menu_order": ["extractor", "harvester", "silo", "drone_bay"],
+  "start": {
+    "resources": { "metal": 500, "crystal": 500 },
+    "buildings": [
+      { "type": "command_center", "cell": [0, 0], "level": 1 },
+      { "type": "drone_bay", "cell": [3, 0], "level": 1 }
+    ]
+  }
+}

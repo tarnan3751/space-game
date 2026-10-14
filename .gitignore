@@ -1,0 +1,12 @@
+# Godot 4 caches and generated files
+.godot/
+/android/
+
+# Engine API dump from tools/dump_api.sh (large, machine-specific)
+.godot-api/
+
+# Server dependencies (added later)
+server/node_modules/
+server/build/
+
+.DS_Store

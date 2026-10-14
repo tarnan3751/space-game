@@ -1,0 +1,86 @@
+{
+  "command_center": {
+    "name": "Command Center",
+    "size": 4,
+    "max_count": [1, 1, 1],
+    "levels": [
+      { "cost": {}, "build_seconds": 0, "hp": 2000,
+        "storage": { "metal": 1000, "crystal": 1000 } },
+      { "cost": { "metal": 800 }, "build_seconds": 120, "hp": 3000,
+        "storage": { "metal": 2500, "crystal": 2500 } },
+      { "cost": { "metal": 2000, "crystal": 1000 }, "build_seconds": 600, "hp": 4200,
+        "requires_cc": 2, "storage": { "metal": 5000, "crystal": 5000 } }
+    ]
+  },
+  "metal_extractor": {
+    "name": "Metal Extractor",
+    "size": 3,
+    "max_count": [2, 4, 6],
+    "levels": [
+      { "cost": { "crystal": 150 }, "build_seconds": 10, "hp": 400,
+        "produces": { "metal": 1800 } },
+      { "cost": { "crystal": 400 }, "build_seconds": 60, "hp": 500,
+        "produces": { "metal": 3600 } },
+      { "cost": { "crystal": 1200 }, "build_seconds": 300, "hp": 650,
+        "requires_cc": 2, "produces": { "metal": 7200 } }
+    ]
+  },
+  "crystal_harvester": {
+    "name": "Crystal Harvester",
+    "size": 3,
+    "max_count": [2, 4, 6],
+    "levels": [
+      { "cost": { "metal": 150 }, "build_seconds": 10, "hp": 400,
+        "produces": { "crystal": 1800 } },
+      { "cost": { "metal": 400 }, "build_seconds": 60, "hp": 500,
+        "produces": { "crystal": 3600 } },
+      { "cost": { "metal": 1200 }, "build_seconds": 300, "hp": 650,
+        "requires_cc": 2, "produces": { "crystal": 7200 } }
+    ]
+  },
+  "metal_silo": {
+    "name": "Metal Silo",
+    "size": 3,
+    "max_count": [1, 2, 3],
+    "levels": [
+      { "cost": { "crystal": 300 }, "build_seconds": 30, "hp": 800,
+        "storage": { "metal": 1500 } },
+      { "cost": { "crystal": 900 }, "build_seconds": 120, "hp": 1000,
+        "requires_cc": 2, "storage": { "metal": 3500 } },
+      { "cost": { "crystal": 2000 }, "build_seconds": 600, "hp": 1300,
+        "requires_cc": 3, "storage": { "metal": 7000 } }
+    ]
+  },
+  "crystal_silo": {
+    "name": "Crystal Silo",
+    "size": 3,
+    "max_count": [1, 2, 3],
+    "levels": [
+      { "cost": { "metal": 300 }, "build_seconds": 30, "hp": 800,
+        "storage": { "crystal": 1500 } },
+      { "cost": { "metal": 900 }, "build_seconds": 120, "hp": 1000,
+        "requires_cc": 2, "storage": { "crystal": 3500 } },
+      { "cost": { "metal": 2000 }, "build_seconds": 600, "hp": 1300,
+        "requires_cc": 3, "storage": { "crystal": 7000 } }
+    ]
+  },
+  "drone_bay": {
+    "name": "Drone Bay",
+    "size": 2,
+    "max_count": [2, 3, 4],
+    "levels": [
+      { "cost": { "metal": 900 }, "build_seconds": 0, "hp": 250, "builders": 1 }
+    ]
+  },
+  "laser_turret": {
+    "name": "Laser Turret",
+    "size": 3,
+    "max_count": [1, 2, 4],
+    "levels": [
+      { "cost": { "metal": 400 }, "build_seconds": 20, "hp": 600,
+        "damage": 12, "range_cells": 7, "fire_ms": 800 },
+      { "cost": { "metal": 1200 }, "build_seconds": 120, "hp": 800,
+        "requires_cc": 2, "damage": 18, "range_cells": 7, "fire_ms": 800 }
+    ]
+  }
+}

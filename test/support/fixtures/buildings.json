@@ -1,0 +1,44 @@
+{
+  "command_center": {
+    "name": "Command Center",
+    "size": 2,
+    "max_count": [1, 1],
+    "levels": [
+      { "cost": {}, "build_seconds": 0, "storage": { "metal": 1000, "crystal": 1000 } },
+      { "cost": { "metal": 400 }, "build_seconds": 100, "storage": { "metal": 2000, "crystal": 2000 } }
+    ]
+  },
+  "drone_bay": {
+    "name": "Drone Bay",
+    "size": 1,
+    "max_count": [2, 3],
+    "levels": [
+      { "cost": { "metal": 100 }, "build_seconds": 0, "builders": 1 }
+    ]
+  },
+  "extractor": {
+    "name": "Extractor",
+    "size": 2,
+    "max_count": [2, 4],
+    "levels": [
+      { "cost": { "crystal": 100 }, "build_seconds": 60, "produces": { "metal": 3600 } },
+      { "cost": { "crystal": 200 }, "build_seconds": 120, "requires_cc": 2, "produces": { "metal": 7200 } }
+    ]
+  },
+  "silo": {
+    "name": "Silo",
+    "size": 2,
+    "max_count": [1, 2],
+    "levels": [
+      { "cost": { "metal": 100 }, "build_seconds": 30, "storage": { "metal": 1000 } }
+    ]
+  },
+  "harvester": {
+    "name": "Harvester",
+    "size": 1,
+    "max_count": [1, 1],
+    "levels": [
+      { "cost": { "metal": 50 }, "build_seconds": 0, "produces": { "crystal": 1800 } }
+    ]
+  }
+}
