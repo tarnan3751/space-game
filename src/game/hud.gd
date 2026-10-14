@@ -23,7 +23,6 @@ const ERROR_TEXT := {
 	BaseState.ERR_BUSY: "Already under construction",
 	BaseState.ERR_MAX_LEVEL: "Already at max level",
 }
-const RESOURCE_COLORS := {"metal": Color("c8d3e0"), "crystal": Color("e2a4ff")}
 const TEXT_COLOR := Color("e9f6ff")
 const ACCENT := Color("4fd6e6")
 const PANEL_COLOR := Color(0.07, 0.08, 0.14, 0.88)
@@ -67,7 +66,7 @@ func refresh(state: BaseState, selected_id: int, placing: bool, ghost_ok: bool) 
 		var rate := state.production_per_hour(res)
 		var rate_text := "   +%s/h" % Format.amount(rate) if rate > 0 else ""
 		_resource_labels[res].text = "%s  %s / %s%s" % [
-			res.capitalize(),
+			_catalog.resource_name(res),
 			Format.amount(state.resources[res]),
 			Format.amount(state.capacity(res)),
 			rate_text,
@@ -175,7 +174,7 @@ func _build_top_bar() -> void:
 	_root.add_child(bar)
 	for res: String in _catalog.resources:
 		var label := _panel_label(bar)
-		label.add_theme_color_override("font_color", RESOURCE_COLORS.get(res, TEXT_COLOR))
+		label.add_theme_color_override("font_color", Color.from_string(_catalog.resource_color(res), TEXT_COLOR))
 		_resource_labels[res] = label
 	_builders_label = _panel_label(bar)
 	_builders_label.add_theme_color_override("font_color", ACCENT)
