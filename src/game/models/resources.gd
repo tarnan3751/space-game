@@ -349,20 +349,91 @@ static func _emitter(s: LowPolyMesh, reach: float, gold: bool) -> void:
 	s.prism(0.035, 0.035, reach - 0.3, 8, Vector3(0, -reach, 0), CRYSTAL_BEAM)
 
 
+static var ANTIMATTER_ACCENT := Surf.make(MaterialKit.Layer.PLATE, MaterialKit.ANTIMATTER)
+static var ANTIMATTER_ACCENT_ROUND := Surf.make(MaterialKit.Layer.PLATE, MaterialKit.ANTIMATTER, 1.0, Surf.LIT, true)
+static var ANTIMATTER_GLOW := Surf.make(MaterialKit.Layer.GLOW, MaterialKit.ANTIMATTER, 1.0, Surf.UNLIT, true)
+static var ANTIMATTER_GLASS := Surf.make(MaterialKit.Layer.GLASS, MaterialKit.ANTIMATTER, 2.0, Surf.GLOSSY)
+
+## The antimatter siphon's core (the torus turns round it), its field pylons (degrees, the
+## camera's corner left open) and the coils on the torus by level.
+const SIPHON_CORE := 1.3
+const SIPHON_PYLONS := [105.0, 225.0, 345.0]
+const SIPHON_COILS := [6, 9, 9]
+
+
+## A magnetic torus turning round a glowing violet core on a pedestal, wound with field coils,
+## three field pylons aiming glowing emitters at it, a capacitor piped to the pedestal.
+## Unlocked at Command Center 4, so it looks advanced from L1. L2 adds coils, pylon armour and
+## a second capacitor; L3 a second, larger torus tilted round the first, and gold trim.
 static func build_antimatter_siphon(p: Parts, level: int) -> void:
 	var m := p.body
-	m.prism(1.35, 1.2, 0.35, 6, Vector3.ZERO, Parts.surf("hull_dark"))
-	m.prism(0.8, 0.7, 0.25, 6, Vector3(0, 0.35, 0), Parts.surf("hull"))
-	var spire := 2.0 + 0.3 * level
-	m.prism(0.3, 0.07, spire, 6, Vector3(0, 0.6, 0), Parts.surf("metal"))
-	m.orb(0.14, 6, 3, Vector3(0, 0.65 + spire, 0), Parts.surf("glow_violet"))
-	for degrees: float in [30.0, 150.0, 270.0]:
-		m.strut(Parts.around(1.0, degrees, 0.35), Parts.around(0.2, degrees, 1.5), 0.12, Parts.surf(Parts.accent(level, 3, "hull_light")))
-	p.pivot = Vector3(0, 1.5, 0)
-	p.speed = 1.4
-	p.spin.ring(0.42, 0.62, 0.14, 8, Vector3.ZERO, Parts.surf("glow_violet"))
+	var gold := level >= 3
+	Parts.foundation(m, 3)
+	var ground := Parts.PAD_HEIGHT
+	m.lathe(PackedVector2Array([
+		Vector2(1.0, 0), Vector2(1.0, 0.14), Vector2(0.62, 0.26), Vector2(0.44, 0.5),
+		Vector2(0.42, 0.66), Vector2(0.54, 0.78), Vector2(0, 0.78),
+	]), 24, Vector3(0, ground, 0), Parts.HULL_MID_ROUND)
+	m.lathe(PackedVector2Array([Vector2(1.04, 0), Vector2(1.04, 0.07), Vector2(0.99, 0.07)]), 24,
+		Vector3(0, ground + 0.05, 0), Parts.GOLD_ROUND if gold else ANTIMATTER_ACCENT_ROUND)
+	for k: int in 6:
+		var degrees := 30.0 + 60.0 * k
+		m.box(Vector3(0.1, 0.16, 0.04), Parts.around(0.44, degrees, ground + 0.42), ANTIMATTER_GLOW, Vector3(-8, 90.0 - degrees, 0))
+	var cap := ground + 0.78
+	m.prism(0.1, 0.08, SIPHON_CORE - cap, 16, Vector3(0, cap, 0), Parts.GUNMETAL)
+	m.orb(0.27, 16, 8, Vector3(0, SIPHON_CORE, 0), ANTIMATTER_GLOW)
+
+	for degrees: float in SIPHON_PYLONS:
+		_field_pylon(m, degrees, level, gold)
+
+	# Capacitors piped to the pedestal.
+	_capacitor(m, Vector3(0.95, ground, 0.95), gold)
+	Parts.pipe_run(m, PackedVector3Array([Vector3(0.82, ground + 0.26, 0.82), Vector3(0.48, ground + 0.32, 0.48)]),
+		0.06, Parts.GUNMETAL, 8)
 	if level >= 2:
-		p.spin.ring(0.3, 0.44, 0.1, 8, Vector3(0, 0.55, 0), Parts.surf("glow_violet"))
+		_capacitor(m, Vector3(-1.0, ground, 0.55), gold)
+		Parts.pipe_run(m, PackedVector3Array([Vector3(-0.84, ground + 0.26, 0.47), Vector3(-0.58, ground + 0.32, 0.32)]),
+			0.06, Parts.GUNMETAL, 8)
+
+	p.pivot = Vector3(0, SIPHON_CORE, 0)
+	p.speed = 1.4
+	var s := p.spin
+	Parts.torus(s, 0.72, 0.12, 24, 10, Vector3(0, -0.12, 0), Parts.HULL_LIGHT_ROUND)
+	var coils: int = SIPHON_COILS[level - 1]
+	for k: int in coils:
+		var degrees := 360.0 * k / coils
+		var yaw := Vector3(0, 90.0 - degrees, 0)
+		s.box_chamfered(Vector3(0.12, 0.34, 0.36), 0.04, Parts.around(0.72, degrees, -0.17), Parts.HULL_DARK, yaw)
+		s.box(Vector3(0.13, 0.06, 0.37), Parts.around(0.72, degrees, 0.04), ANTIMATTER_GLOW, yaw)
+	if level >= 3:
+		var tilt := Vector3(12, 0, 0)
+		Parts.torus(s, 1.05, 0.07, 24, 10, -LowPolyMesh.turn(Vector3(0, 0.07, 0), tilt), Parts.GOLD_ROUND, tilt)
+
+
+## A field pylon on the pedestal's rim: a column on a foot with an antimatter band, its
+## emitter head leaning in towards the torus with a glowing tip.
+static func _field_pylon(m: LowPolyMesh, degrees: float, level: int, gold: bool) -> void:
+	var yaw := Vector3(0, 90.0 - degrees, 0)
+	var foot := Parts.around(1.22, degrees, Parts.PAD_HEIGHT)
+	var height := 1.3 + 0.08 * level
+	m.box_chamfered(Vector3(0.32, 0.12, 0.32), 0.04, foot, Parts.HULL_DARK, yaw)
+	m.box_chamfered(Vector3(0.18, height, 0.18), 0.04, foot, Parts.HULL_LIGHT, yaw)
+	m.box(Vector3(0.2, 0.1, 0.2), foot + Vector3(0, height * 0.62, 0), ANTIMATTER_ACCENT, yaw)
+	if level >= 2:
+		m.box_chamfered(Vector3(0.24, 0.42, 0.24), 0.04, foot + Vector3(0, 0.12, 0), PYLON_ARMOUR, yaw)
+	var head := foot + Vector3(0, height, 0)
+	m.box_chamfered(Vector3(0.24, 0.12, 0.24), 0.04, head, Parts.GOLD_TRIM if gold else Parts.HULL_MID, yaw)
+	var tilt := yaw + Vector3(-50, 0, 0)
+	var inward := LowPolyMesh.turn(Vector3.UP, tilt)
+	m.prism(0.08, 0.06, 0.26, 12, head + Vector3(0, 0.08, 0), Parts.HULL_MID_ROUND, tilt)
+	m.orb(0.07 + 0.015 * level, 10, 5, head + Vector3(0, 0.08, 0) + inward * 0.3, ANTIMATTER_GLOW)
+
+
+## A capacitor: an armoured block with a violet glass window and a glowing cap.
+static func _capacitor(m: LowPolyMesh, pos: Vector3, gold: bool) -> void:
+	m.box_chamfered(Vector3(0.38, 0.4, 0.38), 0.05, pos, Parts.HULL_MID)
+	m.box(Vector3(0.24, 0.2, 0.4), pos + Vector3(0, 0.1, 0), ANTIMATTER_GLASS)
+	m.box_chamfered(Vector3(0.26, 0.05, 0.26), 0.02, pos + Vector3(0, 0.4, 0), Parts.GOLD_TRIM if gold else ANTIMATTER_GLOW)
 
 
 static func build_metal_silo(p: Parts, level: int) -> void:
