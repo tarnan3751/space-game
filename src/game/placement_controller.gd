@@ -56,6 +56,7 @@ func begin_place(type: String) -> void:
 	_ghost.setup(0, type, 1, size)
 	_ghost.set_lifted(true)
 	base_view.add_child(_ghost)
+	base_view.set_grid_highlight(true)
 	var start := Vector2i(state.grid.width / 2, state.grid.height / 2)
 	var centre: Variant = camera.ground_point(camera.get_viewport().get_visible_rect().size * 0.5)
 	if typeof(centre) == TYPE_VECTOR3:
@@ -82,6 +83,7 @@ func cancel_place() -> void:
 		_ghost = null
 	if placing_type != "":
 		placing_type = ""
+		base_view.set_grid_highlight(false)
 		placing_changed.emit()
 
 

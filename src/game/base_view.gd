@@ -6,6 +6,9 @@ extends Node3D
 
 const GROUND_SHADER := preload("res://src/game/ground.gdshader")
 const SCENERY_SEED := 7
+## Strength of the ground's cell lines, normally and while placing.
+const GRID_LINES := 0.1
+const GRID_LINES_PLACING := 0.45
 
 var grid_size: Vector2i = Vector2i.ZERO
 var views: Dictionary[int, BuildingView] = {}
@@ -13,6 +16,8 @@ var views: Dictionary[int, BuildingView] = {}
 var selected_id: int = 0
 ## Building currently being dragged; sync() leaves its position alone.
 var dragging_id: int = 0
+
+var _ground_material: ShaderMaterial
 
 
 func setup(size: Vector2i) -> void:
@@ -45,6 +50,11 @@ func footprint_cell_at(point: Vector3, size: int) -> Vector2i:
 ## The buildable area in world x/z.
 func area() -> Rect2:
 	return Rect2(-grid_size.x * 0.5, -grid_size.y * 0.5, grid_size.x, grid_size.y)
+
+
+## Brightens the cell grid while a building is being placed.
+func set_grid_highlight(on: bool) -> void:
+	_ground_material.set_shader_parameter("line_strength", GRID_LINES_PLACING if on else GRID_LINES)
 
 
 ## Creates, updates and removes building views to match the state.
@@ -86,14 +96,16 @@ func clear() -> void:
 
 
 func _build_ground() -> void:
-	var material := ShaderMaterial.new()
-	material.shader = GROUND_SHADER
-	material.set_shader_parameter("grid_size", Vector2(grid_size))
+	_ground_material = ShaderMaterial.new()
+	_ground_material.shader = GROUND_SHADER
+	_ground_material.set_shader_parameter("grid_size", Vector2(grid_size))
+	_ground_material.set_shader_parameter("base_color", Palette.color("regolith"))
+	_ground_material.set_shader_parameter("line_strength", GRID_LINES)
 	var plane := PlaneMesh.new()
 	plane.size = Vector2(grid_size)
 	var ground := MeshInstance3D.new()
 	ground.mesh = plane
-	ground.material_override = material
+	ground.material_override = _ground_material
 	add_child(ground)
 
 	var outer_plane := PlaneMesh.new()
