@@ -6,6 +6,9 @@ extends CanvasLayer
 ## Touch rule: any Control that isn't IGNORE swallows touches over it, so layout-only
 ## containers that span empty screen space must use MOUSE_FILTER_IGNORE or the world
 ## underneath stops responding.
+##
+## Every part sits inside the device's safe area (clear of notches and the home
+## indicator), refitted when the window resizes; apply_safe_area() sets it directly.
 
 signal build_pressed(type: String)
 signal confirm_pressed
@@ -31,7 +34,10 @@ const TAB_SIZE := Vector2(140, 48)
 const ENTRY_SIZE := Vector2(224, 96)
 
 var _catalog: Catalog
+## Holds every part; positioned on the safe area.
 var _root: Control
+## The last safe area fitted from the device, in the HUD's coordinates.
+var _fitted_area: Rect2 = Rect2()
 var _resource_labels: Dictionary[String, Label] = {}
 var _builders_label: Label
 var _build_bar: Control
@@ -73,10 +79,15 @@ func setup(catalog: Catalog) -> void:
 	_build_toast()
 	if OS.is_debug_build():
 		_build_debug_buttons()
+	get_viewport().size_changed.connect(_fit_safe_area)
+	_fit_safe_area()
 
 
 func refresh(state: BaseState, selected_id: int, placing: bool, ghost_ok: bool) -> void:
 	_state = state
+	# The safe area can move without a resize: turning a phone over moves the notch to the
+	# other side. Every refresh, the 1 s tick's included, checks it.
+	_fit_safe_area()
 	for res: String in _resource_labels:
 		# A resource the base has no storage for yet (antimatter, early on) is hidden.
 		var capacity := state.capacity(res)
@@ -101,6 +112,36 @@ func refresh(state: BaseState, selected_id: int, placing: bool, ghost_ok: bool) 
 		_refresh_entries(state)
 	if _info_panel.visible:
 		_refresh_info(state, state.buildings[selected_id])
+
+
+## Lays every part out inside `inset`, a rect in the HUD's own coordinates (the
+## viewport's visible rect, 1280x720 on a 16:9 screen). The HUD fits the device's safe
+## area itself; the harness calls this to try a notch-like inset.
+func apply_safe_area(inset: Rect2) -> void:
+	var full := get_viewport().get_visible_rect().size
+	_root.offset_left = inset.position.x
+	_root.offset_top = inset.position.y
+	_root.offset_right = inset.end.x - full.x
+	_root.offset_bottom = inset.end.y - full.y
+
+
+## DisplayServer reports the safe area in screen pixels; on desktop it is the screen's
+## usable rect, so it is clipped to the window first. The canvas_items stretch maps the
+## window onto the visible rect, so the scale between them is their size ratio. A window
+## with no size (headless) gets the whole rect. It applies only a rect that differs from
+## the last one it fitted, so an inset the harness applied stays until the device's changes.
+func _fit_safe_area() -> void:
+	var visible := get_viewport().get_visible_rect()
+	var window := Rect2i(DisplayServer.window_get_position(), DisplayServer.window_get_size())
+	var safe := DisplayServer.get_display_safe_area().intersection(window)
+	var area := visible
+	if safe.has_area():
+		var scale := visible.size / Vector2(window.size)
+		area = Rect2(Vector2(safe.position - window.position) * scale, Vector2(safe.size) * scale)
+	if area == _fitted_area:
+		return
+	_fitted_area = area
+	apply_safe_area(area)
 
 
 func show_message(text: String) -> void:
