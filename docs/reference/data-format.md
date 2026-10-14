@@ -12,7 +12,7 @@ A non-whole number stays a float and fails validation wherever an int is require
 ```json
 {
   "resources": [
-    { "id": "metal", "name": "Metal", "color": "c8d3e0" },
+    { "id": "metal", "name": "Metal", "color": "a8c0dc" },
     { "id": "crystal", "name": "Crystal", "color": "e2a4ff" },
     { "id": "antimatter", "name": "Antimatter", "color": "b48cff" }
   ],
