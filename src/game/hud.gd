@@ -107,7 +107,7 @@ func _refresh_build_buttons(state: BaseState) -> void:
 	for type: String in _build_buttons:
 		var button: Button = _build_buttons[type]
 		var error := state.check_can_build(type)
-		var detail := Format.cost(_catalog.level_stats(type, 1).get("cost", {}))
+		var detail := Format.cost(_catalog.level_stats(type, 1).get("cost", {}), _catalog)
 		if error == BaseState.ERR_LIMIT:
 			detail = "Max built"
 		elif error == BaseState.ERR_NO_BUILDER:
@@ -129,10 +129,10 @@ func _refresh_info(state: BaseState, building: BuildingState) -> void:
 	for res: String in _catalog.resources:
 		var produces := int(production.get(res, 0))
 		if produces > 0:
-			lines.append("Produces %s %s/h" % [Format.amount(produces), res.capitalize()])
+			lines.append("Produces %s %s/h" % [Format.amount(produces), _catalog.resource_name(res)])
 		var stores := int(storage.get(res, 0))
 		if stores > 0:
-			lines.append("Stores %s %s" % [Format.amount(stores), res.capitalize()])
+			lines.append("Stores %s %s" % [Format.amount(stores), _catalog.resource_name(res)])
 	if int(stats.get("builders", 0)) > 0:
 		lines.append("Houses %d drone" % int(stats["builders"]))
 	if stats.has("damage"):
@@ -156,7 +156,7 @@ func _refresh_info(state: BaseState, building: BuildingState) -> void:
 	var next := _catalog.level_stats(type, building.level + 1)
 	_upgrade_button.text = "Upgrade to Lv %d   %s   (%s)" % [
 		building.level + 1,
-		Format.cost(next.get("cost", {})),
+		Format.cost(next.get("cost", {}), _catalog),
 		Format.duration(int(next.get("build_seconds", 0))),
 	]
 	var error := state.check_upgrade(building.id)

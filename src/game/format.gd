@@ -23,11 +23,11 @@ static func duration(seconds: int) -> String:
 	return "%ds" % total
 
 
-## {"metal": 150, "crystal": 20} -> "150 Metal  20 Crystal"
-static func cost(costs: Dictionary) -> String:
+## {"metal": 150, "crystal": 20} -> "150 Metal  20 Crystal", named from the catalog.
+static func cost(costs: Dictionary, catalog: Catalog) -> String:
 	if costs.is_empty():
 		return "Free"
 	var parts := PackedStringArray()
 	for res: Variant in costs:
-		parts.append("%s %s" % [amount(int(costs[res])), str(res).capitalize()])
+		parts.append("%s %s" % [amount(int(costs[res])), catalog.resource_name(str(res))])
 	return "  ".join(parts)
