@@ -2,18 +2,24 @@ class_name PlacementController
 extends Node
 ## Interprets gestures on the base: camera pan/zoom, selecting buildings, placing new
 ## ones (ghost + confirm, like Clash), and dragging the selected building to move it.
-## This is the only game-layer code that calls BaseState.apply().
+## Walls are painted instead: until Done, a tap places one, and a drag one on every free
+## cell the finger crosses. This is the only game-layer code that calls BaseState.apply().
 ##
-## While the ghost or a building is dragged with the finger near the screen's edge, the
-## camera scrolls toward that edge and the dragged thing keeps following the finger. Drag
-## positions arrive only as events, so the scroll runs in _process, on only for such drags.
+## While the ghost, a building or the wall brush is dragged with the finger near the
+## screen's edge, the camera scrolls toward that edge and the dragged thing keeps following
+## the finger. Drag positions arrive only as events, so the scroll runs in _process, on
+## only for such drags.
 
 signal selection_changed
 ## Placement started, ended, or the ghost moved.
 signal placing_changed
 signal command_failed(error: String)
 
-enum Drag { NONE, CAMERA, GHOST, BUILDING }
+enum Drag { NONE, CAMERA, GHOST, BUILDING, PAINT }
+
+## One-cell types of this category are painted rather than placed one at a time; a larger
+## type of it places normally, with the ghost and Place.
+const PAINT_CATEGORY := "walls"
 
 ## The edge margin, as a fraction of the viewport's shorter side.
 const EDGE_MARGIN := 0.08
@@ -36,8 +42,13 @@ var _drag: Drag = Drag.NONE
 var _drag_id: int = 0
 var _drag_cell: Vector2i = Vector2i.ZERO
 var _grab_offset: Vector2i = Vector2i.ZERO
-## The finger of a ghost or building drag, and the cell under it when the drag was last
-## followed; the edge scroll follows the drag again only when that cell changes.
+var _painting: bool = false
+## The last cell a paint stroke reached; the next one is walked to from here.
+var _paint_cell: Vector2i = Vector2i.ZERO
+## A failure other than a taken cell has been shown during this stroke.
+var _paint_failed: bool = false
+## The finger of a ghost, building or paint drag, and the cell under it when the drag was
+## last followed; the edge scroll follows the drag again only when that cell changes.
 var _finger: Vector2 = Vector2.ZERO
 var _finger_cell: Vector2i = Vector2i.ZERO
 
@@ -59,8 +70,19 @@ func is_placing() -> bool:
 	return placing_type != ""
 
 
+## Whether the ghost's footprint shows VALID. While painting, whether another wall can be
+## built at all: the cell under the brush is usually the wall it just placed.
 func ghost_is_valid() -> bool:
-	return is_placing() and state.check_place(placing_type, _ghost_cell) == ""
+	if not is_placing():
+		return false
+	if _painting:
+		return state.check_can_build(placing_type) == ""
+	return state.check_place(placing_type, _ghost_cell) == ""
+
+
+## Placing walls: the ghost is a brush and there is nothing to confirm.
+func is_painting() -> bool:
+	return _painting
 
 
 # --- Placing ---------------------------------------------------------------------
@@ -70,6 +92,7 @@ func begin_place(type: String) -> void:
 	select(0)
 	placing_type = type
 	var size := state.catalog.size_of(type)
+	_painting = state.catalog.category_of(type) == PAINT_CATEGORY and size == 1
 	_ghost = BuildingView.new()
 	_ghost.setup(0, type, 1, size)
 	_ghost.set_lifted(true)
@@ -82,8 +105,12 @@ func begin_place(type: String) -> void:
 	_set_ghost_cell(_find_free_cell(start, size))
 
 
+## Places the ghost's building and selects it; while painting, only ends the mode (Done).
 func confirm_place() -> void:
 	if not is_placing():
+		return
+	if _painting:
+		cancel_place()
 		return
 	var command := {"op": "place", "type": placing_type, "cell": [_ghost_cell.x, _ghost_cell.y]}
 	var error := state.apply(command, clock.call())
@@ -96,14 +123,15 @@ func confirm_place() -> void:
 
 
 func cancel_place() -> void:
-	# A ghost drag in progress ends with it: a second finger can press Cancel.
-	if _drag == Drag.GHOST:
+	# A ghost or paint drag in progress ends with it: a second finger can press Cancel.
+	if _drag == Drag.GHOST or _drag == Drag.PAINT:
 		_set_drag(Drag.NONE)
 	if _ghost != null:
 		_ghost.queue_free()
 		_ghost = null
 	if placing_type != "":
 		placing_type = ""
+		_painting = false
 		base_view.set_grid_highlight(false)
 		placing_changed.emit()
 
@@ -112,6 +140,48 @@ func cancel_place() -> void:
 func refresh() -> void:
 	if is_placing():
 		_set_ghost_cell(_ghost_cell)
+
+
+# --- Painting --------------------------------------------------------------------
+
+## A tap, or the start of a paint drag: a wall on `cell`, and the brush moves there.
+func _begin_stroke(cell: Vector2i) -> void:
+	_paint_failed = false
+	_paint_cell = cell
+	_paint(cell)
+	_set_ghost_cell(cell)
+
+
+## Paints every cell from the last one the stroke reached to `cell`, one orthogonal step at
+## a time along the straight line between them, so a fast stroke leaves no gap and a
+## diagonal one becomes a staircase of walls that touch.
+func _paint_to(cell: Vector2i) -> void:
+	if cell == _paint_cell:
+		return
+	var span := (cell - _paint_cell).abs()
+	var step := (cell - _paint_cell).sign()
+	var taken := Vector2i.ZERO
+	while _paint_cell != cell:
+		# Step along whichever axis the line crosses a cell edge on first.
+		if (1 + 2 * taken.x) * span.y < (1 + 2 * taken.y) * span.x:
+			_paint_cell.x += step.x
+			taken.x += 1
+		else:
+			_paint_cell.y += step.y
+			taken.y += 1
+		_paint(_paint_cell)
+	_set_ghost_cell(cell)
+
+
+## One cell of a stroke. A taken cell is skipped quietly; any other failure (resources,
+## the count limit) is shown once a stroke, and the next stroke tries again.
+func _paint(cell: Vector2i) -> void:
+	var command := {"op": "place", "type": placing_type, "cell": [cell.x, cell.y]}
+	var error := state.apply(command, clock.call())
+	if error == "" or error == BaseState.ERR_BLOCKED or _paint_failed:
+		return
+	_paint_failed = true
+	command_failed.emit(error)
 
 
 # --- Selection and upgrades ------------------------------------------------------
@@ -140,6 +210,9 @@ func _on_tapped(screen_pos: Vector2) -> void:
 	if typeof(hit) != TYPE_VECTOR2I:
 		return
 	var cell: Vector2i = hit
+	if _painting:
+		_begin_stroke(cell)
+		return
 	if is_placing():
 		var half := _ghost.footprint_size / 2
 		_set_ghost_cell(cell - Vector2i(half, half))
@@ -156,6 +229,12 @@ func _on_drag_started(screen_pos: Vector2) -> void:
 	var cell: Vector2i = hit
 	_finger = screen_pos
 	_finger_cell = cell
+	# A paint stroke starts on the ground (the grid); one on the terrain around it pans.
+	if _painting:
+		if state.grid.in_bounds(cell, 1):
+			_set_drag(Drag.PAINT)
+			_begin_stroke(cell)
+		return
 	if is_placing():
 		if _in_footprint(cell, _ghost_cell, _ghost.footprint_size):
 			_set_drag(Drag.GHOST)
@@ -183,6 +262,8 @@ func _on_dragged(screen_pos: Vector2, screen_delta: Vector2) -> void:
 	_finger_cell = cell
 	if _drag == Drag.GHOST:
 		_set_ghost_cell(cell + _grab_offset)
+	elif _drag == Drag.PAINT:
+		_paint_to(cell)
 	elif _drag == Drag.BUILDING and base_view.views.has(_drag_id):
 		var view: BuildingView = base_view.views[_drag_id]
 		_drag_cell = _clamp_cell(cell + _grab_offset, view.footprint_size)
@@ -215,10 +296,10 @@ func _on_panned(screen_pos: Vector2, screen_delta: Vector2) -> void:
 
 # --- Edge scroll -----------------------------------------------------------------
 
-## Runs only during a ghost or building drag (_set_drag). With the finger in the edge
-## margin, the camera moves toward that edge, faster the deeper the finger is in it; once
-## the cell under the finger changes, the drag follows it as a drag event would. A frame
-## where that cell stays the same calls nothing in core and allocates nothing.
+## Runs only during a ghost, building or paint drag (_set_drag). With the finger in the
+## edge margin, the camera moves toward that edge, faster the deeper the finger is in it;
+## once the cell under the finger changes, the drag follows it as a drag event would. A
+## frame where that cell stays the same calls nothing in core and allocates nothing.
 func _process(delta: float) -> void:
 	var screen := get_viewport().get_visible_rect().size
 	var margin := minf(screen.x, screen.y) * EDGE_MARGIN
@@ -255,14 +336,13 @@ static func _edge_push(at: float, length: float, margin: float) -> float:
 
 func _set_drag(drag: Drag) -> void:
 	_drag = drag
-	set_process(drag == Drag.GHOST or drag == Drag.BUILDING)
+	set_process(drag == Drag.GHOST or drag == Drag.BUILDING or drag == Drag.PAINT)
 
 
 func _set_ghost_cell(cell: Vector2i) -> void:
 	_ghost_cell = _clamp_cell(cell, _ghost.footprint_size)
 	_ghost.position = base_view.cell_to_world(_ghost_cell, _ghost.footprint_size)
-	var ok := state.check_place(placing_type, _ghost_cell) == ""
-	_ghost.set_footprint(BuildingView.Footprint.VALID if ok else BuildingView.Footprint.INVALID)
+	_ghost.set_footprint(BuildingView.Footprint.VALID if ghost_is_valid() else BuildingView.Footprint.INVALID)
 	placing_changed.emit()
 
 
