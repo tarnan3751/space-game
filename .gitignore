@@ -14,3 +14,6 @@ server/build/
 # Godot MCP bridge, injected into the project only while the MCP runs the game
 mcp_interaction_server.gd
 mcp_interaction_server.gd.uid
+
+# Harness output (tools/harness/run.sh)
+tools/harness/out/

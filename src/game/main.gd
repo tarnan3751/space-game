@@ -4,9 +4,16 @@ extends Node3D
 ##
 ## Saving is local for now (user://base.json). When the server exists, the base comes
 ## from the server instead and commands are sent there; nothing below main.gd changes.
+##
+## A `--save-path=<file>` user argument (after `--` on the command line) replaces the
+## save file, so the harness and the gates never touch the real one.
 
-const SAVE_PATH := "user://base.json"
+const DEFAULT_SAVE_PATH := "user://base.json"
+const SAVE_PATH_ARG := "--save-path="
 const SAVE_EVERY_TICKS := 10
+
+## Where this run loads and saves the base.
+var save_path: String = DEFAULT_SAVE_PATH
 
 var catalog: Catalog
 var state: BaseState
@@ -19,6 +26,7 @@ var _ticks: int = 0
 
 
 func _ready() -> void:
+	save_path = _save_path_from_args()
 	catalog = Catalog.load_default()
 	if catalog.load_error != "":
 		push_error("Game data is invalid: " + catalog.load_error)
@@ -120,8 +128,8 @@ func _reset_base() -> void:
 
 
 func _load_or_create() -> BaseState:
-	if FileAccess.file_exists(SAVE_PATH):
-		var data: Variant = JSON.parse_string(FileAccess.get_file_as_string(SAVE_PATH))
+	if FileAccess.file_exists(save_path):
+		var data: Variant = JSON.parse_string(FileAccess.get_file_as_string(save_path))
 		if typeof(data) == TYPE_DICTIONARY:
 			var loaded := BaseState.from_dict(catalog, data)
 			# Offline progress: finish timers and pay out production since the last save.
@@ -134,11 +142,18 @@ func _load_or_create() -> BaseState:
 func _save() -> void:
 	if state == null:
 		return
-	var file := FileAccess.open(SAVE_PATH, FileAccess.WRITE)
+	var file := FileAccess.open(save_path, FileAccess.WRITE)
 	if file == null:
 		push_warning("Could not save the base: %s" % error_string(FileAccess.get_open_error()))
 		return
 	file.store_string(JSON.stringify(state.to_dict(), "\t"))
+
+
+static func _save_path_from_args() -> String:
+	for arg: String in OS.get_cmdline_user_args():
+		if arg.begins_with(SAVE_PATH_ARG):
+			return arg.trim_prefix(SAVE_PATH_ARG)
+	return DEFAULT_SAVE_PATH
 
 
 func _build_environment() -> void:
