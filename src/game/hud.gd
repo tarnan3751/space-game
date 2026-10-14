@@ -27,13 +27,23 @@ const TEXT_COLOR := Color("e9f6ff")
 const ACCENT := Color("4fd6e6")
 const PANEL_COLOR := Color(0.07, 0.08, 0.14, 0.88)
 const MARGIN := 16
+const TAB_SIZE := Vector2(140, 48)
+const ENTRY_SIZE := Vector2(224, 96)
 
 var _catalog: Catalog
 var _root: Control
 var _resource_labels: Dictionary[String, Label] = {}
 var _builders_label: Label
 var _build_bar: Control
-var _build_buttons: Dictionary[String, Button] = {}
+var _tab_buttons: Dictionary[String, Button] = {}
+var _entry_scroll: ScrollContainer
+var _entries: Dictionary[String, Button] = {}
+## Each entry's third line: built/max, or why it cannot be built.
+var _entry_status: Dictionary[String, Label] = {}
+## The selected build-menu category. Remembered while the game runs, not saved.
+var _tab: String = ""
+## The state of the last refresh, so a tab change can fill its entries.
+var _state: BaseState
 var _place_bar: Control
 var _place_button: Button
 var _info_panel: Control
@@ -62,6 +72,7 @@ func setup(catalog: Catalog) -> void:
 
 
 func refresh(state: BaseState, selected_id: int, placing: bool, ghost_ok: bool) -> void:
+	_state = state
 	for res: String in _resource_labels:
 		var rate := state.production_per_hour(res)
 		var rate_text := "   +%s/h" % Format.amount(rate) if rate > 0 else ""
@@ -79,7 +90,7 @@ func refresh(state: BaseState, selected_id: int, placing: bool, ghost_ok: bool) 
 	_place_button.disabled = not ghost_ok
 	_info_panel.visible = not placing and has_selection
 	if _build_bar.visible:
-		_refresh_build_buttons(state)
+		_refresh_entries(state)
 	if _info_panel.visible:
 		_refresh_info(state, state.buildings[selected_id])
 
@@ -103,19 +114,46 @@ static func error_text(code: String) -> String:
 
 # --- Refresh helpers -------------------------------------------------------------
 
-func _refresh_build_buttons(state: BaseState) -> void:
-	for type: String in _build_buttons:
-		var button: Button = _build_buttons[type]
+## Only the selected tab's entries; the others are hidden.
+func _refresh_entries(state: BaseState) -> void:
+	for type: String in _entries:
+		if _catalog.category_of(type) != _tab:
+			continue
+		var button: Button = _entries[type]
 		var error := state.check_can_build(type)
-		var detail := Format.cost(_catalog.level_stats(type, 1).get("cost", {}), _catalog)
-		if error == BaseState.ERR_LIMIT:
-			detail = "Max built"
-		elif error == BaseState.ERR_NO_BUILDER:
-			detail = "No free drone"
-		elif error == BaseState.ERR_CC_LEVEL:
-			detail = "Needs Command Center"
-		button.text = "%s\n%s" % [_catalog.display_name(type), detail]
+		var status: Label = _entry_status[type]
+		status.text = _entry_status_text(state, type, error)
 		button.disabled = error != ""
+		var content: Control = status.get_parent()
+		content.modulate.a = 1.0 if error == "" else 0.45
+
+
+func _entry_status_text(state: BaseState, type: String, error: String) -> String:
+	if error == "":
+		return "%d/%d" % [state.count_of(type), _catalog.max_count(type, state.cc_level())]
+	var first := _catalog.level_stats(type, 1)
+	if error == BaseState.ERR_CC_LEVEL:
+		return "Needs Command Center %d" % int(first.get("requires_cc", 1))
+	if error == BaseState.ERR_LIMIT:
+		return "Max built"
+	if error == BaseState.ERR_NO_BUILDER:
+		return "No free drone"
+	if error == BaseState.ERR_FUNDS:
+		var cost: Dictionary = first.get("cost", {})
+		for res: String in _catalog.resources:
+			if state.resources[res] < int(cost.get(res, 0)):
+				return "Not enough %s" % _catalog.resource_name(res)
+	return error_text(error)
+
+
+func _select_tab(category: String) -> void:
+	_tab = category
+	_tab_buttons[category].button_pressed = true
+	for type: String in _entries:
+		_entries[type].visible = _catalog.category_of(type) == category
+	_entry_scroll.scroll_horizontal = 0
+	if _state != null and _build_bar.visible:
+		_refresh_entries(_state)
 
 
 func _refresh_info(state: BaseState, building: BuildingState) -> void:
@@ -180,23 +218,75 @@ func _build_top_bar() -> void:
 	_builders_label.add_theme_color_override("font_color", ACCENT)
 
 
+## A row of category tabs over a horizontal strip of entries. Every menu type gets an
+## entry up front; a tab shows its category's entries, in menu_order order.
 func _build_build_bar() -> void:
 	var panel := PanelContainer.new()
 	_root.add_child(panel)
 	_anchor_bottom(panel, true)
-	var scroll := ScrollContainer.new()
-	scroll.vertical_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
-	scroll.custom_minimum_size = Vector2(0, 92)
-	panel.add_child(scroll)
+	var column := VBoxContainer.new()
+	column.add_theme_constant_override("separation", 8)
+	panel.add_child(column)
+	var tabs := HBoxContainer.new()
+	tabs.add_theme_constant_override("separation", 8)
+	column.add_child(tabs)
+	var group := ButtonGroup.new()
+	for category: String in _catalog.categories:
+		var tab := _button(_catalog.category_name(category), TAB_SIZE)
+		tab.toggle_mode = true
+		tab.button_group = group
+		tab.pressed.connect(func() -> void: _select_tab(category))
+		tabs.add_child(tab)
+		_tab_buttons[category] = tab
+	_entry_scroll = ScrollContainer.new()
+	_entry_scroll.vertical_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+	_entry_scroll.custom_minimum_size = Vector2(0, ENTRY_SIZE.y + 8)
+	column.add_child(_entry_scroll)
 	var row := HBoxContainer.new()
 	row.add_theme_constant_override("separation", 10)
-	scroll.add_child(row)
+	_entry_scroll.add_child(row)
 	for type: String in _catalog.menu_order:
-		var button := _button("", Vector2(180, 84))
-		button.pressed.connect(func() -> void: build_pressed.emit(type))
-		row.add_child(button)
-		_build_buttons[type] = button
+		row.add_child(_build_entry(type))
 	_build_bar = panel
+	_select_tab(_catalog.categories[0])
+
+
+## Three lines: the name, the level 1 cost (each amount in its resource's colour), and
+## the status line `_refresh_entries` fills.
+func _build_entry(type: String) -> Button:
+	var button := _button("", ENTRY_SIZE)
+	# PASS, so a drag that starts on an entry reaches the ScrollContainer and scrolls the
+	# strip; the panel behind still stops the touch from reaching the world.
+	button.mouse_filter = Control.MOUSE_FILTER_PASS
+	button.pressed.connect(func() -> void: build_pressed.emit(type))
+	var content := VBoxContainer.new()
+	content.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	content.alignment = BoxContainer.ALIGNMENT_CENTER
+	content.add_theme_constant_override("separation", 0)
+	button.add_child(content)
+	content.set_anchors_preset(Control.PRESET_FULL_RECT)
+	content.offset_left = 8
+	content.offset_top = 8
+	content.offset_right = -8
+	content.offset_bottom = -8
+	var name_label := _entry_label(content, _catalog.display_name(type), 18, TEXT_COLOR)
+	name_label.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
+	var cost_row := HBoxContainer.new()
+	cost_row.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	cost_row.alignment = BoxContainer.ALIGNMENT_CENTER
+	cost_row.add_theme_constant_override("separation", 12)
+	content.add_child(cost_row)
+	var cost: Dictionary = _catalog.level_stats(type, 1).get("cost", {})
+	if cost.is_empty():
+		_entry_label(cost_row, "Free", 16, TEXT_COLOR)
+	for res: Variant in cost:
+		var color := Color.from_string(_catalog.resource_color(str(res)), TEXT_COLOR)
+		_entry_label(cost_row, Format.amount(int(cost[res])), 16, color)
+	var status := _entry_label(content, "", 16, TEXT_COLOR)
+	status.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
+	_entry_status[type] = status
+	_entries[type] = button
+	return button
 
 
 func _build_place_bar() -> void:
@@ -278,6 +368,16 @@ func _panel_label(parent: Control) -> Label:
 	parent.add_child(panel)
 	var label := Label.new()
 	panel.add_child(label)
+	return label
+
+
+func _entry_label(parent: Control, text: String, font_size: int, color: Color) -> Label:
+	var label := Label.new()
+	label.text = text
+	label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	label.add_theme_font_size_override("font_size", font_size)
+	label.add_theme_color_override("font_color", color)
+	parent.add_child(label)
 	return label
 
 
