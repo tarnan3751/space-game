@@ -51,6 +51,12 @@ func pan(screen_pos: Vector2, screen_delta: Vector2) -> void:
 	_apply()
 
 
+## Moves the focus by a world offset, kept inside the bounds. The edge scroll's move.
+func nudge(world_delta: Vector3) -> void:
+	focus += world_delta
+	_apply()
+
+
 ## factor > 1 zooms in. The ground point under `screen_pos` stays put.
 func zoom_at(factor: float, screen_pos: Vector2) -> void:
 	if factor <= 0.0:
