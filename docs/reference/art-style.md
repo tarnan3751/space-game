@@ -301,6 +301,25 @@ The mask has one bit per orthogonal neighbour in cell space, where cell (x, y) i
 | 4 | `PLUS_Z` | cell (x, y + 1), world +z |
 | 8 | `MINUS_Z` | cell (x, y - 1), world -z |
 
+Each level is the same wall grown: a slim hull post (at most 0.46 of the cell, its chamfered cap
+never wider than itself) on a concrete footing, and slate segments 0.4 of the cell thick and
+0.85 of the post's height on a concrete curb that runs on from wall to wall, so a run reads as
+one thick slab with the posts standing just proud as joints. Heights are the post's top, cap
+included:
+
+| Level | Post | Segments |
+| --- | --- | --- |
+| 1 | Squat, 0.55 | Slate plates |
+| 2 | 0.64, gunmetal cap | Riveted slate armour with a band |
+| 3 | Ribbed (the `pipe` layer), 0.72, gunmetal cap | Ribbed slate, an energy cyan strip along the top |
+| 4 | A plated pylon with wide chamfers, 0.81, gunmetal cap | Double plated: a sloped riveted skirt under a slate plate, a brighter strip |
+| 5 | The level 4 post with a gold crown, 0.9 | A low riveted base under an energy field panel |
+
+The strips and the field are unlit (`glow`, flags 1) and, being thin, have no ink. A segment's
+end on the cell edge is a cap painted like the segment but left out of the outline, so two
+segments that meet there draw one unbroken ink line; where walls of different levels meet, the
+taller segment's end shows as a step without an ink edge, and every level's curb meets the next.
+
 `piece(level, mask)` builds a piece on first use and keeps its body and outline arrays
 (`to_arrays`, `to_outline_arrays`), 5 levels by 16 masks at most (a higher level shows level
 5's); every piece stays within the 250 body triangles of a wall piece (`wall_junctions` checks
