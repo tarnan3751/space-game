@@ -1,33 +1,109 @@
 extends RefCounted
-## Models of the army buildings: halls and domes with big doors, on slabs.
+## Models of the army buildings, in the comic style (docs/reference/art-style.md): hull-light
+## halls and towers on concrete pads, army orange on one or two surfaces and in one glow,
+## gunmetal machinery, gold trim at the top level.
 ##
-## BuildingModels calls one static build_<type>(p: Parts, level: int) per type.
+## BuildingModels calls one static build_<type>(p: Parts, level: int) per type. Each builds
+## its level as a run of additions (`if level >= 3:` adds the second bay), so the levels of a
+## type read as one building growing.
+
+## The army's surfaces: its orange accent and glow, the round and armoured hulls.
+static var ORANGE := Surf.make(MaterialKit.Layer.PLATE, MaterialKit.ARMY)
+static var ORANGE_ROUND := Surf.make(MaterialKit.Layer.PLATE, MaterialKit.ARMY, 1.0, Surf.LIT, true)
+static var GLOW := Surf.make(MaterialKit.Layer.GLOW, MaterialKit.ARMY, 1.0, Surf.UNLIT, true)
+static var HULL_ROUND := Surf.make(MaterialKit.Layer.HULL, MaterialKit.HULL_LIGHT, 1.0, Surf.LIT, true)
+static var MID_ROUND := Surf.make(MaterialKit.Layer.HULL, MaterialKit.HULL_MID, 1.0, Surf.LIT, true)
+static var ARMOUR := Surf.make(MaterialKit.Layer.PLATE, MaterialKit.HULL_MID)
+static var DARK_PLATE := Surf.make(MaterialKit.Layer.PLATE, MaterialKit.HULL_DARK)
+static var GOLD_ROUND := Surf.make(MaterialKit.Layer.FLAT, MaterialKit.CORE_GOLD, 1.0, Surf.GLOSSY, true)
 
 
+## A long vaulted hangar: the main bay with its striped door, the control tower in the back
+## corner, landing lights along the apron. Wider door at 2 and 3, a second bay at 3, roof
+## dishes at 4.
 static func build_hangar(p: Parts, level: int) -> void:
 	var m := p.body
-	Parts.slab(m, 5, 0.15)
-	var height := 1.4 + 0.15 * level
-	var front := 1.0
-	m.box(Vector3(4.0, height, 3.0), Vector3(0, 0.15, -0.5), Parts.surf("hull"))
-	var stripe := Parts.accent(level, 5, "hazard")
-	for x: float in [-1.2, 0.0, 1.2]:
-		m.box(Vector3(0.22, 0.04, 2.8), Vector3(x, 0.15 + height, -0.5), Parts.surf(stripe))
-	for i: int in 3:
-		Parts.plate(m, Vector2(0.18, 0.7), Vector3(-1.2 + 1.2 * i, 0.151, 1.6), "hazard", 30)
-	var bays := mini(level, 3)
-	var bay := 3.8 / bays
-	for i: int in bays:
-		var x := -1.9 + bay * (i + 0.5)
-		m.box(Vector3(bay - 0.3, height - 0.35, 0.1), Vector3(x, 0.15, front), Parts.surf("window"))
-		m.box(Vector3(bay - 0.3, 0.08, 0.08), Vector3(x, height - 0.1, front + 0.02), Parts.surf("glow_orange"))
-	for i: int in bays + 1:
-		m.box(Vector3(0.2, height, 0.2), Vector3(-1.9 + bay * i, 0.15, front), Parts.surf("hull_light"))
+	var g := Parts.PAD_HEIGHT
+	Parts.foundation(m, 5)
+	var doors: Array[float] = [1.3, 1.6, 1.9]
+	_vault(m, Vector3(-1.0, g, -2.25), 2.6, 3.6, 0.75, doors[mini(level, 3) - 1], level)
+	if level >= 3:
+		_vault(m, Vector3(1.35, g, -0.9), 1.8, 2.25, 0.55, 1.2, level)
+	else:
+		m.disc(0.75, 24, Vector3(1.35, g + 0.002, 0.2), Parts.HAZARD)
+		m.disc(0.6, 24, Vector3(1.35, g + 0.004, 0.2), ARMOUR)
+	var lights := 4 + level
+	for i: int in lights:
+		var x := -1.85 + 3.9 * i / (lights - 1)
+		Parts.landing_light(m, Vector3(x, g, 2.05), 0.11, GLOW)
+	# The control tower.
+	var tower := Vector3(1.45, g, -1.65)
+	m.box_chamfered(Vector3(0.95, 0.3, 0.95), 0.06, tower, ARMOUR)
+	var shaft := 1.0 + 0.06 * level
+	m.prism(0.3, 0.25, shaft, 16, tower + Vector3(0, 0.3, 0), MID_ROUND)
+	var cab := tower + Vector3(0, 0.3 + shaft, 0)
+	m.prism(0.42, 0.42, 0.1, 16, cab, HULL_ROUND)
+	m.ring(0.41, 0.44, 0.05, 16, cab + Vector3(0, 0.03, 0), GLOW)
+	m.prism(0.42, 0.5, 0.34, 16, cab + Vector3(0, 0.1, 0), Parts.GLASS)
+	m.lathe(PackedVector2Array([
+		Vector2(0.56, 0), Vector2(0.56, 0.06), Vector2(0.4, 0.16), Vector2(0, 0.16),
+	]), 16, cab + Vector3(0, 0.44, 0), GOLD_ROUND if level >= 5 else HULL_ROUND)
+	Parts.mast(m, cab + Vector3(0.12, 0.6, -0.1), 0.3 + 0.03 * level, 0.06, GLOW)
+	if level >= 2:
+		# Fuel tanks on the apron, beside the main door.
+		for z: float in [1.68, 1.92]:
+			Parts.tank(m, 0.1, 0.32, Vector3(-2.2, g, z), ORANGE_ROUND, 0.03)
 	if level >= 4:
-		var tower := Vector3(1.5, 0.15, -1.55)
-		m.box(Vector3(0.9, height + 1.0, 0.9), tower, Parts.surf("hull_light"))
-		m.box(Vector3(0.94, 0.2, 0.94), tower + Vector3(0, height + 0.6, 0), Parts.surf("glow_blue"))
-		m.prism(0.04, 0.03, 0.6, 4, tower + Vector3(0, height + 1.0, 0), Parts.surf("metal"))
+		_roof_dish(m, Vector3(-1.0, g + 1.98, -1.5), 0.5, level)
+		_roof_dish(m, Vector3(1.35, g + 1.38, -0.4), 0.32, level)
+
+
+## A dish on a stub at `foot`, turned to the right of the view, with a glowing feed.
+static func _roof_dish(m: LowPolyMesh, foot: Vector3, radius: float, level: int) -> void:
+	var aim := Vector3(55, 135, 0)
+	m.prism(0.07, 0.06, 0.22, 16, foot, Parts.GUNMETAL)
+	var centre := foot + Vector3(0, 0.2, 0)
+	Parts.dish(m, radius, radius * 0.38, centre, GOLD_ROUND if level >= 5 else HULL_ROUND, aim)
+	var axis := LowPolyMesh.turn(Vector3.UP, aim)
+	var focus := centre + axis * radius * 0.85
+	Parts.pipe(m, centre + axis * radius * 0.1, focus, 0.025, Parts.ROD)
+	m.orb(0.05, 16, 6, focus, GLOW)
+
+
+## One bay of the hangar: walls, a barrel roof with orange ribs, and the striped door on its
+## +Z end. `back` is the middle of its back wall on the pad.
+static func _vault(m: LowPolyMesh, back: Vector3, width: float, length: float, wall: float,
+		door: float, level: int) -> void:
+	var radius := width * 0.5 - 0.005
+	var front := back.z + length
+	m.box_chamfered(Vector3(width, wall, length + 0.02), 0.06, back + Vector3(0, 0, length * 0.5 + 0.01),
+		ARMOUR)
+	var axis := back + Vector3(0, wall, 0)
+	m.prism(radius, radius, length, 24, axis, HULL_ROUND, Vector3(90, 0, 0))
+	var gable := PackedVector3Array()
+	for k: int in 13:
+		var angle := PI * k / 12
+		gable.append(axis + Vector3(radius * cos(angle), radius * sin(angle), length + 0.012))
+	m.polygon(gable, Parts.HULL_LIGHT)
+	for k: int in 3:
+		var z := back.z + length * (0.18 + 0.32 * k)
+		m.ring(radius - 0.02, radius + 0.07, 0.14, 24, Vector3(back.x, axis.y, z), ORANGE_ROUND,
+			Vector3(90, 0, 0))
+	# The door: leaves with a hazard band, hazard posts, a lintel and a glow strip.
+	var post := door * 0.5 + 0.08
+	var height := wall + sqrt(radius * radius - (post + 0.08) * (post + 0.08)) - 0.2
+	var z := front + 0.02
+	var leaf := door / 4.0
+	for i: int in 4:
+		var x := back.x - door * 0.5 + leaf * (i + 0.5)
+		m.box_chamfered(Vector3(leaf - 0.03, height, 0.08), 0.02, Vector3(x, back.y, z + 0.04), DARK_PLATE)
+	m.box_chamfered(Vector3(door, 0.26, 0.1), 0.03, Vector3(back.x, back.y, z + 0.05), Parts.HAZARD)
+	for side: float in [-1.0, 1.0]:
+		m.box_chamfered(Vector3(0.16, height + 0.14, 0.16), 0.04, Vector3(back.x + side * post, back.y, z + 0.08),
+			Parts.HAZARD)
+	m.box_chamfered(Vector3(door + 0.32, 0.14, 0.18), 0.04, Vector3(back.x, back.y + height, z + 0.09),
+		Parts.GOLD_TRIM if level >= 5 else ORANGE)
+	m.box(Vector3(door * 0.6, 0.06, 0.04), Vector3(back.x, back.y + height + 0.22, z), GLOW)
 
 
 static func build_fabricator(p: Parts, level: int) -> void:
