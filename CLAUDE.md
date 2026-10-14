@@ -245,7 +245,7 @@ hash it reproduces and the gate's tail per commit. Once the review's findings ar
 fold's diff read, the coordinator lands it with
 `tools/land_series.sh <patch-dir> <base-commit> <tree-hash>` (clean tree and HEAD at the base
 required; `git am`; the tree checked, with a rollback on mismatch; the gate run; the commits
-left in place). The owner pushes.
+left in place). The coordinator pushes `main` to `origin` after each landing.
 
 Constraints:
 
