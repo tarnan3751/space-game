@@ -12,7 +12,8 @@ Everything here `extends RefCounted`, never reads a clock, holds integers only, 
 Read-only game data, loaded from `data/rules.json` and `data/buildings.json` by
 `Catalog.load_default()`, or from two JSON strings by `Catalog.from_json(rules, buildings)`
 (the tests' fixtures use this). JSON numbers that are whole are converted to `int` on load,
-recursively (`_ints`); everything the catalog hands out is `int`.
+recursively (`_ints`); everything the catalog hands out is `int`. The one exception to
+read-only is `apply_dev_cheats()`, below.
 
 | Member | What |
 | --- | --- |
@@ -32,6 +33,7 @@ recursively (`_ints`); everything the catalog hands out is `int`.
 | `level_stats(type, level)` | The stats dictionary for a 1-based level, or `{}` when the type or level does not exist. |
 | `max_count(type, cc_level)` | `max_count[cc_level - 1]`, with `cc_level` clamped into the list; `0` when the list is empty. |
 | `max_cc_level()` | The Command Center's level count, which is the length of every `max_count` list. |
+| `apply_dev_cheats()` | The dev cheats, which `main.gd` applies once after loading in a debug build unless `--no-cheats` is given (`input-camera.md`): rewrites every level of every type in place to `cost` `{}` and `build_seconds` `min(build_seconds, 1)`: a level that takes time takes one second, and an instant one (walls, the drone bay) stays instant, so it still needs no builder. Nothing else changes (`requires_cc`, `max_count`, `storage`, `produces`, `builders`), so levels still unlock in order. `BaseState` never knows, so a save made under the cheats is an ordinary save. |
 
 Validation (`_read`, `_validate_building`) is listed in `data-format.md`.
 

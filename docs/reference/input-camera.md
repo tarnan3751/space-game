@@ -12,6 +12,9 @@ material kit, `LowPolyMesh`, the shaders, the outlines, the view states, the wal
 `scenes/main.tscn` is one `Node3D` with `main.gd`; everything else is built in `_ready`:
 
 1. `Catalog.load_default()`; a non-empty `load_error` is pushed as an error and the scene stops.
+   In a debug build (`OS.is_debug_build()`) without a `--no-cheats` user argument
+   (`NO_CHEATS_ARG`), `cheats` is set and `catalog.apply_dev_cheats()` makes every level free
+   and one second at most (`core-economy.md`); the HUD is told through `hud.cheats` (`hud.md`).
 2. The environment: a `WorldEnvironment` (deep space background, cool ambient light, linear
    tonemap) and one warm key light, a `DirectionalLight3D` with a hard single-split shadow
    (`art-style.md`, **Light and shading**).

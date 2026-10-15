@@ -37,7 +37,7 @@ when that level unlocks, and no curve (cost, `build_seconds`, `hp`, `produces`, 
 | --- | --- |
 | `test/core/test_base_grid.gd` | Bounds, occupancy, own cells counting as free. |
 | `test/core/test_base_state.gd` | Start layout, place and its refusals, the Command Center level checked before the limit, instant buildings, walls, timers, upgrades and their rules, moves, bad commands, the `changed` signal, the clock going backwards, the save round trip, a save from before the third resource, dropping buildings that no longer fit. |
-| `test/core/test_catalog.gd` | The shipped data (validity, start layout, affordability, curves), int conversion, level, count, resource, category and display-field lookups, one validation message per rule. |
+| `test/core/test_catalog.gd` | The shipped data (validity, start layout, affordability, curves), int conversion, level, count, resource, category and display-field lookups, one validation message per rule, the dev cheats (every level free and one second at most, nothing else changed; a base building what it could not afford). |
 | `test/core/test_production.gd` | Production starting at completion, carried remainders, tick-size independence, storage caps, caps rising when a silo finishes, busy buildings not producing, a third resource. |
 | `test/core/test_seeded_rng.gd` | The frozen sequences for seeds 1 and 12345, range bounds, the zero seed. **These expected values never change.** |
 
@@ -54,7 +54,10 @@ non-zero on any failure:
    exits 0 from `--check-only` even on a parse error, so the gate reads the output for
    `SCRIPT ERROR`, `Parse Error` and `Failed to load script`.
 4. **boot** — `scenes/main.tscn` headless for 240 frames (`--quit-after 240`) on an isolated
-   save (`--save-path=` under a temp directory), with no `SCRIPT ERROR` or `ERROR:` line.
+   save (`--save-path=` under a temp directory), with no `SCRIPT ERROR` or `ERROR:` line. It
+   passes no `--no-cheats` on purpose: it boots with the dev cheats on, as the owner's debug
+   runs do, which makes it the automated run of `main.gd`'s real cheat path, and its isolated
+   save makes that harmless.
 
 It runs in about ten seconds. Every commit of a delivered series passes it; the reviewer runs it
 again; the landing script runs it after the series is applied.
@@ -64,9 +67,11 @@ again; the landing script runs it after the series is applied.
 A scripted driver that boots the real scene on an isolated save, runs a scenario that acts
 through `PlacementController`, the input signals and `BaseState`, and writes a log and
 screenshots. `tools/harness/run.sh <scenario>` runs headless (logic checks);
-`--rendered` opens a window and saves screenshots. `tools/harness/README.md` documents the
-driver, the clock, the isolation and how to write a scenario; `scenarios/place_and_build.gd` is
-the example.
+`--rendered` opens a window and saves screenshots. `run.sh` passes `--no-cheats` beside
+`--save-path`, so a debug build's dev cheats (`core-economy.md`, `apply_dev_cheats`) stay off
+and every scenario runs on the real numbers; `scenarios/dev_cheats.gd` applies them itself and
+checks them. `tools/harness/README.md` documents the driver, the clock, the isolation and how to
+write a scenario; `scenarios/place_and_build.gd` is the example.
 
 ## The texture generator: `tools/gen_textures.gd`
 

@@ -61,6 +61,10 @@ run's screenshots are not all identical. The last lines of `log.txt` are `HARNES
   from `OS.get_cmdline_user_args()` and loads and saves there instead of `user://base.json`.
   The driver refuses a save path under `user://`. This is the only way to boot the game in a
   clone: `$GODOT --path .` without the argument opens the owner's real save.
+- **The numbers.** `run.sh` also passes `--no-cheats`. Without it, a debug build (the editor
+  binary the harness runs on) applies the dev cheats (`Catalog.apply_dev_cheats`: every level
+  free and built in one second at most) and the HUD shows the resources as infinite; with it,
+  `main.cheats` is false and every scenario runs on the real costs and times.
 - **The clock.** The driver's clock starts 1,000,000 s ahead of the device clock and moves
   only when a scenario calls `advance()`. It replaces `PlacementController.clock`, so every
   command a scenario applies carries harness time, and the game's own one-second tick, which
@@ -111,6 +115,14 @@ needs a query, not a reason to reach in.
 placing a Metal Extractor, confirms it, checks the cost, the drone and the construction
 timer, advances to one second before completion and then past it, and screenshots the
 built extractor.
+
+`scenarios/dev_cheats.gd` checks the dev cheats, which `--no-cheats` keeps off: it checks that
+`main.cheats` is false, empties the base's resources, checks that the first menu type that takes
+time to build is unaffordable, applies `main.catalog.apply_dev_cheats()` itself, and places that
+type through `PlacementController`: it builds for one second on the only drone. Meanwhile a
+12-cell paint stroke of Barrier Wall places 12 walls, since instant levels stay instant. Then it
+checks that nothing was spent and that one `advance(1)` later the building is finished at level
+1. It takes no screenshots, so it is meant to run headless.
 
 `scenarios/model_gallery.gd` shows every building model: one `BuildingView` per type and level
 in the catalog, laid out on the grid in rows by category (`"core"`, then

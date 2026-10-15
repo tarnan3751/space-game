@@ -25,7 +25,7 @@ area (**Safe area**):
 
 | Part | Where | Contents |
 | --- | --- | --- |
-| Top bar | top, `MARGIN` (16) in, a column across the width | First row, from the left: one panel label per resource in catalog order (`"Metal  750 / 1,000   +1,800/h"`, the rate only when above 0), named and coloured from the catalog's `resource_name` and `resource_color` (the text colour when a resource has none), then `"Drones  free / total"` in the accent colour. A resource whose `state.capacity(res)` is 0 is hidden, so antimatter appears once something stores it. |
+| Top bar | top, `MARGIN` (16) in, a column across the width | First row, from the left: one panel label per resource in catalog order (`"Metal  750 / 1,000   +1,800/h"`, the rate only when above 0), named and coloured from the catalog's `resource_name` and `resource_color` (the text colour when a resource has none), then `"Drones  free / total"` in the accent colour. A resource whose `state.capacity(res)` is 0 is hidden, so antimatter appears once something stores it. With the dev cheats on (`Hud.cheats`, set by `main.gd`) every resource panel shows, reading the name and `∞` (`"Metal  ∞"`). |
 | Build bar | bottom, full width | A `PanelContainer` with a row of category tabs over a horizontal `ScrollContainer` strip of entries (**Build menu**). |
 | Place bar | bottom centre | `Cancel` and `Place` (170×72); `Place` is disabled unless the ghost is valid. While walls are painted it reads `Done` and is always enabled: there is nothing to confirm. |
 | Info panel | bottom centre, 460 wide | Title `"Name   Lv N"` with a `Close` button; detail lines (**Info panel**); the upgrade button; a note under it. |

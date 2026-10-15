@@ -46,7 +46,7 @@ Run `tools/dump_api.sh` once, then look up exact signatures in `.godot-api/`
 | Compile-check one script (read the output; exit code is 0 either way) | `$GODOT --headless --path . --check-only -s res://src/core/base_state.gd` |
 | Behaviour check through the harness | `tools/harness/run.sh place_and_build [--rendered]` |
 | Land a delivered series | `tools/land_series.sh <patch-dir> <base-commit> <tree-hash>` |
-| Run the game (the owner only: it opens the real save) | `$GODOT --path .` |
+| Run the game (the owner only: it opens the real save) | `$GODOT --path .` (debug build: free one-second builds; `-- --no-cheats` for the real numbers) |
 | Dump engine API | `tools/dump_api.sh` |
 | Regenerate the material kit's textures (after an import) | `$GODOT --headless --path . -s res://tools/gen_textures.gd` |
 
@@ -158,8 +158,10 @@ The coordinator drives the running game through the `godot` MCP server
 touch gestures, read logs and evaluate GDScript in the live scene tree. While it runs, the MCP
 injects a `McpInteractionServer` autoload (TCP on 127.0.0.1:9090) and removes it on stop; never
 commit it. It runs the game normally, on the real save, on the main tree: it is the
-coordinator's instance, never an agent's. Agents see the game through the harness in their own
-clones. Headless (`--headless`) runs catch script errors but render nothing.
+coordinator's instance, never an agent's. Running normally, it runs with the dev cheats on, like
+the owner's own runs, so what it builds is free and goes into the real save. Agents see the game
+through the harness in their own clones. Headless (`--headless`) runs catch script errors but
+render nothing.
 
 ## Agent workflow
 
@@ -265,3 +267,5 @@ Constraints:
 - The material kit's PNGs under `assets/textures/kit/` are loaded by path (`MaterialKit`), so a
   preset that exports selected resources only must include them.
 - Commit the `*.uid` files Godot generates next to scripts.
+- A debug export (a debug APK, for example) is a debug build, so it runs with the dev cheats on;
+  check balance on a release export or with `--no-cheats`.

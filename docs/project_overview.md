@@ -86,7 +86,9 @@ an attack log, revenge and shields.
 | Tests | Built | Own headless runner; fixture catalog; one test file per core area |
 | Tooling | Built | Gate script, landing script, behaviour harness (`tools/`), API dump |
 
-Balance numbers in `data/` are fast development values, not tuned.
+Balance numbers in `data/` are fast development values, not tuned. A debug build goes further:
+every level is free and builds in one second at most (`Catalog.apply_dev_cheats`; `-- --no-cheats`
+for the real numbers).
 
 ### 2.2 Roadmap
 
