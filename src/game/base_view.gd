@@ -7,8 +7,9 @@ extends Node3D
 ## (x, y) maps to world (x, z).
 ##
 ## The terrain and the rocks are generated from SCENERY_SEED, so every player's base sits in
-## the same landscape. Each is one mesh painted from the material kit (the terrain mostly its
-## regolith, the rocks its rock layer); the rocks also have their ink outline.
+## the same landscape: a ring of dunes, craters, mesas and a dry channel, smooth shaded and
+## painted from the material kit's dust and rock by slope, with rocks on it. Each is one mesh with
+## its ink outline.
 
 const GROUND_SHADER := preload("res://src/game/ground.gdshader")
 ## The field texture the ground is drawn from, imported as an Image (tools/gen_textures.gd).
@@ -17,12 +18,51 @@ const SCENERY_SEED := 7
 ## Strength of the ground's cell lines, normally and while placing.
 const GRID_LINES := 0.1
 const GRID_LINES_PLACING := 0.45
-## The terrain reaches this far from the centre in X and Z, on a lattice of TERRAIN_STEP.
-const TERRAIN_EXTENT := 90.0
-const TERRAIN_STEP := 2.0
-## Spacing of the value-noise lattice behind the terrain's hills.
+## The terrain reaches TERRAIN_EXTENT from the centre in x and z, on a lattice of 1 unit within
+## TERRAIN_FINE_REACH of the centre and of TERRAIN_COARSE beyond.
+const TERRAIN_EXTENT := 100.0
+const TERRAIN_FINE_REACH := 50.0
+const TERRAIN_COARSE := 2
+## Outside the field the ground stays flat out to TERRAIN_FLAT (under the curb) and reaches its
+## full relief at TERRAIN_BLEND.
+const TERRAIN_FLAT := 0.8
+const TERRAIN_BLEND := 3.0
+## Spacing of the value-noise lattice behind the dunes and the dust drifts.
 const NOISE_CELL := 7.0
 const NOISE_SIZE := 24
+## The dunes' height next to the field and from 18 units out, the scale of their ridges' noise
+## (NOISE_CELL / DUNE_SCALE units across), and how much the land rises per unit out.
+const DUNES_NEAR := 0.8
+const DUNES_FAR := 5.0
+const DUNE_SCALE := 0.64
+const RISE := 0.04
+## A crater's depth and rim height, in radii.
+const CRATER_DEPTH := 0.18
+const CRATER_RIM := 0.15
+## A mesa's wall: how far in from its outline the rim's edge lies, and how far out its foot.
+const MESA_WALL := 1.4
+const MESA_FOOT := 0.4
+## The dry channel's half width, depth, and how far it wanders either side of its course (radians).
+const CHANNEL_WIDTH := 2.2
+const CHANNEL_DEPTH := 1.2
+const CHANNEL_MEANDER := 0.22
+## Texture repeats per world unit on the terrain: one layer covers between five and six units.
+const TERRAIN_UV := 0.18
+## The terrain's painting: the rock tint where its normal's y is below ROCK_SLOPE_Y (slopes over
+## 35 degrees); the shadow side of slopes over 18 degrees (SHADOW_SLOPE_Y) dark and the lit side
+## of slopes over 25 degrees (LIT_SLOPE_Y) light; crater floors (within CRATER_FLOOR radii of the
+## centre) dark; dust drifts where the drift noise passes DRIFT. Each blends in smoothly across its
+## threshold (the drifts over PAINT_SOFTNESS either side), so the patches between points are
+## rounded. The texture is the dust layer everywhere but on the mesas' walls, which take the rock
+## layer: the shader cannot blend two layers, so they switch only at the mesas' rims.
+const ROCK_SLOPE_Y := 0.819
+const SHADOW_SLOPE_Y := 0.95
+const LIT_SLOPE_Y := 0.906
+const CRATER_FLOOR := 0.75
+const DRIFT := 0.76
+const PAINT_SOFTNESS := 0.08
+## Towards the key light across the ground (main.gd's sun), in world x and z.
+const SUN_ACROSS := Vector2(-0.5, 0.866)
 const ROCK_COUNT := 40
 ## The curb round the field: its height and width, its gap from the field's edge, and how far
 ## each corner is cut back along each side. A glowing stud stands on it at every plate seam (the
@@ -34,24 +74,6 @@ const CURB_CORNER := 0.6
 const CURB_BEVEL := 0.04
 const PLATE_CELLS := 4
 const STUD_RADIUS := 0.1
-## Texture repeats per world unit on the terrain: the dust large (a craterlet about every two
-## cells), the rock grain finer.
-const TERRAIN_DUST_UV := 0.3
-const TERRAIN_ROCK_UV := 0.5
-
-## The terrain's faces by height band, from the crater floors up: flat and not outlined (its
-## relief shows in the bands). The ring reads as quiet dust on the regolith layer, with the rock
-## layer's grain and cracks only on the two highest bands and in the craters.
-static var TERRAIN_CRATER := Surf.make(MaterialKit.Layer.ROCK, MaterialKit.TERRAIN_DARK, TERRAIN_ROCK_UV,
-	Surf.LIT, false, false)
-static var TERRAIN_LOW := Surf.make(MaterialKit.Layer.REGOLITH, MaterialKit.TERRAIN, TERRAIN_DUST_UV, Surf.LIT,
-	false, false)
-static var TERRAIN_MID := Surf.make(MaterialKit.Layer.REGOLITH, MaterialKit.TERRAIN.lerp(MaterialKit.ROCK, 0.5),
-	TERRAIN_DUST_UV, Surf.LIT, false, false)
-static var TERRAIN_HIGH := Surf.make(MaterialKit.Layer.ROCK, MaterialKit.ROCK, TERRAIN_ROCK_UV, Surf.LIT,
-	false, false)
-static var TERRAIN_PEAK := Surf.make(MaterialKit.Layer.ROCK, MaterialKit.ROCK.darkened(0.15), TERRAIN_ROCK_UV,
-	Surf.LIT, false, false)
 ## The curb's studs: domes of unlit energy cyan, too small for the outline.
 static var CURB_STUD := Surf.make(MaterialKit.Layer.GLOW, MaterialKit.ENERGY, 1.0, Surf.UNLIT, false, false)
 ## The rocks' sides and tops, outlined.
@@ -69,6 +91,12 @@ var walls: WallMesh
 ## The scenery, each a body and its ink outline, which casts no shadow.
 var boundary: MeshInstance3D
 var boundary_outline: MeshInstance3D
+var terrain: MeshInstance3D
+var terrain_outline: MeshInstance3D
+## The terrain's craters, each as (x, z, radius), and its mesas, each as (x, z, radius, the
+## height of its top).
+var craters: Array[Vector3] = []
+var mesas: Array[Vector4] = []
 
 var _ground_material: ShaderMaterial
 ## The walls `walls` draws, as (x << 32 | y << 16 | level) in id order: unchanged, no rebuild.
@@ -77,8 +105,12 @@ var _wall_signature: PackedInt64Array = PackedInt64Array()
 var _walls_state: BaseState = null
 ## NOISE_SIZE x NOISE_SIZE heights in [0, 1], wrapping.
 var _noise: PackedFloat32Array = PackedFloat32Array()
-## Each crater as (x, z, radius, depth).
-var _craters: Array[Vector4] = []
+## Each mesa's outline: the phases of the two waves that make it irregular.
+var _mesa_phases: Array[Vector2] = []
+## The dry channel: the angle of its course from the centre, the phase of its meander, and the
+## distance from the centre it starts at; and its course as a direction.
+var _channel: Vector3 = Vector3.ZERO
+var _channel_course: Vector2 = Vector2.ZERO
 
 
 func setup(size: Vector2i) -> void:
@@ -289,48 +321,259 @@ func _add_mesh(mesh: Mesh, casts_shadow: bool) -> MeshInstance3D:
 	return instance
 
 
-## The land around the grid: a flat-shaded annulus from the grid's edge, where it is pinned to
-## y = 0 so it meets the ground without a seam, out to TERRAIN_EXTENT, coloured by height.
+## The land around the field: a smooth-shaded ring out to TERRAIN_EXTENT whose inner edge lies on
+## the field's at y = 0, built as one indexed mesh from a lattice of points (TERRAIN_FINE_REACH,
+## TERRAIN_COARSE). Where the coarse cells meet the fine ones, a coarse cell fans out from the
+## fine point in the middle of its edge, so no point lies on another cell's edge. Each point's
+## normal comes from its lattice neighbours' heights, once, and the ink outline (one more mesh,
+## on the same points and normals) inks the ridges and crater rims the camera sees over. Each
+## point is painted by slope and place (ROCK_SLOPE_Y, SHADOW_SLOPE_Y, CRATER_FLOOR, DRIFT): its
+## tint, which the faces between points blend, and its kit layer, the dust but on the mesas' walls
+## (rock). The terrain receives shadows and casts none.
 func _build_terrain(rng: SeededRng) -> void:
 	_noise.resize(NOISE_SIZE * NOISE_SIZE)
 	for i: int in _noise.size():
 		_noise[i] = rng.range_int(0, 1000) / 1000.0
-	var half := Vector2(grid_size) * 0.5
-	for i: int in rng.range_int(3, 5):
-		var angle := TAU * rng.range_int(0, 3599) / 3600.0
-		var radius := rng.range_int(40, 80) / 10.0
-		var distance := maxf(half.x, half.y) + radius * 1.6 + rng.range_int(40, 250) / 10.0
-		_craters.append(Vector4(cos(angle) * distance, sin(angle) * distance, radius,
-			rng.range_int(14, 22) / 10.0))
+	_place_features(rng)
 
-	var xs := _lattice(-half.x, half.x)
-	var zs := _lattice(-half.y, half.y)
+	# Lattice point (i, j) is world (i - half.x, j - half.y), so the field spans [0, grid_size].
+	# Fine points fill [fine_low, fine_high] but the field's inside, coarse ones every
+	# TERRAIN_COARSE out to [low, high]; both ranges are even, so the lattices meet.
+	var half := Vector2(grid_size) * 0.5
+	var fine_low := -Vector2i(ceili(TERRAIN_FINE_REACH - half.x), ceili(TERRAIN_FINE_REACH - half.y))
+	var fine_high := grid_size - fine_low + Vector2i(grid_size.x % 2, grid_size.y % 2)
+	var reach := TERRAIN_COARSE * ceili((TERRAIN_EXTENT - TERRAIN_FINE_REACH) / TERRAIN_COARSE)
+	var low := fine_low - Vector2i(reach, reach)
+	var high := fine_high + Vector2i(reach, reach)
+	var columns := high.x - low.x + 1
+	var rows := high.y - low.y + 1
+
+	# The points, each with its vertex in `ids` (-1 off the lattice) and its height in `heights`.
+	var ids := PackedInt32Array()
+	ids.resize(columns * rows)
+	ids.fill(-1)
 	var heights := PackedFloat32Array()
-	for z: float in zs:
-		for x: float in xs:
-			heights.append(_terrain_height(x, z))
-	var mesh := LowPolyMesh.new()
-	for j: int in zs.size() - 1:
-		for i: int in xs.size() - 1:
-			if xs[i] >= -half.x and xs[i + 1] <= half.x and zs[j] >= -half.y and zs[j + 1] <= half.y:
-				continue
-			var row := j * xs.size()
-			var a := Vector3(xs[i], heights[row + i], zs[j])
-			var b := Vector3(xs[i + 1], heights[row + i + 1], zs[j])
-			var c := Vector3(xs[i + 1], heights[row + xs.size() + i + 1], zs[j + 1])
-			var d := Vector3(xs[i], heights[row + xs.size() + i], zs[j + 1])
-			# Alternate the diagonals, so the facets do not all lean one way.
-			if (i + j) % 2 == 0:
-				_terrain_face(mesh, a, d, c)
-				_terrain_face(mesh, a, c, b)
+	heights.resize(columns * rows)
+	var vertices := PackedVector3Array()
+	var places := PackedInt32Array()
+	var coarse_columns := PackedInt32Array(range(low.x, high.x + 1, TERRAIN_COARSE))
+	for j: int in range(low.y, high.y + 1):
+		var coarse_row := (j - low.y) % TERRAIN_COARSE == 0
+		var row := coarse_columns
+		if j >= fine_low.y and j <= fine_high.y:
+			row = PackedInt32Array()
+			if coarse_row:
+				row.append_array(PackedInt32Array(range(low.x, fine_low.x, TERRAIN_COARSE)))
+			if j > 0 and j < grid_size.y:
+				row.append_array(PackedInt32Array(range(fine_low.x, 1)))
+				row.append_array(PackedInt32Array(range(grid_size.x, fine_high.x + 1)))
 			else:
-				_terrain_face(mesh, a, d, b)
-				_terrain_face(mesh, b, d, c)
-	var terrain := MeshInstance3D.new()
-	terrain.mesh = mesh.to_mesh()
-	# Its relief shows in the flat shading; its shadows would cost a pass for little.
-	terrain.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
-	add_child(terrain)
+				row.append_array(PackedInt32Array(range(fine_low.x, fine_high.x + 1)))
+			if coarse_row:
+				row.append_array(PackedInt32Array(range(fine_high.x + TERRAIN_COARSE, high.x + 1, TERRAIN_COARSE)))
+		elif not coarse_row:
+			continue
+		var z := j - half.y
+		for i: int in row:
+			var place := (j - low.y) * columns + i - low.x
+			var x := i - half.x
+			var y := terrain_height(x, z)
+			ids[place] = vertices.size()
+			heights[place] = y
+			places.append(place)
+			vertices.append(Vector3(x, y, z))
+
+	var normals := PackedVector3Array()
+	var uvs := PackedVector2Array()
+	var uv2s := PackedVector2Array()
+	var colors := PackedColorArray()
+	# Only points in here can be on a mesa's wall.
+	var mesa_area := Rect2()
+	for k: int in mesas.size():
+		var around := Rect2(mesas[k].x, mesas[k].y, 0.0, 0.0).grow(mesas[k].z + 3.0)
+		mesa_area = around if k == 0 else mesa_area.merge(around)
+	for v: int in vertices.size():
+		var place := places[v]
+		var column := place % columns
+		var row := place / columns
+		var step := 1
+		if column < fine_low.x - low.x or column > fine_high.x - low.x \
+				or row < fine_low.y - low.y or row > fine_high.y - low.y:
+			step = TERRAIN_COARSE
+		# The rise across the point along x and z: between its neighbours `step` either side, or
+		# 2 `step` where the lattice coarsens, or the point itself at an edge.
+		var east := place
+		var west := place
+		var north := place
+		var south := place
+		if column + step < columns and ids[place + step] >= 0:
+			east = place + step
+		elif column + 2 * step < columns and ids[place + 2 * step] >= 0:
+			east = place + 2 * step
+		if column >= step and ids[place - step] >= 0:
+			west = place - step
+		elif column >= 2 * step and ids[place - 2 * step] >= 0:
+			west = place - 2 * step
+		if row + step < rows and ids[place + step * columns] >= 0:
+			south = place + step * columns
+		elif row + 2 * step < rows and ids[place + 2 * step * columns] >= 0:
+			south = place + 2 * step * columns
+		if row >= step and ids[place - step * columns] >= 0:
+			north = place - step * columns
+		elif row >= 2 * step and ids[place - 2 * step * columns] >= 0:
+			north = place - 2 * step * columns
+		var along_x := 0.0
+		var along_z := 0.0
+		if east != west:
+			along_x = (heights[east] - heights[west]) / (east - west)
+		if south != north:
+			along_z = (heights[south] - heights[north]) / ((south - north) / columns)
+		var normal := Vector3(-along_x, 1.0, -along_z).normalized()
+		normals.append(normal)
+		var at := vertices[v]
+		uvs.append(Vector2(at.x, at.z) * TERRAIN_UV)
+		# Each weight steps smoothly from 0 to 1 across its threshold. A slope is steeper than a
+		# threshold where its normal's y is below it.
+		var steep := smoothstep(ROCK_SLOPE_Y + 0.1, ROCK_SLOPE_Y - 0.1, normal.y)
+		var tint := MaterialKit.ROCK
+		if steep < 1.0:
+			var facing := normal.x * SUN_ACROSS.x + normal.z * SUN_ACROSS.y
+			var shadow_side := smoothstep(SHADOW_SLOPE_Y + 0.03, SHADOW_SLOPE_Y - 0.03, normal.y) \
+				* smoothstep(-0.05, -0.15, facing)
+			var lit_side := smoothstep(LIT_SLOPE_Y + 0.03, LIT_SLOPE_Y - 0.03, normal.y) * smoothstep(0.1, 0.2, facing)
+			# The craters all lie inside the fine lattice.
+			var floor_weight := 0.0
+			if step == 1:
+				floor_weight = _crater_floor(at.x, at.z)
+			var drift := smoothstep(DRIFT - PAINT_SOFTNESS, DRIFT + PAINT_SOFTNESS,
+				_noise_at(at.x * 1.9 + 71.0, at.z * 1.9 + 23.0))
+			tint = MaterialKit.TERRAIN.lerp(MaterialKit.TERRAIN_LIGHT, maxf(lit_side, drift)) \
+				.lerp(MaterialKit.TERRAIN_DARK, maxf(shadow_side, floor_weight)) \
+				.lerp(MaterialKit.ROCK, steep)
+		var layer := MaterialKit.Layer.REGOLITH
+		if mesa_area.has_point(Vector2(at.x, at.z)) and _on_mesa_wall(at.x, at.z):
+			layer = MaterialKit.Layer.ROCK
+		uv2s.append(Vector2(layer, Surf.LIT))
+		colors.append(tint)
+
+	# The cells' triangles, going round as (i, j), (i + 1, j), (i + 1, j + 1), (i, j + 1), which
+	# faces up; the diagonals alternate, so the faces do not all lean one way.
+	var indices := PackedInt32Array()
+	for j: int in range(fine_low.y, fine_high.y):
+		for i: int in range(fine_low.x, fine_high.x):
+			if i >= 0 and i < grid_size.x and j >= 0 and j < grid_size.y:
+				continue
+			var place := (j - low.y) * columns + i - low.x
+			var a := ids[place]
+			var b := ids[place + 1]
+			var c := ids[place + columns + 1]
+			var d := ids[place + columns]
+			indices.append(a)
+			indices.append(b)
+			if (i + j) % 2 == 0:
+				indices.append(c)
+				indices.append(a)
+			else:
+				indices.append(d)
+				indices.append(b)
+			indices.append(c)
+			indices.append(d)
+	var span := TERRAIN_COARSE
+	for j: int in range(low.y, high.y, span):
+		for i: int in range(low.x, high.x, span):
+			if i >= fine_low.x and i < fine_high.x and j >= fine_low.y and j < fine_high.y:
+				continue
+			var place := (j - low.y) * columns + i - low.x
+			var corners := PackedInt32Array([ids[place], ids[place + span], ids[place + span * columns + span],
+				ids[place + span * columns]])
+			# The fine point in the middle of an edge the cell shares with the fine lattice, if any.
+			var middles := PackedInt32Array([ids[place + 1], ids[place + columns + span],
+				ids[place + span * columns + 1], ids[place + columns]])
+			var fan := -1
+			for k: int in 4:
+				if middles[k] >= 0:
+					fan = k
+			if fan >= 0:
+				var m := middles[fan]
+				for k: int in range(1, 4):
+					indices.append_array(PackedInt32Array([m, corners[(fan + k) % 4], corners[(fan + k + 1) % 4]]))
+			elif ((i - low.x) / span + (j - low.y) / span) % 2 == 0:
+				indices.append_array(PackedInt32Array([corners[0], corners[1], corners[2],
+					corners[0], corners[2], corners[3]]))
+			else:
+				indices.append_array(PackedInt32Array([corners[0], corners[1], corners[3],
+					corners[1], corners[2], corners[3]]))
+
+	var arrays := []
+	arrays.resize(Mesh.ARRAY_MAX)
+	arrays[Mesh.ARRAY_VERTEX] = vertices
+	arrays[Mesh.ARRAY_NORMAL] = normals
+	arrays[Mesh.ARRAY_INDEX] = indices
+	var hull := ArrayMesh.new()
+	hull.add_surface_from_arrays(Mesh.PRIMITIVE_TRIANGLES, arrays)
+	hull.surface_set_material(0, MaterialKit.ink())
+	arrays[Mesh.ARRAY_TEX_UV] = uvs
+	arrays[Mesh.ARRAY_TEX_UV2] = uv2s
+	arrays[Mesh.ARRAY_COLOR] = colors
+	var body := ArrayMesh.new()
+	body.add_surface_from_arrays(Mesh.PRIMITIVE_TRIANGLES, arrays)
+	body.surface_set_material(0, MaterialKit.toon())
+	terrain = _add_mesh(body, false)
+	terrain_outline = _add_mesh(hull, false)
+
+
+## Places the terrain's features from `rng`, inside the fine lattice: two mesas towards the far
+## edge of the view (up the screen, -x and -z), off its diagonal so that they show at the widest
+## zoom, their flat tops 4 to 6 above the dunes' crests; three to five craters well clear of the
+## field and of each other; and the channel's course, away from the mesas.
+func _place_features(rng: SeededRng) -> void:
+	var half := Vector2(grid_size) * 0.5
+	for attempt: int in 80:
+		if mesas.size() == 2:
+			break
+		var angle := deg_to_rad(225.0 + rng.range_int(15, 45) * (1 if rng.range_int(0, 1) == 0 else -1))
+		var radius := rng.range_int(50, 75) / 10.0
+		var at := Vector2(cos(angle), sin(angle)) * rng.range_int(300, 420) / 10.0
+		var height := rng.range_int(40, 60) / 10.0
+		var phases := Vector2(rng.range_int(0, 359), rng.range_int(0, 359)) * TAU / 360.0
+		var out := _out_of_field(at.x, at.y)
+		if maxf(absf(at.x), absf(at.y)) + radius + 2.0 <= TERRAIN_FINE_REACH and out >= radius + 6.0 \
+				and _clear(at, radius + 3.0):
+			mesas.append(Vector4(at.x, at.y, radius, 0.8 * _dune_height(out) + out * RISE + height))
+			_mesa_phases.append(phases)
+	var count := rng.range_int(3, 5)
+	for attempt: int in 80:
+		if craters.size() == count:
+			break
+		var angle := TAU * rng.range_int(0, 3599) / 3600.0
+		var radius := rng.range_int(60, 120) / 10.0
+		var distance := maxf(half.x, half.y) + radius * 1.4 + rng.range_int(40, 180) / 10.0
+		var at := Vector2(cos(angle), sin(angle)) * distance
+		if _out_of_field(at.x, at.y) >= radius * 1.4 + 4.0 and _clear(at, radius * 1.5) \
+				and maxf(absf(at.x), absf(at.y)) + radius * 1.5 <= TERRAIN_FINE_REACH:
+			craters.append(Vector3(at.x, at.y, radius))
+	var course := 0.0
+	for attempt: int in 40:
+		course = TAU * rng.range_int(0, 3599) / 3600.0
+		var apart := true
+		for mesa: Vector4 in mesas:
+			apart = apart and absf(angle_difference(course, atan2(mesa.y, mesa.x))) > 0.9
+		if apart:
+			break
+	var edge := minf(half.x / maxf(absf(cos(course)), 0.001), half.y / maxf(absf(sin(course)), 0.001))
+	_channel = Vector3(course, TAU * rng.range_int(0, 359) / 360.0, edge + 6.0)
+	_channel_course = Vector2(cos(course), sin(course))
+
+
+## Whether a feature reaching `extent` from `at` stays clear of every crater and mesa so far.
+func _clear(at: Vector2, extent: float) -> bool:
+	for crater: Vector3 in craters:
+		if at.distance_to(Vector2(crater.x, crater.y)) < extent + crater.z * 1.5:
+			return false
+	for mesa: Vector4 in mesas:
+		if at.distance_to(Vector2(mesa.x, mesa.y)) < extent + mesa.z + 3.0:
+			return false
+	return true
 
 
 ## Low-poly rocks scattered on the terrain around the grid, all in one mesh.
@@ -348,7 +591,7 @@ func _build_rocks(rng: SeededRng) -> void:
 		if absf(x) < half.x + radius and absf(z) < half.y + radius:
 			continue
 		placed += 1
-		_rock(mesh, Vector3(x, _terrain_height(x, z) - 0.2 * radius, z), radius, rng)
+		_rock(mesh, Vector3(x, terrain_height(x, z) - 0.2 * radius, z), radius, rng)
 	var rocks := MeshInstance3D.new()
 	rocks.mesh = mesh.to_mesh()
 	add_child(rocks)
@@ -381,65 +624,116 @@ static func _rock(mesh: LowPolyMesh, pos: Vector3, radius: float, rng: SeededRng
 		mesh.triangle(upper[j], peak, upper[k], ROCK_TOP)
 
 
-## Heights: 0 at the grid's edge, rising gently with distance, with value-noise hills and
-## the craters.
-func _terrain_height(x: float, z: float) -> float:
-	var half := Vector2(grid_size) * 0.5
-	var out := Vector2(maxf(absf(x) - half.x, 0.0), maxf(absf(z) - half.y, 0.0)).length()
-	var hills := 0.65 * _noise_at(x, z) + 0.35 * _noise_at(x * 2.3 + 37.0, z * 2.3 + 11.0)
-	return smoothstep(0.0, 10.0, out) * (hills * 3.2 + out * 0.04 + _crater_dip(x, z))
+## The terrain's height at a point: flat out to TERRAIN_FLAT outside the field, then ridged dunes
+## that grow away from it (flattened round the craters) and a gentle rise, the craters' bowls and
+## rims, the channel, and the mesas' flat tops, all blended in by TERRAIN_BLEND. The harness marches
+## the view's rays over it.
+func terrain_height(x: float, z: float) -> float:
+	var out_x := maxf(absf(x) - grid_size.x * 0.5, 0.0)
+	var out_z := maxf(absf(z) - grid_size.y * 0.5, 0.0)
+	var out := sqrt(out_x * out_x + out_z * out_z)
+	if out <= TERRAIN_FLAT:
+		return 0.0
+	var ridge := 1.0 - absf(2.0 * _noise_at(x * DUNE_SCALE, z * DUNE_SCALE) - 1.0)
+	# _dune_height(out), written out: this runs for every point of the lattice.
+	var dunes := lerpf(DUNES_NEAR, DUNES_FAR, smoothstep(3.0, 18.0, out)) \
+		* (0.8 * ridge + 0.2 * _noise_at(x * 2.3 + 37.0, z * 2.3 + 11.0))
+	var height := out * RISE
+	var distance := sqrt(x * x + z * z)
+	# The channel wanders at most CHANNEL_MEANDER from its course: a point well off it is skipped.
+	if distance > _channel.z and x * _channel_course.x + z * _channel_course.y > distance * cos(CHANNEL_MEANDER + 0.3):
+		var course := _channel.x + CHANNEL_MEANDER * sin(distance / 9.0 + _channel.y)
+		var across := angle_difference(course, atan2(z, x)) * distance
+		if absf(across) < CHANNEL_WIDTH:
+			var u := 1.0 - (across / CHANNEL_WIDTH) * (across / CHANNEL_WIDTH)
+			height -= CHANNEL_DEPTH * u * u * smoothstep(_channel.z, _channel.z + 5.0, distance)
+	# The craters and mesas all lie inside the fine lattice.
+	if absf(x) > TERRAIN_FINE_REACH or absf(z) > TERRAIN_FINE_REACH:
+		return height + dunes
+	for crater: Vector3 in craters:
+		var dx := x - crater.x
+		var dz := z - crater.y
+		if dx * dx + dz * dz < 4.0 * crater.z * crater.z:
+			var t := sqrt(dx * dx + dz * dz) / crater.z
+			dunes *= smoothstep(0.8, 1.9, t)
+			height += crater.z * _crater_profile(t)
+	height += dunes
+	for k: int in mesas.size():
+		var mesa := mesas[k]
+		var dx := x - mesa.x
+		var dz := z - mesa.y
+		if dx * dx + dz * dz < (mesa.z + 3.0) * (mesa.z + 3.0):
+			var edge := _mesa_edge(k, dx, dz)
+			var top := 1.0 - smoothstep(edge - MESA_WALL, edge + MESA_FOOT, sqrt(dx * dx + dz * dz))
+			height = lerpf(height, mesa.w, top)
+	return height * smoothstep(TERRAIN_FLAT, TERRAIN_BLEND, out)
 
 
-## How much the craters lower (bowls) or raise (rims) the ground at a point.
-func _crater_dip(x: float, z: float) -> float:
-	var dip := 0.0
-	for crater: Vector4 in _craters:
-		var t := Vector2(x - crater.x, z - crater.y).length() / crater.z
-		if t < 1.8:
-			dip += -crater.w * maxf(1.0 - t * t, 0.0) + crater.w * 0.45 * exp(-pow((t - 1.0) / 0.3, 2.0))
-	return dip
+## The dunes' height `out` units out from the field: low beside it, DUNES_FAR from 18 out.
+static func _dune_height(out: float) -> float:
+	return lerpf(DUNES_NEAR, DUNES_FAR, smoothstep(3.0, 18.0, out))
 
 
-## Smoothly interpolated lattice noise in [0, 1].
+## Mesa `k`'s outline: its distance from the mesa's centre towards (`dx`, `dz`), irregular.
+func _mesa_edge(k: int, dx: float, dz: float) -> float:
+	var turn := atan2(dz, dx)
+	var phases := _mesa_phases[k]
+	return mesas[k].z * (1.0 + 0.12 * sin(3.0 * turn + phases.x) + 0.06 * sin(5.0 * turn + phases.y))
+
+
+## Whether a point is on a mesa's wall: below its rim's edge and out to a unit past its foot,
+## where the rock layer meets the dust on level ground.
+func _on_mesa_wall(x: float, z: float) -> bool:
+	for k: int in mesas.size():
+		var dx := x - mesas[k].x
+		var dz := z - mesas[k].y
+		if dx * dx + dz * dz < (mesas[k].z + 3.0) * (mesas[k].z + 3.0):
+			var edge := _mesa_edge(k, dx, dz)
+			var distance := sqrt(dx * dx + dz * dz)
+			return distance > edge - MESA_WALL and distance < edge + MESA_FOOT + 1.0
+	return false
+
+
+## A crater's height `t` radii from its centre, in radii: a flat floor CRATER_DEPTH deep out to
+## 0.45, a wall steepening up to a rim CRATER_RIM high at 1, and a gentler slope outside it.
+static func _crater_profile(t: float) -> float:
+	var height := CRATER_RIM * exp(-pow((t - 1.0) / (0.15 if t < 1.0 else 0.4), 2.0))
+	if t < 1.0:
+		height -= CRATER_DEPTH * (1.0 - smoothstep(0.45, 1.0, t))
+	return height
+
+
+## How much a point is on a crater's floor: 1 within CRATER_FLOOR radii of a crater's centre,
+## fading out over a tenth of its radius beyond.
+func _crater_floor(x: float, z: float) -> float:
+	for crater: Vector3 in craters:
+		var reach := (CRATER_FLOOR + 0.1) * crater.z
+		var squared := (x - crater.x) * (x - crater.x) + (z - crater.y) * (z - crater.y)
+		if squared < reach * reach:
+			return 1.0 - smoothstep(CRATER_FLOOR, CRATER_FLOOR + 0.1, sqrt(squared) / crater.z)
+	return 0.0
+
+
+## How far a point lies outside the field, in world units (0 inside).
+func _out_of_field(x: float, z: float) -> float:
+	return Vector2(maxf(absf(x) - grid_size.x * 0.5, 0.0), maxf(absf(z) - grid_size.y * 0.5, 0.0)).length()
+
+
+## Smoothly interpolated lattice noise in [0, 1]. Written out, as the terrain asks for some
+## 30,000 values.
 func _noise_at(x: float, z: float) -> float:
 	var gx := x / NOISE_CELL
 	var gz := z / NOISE_CELL
 	var ix := floori(gx)
 	var iz := floori(gz)
-	var fx := smoothstep(0.0, 1.0, gx - ix)
-	var fz := smoothstep(0.0, 1.0, gz - iz)
-	var top := lerpf(_lattice_value(ix, iz), _lattice_value(ix + 1, iz), fx)
-	var bottom := lerpf(_lattice_value(ix, iz + 1), _lattice_value(ix + 1, iz + 1), fx)
-	return lerpf(top, bottom, fz)
-
-
-func _lattice_value(ix: int, iz: int) -> float:
-	return _noise[posmod(iz, NOISE_SIZE) * NOISE_SIZE + posmod(ix, NOISE_SIZE)]
-
-
-## One terrain face (corners counter-clockwise from above), painted by its height band.
-func _terrain_face(mesh: LowPolyMesh, a: Vector3, b: Vector3, c: Vector3) -> void:
-	var centre := (a + b + c) / 3.0
-	var surf := TERRAIN_PEAK
-	if _crater_dip(centre.x, centre.z) < -0.3:
-		surf = TERRAIN_CRATER
-	elif centre.y < 0.8:
-		surf = TERRAIN_LOW
-	elif centre.y < 2.0:
-		surf = TERRAIN_MID
-	elif centre.y < 3.2:
-		surf = TERRAIN_HIGH
-	mesh.triangle(a, b, c, surf)
-
-
-## Lattice coordinates along one axis from -TERRAIN_EXTENT to TERRAIN_EXTENT that include
-## both grid edges, `low` and `high`, so the terrain's inner edge lies exactly on them.
-static func _lattice(low: float, high: float) -> PackedFloat32Array:
-	var axis := PackedFloat32Array()
-	for k: int in range(ceili((TERRAIN_EXTENT + low) / TERRAIN_STEP), 0, -1):
-		axis.append(low - k * TERRAIN_STEP)
-	for k: int in ceili((high - low) / TERRAIN_STEP):
-		axis.append(low + k * TERRAIN_STEP)
-	for k: int in ceili((TERRAIN_EXTENT - high) / TERRAIN_STEP) + 1:
-		axis.append(high + k * TERRAIN_STEP)
-	return axis
+	var fx := gx - ix
+	var fz := gz - iz
+	fx = fx * fx * (3.0 - 2.0 * fx)
+	fz = fz * fz * (3.0 - 2.0 * fz)
+	var left := posmod(ix, NOISE_SIZE)
+	var right := (left + 1) % NOISE_SIZE
+	var near := posmod(iz, NOISE_SIZE) * NOISE_SIZE
+	var far := (near + NOISE_SIZE) % (NOISE_SIZE * NOISE_SIZE)
+	var top := _noise[near + left] + (_noise[near + right] - _noise[near + left]) * fx
+	var bottom := _noise[far + left] + (_noise[far + right] - _noise[far + left]) * fx
+	return top + (bottom - top) * fz

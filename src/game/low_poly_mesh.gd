@@ -110,8 +110,8 @@ static func turn(offset: Vector3, rot: Vector3) -> Vector3:
 # --- Faces -----------------------------------------------------------------------
 
 ## One face. Corners are counter-clockwise seen from the front. Built directly, with no arrays
-## along the way, since the terrain adds some 15,000 of them; the UVs are the planar ones _face
-## gives, and a single face has nothing to smooth.
+## along the way, for meshes made of many single faces (the scenery's rocks); the UVs are the
+## planar ones _face gives, and a single face has nothing to smooth.
 func triangle(a: Vector3, b: Vector3, c: Vector3, surf: Surf) -> void:
 	var facing := (b - a).cross(c - a)
 	var normal := facing.normalized()
