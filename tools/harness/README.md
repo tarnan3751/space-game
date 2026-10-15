@@ -151,6 +151,25 @@ a SWING part's bounds are turned every 5 degrees from -amplitude to +amplitude, 
 included; a SLIDE part's are shifted to both ends. A failure says by how much it reaches over;
 nothing checks the height.
 
+`scenarios/effects.gd` is the animation rig (`docs/reference/art-style.md`, **Animation**): a
+test part for each surface effect and each kind of moving part, built with `LowPolyMesh` and
+`Parts` and assembled by `BuildingModels.instantiate`, in two rows across the screen with the
+base's own views hidden. The first row: a PULSE orb, eight BLINK lamps round a ring at phases
+k/8, FLICKER sparks, a FLOW pipe on the pipe layer, a FLOW_U disc on the hazard layer, a BOB orb,
+an arc of UNLIT, FLICKER and JITTER strips between two posts, and a HOLO prism on a pedestal,
+plain and with the pedestal ghost-tinted. The second row: moving parts that SPIN about Y, SWING
+about X (SMOOTH), SLIDE along X (HAMMER) and along Z (RECOIL), and a turning cluster of FLICKER
+sparks, which has no outline. The scenario moves the moving parts itself, each frame, with
+`Motion.transform_at`, as `BuildingView` does. In both modes it checks each part's surface count
+(two for a hologram, its second on `MaterialKit.holo()` and never overridden), the flag bits on
+every vertex, UV2 stored uncompressed, at most eight instances, the outlines (the BOB orb's
+carries UV2 and colour, the arc's holds its posts only, the spark cluster has none), that a
+phase read back from the mesh decodes as the shaders do (0.5 exactly, every k/8 within half a
+1/254 step), and that every moving part moves in ten frames. Rendered, it frames the rig at camera size 10, waits half
+a second and ten frames, screenshots it at 0.0, 0.3 and 0.9 seconds, and checks that each part's
+region of the screen (1.5 units square round it) changed between the first two shots, or between
+any two for the flickering parts, which can be off in two shots.
+
 `scenarios/view_states.gd` checks the comic style's view states on a fresh base, each with a
 close-up screenshot: the selected Command Center's outlines in gold (and the override cleared on
 deselecting), the placement ghost's body tinted valid on a free spot and invalid on the Command
