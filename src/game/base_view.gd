@@ -1,7 +1,8 @@
 class_name BaseView
 extends Node3D
-## Draws the base: the buildable ground with its cell grid, the terrain and rocks around it,
-## and one BuildingView per building, the finished walls drawn together by one WallMesh. Also
+## Draws the base: the buildable ground with its cell grid, the curb round it, the terrain and
+## rocks around that, and one BuildingView per building, the finished walls drawn together by one
+## WallMesh. Also
 ## owns the cell <-> world mapping: 1 cell = 1 world unit, grid centred on the origin, cell
 ## (x, y) maps to world (x, z).
 ##
@@ -23,6 +24,16 @@ const TERRAIN_STEP := 2.0
 const NOISE_CELL := 7.0
 const NOISE_SIZE := 24
 const ROCK_COUNT := 40
+## The curb round the field: its height and width, its gap from the field's edge, and how far
+## each corner is cut back along each side. A glowing stud stands on it at every plate seam (the
+## ground's plates are PLATE_CELLS square) and on each corner.
+const CURB_HEIGHT := 0.2
+const CURB_WIDTH := 0.3
+const CURB_GAP := 0.3
+const CURB_CORNER := 0.6
+const CURB_BEVEL := 0.04
+const PLATE_CELLS := 4
+const STUD_RADIUS := 0.1
 ## Texture repeats per world unit on the terrain: the dust large (a craterlet about every two
 ## cells), the rock grain finer.
 const TERRAIN_DUST_UV := 0.3
@@ -41,6 +52,8 @@ static var TERRAIN_HIGH := Surf.make(MaterialKit.Layer.ROCK, MaterialKit.ROCK, T
 	false, false)
 static var TERRAIN_PEAK := Surf.make(MaterialKit.Layer.ROCK, MaterialKit.ROCK.darkened(0.15), TERRAIN_ROCK_UV,
 	Surf.LIT, false, false)
+## The curb's studs: domes of unlit energy cyan, too small for the outline.
+static var CURB_STUD := Surf.make(MaterialKit.Layer.GLOW, MaterialKit.ENERGY, 1.0, Surf.UNLIT, false, false)
 ## The rocks' sides and tops, outlined.
 static var ROCK_SIDE := Surf.make(MaterialKit.Layer.ROCK, MaterialKit.ROCK)
 static var ROCK_TOP := Surf.make(MaterialKit.Layer.ROCK, MaterialKit.ROCK_LIT)
@@ -53,6 +66,9 @@ var selected_id: int = 0
 var dragging_id: int = 0
 ## Every finished wall but the dragged one, in one mesh.
 var walls: WallMesh
+## The scenery, each a body and its ink outline, which casts no shadow.
+var boundary: MeshInstance3D
+var boundary_outline: MeshInstance3D
 
 var _ground_material: ShaderMaterial
 ## The walls `walls` draws, as (x << 32 | y << 16 | level) in id order: unchanged, no rebuild.
@@ -68,6 +84,7 @@ var _craters: Array[Vector4] = []
 func setup(size: Vector2i) -> void:
 	grid_size = size
 	_build_ground()
+	_build_boundary()
 	var rng := SeededRng.new(SCENERY_SEED)
 	_build_terrain(rng)
 	_build_rocks(rng)
@@ -191,6 +208,85 @@ func _build_ground() -> void:
 	ground.mesh = plane
 	ground.material_override = _ground_material
 	add_child(ground)
+
+
+## The curb round the field (CURB_*): an octagonal band of concrete with bevelled top edges and
+## a glowing stud on it at every plate seam and on each corner, in one mesh with its outline.
+## Neither casts a shadow.
+func _build_boundary() -> void:
+	var mesh := LowPolyMesh.new()
+	var top := CURB_HEIGHT - CURB_BEVEL
+	var inner := _curb_loop(0.0, 0.0)
+	var inner_shoulder := _curb_loop(0.0, top)
+	var inner_top := _curb_loop(CURB_BEVEL, CURB_HEIGHT)
+	var outer_top := _curb_loop(CURB_WIDTH - CURB_BEVEL, CURB_HEIGHT)
+	var outer_shoulder := _curb_loop(CURB_WIDTH, top)
+	var outer := _curb_loop(CURB_WIDTH, 0.0)
+	_curb_band(mesh, inner, inner_shoulder, -1.0)
+	_curb_band(mesh, inner_shoulder, inner_top, -1.0)
+	_curb_band(mesh, inner_top, outer_top, 1.0)
+	_curb_band(mesh, outer_top, outer_shoulder, 1.0)
+	_curb_band(mesh, outer_shoulder, outer, 1.0)
+
+	# A stud on the middle of the top at every plate seam along the straight sides, and on the
+	# middle of each corner cut (between corners 2k and 2k + 1 of the loop).
+	var middle := _curb_loop(CURB_WIDTH * 0.5, CURB_HEIGHT)
+	var straight := Vector2(middle[0].x, middle[1].z)
+	var studs := PackedVector3Array()
+	for k: int in 4:
+		studs.append((middle[2 * k] + middle[2 * k + 1]) * 0.5)
+	for x: int in range(PLATE_CELLS, grid_size.x, PLATE_CELLS):
+		var at := x - grid_size.x * 0.5
+		if absf(at) < straight.x:
+			studs.append(Vector3(at, CURB_HEIGHT, middle[0].z))
+			studs.append(Vector3(at, CURB_HEIGHT, -middle[0].z))
+	for z: int in range(PLATE_CELLS, grid_size.y, PLATE_CELLS):
+		var at := z - grid_size.y * 0.5
+		if absf(at) < straight.y:
+			studs.append(Vector3(middle[1].x, CURB_HEIGHT, at))
+			studs.append(Vector3(-middle[1].x, CURB_HEIGHT, at))
+	for stud: Vector3 in studs:
+		mesh.dome(STUD_RADIUS, STUD_RADIUS * 0.7, 10, 2, stud, CURB_STUD)
+
+	boundary = _add_mesh(mesh.to_mesh(), false)
+	boundary_outline = _add_mesh(mesh.to_outline_mesh(), false)
+
+
+## The curb's plan at `offset` out from its inner edge and at height `y`: the field's edge
+## CURB_GAP + offset out, with each corner cut, as eight corners going round.
+func _curb_loop(offset: float, y: float) -> PackedVector3Array:
+	var reach := Vector2(grid_size) * 0.5 + Vector2.ONE * (CURB_GAP + offset)
+	# Offsetting a 45 degree cut by `offset` lengthens it along each side by (2 - sqrt 2) offset.
+	var cut := CURB_CORNER + offset * (2.0 - sqrt(2.0))
+	return PackedVector3Array([
+		Vector3(reach.x - cut, y, reach.y), Vector3(reach.x, y, reach.y - cut),
+		Vector3(reach.x, y, -reach.y + cut), Vector3(reach.x - cut, y, -reach.y),
+		Vector3(-reach.x + cut, y, -reach.y), Vector3(-reach.x, y, -reach.y + cut),
+		Vector3(-reach.x, y, reach.y - cut), Vector3(-reach.x + cut, y, reach.y),
+	])
+
+
+## The faces between two curb loops, facing out from the field when `outwards` is 1, in when -1,
+## and up when they are level.
+static func _curb_band(mesh: LowPolyMesh, from: PackedVector3Array, to: PackedVector3Array, outwards: float) -> void:
+	for i: int in from.size():
+		var j := (i + 1) % from.size()
+		var quad := PackedVector3Array([from[i], from[j], to[j], to[i]])
+		var middle := (from[i] + from[j] + to[i] + to[j]) * 0.25
+		var facing := Vector3(middle.x * outwards, 1.0, middle.z * outwards)
+		if (quad[1] - quad[0]).cross(quad[2] - quad[0]).dot(facing) < 0.0:
+			quad.reverse()
+		mesh.polygon(quad, Parts.CONCRETE_PAD)
+
+
+## Adds an instance of `mesh`, casting a shadow or not.
+func _add_mesh(mesh: Mesh, casts_shadow: bool) -> MeshInstance3D:
+	var instance := MeshInstance3D.new()
+	instance.mesh = mesh
+	if not casts_shadow:
+		instance.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	add_child(instance)
+	return instance
 
 
 ## The land around the grid: a flat-shaded annulus from the grid's edge, where it is pinned to
