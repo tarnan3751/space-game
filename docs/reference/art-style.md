@@ -992,7 +992,8 @@ shadow offset down and right; text on a bright fill or over the world outlined i
 icons (the resource meters' ingot, shards and orb, seen from an angle, and the drone ring's
 quadcopter, seen from above)
 are vector shapes drawn in code, flat fills with a lighter facet and an ink outline, with no
-asset file.
+asset file. The meters' stripes drift, a hard-edged glint crosses each fill in turn and a change
+flashes it, all from `anim_time` (`meter.gdshader`, `hud.md`, **Top bar**).
 The build cards carry their category's accent from **Colour** as a stripe.
 
 ## Cost

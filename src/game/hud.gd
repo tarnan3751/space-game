@@ -89,13 +89,22 @@ const METER_TROUGH_LEFT := 20.0
 ## What the fill grows across: the trough inside its border.
 const METER_TRACK := Vector2(METER_SIZE.x - METER_TROUGH_LEFT - 2 * BORDER, METER_SIZE.y - 2 * BORDER)
 ## The fill's texture: a tile this many pixels square crossed by a 45-degree band this wide.
-## The band is white and the rest STRIPE_BASE grey, so the band is 25 % lighter; the fill's
-## modulate is the resource's colour over STRIPE_BASE, so the rest reads as the colour itself.
+## The band is white and the rest STRIPE_BASE grey, so the band is 25 % lighter; the stripes'
+## shader tints it by the resource's colour over STRIPE_BASE, so the rest reads as the colour itself.
 const STRIPE_TILE := 16
 const STRIPE_BAND := 6
 const STRIPE_BASE := 0.8
 ## Across the top third of the fill.
 const GLOSS := Color(1, 1, 1, 0.25)
+## The stripes' shader: their drift, the glint and the flash on a change (meter.gdshader).
+const METER_SHADER: Shader = preload("res://src/game/meter.gdshader")
+## Each meter glints this share of the glint's period after the one before it.
+const GLINT_STAGGER := 1.0 / 3.0
+## A meter flashes on a rise larger than this many seconds' (ticks') production.
+const FLASH_RISE_TICKS := 1.5
+## The seconds since the last refresh weighed against a rise are capped here: a stalled tick or
+## two still never flashes, while a longer gap's catch-up (the app resumed) does.
+const FLASH_MAX_SECONDS := 5
 ## The build panel's height, never past a share of the screen's.
 const MENU_HEIGHT := 300.0
 const MENU_MAX_SHARE := 0.4
@@ -118,6 +127,12 @@ var _top: VBoxContainer
 var _meters: Dictionary[String, Control] = {}
 var _meter_fills: Dictionary[String, Control] = {}
 var _meter_labels: Dictionary[String, Label] = {}
+## Each meter's stripes' material, and the amount it last showed, which a change flashes.
+var _meter_shaders: Dictionary[String, ShaderMaterial] = {}
+var _meter_amounts: Dictionary[String, int] = {}
+## The state's time at the meters' last refresh, so a rise is weighed against the production of
+## the seconds since.
+var _meters_now: int = 0
 var _drone_ring: DroneRing
 var _build_button: Button
 ## The build panel, outside the root and under it, so the Build button draws over it.
@@ -188,6 +203,8 @@ func refresh(state: BaseState, selected_id: int, placing: bool, ghost_ok: bool, 
 	# The safe area can move without a resize: turning a phone over moves the notch to the
 	# other side. Every refresh, the 1 s tick's included, checks it.
 	_fit_safe_area()
+	var elapsed := clampi(state.now - _meters_now, 1, FLASH_MAX_SECONDS)
+	_meters_now = state.now
 	for res: String in _meters:
 		# A resource the base has no storage for yet (antimatter, early on) is hidden, unless
 		# the cheats make every resource infinite.
@@ -197,7 +214,16 @@ func refresh(state: BaseState, selected_id: int, placing: bool, ghost_ok: bool, 
 		var fraction := clampf(float(amount) / capacity, 0.0, 1.0) if capacity > 0 else 0.0
 		if cheats:
 			fraction = 1.0
-		_meter_fills[res].size = Vector2(roundf(METER_TRACK.x * fraction), METER_TRACK.y)
+		var width := roundf(METER_TRACK.x * fraction)
+		if _meter_fills[res].size.x != width:
+			_meter_fills[res].size = Vector2(width, METER_TRACK.y)
+			_meter_shaders[res].set_shader_parameter(&"fill_width", width)
+		# A drop (a purchase) or a rise past FLASH_RISE_TICKS ticks' production (a payout, an
+		# offline catch-up) flashes the fill; the per-tick trickle does not. Under the cheats the
+		# meter reads "∞" whatever it holds.
+		if not cheats and _meter_amounts.has(res) and _flashes(res, amount - _meter_amounts[res], elapsed):
+			_meter_shaders[res].set_shader_parameter(&"flash_time", Motion.clock())
+		_meter_amounts[res] = amount
 		_meter_labels[res].text = "∞" if cheats else "%s / %s" % [Format.amount(amount), Format.amount(capacity)]
 	_drone_ring.set_counts(state.builders_free(), state.builders_total())
 
@@ -589,17 +615,18 @@ func _build_top_bar() -> void:
 	bar.add_theme_constant_override("separation", 14)
 	_top.add_child(bar)
 	var stripe := _make_stripe()
-	for res: String in _catalog.resources:
-		_build_meter(bar, res, stripe)
+	for i: int in _catalog.resources.size():
+		_build_meter(bar, _catalog.resources[i], stripe, fmod(i * GLINT_STAGGER, 1.0))
 	_drone_ring = DroneRing.new()
 	bar.add_child(_drone_ring)
 
 
 ## One resource's meter: a trough that the fill, textured with `stripe`, grows across by
-## amount over storage, the amount on it, and the resource's icon over its left end. The meter
-## stops a touch on it, as any opaque part does, so it never selects or drags what lies under
-## it; its parts take none.
-func _build_meter(parent: Control, res: String, stripe: Texture2D) -> void:
+## amount over storage, the amount on it, and the resource's icon over its left end. The stripes
+## drift and glint (meter.gdshader), the glint at `phase` of its period. The meter stops a touch
+## on it, as any opaque part does, so it never selects or drags what lies under it; its parts
+## take none.
+func _build_meter(parent: Control, res: String, stripe: Texture2D, phase: float) -> void:
 	var color := _resource_color(res)
 	var meter := Control.new()
 	meter.mouse_filter = Control.MOUSE_FILTER_STOP
@@ -629,7 +656,12 @@ func _build_meter(parent: Control, res: String, stripe: Texture2D) -> void:
 	stripes.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
 	stripes.stretch_mode = TextureRect.STRETCH_TILE
 	stripes.texture_repeat = CanvasItem.TEXTURE_REPEAT_ENABLED
-	stripes.modulate = Color(color.r / STRIPE_BASE, color.g / STRIPE_BASE, color.b / STRIPE_BASE)
+	var shader := ShaderMaterial.new()
+	shader.shader = METER_SHADER
+	shader.set_shader_parameter(&"tint", Color(color.r / STRIPE_BASE, color.g / STRIPE_BASE, color.b / STRIPE_BASE))
+	shader.set_shader_parameter(&"phase", phase)
+	shader.set_shader_parameter(&"track_height", METER_TRACK.y)
+	stripes.material = shader
 	stripes.size = METER_TRACK
 	fill.add_child(stripes)
 	var gloss := ColorRect.new()
@@ -661,6 +693,17 @@ func _build_meter(parent: Control, res: String, stripe: Texture2D) -> void:
 	_meters[res] = meter
 	_meter_fills[res] = fill
 	_meter_labels[res] = label
+	_meter_shaders[res] = shader
+
+
+## Whether a change of `change` in a resource's amount over `elapsed` seconds flashes its meter:
+## any drop, or a rise larger than FLASH_RISE_TICKS times the production of those seconds, rounded
+## up to a whole unit, since a slow trickle still rises a whole unit at a time. Only a rise sums
+## the production.
+func _flashes(res: String, change: int, elapsed: int) -> bool:
+	if change <= 0:
+		return change < 0
+	return change > ceili(FLASH_RISE_TICKS * _state.production_per_hour(res) * elapsed / 3600.0)
 
 
 ## Bottom right: toggles the build panel.

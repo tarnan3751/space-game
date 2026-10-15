@@ -1,8 +1,14 @@
 extends HarnessScenario
 ## The HUD on a fresh base: the meters and drone ring, the Build button and the panel it slides
 ## up (tabs, cards and their pictures, the selected tab pressed again, close button), a card
-## picked into the place bar, a purchase, a wide window.
+## picked into the place bar, a purchase and its flash on the metal meter, the crystal meter
+## still through the new harvester's trickle and flashing on a catch-up, a wide window; the
+## meters' glint crossing the metal fill.
 ## Touches are real input events (Input.parse_input_event), so they take a finger's path.
+
+## The meters' glint (meter.gdshader): its period and how long it takes to cross a fill.
+const GLINT_PERIOD := 3.5
+const GLINT_SWEEP := 0.6
 
 var _world_taps: int = 0
 
@@ -17,6 +23,7 @@ func run(main: MainScript) -> void:
 	_check_top_bar(hud, state)
 	check(not hud.is_menu_open() and hud.build_button().is_visible_in_tree(), "the panel starts closed, Build showing")
 	await screenshot("closed")
+	await _check_glint(main, hud)
 	await _tap(main, main.get_viewport().get_visible_rect().size * Vector2(0.4, 1.0) - Vector2(0, 100))
 	check(_world_taps == 1, "a tap where the closed panel opens reached the world")
 	main.placement.select(0)
@@ -108,10 +115,15 @@ func run(main: MainScript) -> void:
 	await open_build_menu(main)
 	hud.entry_button("crystal_harvester").pressed.emit()
 	main.placement.confirm_place()
+	var flash_at: float = _meter_shader(hud, "metal").get_shader_parameter(&"flash_time")
+	check(absf(Motion.clock() - flash_at) < 0.05, "the purchase flashed the metal meter at %.2f s (now %.2f s)" % [flash_at, Motion.clock()])
+	await screenshot("purchase-flash")
+	say("flash shot %.2f s after the purchase" % (Motion.clock() - flash_at))
 	await _wait(main, Hud.MENU_CLOSE_SECONDS)
 	_check_top_bar(hud, state)
 	check(hud.resource_fill("metal").size.x < metal_before, "the metal fill fell from %d px" % metal_before)
 	await screenshot("purchase")
+	await _check_trickle(main, hud)
 	# Build over the new building's info panel deselects it; the panel fits a wide window.
 	await open_build_menu(main)
 	check(main.placement.selected_id == 0, "opening the build panel cleared the selection")
@@ -132,6 +144,77 @@ func _check_top_bar(hud: Hud, state: BaseState) -> void:
 	var ring := hud.drones_panel()
 	check(ring.free_count() == state.builders_free() and ring.total_count() == state.builders_total(),
 		"the drone ring shows %d of %d free" % [ring.free_count(), ring.total_count()])
+
+
+## Each meter's stripes carry their own glint, a third of a period after the one before; two
+## shots 0.3 s apart catch the band crossing the metal fill (phase 0), timed by the one clock, and
+## a third catches it on the crystal fill.
+## With the panel closed, the draw calls are logged.
+func _check_glint(main: MainScript, hud: Hud) -> void:
+	var resources := main.state.catalog.resources
+	for i: int in resources.size():
+		var phase: float = _meter_shader(hud, resources[i]).get_shader_parameter(&"phase")
+		check(is_equal_approx(phase, fmod(i / 3.0, 1.0)), "the %s glint's phase is %.2f" % [resources[i], phase])
+	var width: float = _meter_shader(hud, "metal").get_shader_parameter(&"fill_width")
+	check(width == hud.resource_fill("metal").size.x, "the metal glint crosses the %.0f px fill" % width)
+	say("panel closed: %d draw calls" % Performance.get_monitor(Performance.RENDER_TOTAL_DRAW_CALLS_IN_FRAME))
+	# A shot is taken two frames after it is asked for, so the second is asked for that much
+	# before 0.3 s has passed.
+	while fmod(Motion.clock(), GLINT_PERIOD) < 0.1 or fmod(Motion.clock(), GLINT_PERIOD) >= 0.16:
+		await frames(1)
+	await screenshot("glint-start")
+	var start := Motion.clock()
+	say("glint shot at %.2f s into the metal sweep" % fmod(start, GLINT_PERIOD))
+	while Motion.clock() < start + 0.27:
+		await frames(1)
+	await screenshot("glint-later")
+	var later := fmod(Motion.clock(), GLINT_PERIOD)
+	say("glint shot at %.2f s into the metal sweep" % later)
+	check(later < GLINT_SWEEP, "the second glint shot is still within the %.1f s sweep" % GLINT_SWEEP)
+	# Then the crystal meter's glint, a third of a period later, halfway across its fill.
+	var crystal_start := GLINT_PERIOD / 3.0
+	while fposmod(Motion.clock() - crystal_start, GLINT_PERIOD) < 0.25 or fposmod(Motion.clock() - crystal_start, GLINT_PERIOD) >= 0.31:
+		await frames(1)
+	await screenshot("glint-crystal")
+	say("glint shot at %.2f s into the crystal sweep" % fposmod(Motion.clock() - crystal_start, GLINT_PERIOD))
+
+
+## The crystal harvester bought above, once built, adds crystal every tick or two: that trickle
+## never flashes the crystal meter, a stalled tick's included, and an hour's catch-up does.
+func _check_trickle(main: MainScript, hud: Hud) -> void:
+	var state: BaseState = main.state
+	var harvester := 0
+	for id: int in state.buildings:
+		if state.buildings[id].type == "crystal_harvester":
+			harvester = id
+	advance(state.seconds_left(harvester) + 1)
+	_refresh(main)
+	check(state.production_per_hour("crystal") > 0, "the harvester produces %d crystal an hour" % state.production_per_hour("crystal"))
+	# Null until the meter first flashes.
+	var flashed: Variant = _meter_shader(hud, "crystal").get_shader_parameter(&"flash_time")
+	var before: int = state.resources["crystal"]
+	for tick: int in 6:
+		advance(1)
+		_refresh(main)
+	# A stalled tick: four seconds' trickle at once.
+	advance(4)
+	_refresh(main)
+	var still: Variant = _meter_shader(hud, "crystal").get_shader_parameter(&"flash_time")
+	check(still == flashed and state.resources["crystal"] > before,
+		"six ticks' and a four-second tick's trickle (%d -> %d crystal) did not flash the meter" % [before, state.resources["crystal"]])
+	advance(3600)
+	_refresh(main)
+	var caught_up: float = _meter_shader(hud, "crystal").get_shader_parameter(&"flash_time")
+	check(absf(Motion.clock() - caught_up) < 0.05, "an hour's catch-up to %d crystal flashed the meter" % state.resources["crystal"])
+
+
+func _refresh(main: MainScript) -> void:
+	main.hud.refresh(main.state, main.placement.selected_id, main.placement.is_placing(), main.placement.ghost_is_valid(),
+		main.placement.is_painting())
+
+
+func _meter_shader(hud: Hud, res: String) -> ShaderMaterial:
+	return (hud.resource_fill(res).get_child(0) as CanvasItem).material as ShaderMaterial
 
 
 func _wait(main: MainScript, seconds: float) -> void:

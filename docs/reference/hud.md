@@ -98,7 +98,7 @@ antimatter appears once something stores it. A trough (`TROUGH`, radius 10, its 
 capacity` of the track (full at the cap), resized only on `refresh`. The fill is a `Control`
 with `clip_contents` holding a `TextureRect` that tiles a 16×16 stripe image across the whole
 track — a 45-degree white band over a grey 25 % darker, built once in `setup`
-(`_make_stripe`) and modulated by the resource's colour over that grey, so the base reads as the
+(`_make_stripe`) and tinted by the resource's colour over that grey, so the base reads as the
 colour itself and the band 25 % lighter — and a gloss band (white at 25 %) across its top
 third. The trough's ink border is drawn again over the fill, so the fill's square ends never
 cover its round corners. The amount, `"750 / 1,000"` (`Format.amount`), sits centred on the
@@ -106,6 +106,25 @@ part of the trough right of the icon, in Lilita One 18 px white with a 2 px ink 
 resource's icon (a `HudIcon`, 40×40) sits over the trough's left end like a badge. With the dev
 cheats on (`Hud.cheats`, set by `main.gd`) every meter shows, full, reading `∞` (Lilita One has
 no `∞`; the meters' fallback, the engine's font, draws it, **Theme**).
+
+**The meters move.** The stripes are drawn through `meter.gdshader`, one `ShaderMaterial` per
+meter (its tint, its phase, the fill's width), all on the one animation clock, `anim_time`
+(`art-style.md`, **Animation**, "One clock"), so nothing animates them per frame in GDScript. The
+stripes drift along the bar, one tile (16 px) every 4 s. Once every 3.5 s a glint sweeps across
+the filled part from left to right in 0.6 s: a hard-edged band 26 px wide, leaning right at the
+top, in the near-white text colour at 70 % with a 6 px core at full, each with a 1 px soft edge.
+Each meter's glint comes a third of the period after the one before it (`GLINT_STAGGER`), so they
+never flash together. When a refresh finds a meter's amount dropped (a purchase), or
+risen (a payout, an offline catch-up, loot) by more than 1.5 times what the resource produces in
+the seconds the state advanced since the last refresh, counted as at least one and at most five
+(`FLASH_RISE_TICKS`, `FLASH_MAX_SECONDS`) and rounded up to a whole unit, since a slow trickle
+still rises a whole unit at a time, its whole fill flashes once, brightening 45 % towards white
+and fading back over 0.25 s (`flash_time`, set to `Motion.clock()`). The per-tick trickle, a
+stalled tick's included, never flashes; a longer gap's catch-up does. The first refresh only records the
+amounts, and under the cheats, whose meters read `∞`, nothing flashes. The glint and the flash
+are in the stripes, so the fill's clip keeps them off the border, the shadow and the icon. The
+drift's period divides the clock's hour; the glint's does not, so it jumps once an hour. The
+shader adds no draw call (`art-style.md`, **Cost**).
 
 **Icons.** `HudIcon` draws its silhouette in `_draw`, vector, from no asset file, and only when it
 is built or resized. Each part is a flat fill in the icon's colour with a lighter highlight facet

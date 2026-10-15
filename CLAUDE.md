@@ -65,7 +65,7 @@ or `data/`.
 | Data format: `rules.json`, `buildings.json`, the fixtures, the save file | `data/`, `test/support/fixtures/` | `docs/reference/data-format.md` |
 | Input and camera: the scene, camera, gestures, placement, views | `src/game/` (all but the HUD's and the art style's files) | `docs/reference/input-camera.md` |
 | Art style: the look, light, colours, the material kit, `LowPolyMesh`, outlines, models, animation, the construction drone, view states | `src/game/models/`, `construction_drone.gd`, `src/game/*.gdshader*`, `material_kit.gd`, `surf.gd`, `motion.gd`, `low_poly_mesh.gd`, `assets/textures/kit/`, `assets/textures/*.png`, `tools/gen_textures.gd` | `docs/reference/art-style.md` |
-| HUD: the theme and fonts, top bar (meters, drone ring), Build button and build panel, place bar, info panel, toasts | `src/game/hud.gd`, `hud_icon.gd`, `drone_ring.gd`, `format.gd`, `assets/fonts/` | `docs/reference/hud.md` |
+| HUD: the theme and fonts, top bar (meters, drone ring), Build button and build panel, place bar, info panel, toasts | `src/game/hud.gd`, `hud_icon.gd`, `drone_ring.gd`, `meter.gdshader`, `format.gd`, `assets/fonts/` | `docs/reference/hud.md` |
 | Testing and tools: runner, fixtures, gate, harness, landing, API dump | `test/`, `tools/` | `docs/reference/testing-tools.md`, `tools/harness/README.md` |
 
 ## Architecture rules
@@ -123,7 +123,7 @@ src/game/        main, template_base, iso_camera, world_input, placement_control
                  building_view, construction_drone, building_models, wall_mesh, low_poly_mesh, surf,
                  motion, material_kit, hud, hud_icon, drone_ring, format, model_preview, toon.gdshader,
                  toon_common.gdshaderinc, effects.gdshaderinc, ink.gdshader, holo.gdshader,
-                 ground.gdshader, terrain.gdshader, field_marks.gdshaderinc
+                 ground.gdshader, terrain.gdshader, field_marks.gdshaderinc, meter.gdshader
 src/game/models/ parts (the model being built, shared helpers and surfaces), then one file of
                  model builders per category: core, resources, army, defense, traps, walls; and
                  drone, the construction drone and its laser
