@@ -119,6 +119,12 @@ its current level; `builders_busy()` counts busy buildings; `builders_free()` is
 difference. `cc_level()` is the Command Center's level, at least 1, and 1 when there is none.
 `count_of(type)` counts buildings of a type, busy ones included.
 
+The checks allocate nothing per call, measured with a malloc counter on the development Mac:
+the HUD runs them every frame while a ghost is dragged, and the server will run them per
+command. So the queries above iterate `for id: int in buildings` (not `buildings.values()`,
+which builds an Array), and the lookups these checks make default to shared read-only
+constants instead of a `{}` or `[]` literal.
+
 ### Time and production
 
 `advance_to(time)` moves the base forward. Earlier or equal times are ignored, so a clock that

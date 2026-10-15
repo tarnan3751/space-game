@@ -198,5 +198,79 @@ func test_save_from_before_the_third_resource_loads() -> void:
 	assert_eq(saved["version"], 1)
 
 
+func test_counts_follow_place_move_and_upgrade() -> void:
+	var state := Fixtures.new_base()
+	assert_eq(state.count_of("extractor"), 0)
+	assert_eq(state.count_of(Catalog.HQ_TYPE), 1)
+	assert_eq(state.count_of("drone_bay"), 1)
+	assert_eq(state.cc_level(), 1)
+	assert_eq(state.builders_total(), 1)
+	assert_eq(state.apply(_place("extractor", 5, 5), 0), "")
+	assert_eq(state.count_of("extractor"), 1, "a building under construction counts")
+	assert_eq(state.builders_busy(), 1)
+	assert_eq(state.apply({"op": "move", "id": 3, "cell": [7, 7]}, 0), "")
+	assert_eq(state.count_of("extractor"), 1)
+	assert_eq(state.apply({"op": "upgrade", "id": CC_ID}, 60), "")
+	assert_eq(state.builders_busy(), 1, "an upgrade occupies a builder")
+	assert_eq(state.cc_level(), 1, "the level rises only when the upgrade completes")
+	state.advance_to(160)
+	assert_eq(state.cc_level(), 2)
+	assert_eq(state.count_of(Catalog.HQ_TYPE), 1)
+	assert_eq(state.builders_busy(), 0)
+	assert_eq(state.builders_free(), 1)
+
+
+func test_counts_survive_a_save_round_trip() -> void:
+	var state := Fixtures.new_base()
+	state.apply(_place("extractor", 5, 5), 0)
+	state.apply(_place("mine", 9, 9), 0)
+	var restored := BaseState.from_dict(Fixtures.catalog(), JSON.parse_string(JSON.stringify(state.to_dict())))
+	for type: String in ["extractor", "mine", "drone_bay", Catalog.HQ_TYPE, "wall"]:
+		assert_eq(restored.count_of(type), state.count_of(type), type)
+	assert_eq(restored.cc_level(), state.cc_level())
+	assert_eq(restored.builders_free(), state.builders_free())
+
+
+func test_a_load_that_drops_buildings_counts_only_what_it_kept() -> void:
+	var data := Fixtures.new_base().to_dict()
+	var saved: Array = data["buildings"]
+	# A level 2 Command Center that overflows the grid is dropped, so the level stays 1;
+	# a second one that fits comes after the first, and the first one sets the level.
+	saved.append({"id": 3, "type": Catalog.HQ_TYPE, "cell": [9, 9], "level": 2, "target_level": 2})
+	saved.append({"id": 4, "type": Catalog.HQ_TYPE, "cell": [5, 5], "level": 2, "target_level": 2})
+	saved.append({"id": 5, "type": "extractor", "cell": [1, 1], "level": 1, "target_level": 1})
+	var state := BaseState.from_dict(Fixtures.catalog(), data)
+	assert_eq(state.count_of(Catalog.HQ_TYPE), 2)
+	assert_eq(state.cc_level(), 1)
+	assert_eq(state.count_of("extractor"), 0)
+
+
+func test_failed_commands_leave_counts_unchanged() -> void:
+	var state := Fixtures.new_base()
+	assert_eq(state.apply(_place("extractor", 0, 0), 0), BaseState.ERR_BLOCKED)
+	assert_eq(state.apply(_place("castle", 7, 7), 0), BaseState.ERR_UNKNOWN_TYPE)
+	assert_eq(state.count_of("extractor"), 0)
+	state.apply(_place("extractor", 5, 5), 0)
+	assert_eq(state.apply(_place("extractor", 7, 7), 0), BaseState.ERR_NO_BUILDER)
+	assert_eq(state.apply({"op": "move", "id": 3, "cell": [0, 0]}, 0), BaseState.ERR_BLOCKED)
+	assert_eq(state.apply({"op": "upgrade", "id": 3}, 0), BaseState.ERR_BUSY)
+	assert_eq(state.apply({"op": "upgrade", "id": CC_ID}, 0), BaseState.ERR_NO_BUILDER)
+	assert_eq(state.count_of("extractor"), 1)
+	assert_eq(state.count_of(Catalog.HQ_TYPE), 1)
+	assert_eq(state.cc_level(), 1)
+	assert_eq(state.builders_busy(), 1)
+	assert_eq(state.buildings.size(), 3)
+
+
+func test_a_base_without_a_command_center_reads_as_level_one() -> void:
+	var data := {"buildings": [
+		{"id": 2, "type": "drone_bay", "cell": [3, 0], "level": 1, "target_level": 1, "finish_at": 0},
+	]}
+	var state := BaseState.from_dict(Fixtures.catalog(), data)
+	assert_eq(state.count_of(Catalog.HQ_TYPE), 0)
+	assert_eq(state.cc_level(), 1)
+	assert_eq(state.builders_free(), 1)
+
+
 func _place(type: String, x: int, y: int) -> Dictionary:
 	return {"op": "place", "type": type, "cell": [x, y]}

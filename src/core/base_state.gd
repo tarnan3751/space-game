@@ -23,6 +23,9 @@ const ERR_FUNDS := "insufficient_resources"
 const ERR_BUSY := "busy"
 const ERR_MAX_LEVEL := "max_level"
 
+## A shared, read-only default for lookups, so the checks build no {} per call.
+const _EMPTY := {}
+
 var catalog: Catalog
 var grid: BaseGrid
 ## Unix time (seconds) the state has been advanced to.
@@ -184,9 +187,12 @@ func production_per_hour(res: String) -> int:
 	return total
 
 
+## The checks below iterate the ids rather than buildings.values(), which builds an Array
+## per call: the HUD runs the placement checks every frame while a ghost is dragged.
 func builders_total() -> int:
 	var total := 0
-	for building: BuildingState in buildings.values():
+	for id: int in buildings:
+		var building: BuildingState = buildings[id]
 		if building.level >= 1:
 			total += int(_stats(building).get("builders", 0))
 	return total
@@ -194,7 +200,8 @@ func builders_total() -> int:
 
 func builders_busy() -> int:
 	var total := 0
-	for building: BuildingState in buildings.values():
+	for id: int in buildings:
+		var building: BuildingState = buildings[id]
 		if building.is_busy():
 			total += 1
 	return total
@@ -205,7 +212,8 @@ func builders_free() -> int:
 
 
 func cc_level() -> int:
-	for building: BuildingState in buildings.values():
+	for id: int in buildings:
+		var building: BuildingState = buildings[id]
 		if building.type == Catalog.HQ_TYPE:
 			return maxi(building.level, 1)
 	return 1
@@ -213,7 +221,8 @@ func cc_level() -> int:
 
 func count_of(type: String) -> int:
 	var total := 0
-	for building: BuildingState in buildings.values():
+	for id: int in buildings:
+		var building: BuildingState = buildings[id]
 		if building.type == type:
 			total += 1
 	return total
@@ -317,7 +326,7 @@ func _check_level_requirements(stats: Dictionary) -> String:
 		return ERR_CC_LEVEL
 	if int(stats.get("build_seconds", 0)) > 0 and builders_free() <= 0:
 		return ERR_NO_BUILDER
-	if not can_afford(stats.get("cost", {})):
+	if not can_afford(stats.get("cost", _EMPTY)):
 		return ERR_FUNDS
 	return ""
 
