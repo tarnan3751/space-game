@@ -267,8 +267,9 @@ while the old drone leaves under the base view, starting clear of the finished m
 frees itself. Then, with the metal and the crystal topped up by the scenario (the start's
 amounts and caps do not cover both), the Command Center goes to level 2 and an upgrade of the
 silo gets a drone again, clear of the model on its orbit a second in and firing at it with the
-same checks. It screenshots the drone arriving, firing at the scaffold, leaving and firing at
-the upgrading silo, at camera size 10 on the silo.
+same checks. It screenshots the drone arriving, firing at the scaffold (twice, a fifth of a
+second apart, to compare the sparks, the rotors and the beam's flow), leaving and firing at the
+upgrading silo, at camera size 10 on the silo.
 
 `scenarios/template_base.gd` checks the debug build's Template base (`TemplateBase`,
 `docs/reference/input-camera.md`): it presses the HUD's button (`template_button()`) and checks

@@ -385,10 +385,11 @@ While a building is constructed or upgraded, a builder drone works over it
 - **The model** (`models/drone.gd`, `DroneModels.build_drone`): the drone bay's parked drone with
   a builder's marks. A 12-sided saucer on `HULL_LIGHT_ROUND`, a `GLASS` canopy, an `ENERGY` eye
   at its front (+Z), four `ROD` arms on the diagonals to `HULL_MID_ROUND` ducts, each banded in
-  hazard stripes round a rotor blur disc (`ROTOR`, glossy glass for now), and a gunmetal tool arm
+  hazard stripes round a rotor blur disc (`ROTOR`, a hologram: below), and a gunmetal tool arm
   under the nose ending in an `ENERGY` emitter lens (`EMITTER`). It is built round its own centre
   at the bay's size and shown 1.4 times larger (`SCALE`), so it reads at the starting zoom.
-  `BuildingModels.create_drone()` builds and caches it like a model: a body and its outline.
+  `BuildingModels.create_drone()` builds and caches it like a model: a body, whose rotors are its
+  mesh's second surface (**Animation**, **Holograms**), and its outline.
 - **The flight** (constants on `ConstructionDrone`): it descends over 0.8 s, easing out, from 3.5
   above the orbit's height over the footprint's centre, then cycles. It orbits the centre at
   half the footprint plus 0.45, 1.4 high (higher over a tall site: the same clearance as the
@@ -404,15 +405,29 @@ While a building is constructed or upgraded, a builder drone works over it
   building's id and the shot count, so a run repeats. It hovers 0.9 above the point, nudged 0.3
   outward along the face's horizontal normal, with its lowest point (tilted to fire, at the bottom
   of its bob) held at least 0.3 above the site's top; the beam slants down to the point.
-- **The laser**: a thin unlit `ENERGY` prism (radius 0.025, not outlined), one unit long
+- **The laser**: a thin unlit `ENERGY` square rod (0.05 across, not outlined), one unit long
   (`create_drone_effect("beam")`) under a node stretched from the emitter to the work point, so
   no mesh is rebuilt per shot; at the point a flare (`create_drone_effect("flare")`): an unlit
   cyan dome (radius 0.14) and five hazard-yellow spark shards fanned round it, 0.08 to 0.14 long
-  past its edge so their tips reach about 0.25 out, each seen from both sides.
-  Both are shown only while firing (`visible`). The beam, the flare's dome, the sparks and the
-  rotor blur each have a surface of their own on `DroneModels`, for the effects to come.
-- **Instances**: the body, its outline, the beam and the flare, four, made at spawn; nothing is
-  allocated per frame. Only the body casts a shadow. Drones exist only while a building is busy
+  past its edge so their tips reach about 0.25 out, each seen from both sides. Both are shown
+  only while firing (`visible`). At each shot the flare is turned so its up axis is the hit
+  face's normal (one basis, no allocation), so the burst fans along the surface instead of half
+  of it entering a wall.
+- **Its animation** (**Animation**; each on a surface of its own on `DroneModels`): the beam is
+  UNLIT, FLOW and PULSE on the pipe layer at 0.4 repeats a unit and phase 0.15: its dark rib
+  lines, about 2 px wide at the closest zoom, travel fast from the emitter to the hit point (a
+  face's V is minus its height, so the phase is below 0.5) while it pulses. The rod is a box,
+  not a prism: a lathe takes a whole repeat round, which on so thin a rod mips the lines away,
+  where a box's planar UVs keep the texture as dense across it as along it. The glow layer's
+  stripes, and the pipe layer at higher scales, are too faint or too fine to show the flow. The
+  hit dome is UNLIT and PULSE; the sparks are UNLIT, FLICKER and JITTER on the glow layer in
+  hazard yellow, each shard at phase k/5, so the burst pops and crackles; the rotor discs are HOLO
+  and FLOW_U on the glass layer untinted (its pale glass and diagonal streak as they are), at
+  phases 0.92, 0.08, 0.96 and 0.04, so they read as pale translucent discs whose streak sweeps
+  round as a blur arc, turning at different speeds, the pairs counter-rotating.
+- **Instances**: the body (two surfaces, the second the rotors' holograms), its outline, the beam
+  and the flare, four, made at spawn; nothing is allocated per frame. The holograms add one draw
+  in the transparent pass. Only the body casts a shadow. Drones exist only while a building is busy
   (and for the 0.7 s of leaving), so there are about as many as the base has busy drones.
 
 ## Animation

@@ -72,6 +72,8 @@ var _drop: float = 0.0
 ## ORBIT_HEIGHT, or higher to clear a tall site.
 var _orbit_height: float = ORBIT_HEIGHT
 var _hover_normal: Vector3 = Vector3.ZERO
+## The work point's face normal, which the flare stands on.
+var _work_normal: Vector3 = Vector3.UP
 var _phase: Phase = Phase.ARRIVE
 ## Seconds into the current phase, and since spawning (the bob).
 var _time: float = 0.0
@@ -155,7 +157,7 @@ func advance(delta: float) -> bool:
 					_begin(Phase.FIRE)
 					_beam.visible = true
 					_flare.visible = true
-					_flare.position = _work
+					_flare.transform = Transform3D(_standing_on(_work_normal), _work)
 				else:
 					_begin(Phase.ORBIT)
 		Phase.FIRE:
@@ -286,12 +288,14 @@ func _work_point() -> Vector3:
 	if _face_normals.is_empty():
 		# A site with nothing towards the camera in the band (none is built so): its centre.
 		_hover_normal = Vector3.ZERO
+		_work_normal = Vector3.UP
 		return Vector3(0, lerpf(WORK_LOW, WORK_HIGH, u) * _height, 0)
 	var face := h % _face_normals.size()
 	var a := _faces[face * 3]
 	var b := _faces[face * 3 + 1]
 	var c := _faces[face * 3 + 2]
 	var normal := _face_normals[face]
+	_work_normal = normal
 	_hover_normal = Vector3(normal.x, 0, normal.z)
 	_hover_normal = _hover_normal.normalized() if _hover_normal.length() > 0.05 else Vector3.ZERO
 	var low := maxf(WORK_LOW * _height, minf(a.y, minf(b.y, c.y)))
@@ -340,6 +344,12 @@ func _place(delta: float, last: Vector3 = Vector3.ZERO) -> void:
 		var length := _work - emitter
 		var side := length.cross(Vector3.RIGHT).normalized()
 		_beam.transform = Transform3D(Basis(side, length, side.cross(length.normalized())), emitter)
+
+
+## A basis whose up axis is `normal`, so the flare's burst fans along the face it hits.
+static func _standing_on(normal: Vector3) -> Basis:
+	var across := normal.cross(Vector3.RIGHT if absf(normal.x) < 0.9 else Vector3.FORWARD).normalized()
+	return Basis(across, normal, across.cross(normal))
 
 
 static func _ease_out(t: float) -> float:

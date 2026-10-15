@@ -27,6 +27,9 @@ func run(main: MainScript) -> void:
 	if drone == null:
 		return
 	check(_instances(drone) == 4, "the drone is four instances (%d)" % _instances(drone))
+	var body := drone.get_child(0).get_child(0) as MeshInstance3D
+	check(body.mesh.get_surface_count() == 2 and body.mesh.surface_get_material(1) == MaterialKit.holo(),
+		"the drone's body has its hologram rotors on a second surface")
 	check(view.is_processing(), "the view processes while the drone works")
 	var centre := main.get_viewport().get_visible_rect().size * 0.5
 	main.camera.zoom_at(main.camera.size / CLOSE_UP_SIZE, centre)
@@ -45,6 +48,9 @@ func run(main: MainScript) -> void:
 	_check_beam(drone, view.footprint_size)
 	await frames(2)
 	await screenshot("firing")
+	# A fifth of a second on, to compare: the sparks flicker, the rotors turn, the beam flows.
+	await _wait(main, 0.2)
+	await screenshot("firing-later")
 
 	# Finished: the new level's view has no drone and does not process; the old drone leaves.
 	advance(state.seconds_left(id))
