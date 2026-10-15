@@ -185,9 +185,9 @@ static func _save_path_from_args() -> String:
 
 
 ## The comic style's light (docs/reference/art-style.md, **Light and shading**): deep space
-## behind, a cool ambient for the sides the sun misses, and one warm key light whose hard,
-## single-split shadow the toon shader quantises into its shadow band. Linear tonemapping, so the
-## accent colours come out as picked.
+## behind, a cool ambient for the sides the sun misses, and one warm key light whose filtered,
+## single-split shadow the toon shader draws into its shadow band with a dotted edge. Linear
+## tonemapping, so the accent colours come out as picked.
 func _build_environment() -> void:
 	var environment := Environment.new()
 	environment.background_mode = Environment.BG_COLOR
@@ -207,4 +207,6 @@ func _build_environment() -> void:
 	sun.shadow_enabled = true
 	sun.directional_shadow_mode = DirectionalLight3D.SHADOW_ORTHOGONAL
 	sun.directional_shadow_max_distance = 80.0
+	sun.shadow_normal_bias = 5.0
+	sun.shadow_bias = 0.3
 	add_child(sun)

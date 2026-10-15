@@ -44,9 +44,25 @@ a faceted primitive.
 the terrain ring hides at every zoom on screens up to about 2.98:1; there is no sky), a cool ambient
 (`AMBIENT`, `8C8CFF` at 0.35), linear tonemapping (filmic desaturates the accents), and one
 `DirectionalLight3D`, the key light: warm white (`SUN`, `FFF4E0`) at energy 1.0, from the upper
-left of the view (rotation −55°, −30°), casting one hard `SHADOW_ORTHOGONAL` split out to 80
-units. `project.godot` sets the directional shadow map to 2048 with no soft filtering. There is
-no second light: bands are per light and add up, so a second light doubles the tones.
+left of the view (rotation −55°, −30°), casting one `SHADOW_ORTHOGONAL` split. There is no second
+light: bands are per light and add up, so a second light doubles the tones.
+
+**The shadow.** The Compatibility renderer fits the directional shadow map to the camera's slice
+between its near and far planes (a bounding sphere, snapped to texels, so a pan does not make
+the edges crawl and a zoom re-fits it); with an orthographic camera
+`directional_shadow_max_distance` (left at 80) does nothing. `IsoCamera` keeps that slice tight
+round the scene at every zoom (`input-camera.md`, **IsoCamera**), which is what keeps the texel
+small: about 0.05 units at the closest zoom, 0.08 at the start and 0.12 at the widest, where a
+loose slice made it blocky. `project.godot` sets the map to 1024 (16-bit depth, the engine's
+default) and `soft_shadow_filter_quality` to 4, both on mobile too (`.mobile`; the filter's
+mobile default is 0, hard): a 13-tap PCF about two texels wide. The map is 1024 rather than 2048
+for the softness: the filter's footprint is what sets the penumbra's width (**The penumbra**), and
+2048 left it about 2 px at the start zoom; at 1024 the edges stay smooth, with no new acne.
+`DirectionalLight3D.shadow_blur` and `light_angular_distance` do nothing in Compatibility. The
+light's biases, both in texels, are `shadow_normal_bias` 5 and `shadow_bias` 0.3: with filtering on,
+the defaults (2 and 0.1) left acne on grazing faces (the Command Center's step risers, the hangars'
+vaults, plinth edges) as patches of dots; at these values the wall and pylon feet still meet their
+shadows.
 
 The toon, ground and terrain shaders take no ambient light (`render_mode
 ambient_light_disabled`). The Compatibility renderer adds the ambient pass and the shadowed key
@@ -54,11 +70,11 @@ light's pass separately, each already in sRGB, so even a little ambient lifts ev
 shadow band's whole tone and washes it blue; the cool side lives in the shadow band's tint
 instead. The environment's ambient still lights anything else (none of the scene today).
 
-`light()` in `toon_common.gdshaderinc` quantises the key light, its shadow included (`NdotL`
-times the shadow term, which is first stepped at 0.5 so a shadow's edge is crisp rather than a
-one-texel fringe of the mid band), into three bands with 0.02-wide smoothstep edges:
+`light()` in `toon_common.gdshaderinc` quantises the key light into three bands on `NdotL`, with
+0.02-wide smoothstep edges, and lays the cast shadow over them as the shadow band (below, **The
+penumbra**):
 
-| Band | NdotL × shadow | Tone (sRGB, of the albedo) | Measured on a flat box |
+| Band | NdotL | Tone (sRGB, of the albedo) | Measured on a flat box |
 | --- | --- | --- | --- |
 | Lit | above 0.55 | 1.0, warm from the key light | 0.95, 0.90, 0.83 |
 | Mid | 0.15 to 0.55 | 0.78 | 0.74, 0.70, 0.65 |
@@ -76,6 +92,17 @@ toe makes the shadow a little darker.
   pixel's width in grid cells is known), not with `fwidth`: derivatives inside `light()` are not
   safe, since it can run in non-uniform control flow. It is a screen-space pattern, so the dots
   are the same size at every zoom. Print grain, not polka dots.
+- **The penumbra**: the cast shadow's filtered term (`ATTENUATION`) never scales `NdotL`, which
+  would grey its edge and fringe it with the mid band. Its complement, linearly between
+  `PENUMBRA_DARK` (0) and `PENUMBRA_LIT` (1), thresholds the halftone's own dot grid
+  (`shadow_cover()`): the shadow band's dots grow from nothing to the whole cell across the
+  penumbra, so a shadow's edge is drawn as a dot screen, the shadow band with its halftone
+  inside them and the surface's own band between them. The edge's width is the filter's
+  footprint, about two shadow texels, so it follows the texel: at 720p about 7 px at the
+  closest zoom (size 10), 5 px at size 16 and at the start (24), and 4 px at the widest (44).
+  The shader cannot widen it: its window already spans the whole filtered term. The ground and
+  the terrain share `light()`, so every surface's shadow edge matches. The specular disc is cut
+  where the shadow covers.
 - **Cel specular**: on glossy surfaces only (glass, metal trim): a hard-edged disc where NdotH
   passes 0.92, white at 0.35, in the lit band.
 - **Emissive surfaces** (flag unlit): pure emission, full tint: no bands, no halftone. A lit
@@ -863,16 +890,19 @@ draw calls on page 1 and 217 on page 2 with every type animated (362 and 158 bef
 animation pass, when nine types had one spinner each; 381 and 177 with the build bar, 375 and
 171 before the environment, 294 and 157 before the kit): every moving part is two more draws
 and a shadow draw, and every mesh with holograms one more. The render thread's CPU time on
-the development Mac is about 1.5 ms a frame on page 1 (118 models at once) and 0.4 ms on
-page 2, measured with the gallery's own line. The kit's texture array,
-sixteen 256×256 RGBA8 layers, is about 5.3 MB with its mipmaps; the field texture, one 1024×1024
-RGBA8 image, is about 5.3 MB with its mipmaps too, and the ground and the terrain share it; the
-terrain's rock texture, one 512×512 RGBA8 image, is about 1.4 MB with its mipmaps. The terrain's
-shader has two samplers (the field texture and the rock texture) and takes three texture reads a
-fragment (the field's marks and the rock texture along x and along z), with five value noises.
-Keep `_process` free of allocation, and keep every building to its eight instances
-(**Animation**); a busy building adds its construction drone's four. The shader effects cost a
-few integer tests and a sine or two a vertex and a fragment, and no draw; a moving part costs two
-draws (its body and its outline) plus the body's shadow draw, and a mesh with HOLO parts one more
-draw in the transparent pass. The finished walls are one merged mesh, a fixed handful of draws
+the development Mac is about 1.2 to 1.5 ms a frame on page 1 (118 models at once) and 0.4 to
+0.7 ms on page 2, measured with the gallery's own line; it does not move with the shadow's
+filter (0, 2 or 4 measure the same within that noise), since PCF costs on the GPU: 13 shadow
+taps a fragment near a shadow edge (fewer where the first taps agree), and the penumbra's dot
+screen a few more instructions in `light()`. The shadow map, 1024² at 16 bits, is 2 MB. The
+kit's texture array, sixteen 256×256 RGBA8 layers, is about 5.3 MB with its mipmaps; the field
+texture, one 1024×1024 RGBA8 image, is about 5.3 MB with its mipmaps too, and the ground and the
+terrain share it; the terrain's rock texture, one 512×512 RGBA8 image, is about 1.4 MB with its
+mipmaps. The terrain's shader has two samplers (the field texture and the rock texture) and takes
+three texture reads a fragment (the field's marks and the rock texture along x and along z), with
+five value noises. Keep `_process` free of allocation, and keep every building to its eight
+instances (**Animation**); a busy building adds its construction drone's four. The shader effects
+cost a few integer tests and a sine or two a vertex and a fragment, and no draw; a moving part costs
+two draws (its body and its outline) plus the body's shadow draw, and a mesh with HOLO parts one
+more draw in the transparent pass. The finished walls are one merged mesh, a fixed handful of draws
 however many there are (`input-camera.md`, **Walls**).

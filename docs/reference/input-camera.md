@@ -16,7 +16,7 @@ material kit, `LowPolyMesh`, the shaders, the outlines, the view states, the wal
    (`NO_CHEATS_ARG`), `cheats` is set and `catalog.apply_dev_cheats()` makes every level free
    and one second at most (`core-economy.md`); the HUD is told through `hud.cheats` (`hud.md`).
 2. The environment: a `WorldEnvironment` (deep space background, cool ambient light, linear
-   tonemap) and one warm key light, a `DirectionalLight3D` with a hard single-split shadow
+   tonemap) and one warm key light, a `DirectionalLight3D` with a soft single-split shadow
    (`art-style.md`, **Light and shading**).
 3. `BaseView` (ground, scenery, building views), `IsoCamera` (made current), `WorldInput`,
    `Hud`, then `PlacementController`, which is given the view, the camera and the clock
