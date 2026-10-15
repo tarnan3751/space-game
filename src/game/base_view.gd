@@ -86,18 +86,31 @@ const OUTCROP_COUNT := Vector2i(6, 10)
 const OUTCROP_SHARDS := Vector2i(3, 7)
 const SHARD_LENGTH := Vector2(0.6, 2.0)
 const OUTCROP_GAP := 4.0
-## The curb round the field: its height and width, its gap from the field's edge, and how far
-## each corner is cut back along each side. A glowing stud stands on it every PLATE_CELLS cells
-## (the field texture's tiles are as wide) and on each corner.
-const CURB_HEIGHT := 0.2
-const CURB_WIDTH := 0.3
+## The perimeter round the field. The kerb: its height and width, its gap from the field's edge,
+## how far each corner is cut back along each side, and the chamfer on its top edges. A pylon
+## stands on its middle line every PLATE_CELLS cells (the field texture's tiles are as wide) and on
+## each corner cut: PYLON_WIDTH square, PYLON_HEIGHT tall, CORNER_PYLON_HEIGHT on the corners. The
+## fence between them: a rail RAIL_RADIUS thick RAIL_HEIGHT up, over an energy panel from the
+## kerb's top to the rail.
+const CURB_HEIGHT := 0.25
+const CURB_WIDTH := 0.35
 const CURB_GAP := 0.3
 const CURB_CORNER := 0.6
-const CURB_BEVEL := 0.04
+const CURB_BEVEL := 0.05
 const PLATE_CELLS := 4
-const STUD_RADIUS := 0.1
-## The curb's studs: domes of unlit energy cyan, too small for the outline.
-static var CURB_STUD := Surf.make(MaterialKit.Layer.GLOW, MaterialKit.ENERGY, 1.0, Surf.UNLIT, false, false)
+const PYLON_WIDTH := 0.4
+const PYLON_HEIGHT := 0.9
+const CORNER_PYLON_HEIGHT := 1.2
+const RAIL_HEIGHT := 0.55
+const RAIL_RADIUS := 0.03
+## The pylons' plated posts; their lamps, energy cyan, pulsing (each phased by its place round the
+## loop, so the pulse travels round it); and the corner pylons' beacons, hazard yellow, blinking.
+static var PYLON := Surf.make(MaterialKit.Layer.PLATE, MaterialKit.HULL_MID)
+static var PYLON_CAP := Surf.make(MaterialKit.Layer.PLATE, MaterialKit.GUNMETAL)
+static var PYLON_LAMP := Surf.make(MaterialKit.Layer.GLOW, MaterialKit.ENERGY, 1.0, Surf.UNLIT | Surf.PULSE, true)
+static var PYLON_BEACON := Surf.make(MaterialKit.Layer.GLOW, MaterialKit.HAZARD, 1.0, Surf.UNLIT | Surf.BLINK, true)
+## The fence's panels: a low hologram in energy cyan, phased per side.
+static var FENCE_FIELD := Surf.make(MaterialKit.Layer.GLOW, MaterialKit.ENERGY, 1.0, Surf.HOLO)
 ## The rocks' sides and their chamfers and tops, flat shaded and outlined.
 static var ROCK_SIDE := Surf.make(MaterialKit.Layer.ROCK, MaterialKit.ROCK)
 static var ROCK_TOP := Surf.make(MaterialKit.Layer.ROCK, MaterialKit.ROCK_LIT)
@@ -292,9 +305,12 @@ func _build_ground() -> void:
 	add_child(ground)
 
 
-## The curb round the field (CURB_*): an octagonal band of concrete with bevelled top edges and
-## a glowing stud on it every PLATE_CELLS cells and on each corner, in one mesh with its outline.
-## Neither casts a shadow.
+## The perimeter round the field (CURB_*, PYLON_*, RAIL_*), in one mesh with its outline: the
+## kerb, an octagonal band of concrete with chamfered top edges; a pylon on its middle line every
+## PLATE_CELLS cells along each side and a taller one on each corner cut, each a plated post with a
+## hazard band, a gunmetal cap and a lamp (a beacon on the corners); and between the pylons a fence,
+## a gunmetal rail, with a ball joint where it bends, over a hologram panel. The body casts a shadow (the pylons are real masses); the
+## outline none.
 func _build_boundary() -> void:
 	var mesh := LowPolyMesh.new()
 	var top := CURB_HEIGHT - CURB_BEVEL
@@ -310,28 +326,85 @@ func _build_boundary() -> void:
 	_curb_band(mesh, outer_top, outer_shoulder, 1.0)
 	_curb_band(mesh, outer_shoulder, outer, 1.0)
 
-	# A stud on the middle of the top every PLATE_CELLS cells along the straight sides, and on the
-	# middle of each corner cut (between corners 2k and 2k + 1 of the loop).
-	var middle := _curb_loop(CURB_WIDTH * 0.5, CURB_HEIGHT)
-	var straight := Vector2(middle[0].x, middle[1].z)
-	var studs := PackedVector3Array()
+	# The fence's course round the kerb's middle line: for each corner k, its pylon (on the middle
+	# of the cut, between corners 2k and 2k + 1 of the loop), the bend into side k, that side's
+	# pylons in order, and the bend out of it. Each point's kind: 0 a bend, 1 a pylon, 2 a corner.
+	var middle := _curb_loop(CURB_WIDTH * 0.5, 0.0)
+	var course := PackedVector3Array()
+	var kinds := PackedInt32Array()
+	var sides := PackedInt32Array()
+	var pylons := 0
 	for k: int in 4:
-		studs.append((middle[2 * k] + middle[2 * k + 1]) * 0.5)
-	for x: int in range(PLATE_CELLS, grid_size.x, PLATE_CELLS):
-		var at := x - grid_size.x * 0.5
-		if absf(at) < straight.x:
-			studs.append(Vector3(at, CURB_HEIGHT, middle[0].z))
-			studs.append(Vector3(at, CURB_HEIGHT, -middle[0].z))
-	for z: int in range(PLATE_CELLS, grid_size.y, PLATE_CELLS):
-		var at := z - grid_size.y * 0.5
-		if absf(at) < straight.y:
-			studs.append(Vector3(middle[1].x, CURB_HEIGHT, at))
-			studs.append(Vector3(-middle[1].x, CURB_HEIGHT, at))
-	for stud: Vector3 in studs:
-		mesh.dome(STUD_RADIUS, STUD_RADIUS * 0.7, 10, 2, stud, CURB_STUD)
+		var from := middle[2 * k + 1]
+		var to := middle[(2 * k + 2) % middle.size()]
+		course.append((middle[2 * k] + from) * 0.5)
+		kinds.append(2)
+		course.append(from)
+		kinds.append(0)
+		for t: float in _pylon_spots(from, to):
+			course.append(from.lerp(to, t))
+			kinds.append(1)
+		course.append(to)
+		kinds.append(0)
+		while sides.size() < course.size():
+			sides.append(k)
+	for kind: int in kinds:
+		pylons += 1 if kind != 0 else 0
 
-	boundary = _add_mesh(mesh.to_mesh(), false)
+	var index := 0
+	for i: int in course.size():
+		if kinds[i] != 0:
+			_pylon(mesh, course[i], kinds[i] == 2, float(index) / pylons)
+			index += 1
+		var next := course[(i + 1) % course.size()]
+		var rail := Vector3(0, RAIL_HEIGHT, 0)
+		Parts.pipe(mesh, course[i] + rail, next + rail, RAIL_RADIUS, Parts.ROD, 8, false)
+		if kinds[i] == 0:
+			# A ball joint where the rail bends round a corner cut, as Parts.pipe_run makes.
+			mesh.orb(RAIL_RADIUS, 8, 4, course[i] + rail, Parts.ROD)
+		# The panel is see-through and drawn with back faces culled: one face each way.
+		var panel := PackedVector3Array([course[i] + Vector3(0, CURB_HEIGHT, 0), next + Vector3(0, CURB_HEIGHT, 0),
+			next + rail, course[i] + rail])
+		var field := FENCE_FIELD.phased(sides[i] * 0.25)
+		mesh.polygon(panel, field)
+		panel.reverse()
+		mesh.polygon(panel, field)
+
+	boundary = _add_mesh(mesh.to_mesh(), true)
 	boundary_outline = _add_mesh(mesh.to_outline_mesh(), false)
+
+
+## Where the pylons stand along one side of the perimeter, from `from` to `to`: at every
+## PLATE_CELLS-th line of the grid across it, as fractions of the way along, in order.
+func _pylon_spots(from: Vector3, to: Vector3) -> PackedFloat32Array:
+	var along_x := absf(to.x - from.x) > absf(to.z - from.z)
+	var cells := grid_size.x if along_x else grid_size.y
+	var start := from.x if along_x else from.z
+	var end := to.x if along_x else to.z
+	var spots := PackedFloat32Array()
+	for line: int in range(PLATE_CELLS, cells, PLATE_CELLS):
+		var t := (line - cells * 0.5 - start) / (end - start)
+		if t > 0.0 and t < 1.0:
+			spots.append(t)
+	spots.sort()
+	return spots
+
+
+## A pylon standing on `foot`: a plated post with a hazard band near its top, a gunmetal cap, and
+## on it a lamp pulsing at `phase`, or on a corner, turned to face across the cut and taller, a
+## beacon blinking in its place.
+static func _pylon(mesh: LowPolyMesh, foot: Vector3, corner: bool, phase: float) -> void:
+	var height := CORNER_PYLON_HEIGHT if corner else PYLON_HEIGHT
+	var turn := Vector3(0, 45.0 if corner else 0.0, 0)
+	mesh.box_chamfered(Vector3(PYLON_WIDTH, height, PYLON_WIDTH), 0.06, foot, PYLON, turn)
+	mesh.box_chamfered(Vector3(PYLON_WIDTH + 0.03, 0.12, PYLON_WIDTH + 0.03), 0.03,
+		foot + Vector3(0, height - 0.28, 0), Parts.HAZARD, turn)
+	var cap := foot + Vector3(0, height, 0)
+	mesh.box_chamfered(Vector3(PYLON_WIDTH + 0.06, 0.08, PYLON_WIDTH + 0.06), 0.03, cap, PYLON_CAP, turn)
+	if corner:
+		mesh.dome(0.12, 0.16, 10, 3, cap + Vector3(0, 0.08, 0), PYLON_BEACON.phased(phase))
+	else:
+		mesh.dome(0.1, 0.09, 8, 3, cap + Vector3(0, 0.08, 0), PYLON_LAMP.phased(phase))
 
 
 ## The curb's plan at `offset` out from its inner edge and at height `y`: the field's edge

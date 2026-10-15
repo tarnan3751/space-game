@@ -178,9 +178,10 @@ override, since a ghost leaves holograms alone), and a new building's scaffold. 
 fresh base's draw calls and frame rate.
 
 `scenarios/environment.gd` checks the ground and the scenery on a fresh base
-(`docs/reference/art-style.md`, **Environment**): the terrain, the curb, the rocks and the crystal
-outcrops are each a body with an ink outline on `MaterialKit.ink()` that casts no shadow, the
-terrain's and the curb's bodies casting none either; the terrain's triangles are within 38,000; no
+(`docs/reference/art-style.md`, **Environment**): the terrain, the perimeter, the rocks and the
+crystal outcrops are each a body with an ink outline on `MaterialKit.ink()` that casts no shadow,
+the terrain's body casting none either; the perimeter's body casts a shadow and is two surfaces,
+the toon's and the holograms' (its fence); the terrain's triangles are within 38,000; no
 vertex of an outcrop lies within 4 units of the field; along each side of the field, 3 units out,
 at 40 evenly spaced points, the terrain's heights spread by more than 0.1 (the ground is uneven)
 and never pass 0.4 (it stays low by the curb), and the distance out at which its relief is full
@@ -194,10 +195,11 @@ leaves. Those checks are worked out from `BaseView` and the camera's transform, 
 headless. It screenshots the start zoom, the closest zoom on the field (its marks and the grid),
 the closest zoom on a point where four of the field texture's tiles meet (`tile-corner`, where
 nothing should show the tiles' edges), a wider stretch of the field at camera size 12 (`tiles`),
-the curb at the middle of each side of the field at size 16 (`edge-top-left`, `edge-top-right`,
-`edge-bottom-right`, `edge-bottom-left`, by the screen corner each side faces), the widest zoom in
-the wide window, and a crater and an outcrop each centred; for the curb, the crater and the
-outcrop it widens the camera's bounds to the terrain's, since the player cannot centre the view
+the perimeter at the middle of each side of the field at size 16 (`edge-top-left`, `edge-top-right`,
+`edge-bottom-right`, `edge-bottom-left`, by the screen corner each side faces), the middle of the
++z side and the +x +z corner of the perimeter at the closest zoom (`perimeter-side`,
+`perimeter-corner`), the widest zoom in the wide window, and a crater and an outcrop each
+centred; for the perimeter, the crater and the outcrop it widens the camera's bounds to the terrain's, since the player cannot centre the view
 off the field.
 
 `scenarios/hud_menu.gd` checks the HUD on a fresh base. The top bar: antimatter hidden, each

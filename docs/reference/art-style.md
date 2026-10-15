@@ -18,7 +18,7 @@ camera and the views' wiring are in `input-camera.md`.
 | `src/game/ground.gdshader` | the buildable field: its ground, its marks, the grid |
 | `src/game/terrain.gdshader` | the terrain ring's body: its marks, ripples and rock strata over the vertex tint |
 | `src/game/field_marks.gdshaderinc` | the field texture's tiles, the marks' light and the grain, shared by the ground and the terrain |
-| `src/game/base_view.gd` | builds the ground, the curb, the terrain ring, the rocks and the outcrops (**Environment**) |
+| `src/game/base_view.gd` | builds the ground, the perimeter, the terrain ring, the rocks and the outcrops (**Environment**) |
 | `src/game/building_models.gd`, `src/game/models/` | the dispatcher and one model file per category, `Parts` in `models/parts.gd` |
 | `src/game/construction_drone.gd`, `src/game/models/drone.gd` | the builder drone over a busy site, its flight and its laser (**Construction drone**) |
 | `assets/textures/kit/` | the sixteen layers, committed PNGs |
@@ -174,8 +174,9 @@ The field's row is lighter than when ink seams ran between its tiles: away from 
 the plain renders as it did (L 0.485 against 0.486). The ring's row was re-measured when its
 surface was drawn (marks, ripples, strata): over the same three stretches of flat ring the
 untextured ring rendered `5547A6` to `5A4CA8` (L 0.46 to 0.48, S 0.38 to 0.40), and the field's
-four quarters rendered pixel for pixel as before. The curb is `CONCRETE` with `ENERGY` studs;
-the outcrops are `CRYSTAL`, `METAL` and `ANTIMATTER`.
+four quarters rendered pixel for pixel as before. The perimeter's kerb is `CONCRETE`, its
+pylons `HULL_MID` with `ENERGY` lamps and `HAZARD` beacons, its fence `ENERGY`; the outcrops are
+`CRYSTAL`, `METAL` and `ANTIMATTER`.
 
 ## The material kit
 
@@ -689,10 +690,31 @@ the sun and a pebble on the side towards it. Then the tone, then the ink. The ti
 keeps the plain from repeating: there is no seam between them, no tint of their own, no grain of
 their own, and no made thing (patch, bolt or joint) among the marks.
 
-**The curb** (`boundary`): a concrete band 0.2 high and 0.3 wide, 0.3 outside the field's edge,
-its corners cut at 45 degrees and its top edges bevelled, with a glowing energy cyan stud (unlit,
-not outlined) on it every four cells along each side and on each corner cut. One mesh with its
-outline; neither casts a shadow.
+**The perimeter** (`boundary`, `_build_boundary`): a fence round the field in the buildings'
+language, with no gate.
+
+- **The kerb**: a concrete band (`CONCRETE_PAD`) 0.25 high and 0.35 wide, 0.3 outside the field's
+  edge, its top edges chamfered 0.05 and its corners cut at 45 degrees. The ink line along the
+  field's edge (`ground.gdshader`) stays inside it.
+- **Pylons**: on the kerb's middle line, one every four cells along each side (where the field
+  texture's tiles meet) and one on the middle of each corner cut, 40 on the 40×40 field: a
+  chamfered post 0.4 square and 0.9 tall on the plate layer in `HULL_MID`, a hazard-striped band
+  near its top, a gunmetal cap, and on the cap an energy cyan lamp (unlit, PULSE) whose phase is
+  the pylon's place round the loop over the count, so the pulse travels round the perimeter. The
+  corner pylons stand 1.2 tall, turned across the cut, and carry a hazard yellow beacon (unlit,
+  BLINK) in place of the lamp; at phases a quarter apart they flash in turn.
+- **The fence**: between each pylon and the next, following the kerb round its corners, a
+  gunmetal rail (`ROD`, radius 0.03, not outlined) 0.55 up, with a ball joint of its radius at
+  each of the kerb's eight bends, and under it, from the kerb's top to the rail, an energy panel:
+  a HOLO quad in `ENERGY` on the glow layer, built as a face each way since the hologram culls
+  back faces, its scan bands drifting up and its dip phased a quarter apart from one side to the
+  next. It is low and see-through, so the field's edge cells show
+  through and over it. On the two sides nearest the camera the panel is seen nearly edge-on and
+  reads faint, left so for the owner to judge.
+
+One `LowPolyMesh`, about 6,500 triangles on its toon surface and 190 on its hologram surface,
+and its outline. The body casts a shadow (the pylons are real masses; the transparent fence casts
+none); the outline does not.
 
 **The terrain ring**: one indexed mesh from the field's edge to ±100, on a lattice of points 1
 unit apart within 50 of the centre and 2 apart beyond, cut to half a unit within 3 units of a
@@ -802,13 +824,15 @@ would take wall geometry that follows the mesa's outline rather than the lattice
   within 4 units of the field; they keep off the mesas and out of the craters' bowls. One mesh with
   its outline; the body casts shadows.
 
-**Budgets**: the field 1 draw; the curb, the terrain, the rocks and the outcrops a body and an
-outline each. The terrain is 35,820 triangles on 18,190 points (the `environment` scenario allows
+**Budgets**: the field 1 draw; the perimeter, the terrain, the rocks and the outcrops a body and an
+outline each, the perimeter's body two surfaces (its fence a hologram) and drawn into the shadow
+map. The terrain is 35,820 triangles on 18,190 points (the `environment` scenario allows
 38,000), the rocks about 3,900 (about 1,100 of them the rubble) and the outcrops about 900. It is
-all built once, in about 90 ms on the development Mac (88 to 97 warm, against 74 to 79 before the
-half-unit lattice and the rock texture, measured side by side; the kit's build and the field and
-rock textures' loads and mipmaps included), the terrain 59 to 66 ms of it (45 to 49 before) and the
-rubble about 5; phones are unmeasured. Nothing runs per frame beyond the shaders.
+all built once, in about 110 ms on the development Mac (88 to 97 warm before the perimeter's
+pylons and fence added about 22, and 74 to 79 before the half-unit lattice and the rock texture,
+each measured side by side; the kit's build and the field and rock textures' loads and mipmaps
+included), the terrain 59 to 66 ms of it (45 to 49 before), the perimeter about 25 and the rubble
+about 5; phones are unmeasured. Nothing runs per frame beyond the shaders.
 
 ## HUD
 
@@ -826,8 +850,9 @@ The build cards carry their category's accent from **Colour** as a stripe.
 
 A building's body instances draw for the light and into the shadow map; its outline instances
 draw once and never cast. Measured with `Performance.RENDER_TOTAL_DRAW_CALLS_IN_FRAME`: a fresh
-base is 44 draw calls with the HUD's build panel closed (63 with the always-visible build bar it
-replaced, 57 of those before the environment's curb, terrain outline and outcrops). The panel
+base is 48 draw calls with the HUD's build panel closed (46 before the perimeter gained its
+hologram fence and its shadow; earlier, 63 with the always-visible build bar it replaced, 57 of
+those before the environment's curb, terrain outline and outcrops). The panel
 costs only while it is open: a fresh base with it open is 100 draw calls on a full tab
 (resources, army, defence), 86 on traps and 68 on walls. The model gallery's overview is 362
 draw calls on page 1 and 158 on page 2 (381 and 177 with the build bar, 375 and 171 before the

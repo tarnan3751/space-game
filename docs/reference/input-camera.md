@@ -197,8 +197,9 @@ same landscape. How each looks is in `art-style.md`, **Environment**:
   plain, laid with the tiles each turned its own way, with inked craters, pits, pebbles, shards and
   cracks lit from `SUN_ACROSS`, and a cell grid whose `line_strength` is faint by default and
   brighter while placing; `grid_size` and `sun_across` are uniforms.
-- **The curb** (`boundary`): a low concrete band round the field, `CURB_GAP` (0.3) outside its
-  edge, with a glowing stud every four cells and on each cut corner; casts no shadow.
+- **The perimeter** (`boundary`): a concrete kerb round the field, `CURB_GAP` (0.3) outside its
+  edge, with a pylon every four cells and on each cut corner and a low rail-and-hologram fence
+  between them (`art-style.md`, **Environment**); its body casts a shadow.
 - **The terrain**: one smooth-shaded, indexed `ArrayMesh` from the field's edge out to
   ±`TERRAIN_EXTENT` (100), on a lattice of 1 unit within `TERRAIN_FINE_REACH` (50) of the centre
   and of `TERRAIN_COARSE` (2) beyond, cut to half a unit within `TERRAIN_MESA_REACH` (3) of a

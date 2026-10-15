@@ -1,17 +1,18 @@
 extends HarnessScenario
 ## The environment on a fresh base (docs/reference/art-style.md, **Environment**). Checks that the
-## terrain, the curb, the rocks and the outcrops are each a body with an ink outline that casts no
-## shadow (the terrain's and the curb's bodies none either); the terrain's triangle budget; that no
+## terrain, the perimeter, the rocks and the outcrops are each a body with an ink outline that casts
+## no shadow (the terrain's body none either, the perimeter's one); that the perimeter's body is two
+## surfaces, the toon's and the holograms' (its fence); the terrain's triangle budget; that no
 ## part of an outcrop comes within OUTCROP_GAP of the field; that along each side of the field,
 ## EDGE_OUT units out, the ground is uneven (its height spreads by more than EDGE_SPREAD) and low
 ## (never over EDGE_HIGHEST), and the distance at which the relief is full (BaseView.blend_end)
 ## wanders by more than BLEND_WANDER; and that at the widest zoom in a WIDE window, the focus at
 ## each corner of its bounds, the ray from every screen corner meets the terrain. Screenshots: the
 ## start zoom, the closest on the field, the closest on a point where four of the field texture's
-## tiles meet (nothing should show where they do), a wider stretch of the field, the curb at the
-## middle of each side, the widest in the WIDE window, and a crater and an outcrop centred (for the
-## curb, the crater and the outcrop the camera's bounds are widened, as a player cannot centre the
-## view off the field).
+## tiles meet (nothing should show where they do), a wider stretch of the field, the perimeter at
+## the middle of each side, a side and a corner of it at the closest zoom, the widest in the WIDE window, and
+## a crater and an outcrop centred (for the perimeter, the crater and the outcrop the camera's
+## bounds are widened, as a player cannot centre the view off the field).
 
 const TERRAIN_BUDGET := 38000
 const OUTCROP_GAP := 4.0
@@ -27,14 +28,19 @@ func run(main: MainScript) -> void:
 	var off := GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 	# Each: the body, its outline, and whether the body may cast a shadow.
 	var pairs := {"terrain": [view.terrain, view.terrain_outline, false],
-		"curb": [view.boundary, view.boundary_outline, false], "rocks": [view.rocks, view.rocks_outline, true],
+		"perimeter": [view.boundary, view.boundary_outline, true], "rocks": [view.rocks, view.rocks_outline, true],
 		"outcrops": [view.outcrops, view.outcrops_outline, true]}
 	for name: String in pairs:
 		var body: MeshInstance3D = pairs[name][0]
 		var outline: MeshInstance3D = pairs[name][1]
 		check(body != null and body.mesh != null and outline != null and outline.mesh != null
 			and outline.cast_shadow == off and outline.mesh.surface_get_material(0) == MaterialKit.ink()
-			and (pairs[name][2] or body.cast_shadow == off), "the %s: a body and an ink outline, no shadow" % name)
+			and (pairs[name][2] or body.cast_shadow == off), "the %s: a body and an ink outline casting no shadow" % name)
+	var perimeter := view.boundary.mesh
+	check(view.boundary.cast_shadow != off and perimeter.get_surface_count() == 2
+		and perimeter.surface_get_material(0) == MaterialKit.toon()
+		and perimeter.surface_get_material(1) == MaterialKit.holo(),
+		"the perimeter: its body casts a shadow, in two surfaces, the toon's and the fence's holograms'")
 	var triangles := view.terrain.mesh.get_faces().size() / 3
 	check(triangles <= TERRAIN_BUDGET, "the terrain has %d triangles, within %d" % [triangles, TERRAIN_BUDGET])
 	var field := view.area()
@@ -71,6 +77,8 @@ func run(main: MainScript) -> void:
 	for side: String in sides:
 		var out: Vector2 = sides[side]
 		await _shot(main, "edge-" + side, Vector3(out.x * curb.x, 0.0, out.y * curb.y), 16.0)
+	await _shot(main, "perimeter-side", Vector3(0.0, 0.0, curb.y), IsoCamera.MIN_ZOOM_SIZE)
+	await _shot(main, "perimeter-corner", Vector3(curb.x, 0.0, curb.y), IsoCamera.MIN_ZOOM_SIZE)
 	main.camera.bounds = field
 	main.get_window().size = WIDE
 	main.camera.zoom_at(main.camera.size / IsoCamera.MAX_ZOOM_SIZE, Vector2.ZERO)
