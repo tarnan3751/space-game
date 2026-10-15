@@ -41,9 +41,10 @@ func run(main: MainScript) -> void:
 	var bay_start := _drone_bay(state).cell
 
 	# The menu entry enters paint mode; the place bar offers Done, enabled whatever the brush is on.
+	await open_build_menu(main)
 	hud.entry_button(WALL).pressed.emit()
 	await frames(2)
-	check(placement.is_painting(), "Barrier Wall from the menu enters paint mode")
+	check(placement.is_painting() and not hud.is_menu_open(), "Barrier Wall from the menu enters paint mode")
 	check(hud.place_button().text == "Done" and not hud.place_button().disabled,
 		"the place bar reads Done (%s, %s)" % [hud.place_button().text,
 			"disabled" if hud.place_button().disabled else "enabled"])

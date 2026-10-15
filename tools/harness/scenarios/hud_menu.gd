@@ -1,212 +1,119 @@
 extends HarnessScenario
-## The HUD on a fresh base: the build menu's tabs and entries, touches on the menu, the
-## place bar following the ghost, the Command Center's info panel, the top bar, and a
-## notch-like safe-area inset; then the top bar at its widest, on a Command Center 4 base. Touches are
-## real input events (Input.parse_input_event), so they take the same path as a finger:
-## through the HUD first, and on to WorldInput only when the HUD lets them through.
+## The HUD on a fresh base: the meters and drone ring, the Build button and the panel it slides
+## up (tabs, cards, close button), a card picked into the place bar, a purchase, a wide window.
+## Touches are real input events (Input.parse_input_event), so they take a finger's path.
 
-## Top and bottom of a phone's safe area, in the HUD's coordinates at 1280x720.
-const NOTCH_TOP := 44
-const NOTCH_BOTTOM := 34
-
-var _world_touches: int = 0
+var _world_taps: int = 0
 
 
 func run(main: MainScript) -> void:
 	var state: BaseState = main.state
 	var catalog: Catalog = state.catalog
 	var hud: Hud = main.hud
-	main.world_input.tapped.connect(func(_at: Vector2) -> void: _world_touches += 1)
-	main.world_input.drag_started.connect(func(_at: Vector2) -> void: _world_touches += 1)
+	main.world_input.tapped.connect(func(_at: Vector2) -> void: _world_taps += 1)
 	await frames(2)
-
-	# The top bar shows what the base can store, and hides antimatter until it can.
-	for res: String in catalog.resources:
-		var shown := hud.resource_panel(res).visible
-		check(shown == (state.capacity(res) > 0), "%s is %s (capacity %d)" % [
-			res, "shown" if shown else "hidden", state.capacity(res)])
 	check(not hud.resource_panel("antimatter").visible, "a fresh base hides antimatter")
+	_check_top_bar(hud, state)
+	check(not hud.is_menu_open() and hud.build_button().is_visible_in_tree(), "the panel starts closed, Build showing")
+	await screenshot("closed")
+	await _tap(main, main.get_viewport().get_visible_rect().size * Vector2(0.4, 1.0) - Vector2(0, 100))
+	check(_world_taps == 1, "a tap where the closed panel opens reached the world")
+	main.placement.select(0)
 
-	# Every menu type sits in exactly one tab, in menu_order order.
-	var tabs_of: Dictionary[String, int] = {}
+	# Build opens the panel on the first tab; a tap on each tab shows its cards.
+	await open_build_menu(main)
+	check(hud.tab_button(catalog.categories[0]).button_pressed, "the first tab is selected")
 	for category: String in catalog.categories:
-		hud.tab_button(category).pressed.emit()
-		await frames(2)
-		var last_x := -INF
-		var in_order := true
-		var shown_types := PackedStringArray()
+		await _tap(main, hud.tab_button(category).get_global_rect().get_center())
+		var shown := PackedStringArray()
+		var expected := PackedStringArray()
 		for type: String in catalog.menu_order:
-			var entry := hud.entry_button(type)
-			if not entry.visible:
-				continue
-			shown_types.append(type)
-			tabs_of[type] = tabs_of.get(type, 0) + 1
-			check(catalog.category_of(type) == category, "%s is under %s" % [type, category])
-			in_order = in_order and entry.global_position.x > last_x
-			last_x = entry.global_position.x
-		check(in_order, "%s lists its %d types in menu order" % [category, shown_types.size()])
-		say("tab %s: %s" % [category, ", ".join(shown_types)])
-		await screenshot("tab-" + category)
-	for type: String in catalog.menu_order:
-		check(tabs_of.get(type, 0) == 1, "%s appears in exactly one tab" % type)
+			if catalog.category_of(type) == category:
+				expected.append(type)
+			if hud.entry_button(type).is_visible_in_tree():
+				shown.append(type)
+		check(shown == expected, "the %s tab shows %s" % [category, ", ".join(shown)])
+		await screenshot("open-" + category)
 
-	# An available entry shows built/max; a locked one says which Command Center it needs.
-	await _open_tab(hud, catalog.category_of("metal_extractor"))
-	var max_extractors := catalog.max_count("metal_extractor", state.cc_level())
-	check(hud.entry_status("metal_extractor") == "%d/%d" % [state.count_of("metal_extractor"), max_extractors],
+	# A locked card is disabled and says what it needs. Taps on the panel's empty top row, on a
+	# meter and on the drone ring stop there; the close button closes the panel.
+	var locked: String = Array(catalog.menu_order).filter(func(type: String) -> bool:
+		return int(catalog.level_stats(type, 1).get("requires_cc", 1)) > state.cc_level())[0]
+	await _tap(main, hud.tab_button(catalog.category_of(locked)).get_global_rect().get_center())
+	check(hud.entry_button(locked).disabled and hud.entry_status(locked).begins_with("Needs Command Center"),
+		"%s is disabled: %s" % [locked, hud.entry_status(locked)])
+	for at: Vector2 in [hud.close_button().get_global_rect().get_center() - Vector2(120, 0),
+			hud.resource_panel("metal").get_global_rect().get_center(), hud.drones_panel().get_global_rect().get_center()]:
+		await _tap(main, at)
+	await _tap(main, hud.close_button().get_global_rect().get_center())
+	await _wait(main, Hud.MENU_CLOSE_SECONDS)
+	check(not hud.is_menu_open() and not hud.close_button().is_visible_in_tree(), "the close button closed the panel")
+	check(_world_taps == 1, "no touch on the panel, a meter or the ring reached the world (%d did)" % (_world_taps - 1))
+
+	# Picking a card closes the panel and begins placing; the place bar takes Build's place.
+	await open_build_menu(main)
+	await _tap(main, hud.tab_button(catalog.category_of("metal_extractor")).get_global_rect().get_center())
+	check(hud.entry_status("metal_extractor") == "0 / %d" % catalog.max_count("metal_extractor", state.cc_level()),
 		"Metal Extractor reads %s" % hud.entry_status("metal_extractor"))
-	check(not hud.entry_button("metal_extractor").disabled, "Metal Extractor is enabled")
-	var locked := ""
-	for type: String in catalog.menu_order:
-		if int(catalog.level_stats(type, 1).get("requires_cc", 1)) > state.cc_level():
-			locked = type
-			break
-	var needed := int(catalog.level_stats(locked, 1).get("requires_cc", 1))
-	await _open_tab(hud, catalog.category_of(locked))
-	check(hud.entry_button(locked).disabled, "%s is disabled at Command Center %d" % [locked, state.cc_level()])
-	check(hud.entry_status(locked) == "Needs Command Center %d" % needed,
-		"%s reads %s" % [locked, hud.entry_status(locked)])
-
-	# A tap on a tab switches it, and the world never hears of it.
-	await _open_tab(hud, catalog.categories[0])
-	var defence := catalog.category_of("laser_turret")
-	await _tap(main, hud.tab_button(defence).get_global_rect().get_center())
-	check(hud.entry_button("laser_turret").visible and not hud.entry_button("metal_extractor").visible,
-		"a tap on the %s tab opened it" % defence)
-
-	# A one-finger drag across the strip scrolls it and presses nothing.
-	var first := hud.entry_button("laser_turret")
-	var x_before := first.global_position.x
-	var from := first.get_global_rect().get_center()
-	await _drag(main, from, from - Vector2(400, 0))
-	check(first.global_position.x < x_before - 100, "a drag scrolled the strip (%d -> %d)" % [
-		x_before, first.global_position.x])
-	check(not main.placement.is_placing(), "the drag pressed no entry")
-
-	# A tap on an entry still presses it, and swaps the build bar for the place bar.
-	await _open_tab(hud, catalog.category_of("metal_extractor"))
-	await _tap(main, hud.entry_button("metal_extractor").get_global_rect().get_center())
-	check(main.placement.placing_type == "metal_extractor", "a tap on Metal Extractor began placing it")
-	check(_world_touches == 0, "no touch on the menu reached the world (%d did)" % _world_touches)
-	check(hud.place_button().is_visible_in_tree() and not hud.entry_button("metal_extractor").is_visible_in_tree(),
-		"the place bar replaced the build bar")
-
-	# Moving the ghost updates Place: onto the Command Center it is disabled, off it enabled.
-	var cc_id := 0
-	for id: int in state.buildings:
-		if state.buildings[id].type == Catalog.HQ_TYPE:
-			cc_id = id
-	var cc: BuildingState = state.buildings[cc_id]
-	tap_cell(main, cc.cell + Vector2i.ONE)
+	var card_at := hud.entry_button("metal_extractor").get_global_rect().get_center()
+	_touch(main, card_at, true)
 	await frames(2)
-	check(not main.placement.ghost_is_valid() and hud.place_button().disabled,
-		"Place is disabled with the ghost on the Command Center")
-	# A tap centres the 3x3 footprint on the tapped cell.
-	var free_cell := cc.cell - Vector2i(3, 0)
-	check(state.grid.is_free(free_cell - Vector2i.ONE, 3), "the footprint around %s is free" % free_cell)
-	tap_cell(main, free_cell)
-	await frames(2)
-	check(main.placement.ghost_is_valid() and not hud.place_button().disabled,
-		"Place is enabled with the ghost on a free cell")
+	await screenshot("card-pressed")
+	_touch(main, card_at, false)
+	await _wait(main, Hud.MENU_CLOSE_SECONDS)
+	check(main.placement.placing_type == "metal_extractor" and not hud.is_menu_open(), "the card closed the panel, placing")
+	check(hud.place_button().is_visible_in_tree() and not hud.build_button().is_visible_in_tree(), "the place bar hid Build")
+	await screenshot("place-bar")
 	main.placement.cancel_place()
 	await frames(2)
-	check(hud.entry_button("metal_extractor").is_visible_in_tree() and not hud.place_button().is_visible_in_tree(),
-		"cancelling brings the build bar back")
+	check(hud.build_button().is_visible_in_tree(), "Build is back after cancelling")
 
-	# The Command Center's info panel.
-	main.placement.select(cc_id)
-	await frames(2)
-	await screenshot("info-command-center")
-
-	# A notch-like inset moves every part inside it.
-	var full := main.get_viewport().get_visible_rect()
-	var inset := Rect2(0, NOTCH_TOP, full.size.x, full.size.y - NOTCH_TOP - NOTCH_BOTTOM)
-	hud.apply_safe_area(inset)
-	await frames(2)
-	await screenshot("notch-info")
-	main.placement.select(0)
-	await frames(2)
-	check(hud.resource_panel("metal").get_global_rect().position.y >= NOTCH_TOP + Hud.MARGIN,
-		"the top bar sits below the inset's top")
-	check(hud.entry_button("metal_extractor").get_global_rect().end.y <= inset.end.y - Hud.MARGIN,
-		"the build bar sits above the inset's bottom")
-	await screenshot("notch-build-bar")
-
-	# A Command Center 4 base with every collector it allows, storage full, stretches the top
-	# bar to its widest: antimatter shows, and the debug button, on its own row, stays clear
-	# of the Drones panel. Resources have no command, so the scenario sets them directly.
-	_fund(state)
-	for level: int in range(2, 5):
-		main.placement.select(cc_id)
-		main.placement.upgrade_selected()
-		check(cc.target_level == level, "the Command Center is upgrading to %d" % level)
-		advance(state.seconds_left(cc_id) + 1)
-		_fund(state)
-	for type: String in ["metal_extractor", "crystal_harvester", "antimatter_siphon"]:
-		while state.count_of(type) < catalog.max_count(type, state.cc_level()):
-			var count := state.count_of(type)
-			main.placement.begin_place(type)
-			main.placement.confirm_place()
-			if state.count_of(type) == count:
-				check(false, "placing a %s failed" % type)
-				break
-			advance(state.seconds_left(state.last_added_id) + 1)
-			_fund(state)
-	for res: String in catalog.resources:
-		state.resources[res] = state.capacity(res)
-	main.placement.select(0)
-	await frames(2)
-	check(hud.resource_panel("antimatter").visible, "antimatter shows at Command Center %d" % state.cc_level())
-	var drones := hud.drones_panel().get_global_rect()
-	var reset := hud.reset_button().get_global_rect()
-	say("the top bar ends at x=%d; Reset base spans %s" % [drones.end.x, reset])
-	check(not drones.intersects(reset), "the debug button clears the Drones panel")
-	await screenshot("top-bar-command-center-4")
+	# A purchase lowers the metal meter and busies the ring's drone.
+	var metal_before := hud.resource_fill("metal").size.x
+	await open_build_menu(main)
+	hud.entry_button("crystal_harvester").pressed.emit()
+	main.placement.confirm_place()
+	await _wait(main, Hud.MENU_CLOSE_SECONDS)
+	_check_top_bar(hud, state)
+	check(hud.resource_fill("metal").size.x < metal_before, "the metal fill fell from %d px" % metal_before)
+	await screenshot("purchase")
+	# Build over the new building's info panel deselects it; the panel fits a wide window.
+	await open_build_menu(main)
+	check(main.placement.selected_id == 0, "opening the build panel cleared the selection")
+	main.get_window().size = Vector2i(1560, 720)
+	await frames(4)
+	check(hud.close_button().get_global_rect().end.x <= 1560 - Hud.MARGIN, "the close button fits a 1560x720 window")
+	await screenshot("wide-open")
 
 
-func _fund(state: BaseState) -> void:
+## Each meter's fill spans its track by amount over capacity, to a pixel; the ring counts drones.
+func _check_top_bar(hud: Hud, state: BaseState) -> void:
 	for res: String in state.catalog.resources:
-		state.resources[res] = 1_000_000
+		var fill := hud.resource_fill(res)
+		var track: Control = fill.get_parent()
+		var capacity := state.capacity(res)
+		var want := track.size.x * state.resources[res] / capacity if capacity > 0 else 0.0
+		check(absf(fill.size.x - want) <= 1.0, "the %s fill is %.0f px for %d / %d" % [res, fill.size.x, state.resources[res], capacity])
+	var ring := hud.drones_panel()
+	check(ring.free_count() == state.builders_free() and ring.total_count() == state.builders_total(),
+		"the drone ring shows %d of %d free" % [ring.free_count(), ring.total_count()])
 
 
-func _open_tab(hud: Hud, category: String) -> void:
-	hud.tab_button(category).pressed.emit()
+func _wait(main: MainScript, seconds: float) -> void:
+	await main.get_tree().create_timer(seconds + 0.05).timeout
 	await frames(2)
 
 
-## A finger down and up at `point`, in the HUD's coordinates.
 func _tap(main: MainScript, point: Vector2) -> void:
-	var at := _to_window(main, point)
-	_touch(at, true)
-	await frames(2)
-	_touch(at, false)
-	await frames(2)
+	for pressed: bool in [true, false]:
+		_touch(main, point, pressed)
+		await frames(2)
 
 
-## A finger pressed at `from`, moved to `to` in ten steps and lifted.
-func _drag(main: MainScript, from: Vector2, to: Vector2) -> void:
-	var start := _to_window(main, from)
-	var end := _to_window(main, to)
-	_touch(start, true)
-	await frames(2)
-	for i: int in 10:
-		var drag := InputEventScreenDrag.new()
-		drag.position = start.lerp(end, (i + 1) / 10.0)
-		drag.relative = (end - start) / 10.0
-		Input.parse_input_event(drag)
-		await frames(1)
-	_touch(end, false)
-	await frames(2)
-
-
-func _touch(at: Vector2, pressed: bool) -> void:
+## A finger down or up at `point`, in the HUD's coordinates: input events arrive in window
+## pixels, which the viewport maps back through its final transform (the canvas_items stretch).
+func _touch(main: MainScript, point: Vector2, pressed: bool) -> void:
 	var touch := InputEventScreenTouch.new()
-	touch.position = at
+	touch.position = main.get_viewport().get_final_transform() * point
 	touch.pressed = pressed
 	Input.parse_input_event(touch)
-
-
-## Input events arrive in window pixels; the viewport maps them back through its final
-## transform (the canvas_items stretch).
-func _to_window(main: MainScript, point: Vector2) -> Vector2:
-	return main.get_viewport().get_final_transform() * point

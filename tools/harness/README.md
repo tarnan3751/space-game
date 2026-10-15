@@ -89,7 +89,7 @@ through the game layer as the player would, and read the state through `BaseStat
 | `main.placement` | `begin_place(type)`, `confirm_place()`, `cancel_place()`, `select(id)`, `upgrade_selected()`, `is_placing()`, `is_painting()`, `ghost_is_valid()`, `ghost_cell()`, `selected_id` |
 | `main.world_input` signals | `tapped`, `drag_started`, `dragged`, `drag_ended`, `pinched`, `panned`; emit them to simulate a gesture (`tap_cell` below does) |
 | `main.hud` signals | `build_pressed`, `confirm_pressed`, `cancel_pressed`, `upgrade_pressed`, `close_pressed`, `reset_pressed`; emit them to press a button |
-| `main.hud` queries | `tab_button(category)`, `entry_button(type)`, `entry_status(type)`, `resource_panel(res)`, `place_button()`, `drones_panel()`, `reset_button()` (`docs/reference/hud.md`); `apply_safe_area(inset)` to try a notch-like inset |
+| `main.hud` queries | `build_button()`, `is_menu_open()`, `build_panel()`, `close_button()`, `tab_button(category)`, `entry_button(type)`, `entry_status(type)`, `resource_panel(res)`, `resource_fill(res)`, `place_button()`, `drones_panel()` (the `DroneRing`: `free_count()`, `total_count()`), `reset_button()` (`docs/reference/hud.md`); `apply_safe_area(inset)` to try a notch-like inset |
 | `main.state` | the `BaseState`: `buildings`, `resources`, `capacity()`, `builders_free()`, `seconds_left(id)`, `check_*` |
 | `main.camera`, `main.base_view` | `IsoCamera` and `BaseView`, for cell and screen mapping |
 
@@ -105,6 +105,9 @@ Helpers on `HarnessScenario`:
 - `await screenshot(name)` — saves `NN-name.png` in a rendered run, logs a skip headless.
 - `tap_cell(main, cell)` — emits `WorldInput.tapped` at the screen position of a cell's
   centre, so `PlacementController` handles it exactly as a real tap.
+- `await open_build_menu(main)` — presses the HUD's Build button (unless the build panel is
+  already open), waits for the panel to slide up and checks that it is open. A scenario that
+  picks a building from the menu opens it this way first.
 
 A scenario never reads a clock, never writes outside the output directory, and never calls
 `BaseState.apply` for something the player does through `PlacementController` (the point is
@@ -172,18 +175,32 @@ the wide window, and a crater and an outcrop each centred; for the curb, the cra
 outcrop it widens the camera's bounds to the terrain's, since the player cannot centre the view
 off the field.
 
-`scenarios/hud_menu.gd` checks the HUD on a fresh base: antimatter hidden in the top bar,
-every menu type in exactly one tab and in menu order, an entry's built/max and a locked
-entry's "Needs Command Center N", that taps on a tab and an entry and a drag across the
-strip act on the menu without reaching the world, and that Place follows the ghost onto the
-Command Center and off it. It screenshots each tab, the Command Center's info panel, and the
-HUD under a notch-like inset (44 at the top, 34 at the bottom). Last, it grows the base to
-Command Center 4 with every collector that level allows, fills the storage, and checks that
-antimatter shows and that the debug button clears the Drones panel on the widest top bar.
-Where a check is about touch routing, a scenario sends real events with
-`Input.parse_input_event` (`InputEventScreenTouch`, `InputEventScreenDrag`): they arrive in
-window pixels, so map a HUD point through `get_viewport().get_final_transform()`. They are
-delivered headless too, so those checks run in both modes.
+`scenarios/hud_menu.gd` checks the HUD on a fresh base. The top bar: antimatter hidden, each
+meter's fill as wide as its track times amount over capacity (to a pixel) and the drone ring's
+free and total drones. The build panel: closed at start with Build showing, and a tap where it
+opens reaching the world; Build opens it on the first tab; a tap on each tab shows exactly that
+category's cards; a locked card is disabled with its "Needs Command Center N"; taps on the panel's
+empty top row, on a meter, on the drone ring and on the close button reach nothing behind them,
+and the close button closes the panel. A card: Metal Extractor reads "0 / 2"; a finger on it shows
+it pressed, and lifting it closes the panel and begins placing, with the place bar in place of
+Build, which comes back on cancelling. A purchase (Crystal Harvester, through the menu, confirmed)
+lowers the metal fill and busies the ring's one drone, both checked as at the start. Last, Build
+over the new building's info panel clears the selection and opens the panel, and in a 1560x720
+window the close button stays on screen. It screenshots the closed HUD, the open panel on each
+tab, the card pressed, the place bar, the purchase (the meters after it, the busy ring and the new
+building's info panel), and the open panel in the wide window. Where a check is about touch
+routing, a scenario sends real events with `Input.parse_input_event` (`InputEventScreenTouch`,
+`InputEventScreenDrag`): they arrive in window pixels, so map a HUD point through
+`get_viewport().get_final_transform()`. They are delivered headless too, so those checks run in
+both modes.
+
+`scenarios/hud_layout.gd` checks the HUD's layout on a fresh base. Under a notch-like safe-area
+inset (48 at the sides, 44 at the top, 34 at the bottom) with the build panel open on the
+defence tab, the top bar, the Build button, the tabs and the first card keep inside the inset
+less `Hud.MARGIN`, while the panel reaches the screen's sides and bottom edge; it screenshots
+that. Back on the whole screen, a real one-finger drag across the card strip scrolls it and
+presses nothing. Last, it presses Build, resizes the window to 1280x900 two frames into the
+opening slide, and checks that the panel ends open on the new bottom edge, and screenshots it.
 
 `scenarios/paint_walls.gd` checks wall painting and the edge scroll on a fresh base: Barrier
 Wall from the menu enters paint mode with Done on the place bar; a drag along a row of twelve

@@ -49,6 +49,17 @@ func screenshot(name: String) -> void:
 	await harness.screenshot(name)
 
 
+## Opens the build panel the way the player does: presses the Build button (unless the panel
+## is already open), waits for the panel to slide up, and checks that it is open.
+func open_build_menu(main: MainScript) -> void:
+	var hud: Hud = main.hud
+	if not hud.is_menu_open():
+		hud.build_button().pressed.emit()
+	await main.get_tree().create_timer(Hud.MENU_OPEN_SECONDS + 0.05).timeout
+	await frames(2)
+	check(hud.is_menu_open(), "the Build button opened the build panel")
+
+
 ## Taps the ground at the centre of `cell`, the way a finger would: through WorldInput's
 ## tapped signal, so PlacementController handles it exactly as a real tap.
 func tap_cell(main: MainScript, cell: Vector2i) -> void:
