@@ -580,15 +580,29 @@ all built once, in under 80 ms on the development Mac (76 to 79 warm, the kit's 
 texture's load and mipmaps included), the terrain about 45 ms of it and the rubble about 5; phones
 are unmeasured. Nothing runs per frame.
 
+## HUD
+
+The HUD follows the same comic look in 2D (`hud.md`, **Theme**): two display fonts, Bangers
+for its loudest labels and Lilita One for the rest; a UI palette of the same ink (`1B1A2E`), deep
+violet panels and cards, a near-white text, the energy cyan for the selected and the confirming
+and a build gold; every shape a flat fill with a 3 px ink border, round corners and a flat ink
+shadow offset down and right; text on a bright fill or over the world outlined in ink. Its
+icons (the resource meters' ingot, shards and orb, the drone ring's quad-rotor) are vector
+shapes drawn in code, flat fills with a lighter facet and an ink outline, with no asset file.
+The build cards carry their category's accent from **Colour** as a stripe.
+
 ## Cost
 
 A building's body instances draw for the light and into the shadow map; its outline instances
 draw once and never cast. Measured with `Performance.RENDER_TOTAL_DRAW_CALLS_IN_FRAME`: a fresh
-base is 63 draw calls (57 before the environment's curb, terrain outline and outcrops); the model
-gallery's overview is 381 draw calls on page 1 and 177 on page 2 (375 and 171 before them, 294 and
-157 before the kit; the research lab's spinning dish adds 15 on page 1), and the render thread's
-CPU time is about 0.5 ms a frame either way. The kit's texture array, sixteen 256×256 RGBA8 layers,
-is about 5.3 MB with its mipmaps; the field texture, one 1024×1024 RGBA8 image, is about 5.3 MB
-with its mipmaps too. Keep `_process` free
-of allocation, and keep every building to its four instances. The finished walls are one merged
+base is 44 draw calls with the HUD's build panel closed (63 with the always-visible build bar it
+replaced, 57 of those before the environment's curb, terrain outline and outcrops). The panel
+costs only while it is open: a fresh base with it open is 100 draw calls on a full tab
+(resources, army, defence), 86 on traps and 68 on walls. The model gallery's overview is 362
+draw calls on page 1 and 158 on page 2 (381 and 177 with the build bar, 375 and 171 before the
+environment, 294 and 157 before the kit; the research lab's spinning dish adds 15 on page 1),
+and the render thread's CPU time is about 0.5 ms a frame either way. The kit's texture array,
+sixteen 256×256 RGBA8 layers, is about 5.3 MB with its mipmaps; the field texture, one 1024×1024
+RGBA8 image, is about 5.3 MB with its mipmaps too. Keep `_process` free of allocation, and keep
+every building to its four instances. The finished walls are one merged
 mesh, a fixed handful of draws however many there are (`input-camera.md`, **Walls**).

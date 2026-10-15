@@ -2,53 +2,154 @@
 
 `src/game/hud.gd`: the on-screen UI, a `CanvasLayer` built in code. It reads `BaseState` for
 display and reports presses as signals; it never changes game state. `main.gd` wires the
-signals to `PlacementController` (`input-camera.md`).
+signals to `PlacementController` (`input-camera.md`). Two controls of its own draw in code:
+`HudIcon` (`hud_icon.gd`), the vector icons, and `DroneRing` (`drone_ring.gd`), the drones.
 
 ## The touch rule
 
 `WorldInput` uses `_unhandled_input`, so any `Control` that is not `MOUSE_FILTER_IGNORE`
 swallows every touch over it and the world underneath stops responding. Layout-only containers
 that span empty screen space — the root, the top bar's column and its rows, the place bar's
-row — are set to `MOUSE_FILTER_IGNORE`. Panels and buttons keep the default and block, which is what
-they should do. A new container must be IGNORE unless it is meant to block.
+row, the build panel's rows — are set to `MOUSE_FILTER_IGNORE`. Panels and buttons keep the
+default and block, which is what they should do. A new container must be IGNORE unless it is
+meant to block. The meters and the drone ring block too, like the panels: an opaque part of the
+HUD never lets a tap through to select or drag what lies under it. Each meter's root and the
+ring are `MOUSE_FILTER_STOP`, and a meter's own parts (trough, fill, amount, icon) are IGNORE,
+so the root is what a touch lands on. The toast is IGNORE, so it never blocks the world while it
+shows.
 
-The build entries are the one exception: they are `MOUSE_FILTER_PASS`, so a drag that starts on
-an entry also reaches the `ScrollContainer` and scrolls the strip (with the default `STOP` it
-does not). The build bar's `PanelContainer` behind them still stops the touch, so it never
-reaches the world. Each entry's content (a `VBoxContainer` of labels) is IGNORE, so the button
-itself is what a touch lands on.
+The build cards are the one exception: they are `MOUSE_FILTER_PASS`, so a drag that starts on
+a card also reaches the `ScrollContainer` and scrolls the strip (with the default `STOP` it
+does not). The build panel's `PanelContainer` behind them is `STOP`, so a touch anywhere on the
+open panel never reaches the world. Each card's content (its stripe and a `VBoxContainer` of
+labels) is IGNORE, so the button itself is what a touch lands on.
+
+## Theme
+
+One `Theme`, built in `_make_theme`, styles every part: its fonts, sizes, colours and
+`StyleBoxFlat`s. Controls take their style from it by type variation (`theme_type_variation`:
+`BuildButton`, `TabButton`, `MeterText` and so on), not by overrides of their own; only a cost
+amount takes its resource's colour as an override, since that colour is data. The buttons take
+no focus.
+
+**Fonts** (`assets/fonts/`, Google Fonts under the SIL Open Font License, each with its
+`OFL.txt`, imported with Godot's default dynamic font settings): **Bangers** for the Build
+button, the category tabs, the panel's close button, the info panel's title and the place bar's
+and Reset base's buttons; **Lilita One**, the theme's default, for every other text. No text is
+smaller than 15 px at 720p. Lilita One has no `∞`, which the meters show under the dev cheats,
+so the meters' amounts take a `FontVariation` of it (`_meter_font`) whose fallback is the
+engine's own font, `ThemeDB.fallback_font`: the sign draws the same on every platform rather
+than from whatever font the system has. Only the meters fall back. The shared Lilita One
+resource has no fallback, since a fallback's taller line metrics would space every other text,
+the building view's timer label included, wider.
+
+**Palette** (constants on `Hud`):
+
+| Role | Value | Where |
+| --- | --- | --- |
+| Ink `INK` | `1B1A2E` | every outline, text outlines; `SHADOW` is the ink at 60 %, every flat shadow |
+| Panel `PANEL` | `262348` at 96 % | the build panel, the info panel, the place bar, the toast |
+| Card `CARD` | `3B3670` | cards, unselected tabs, the close button, Cancel, Close, Reset base |
+| Card disabled `CARD_DISABLED` | `2E2B55` | a card or button that cannot be pressed now, a busy drone |
+| Text `TEXT` | `F4F2FF` | names, amounts |
+| Text dim `TEXT_DIM` | `9A95C4` | counts, reasons, the scroll bar's grabber |
+| Accent `ACCENT` | `58E8FF` | the selected tab, Place, free drones |
+| Build gold `GOLD` | `FFC13B`, pressed `E0A52A` | the Build button, the upgrade button |
+| Trough `TROUGH` | `17162A` | the meters' troughs |
+| Warning `WARNING` | `FFB37A` | the info panel's note |
+| Resource colours | `rules.json`, `Catalog.resource_color` | costs, the meters' fills and icons |
+| Category stripes `CATEGORY_STRIPE` | `MaterialKit` roles: resources `ENERGY`, army `ARMY`, defense `DEFENCE`, traps `HAZARD`, walls `WALL` | the stripe along a card's top; a category not listed takes `ACCENT` |
+
+**Shapes.** A `StyleBoxFlat` with a flat fill, a 3 px ink border (`BORDER`), round corners
+(12; tabs, the meters and the toast 10) and a flat shadow, the ink at 60 % offset 4 px down
+and right (`_shape`). A pressed button sinks: the shape and its text move 2 px down and right,
+onto a shadow then 2 px away. Hover is a shade lighter; disabled takes the disabled fill with
+its text at 55 %. Text gets an ink outline where it sits on a bright fill or over the world —
+the Build label 4 px at 30 px, the tabs and the close button 3 px, the upgrade button 3 px, card
+names and meter amounts 2 px — and none on a dark panel. A label's `outline_size` is four times
+the outline's width in pixels (`OUTLINE_PER_PX`), since the font's stroke reaches a quarter of
+`outline_size` out from each glyph.
 
 ## Layout
 
-`setup(catalog)` builds, under a root `Control` carrying the theme and laid out on the safe
-area (**Safe area**):
+`setup(catalog)` builds the build panel, then, under a root `Control` carrying the theme and
+laid out on the safe area (**Safe area**), every other part. The root comes after the panel,
+so its parts — the Build button above all — draw over the panel.
 
 | Part | Where | Contents |
 | --- | --- | --- |
-| Top bar | top, `MARGIN` (16) in, a column across the width | First row, from the left: one panel label per resource in catalog order (`"Metal  750 / 1,000   +1,800/h"`, the rate only when above 0), named and coloured from the catalog's `resource_name` and `resource_color` (the text colour when a resource has none), then `"Drones  free / total"` in the accent colour. A resource whose `state.capacity(res)` is 0 is hidden, so antimatter appears once something stores it. With the dev cheats on (`Hud.cheats`, set by `main.gd`) every resource panel shows, reading the name and `∞` (`"Metal  ∞"`). |
-| Build bar | bottom, full width | A `PanelContainer` with a row of category tabs over a horizontal `ScrollContainer` strip of entries (**Build menu**). |
-| Place bar | bottom centre | `Cancel` and `Place` (170×72); `Place` is disabled unless the ghost is valid. While walls are painted it reads `Done` and is always enabled: there is nothing to confirm. |
+| Top bar | top, `MARGIN` (16) in, a column across the width | First row, from the left: a meter per resource in catalog order, then the drone ring (**Top bar**). |
+| Build button | bottom right, `MARGIN` from the safe area's corner, 128×64 | "BUILD" on gold; toggles the build panel (**Build panel**). Hidden while placing or painting. |
+| Build panel | bottom, the screen's full width | Slides up over the bottom of the screen (**Build panel**). |
+| Place bar | bottom centre | A panel holding `Cancel` and `Place` (170×72); `Place` is disabled unless the ghost is valid. While walls are painted it reads `Done` and is always enabled: there is nothing to confirm. |
 | Info panel | bottom centre, 460 wide | Title `"Name   Lv N"` with a `Close` button; detail lines (**Info panel**); the upgrade button; a note under it. |
-| Toast | top centre, 96 down | A centred outlined label that fades out after 1.8 s over 0.6 s. |
-| Reset base | debug builds only (`OS.is_debug_build()`): the top bar's second row, right-aligned | Emits `reset_pressed`. On a row of its own so a long top bar (a Command Center 4 base) never runs under it. |
+| Toast | top centre, 96 down | A small panel with a centred line that fades out after 1.8 s over 0.6 s, then hides. |
+| Reset base | debug builds only (`OS.is_debug_build()`): the top bar's second row, right-aligned | Emits `reset_pressed`. On a row of its own so a long top bar never runs under it. |
 
-Bottom parts are anchored to the bottom edge and grow upward (`_anchor_bottom`). The theme
-(`_make_theme`) sets the default font size (20), the panel style and the button styles; the
-buttons take no focus.
+The place bar and the info panel are anchored to the bottom edge and grow upward
+(`_anchor_bottom`).
+
+## Top bar
+
+**Meters.** One per resource, 220×36 (`METER_SIZE`), hidden while `state.capacity(res)` is 0, so
+antimatter appears once something stores it. A trough (`TROUGH`, radius 10, its shadow) starts
+20 px in from the meter's left; inside its border a fill grows from the left to `amount /
+capacity` of the track (full at the cap), resized only on `refresh`. The fill is a `Control`
+with `clip_contents` holding a `TextureRect` that tiles a 16×16 stripe image across the whole
+track — a 45-degree white band over a grey 25 % darker, built once in `setup`
+(`_make_stripe`) and modulated by the resource's colour over that grey, so the base reads as the
+colour itself and the band 25 % lighter — and a gloss band (white at 25 %) across its top
+third. The trough's ink border is drawn again over the fill, so the fill's square ends never
+cover its round corners. The amount, `"750 / 1,000"` (`Format.amount`), sits centred on the
+part of the trough right of the icon, in Lilita One 18 px white with a 2 px ink outline. The
+resource's icon (a `HudIcon`, 40×40) sits over the trough's left end like a badge. With the dev
+cheats on (`Hud.cheats`, set by `main.gd`) every meter shows, full, reading `∞` (Lilita One has
+no `∞`; the meters' fallback, the engine's font, draws it, **Theme**).
+
+**Icons.** `HudIcon` draws its silhouette in `_draw`, vector, from no asset file, and only when it
+is built or resized. Each part is a flat fill in the icon's colour with a lighter highlight facet
+and a 2.5 px ink outline, over a 2 px ink offset shadow under the whole icon, laid out in a
+40-unit box scaled to its rect: **metal** an ingot (a trapezoid bar with a lighter top face and a
+darker end), **crystal** a pair of shards (a tall kite and a smaller one leaning on it, each with
+a lighter left face), **antimatter** an orb with an orbit ring tilted across it, **drones** a
+quad-rotor seen from above (a rounded body on crossed arms with four rotor discs). Any other
+resource gets a plain cut gem. `HudIcon.paint(pen, kind, rect, color)` adds one to a
+`HudIcon.Pen`.
+
+**One draw call each.** The renderer draws every `draw_colored_polygon` and `draw_polyline` on
+its own, so an icon drawn with them would cost a draw call per part. `HudIcon.Pen` builds a whole
+icon, or the whole drone ring with its icon, as one triangle array instead
+(`RenderingServer.canvas_item_add_triangle_array`, per-vertex colours): fills triangulated with
+`Geometry2D.triangulate_polygon`, strokes as quads with mitred corners (capped at three times
+their width), and in place of the renderer's antialiasing a 1 px feather that fades to nothing
+along every stroke and shadow. Fills are left hard, since their outlines cover their edges.
+
+**Drone ring.** `DroneRing`, 56×56, at the row's right end: one annular sector per drone
+(`state.builders_total()`; outer radius 26, inner 18), laid out symmetrically round the whole
+circle from the top, clockwise, with 6 degrees between neighbours, so a lone drone is a ring with
+a seam at the top. Each sector is a closed polygon, at least 8 steps per arc and one per 12
+degrees of a longer one, with a 2.5 px ink outline, over a 2 px ink offset shadow under the whole
+ring, all one triangle array with the icon (**One draw call each**). The first
+`state.builders_free()` sectors clockwise from the top are filled in the accent cyan with a thin
+highlight arc (white at 35 %) in their outer third; the busy ones take the card-disabled fill. The
+quad-rotor icon, 26 across, sits in the middle; with no drones the icon shows alone. It is redrawn
+only when `refresh` changes a count (`set_counts`), never per frame, and shows no text: the "All
+drones are busy" toast and the cards' "No free drone" name the drones.
 
 ## Refresh
 
 `refresh(state, selected_id, placing, ghost_ok, painting)` is called by `main.gd` every tick,
 after every state change, and on every selection change; `painting` is
 `PlacementController.is_painting()`, which turns `Place` into `Done`. It refits the safe area if
-the device's changed (**Safe area**), updates the top bar, then shows exactly one of the three
-bottom parts:
+the device's changed (**Safe area**), updates the meters and the drone ring, then:
 
-- **placing** → the place bar;
-- **a building selected** (`selected_id` in `state.buildings`) → the info panel;
-- **otherwise** → the build bar.
+- **placing** (painting included) → the build panel closes, Build hides and the place bar shows;
+- **a building selected** (`selected_id` in `state.buildings`) → the build panel closes and the
+  info panel shows;
+- **otherwise** → neither bar nor panel shows; Build does.
 
-The build entries are refreshed only while the build bar is shown, and only the selected tab's.
+The cards are refreshed only while the build panel is open (and when it opens), and only the
+selected tab's.
 
 `refresh_placing(state, selected_id, placing, ghost_ok, painting)` takes `placing_changed`,
 which fires when placement begins or ends and on every move of the ghost
@@ -57,24 +158,48 @@ which fires when placement begins or ends and on every move of the ghost
 A ghost drag therefore never recomputes the top bar or re-runs `check_can_build` for the menu;
 they catch up on the next state change or tick.
 
-## Build menu
+## Build panel
 
-**Tabs.** One toggle button (140×48) per `catalog.categories` id, in that order, labelled with
-`catalog.category_name`, in one `ButtonGroup`. The first is selected when the HUD is built; the
-selection is remembered while the game runs (not saved). Selecting a tab shows the entries of
-the `catalog.menu_order` types whose `catalog.category_of(type)` is that tab, in `menu_order`
-order, scrolls the strip back to its start, and refreshes those entries from the last state
-`refresh` was given.
+**Opening and closing.** Closed at start. The Build button toggles it; opening it over a
+selected building's info panel first emits `close_pressed`, as the panel's Close would, so the
+two never show together. The close button closes it, and so do picking a card, starting
+placement or painting, and selecting a building in the world (`refresh`). `is_menu_open()` is
+true from the press that opens it until the one that closes it. It slides by a `Tween` on its
+position: up from below the screen's bottom edge over 0.18 s (`MENU_OPEN_SECONDS`, cubic ease
+out), down over 0.14 s (`MENU_CLOSE_SECONDS`, cubic ease in), after which it is hidden so it
+blocks nothing; a new slide kills the one under way. A resize, or a new safe area, while it
+slides open stops the slide and sets it open on the new bottom edge (`apply_safe_area`).
 
-**Entries.** Every menu type gets a 224×96 button when the HUD is built; a tab only shows or
-hides them. Three centred lines:
+**Shape.** A `PanelContainer` under the `CanvasLayer` itself, outside the root: it spans the
+screen's whole width and reaches its bottom edge, and a `MarginContainer` pads its content into
+the safe area (`apply_safe_area`). It is 300 px high at 720p (`MENU_HEIGHT`), never more than
+40 % of the screen's height (`MENU_MAX_SHARE`, so 288 at 720p), and grows upward if its content
+needs more. Panel fill, a 3 px ink border along its top edge only, its top corners rounded 16,
+no shadow.
 
-1. the display name (18 px);
+**Tabs.** The top row: one toggle button (140×48, Bangers 24) per `catalog.categories` id, in
+that order, labelled with `catalog.category_name`, in one `ButtonGroup`; then, at the right, the
+close button (48×48, "X" in Bangers 28). An unselected tab is a card with white text in a 3 px
+ink outline (`TabButton`); the selected one is cyan with ink text and no outline
+(`TabSelected`). The first is selected when the HUD is built; the selection is remembered while
+the game runs (not saved). Selecting a tab shows the cards of the `catalog.menu_order` types
+whose `catalog.category_of(type)` is that tab, in `menu_order` order, scrolls the strip back to
+its start, and refreshes those cards from the last state `refresh` was given.
+
+**Cards.** Under the tabs, a horizontal `ScrollContainer` of cards, scrolled by a drag, with a
+thin scroll bar under it; to its right a column as wide as the Build button stays clear, since
+Build stays over the open panel at the safe area's corner. Every menu type gets a 200×120 card
+when the HUD is built; a tab only shows or hides them. A card is a card-filled button with the
+ink border and shadow, its category's stripe (6 px, `CATEGORY_STRIPE`) along its top inside the
+border, and three centred lines:
+
+1. the display name (Lilita One 20 px, white, a 2 px ink outline);
 2. the level 1 cost, each amount in its resource's colour (`resource_color`, the text colour
-   when there is none), or "Free" (16 px);
-3. the status (16 px): `built/max`, from `state.count_of(type)` and
+   when there is none), or "Free" (18 px);
+3. the status: `"built / max"` (16 px, dim), from `state.count_of(type)` and
    `catalog.max_count(type, state.cc_level())`, when `state.check_can_build(type)` passes; else
-   the reason, and the button is disabled and its lines dimmed:
+   the reason (15 px, dim), and the card is disabled: the disabled fill, its name and cost at
+   55 %:
 
 | `check_can_build` | Status line |
 | --- | --- |
@@ -85,8 +210,9 @@ hides them. Three centred lines:
 | anything else | `error_text(code)` |
 
 A type the Command Center has not unlocked (`max_count` 0 at the current level) is still
-listed, disabled with its "Needs Command Center N" line. Pressing an entry emits
-`build_pressed(type)`; a drag across the strip scrolls it and presses nothing.
+listed, disabled with its "Needs Command Center N" line. Pressing a card closes the panel and
+emits `build_pressed(type)`; a drag across the strip scrolls it and presses nothing. The walls
+tab's Barrier Wall is a card like any other, and placement paints it (`input-camera.md`).
 
 ## Info panel
 
@@ -108,27 +234,29 @@ constructed), one line each, only when the level has the stat, in this order:
 Once built and below its top level, a value the next level changes is followed by the next
 level's after an arrow: "Hull 600 → 800", "Produces 1,800 → 3,000 Metal/h"; while first being
 built it shows level 1's values with no arrow. The arrow is " → " when the theme's font has the
-glyph and " > " when it does not (the bundled default font does not), checked once in `setup`.
-Resources are named with
-`catalog.resource_name`. While busy, a last line reads "Under construction: 10s left" or
+glyph and " > " when it does not (Lilita One does not), checked once in `setup`. Resources are
+named with `catalog.resource_name`. While busy, a last line reads "Under construction: 10s left" or
 "Upgrading to Lv N: 1m 00s left".
 
-The upgrade button reads "Under construction" (disabled) while busy, "Max level" (disabled) at
+The title is in Bangers 24 and the detail lines in Lilita One 17. The upgrade button, gold
+like Build with its text in a 3 px ink outline, reads "Under construction" (disabled) while
+busy, "Max level" (disabled) at
 the top level, else "Upgrade to Lv N   cost   (duration)", disabled with the reason in the
 note when `state.check_upgrade` fails. Pressing emits `upgrade_pressed`; `Close` emits
 `close_pressed`.
 
 ## Safe area
 
-The root holds every part, so every part's anchors and margins are relative to the safe area,
-the part of the screen clear of notches and the home indicator.
+The root holds every part but the build panel, so their anchors and margins are relative to the
+safe area, the part of the screen clear of notches and the home indicator.
 
 `apply_safe_area(inset: Rect2)` lays the root out inside `inset`, a rect in the HUD's own
 coordinates (the viewport's visible rect: 1280×720 on a 16:9 screen under the `canvas_items`
-stretch), by setting its offsets. `_fit_safe_area` fits it to the device in `setup`, on
-`get_viewport().size_changed`, and on every `refresh` (the 1 s tick's included), since turning
-a phone over moves the notch to the other side without a resize:
-`DisplayServer.get_display_safe_area()`, in screen pixels, is clipped to the window
+stretch), by setting its offsets. It pads the build panel's content by the same inset on the
+left, the right and the bottom, and sets the panel's height for the screen's. `_fit_safe_area`
+fits it to the device in `setup`, on `get_viewport().size_changed`, and on every `refresh` (the
+1 s tick's included), since turning a phone over moves the notch to the other side without a
+resize: `DisplayServer.get_display_safe_area()`, in screen pixels, is clipped to the window
 (`window_get_position`, `window_get_size`), made relative to it, and scaled by the visible
 rect's size over the window's. It is applied only when it differs from the last rect fitted
 this way. On desktop the safe area is the screen's usable rect: while the window lies inside
@@ -141,20 +269,25 @@ that inset stays until the device's safe area changes.
 
 | Signal | Emitted by | `main.gd` connects it to |
 | --- | --- | --- |
-| `build_pressed(type)` | a build entry | `placement.begin_place` |
+| `build_pressed(type)` | a build card | `placement.begin_place` |
 | `confirm_pressed` | Place (Done while painting) | `placement.confirm_place`, which ends paint mode while painting |
 | `cancel_pressed` | Cancel | `placement.cancel_place` |
 | `upgrade_pressed` | the upgrade button | `placement.upgrade_selected` |
-| `close_pressed` | Close | `placement.select(0)` |
+| `close_pressed` | Close; Build, opening the panel over the info panel | `placement.select(0)` |
 | `reset_pressed` | Reset base | `main._reset_base` |
 
 ## Queries for the harness
 
 Read-only, so a scenario never reads a private member (`tools/harness/README.md`):
-`tab_button(category)` and `entry_button(type)` return the tab's and the entry's `Button`;
-`entry_status(type)` is an entry's third line; `resource_panel(res)` is the top bar's panel for
-a resource; `place_button()` is the place bar's `Place` (or `Done`); `drones_panel()` is the top
-bar's drones panel; `reset_button()` is the debug Reset base button (null in a release build).
+`build_button()` is the Build button; `is_menu_open()` whether the build panel is open or opening;
+`build_panel()` the panel itself; `close_button()` the panel's close button;
+`tab_button(category)` and `entry_button(type)` return the tab's and the card's `Button`;
+`entry_status(type)` is a card's status line; `resource_panel(res)` is the top bar's meter for a
+resource and `resource_fill(res)` its fill, whose parent is the track it grows across;
+`place_button()` is the place bar's `Place` (or `Done`); `drones_panel()` is the `DroneRing`,
+whose `free_count()` and `total_count()` are the counts it shows; `reset_button()` is the debug
+Reset base button (null in a release build). `MENU_OPEN_SECONDS` and `MENU_CLOSE_SECONDS` say how
+long to wait for a slide.
 
 ## Messages
 

@@ -205,7 +205,9 @@ same landscape. How each looks is in `art-style.md`, **Environment**:
 A `BuildingView` is one building's visual: the model for its finished level, a scaffold shown
 instead while `level` is 0, a footprint tile (`Footprint.NONE / SELECTED / VALID / INVALID`, the
 last three translucent cyan, green and red), and a billboard `Label3D` timer ("Building 10s",
-"Lv 2 1m 00s") shown while busy. A wall drawn by the merged wall mesh hides its model
+"Lv 2 1m 00s") shown while busy, in the HUD's Lilita One (`Hud.BODY_FONT`, the same resource) and
+text colour with an ink outline about 2 px wide at the starting zoom. A wall drawn by the merged
+wall mesh hides its model
 (`set_merged(true)`, **Walls**) and keeps the rest; `is_model_visible()` says whether the view
 draws its own model. `setup(id, type, level, size)` builds it for one level (level 1's model
 while the level is 0); `building_level` records it, and `BaseView.sync` replaces the view when

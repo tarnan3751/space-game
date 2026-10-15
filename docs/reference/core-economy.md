@@ -73,7 +73,7 @@ emits `changed`. A failed command changes nothing and charges nothing. The three
 
 Checks, in the order they are made:
 
-- `check_can_build(type)` (the build bar's question, independent of where): `unknown_type`;
+- `check_can_build(type)` (the build menu's question, independent of where): `unknown_type`;
   `needs_command_center_level` when level 1's `requires_cc` exceeds `cc_level()`;
   `limit_reached` when `count_of(type) >= catalog.max_count(type, cc_level())`; then the rest
   of level 1's requirements. The Command Center level comes before the limit, so a type whose
