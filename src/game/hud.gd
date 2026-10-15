@@ -12,7 +12,8 @@ extends CanvasLayer
 ## underneath stops responding.
 ##
 ## Every part sits inside the device's safe area (clear of notches and the home
-## indicator), refitted when the window resizes; apply_safe_area() sets it directly.
+## indicator), refitted when the window resizes; apply_safe_area() sets it directly. The
+## build panel alone reaches the screen's edges, with its content inside the safe area.
 
 signal build_pressed(type: String)
 signal confirm_pressed
@@ -46,7 +47,15 @@ const GOLD_PRESSED := Color("e0a52a")
 const TROUGH := Color("17162a")
 ## The info panel's note when an upgrade is refused.
 const WARNING := Color("ffb37a")
-## Text on a disabled button.
+## The stripe along the top of a build card, by category: the category's MaterialKit role.
+const CATEGORY_STRIPE := {
+	"resources": MaterialKit.ENERGY,
+	"army": MaterialKit.ARMY,
+	"defense": MaterialKit.DEFENCE,
+	"traps": MaterialKit.HAZARD,
+	"walls": MaterialKit.WALL,
+}
+## Text on a disabled button, and a card's name and cost while it cannot be built.
 const DISABLED_ALPHA := 0.55
 ## outline_size per pixel of ink round a text: the font's stroke reaches a quarter of
 ## outline_size out from each glyph.
@@ -54,7 +63,8 @@ const OUTLINE_PER_PX := 4
 const BUTTON_TEXT_COLORS := ["font_color", "font_hover_color", "font_pressed_color", "font_hover_pressed_color",
 	"font_focus_color"]
 
-## Bangers for the loudest labels and the titles; Lilita One for every other text.
+## Bangers for the Build button, the tabs, the close button and the titles; Lilita One for
+## every other text.
 const DISPLAY_FONT: FontFile = preload("res://assets/fonts/bangers/Bangers-Regular.ttf")
 const BODY_FONT: FontFile = preload("res://assets/fonts/lilitaone/LilitaOne-Regular.ttf")
 
@@ -64,7 +74,11 @@ const BORDER := 3
 ## Round a button's text: its minimum size, not its text, sets how big it is.
 const BUTTON_MARGIN := 6.0
 const TAB_SIZE := Vector2(140, 48)
-const ENTRY_SIZE := Vector2(224, 96)
+const CLOSE_SIZE := Vector2(48, 48)
+const CARD_SIZE := Vector2(200, 120)
+## The category stripe along a card's top, inside its border.
+const STRIPE_HEIGHT := 6
+const BUILD_SIZE := Vector2(128, 64)
 const METER_SIZE := Vector2(220, 36)
 ## A meter's icon sits over the left end of its trough, which starts this far in.
 const METER_ICON := Vector2(40, 40)
@@ -79,11 +93,17 @@ const STRIPE_BAND := 6
 const STRIPE_BASE := 0.8
 ## Across the top third of the fill.
 const GLOSS := Color(1, 1, 1, 0.25)
+## The build panel's height, never past a share of the screen's.
+const MENU_HEIGHT := 300.0
+const MENU_MAX_SHARE := 0.4
+const MENU_OPEN_SECONDS := 0.18
+const MENU_CLOSE_SECONDS := 0.14
 
 ## The dev cheats are on (main.gd): every meter shows, full, reading "∞" instead of amount / cap.
 var cheats: bool = false
 var _catalog: Catalog
-## Holds every part; positioned on the safe area.
+var _theme: Theme
+## Holds every part but the build panel; positioned on the safe area.
 var _root: Control
 ## The last safe area fitted from the device, in the HUD's coordinates.
 var _fitted_area: Rect2 = Rect2()
@@ -94,15 +114,25 @@ var _meters: Dictionary[String, Control] = {}
 var _meter_fills: Dictionary[String, Control] = {}
 var _meter_labels: Dictionary[String, Label] = {}
 var _drone_ring: DroneRing
-var _build_bar: Control
+var _build_button: Button
+## The build panel, outside the root and under it, so the Build button draws over it.
+var _menu: PanelContainer
+## Pads the panel's content to the safe area.
+var _menu_inset: MarginContainer
+## Whether the panel is open or opening.
+var _menu_open: bool = false
+var _menu_tween: Tween
+var _close_button: Button
 var _tab_buttons: Dictionary[String, Button] = {}
 var _entry_scroll: ScrollContainer
 var _entries: Dictionary[String, Button] = {}
-## Each entry's third line: built/max, or why it cannot be built.
+## Each card's name and cost, dimmed while it cannot be built.
+var _entry_heading: Dictionary[String, Control] = {}
+## Each card's last line: built / max, or why it cannot be built.
 var _entry_status: Dictionary[String, Label] = {}
 ## The selected build-menu category. Remembered while the game runs, not saved.
 var _tab: String = ""
-## The state of the last refresh, so a tab change can fill its entries.
+## The state of the last refresh, so a tab change can fill its cards.
 var _state: BaseState
 var _place_bar: Control
 var _place_button: Button
@@ -121,15 +151,17 @@ var _reset_button: Button
 
 func setup(catalog: Catalog) -> void:
 	_catalog = catalog
+	_theme = _make_theme()
+	_build_menu()
 	_root = Control.new()
 	_root.set_anchors_preset(Control.PRESET_FULL_RECT)
 	_root.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	_root.theme = _make_theme()
+	_root.theme = _theme
 	add_child(_root)
 	if _root.get_theme_default_font().has_char(0x2192):
 		_arrow = " → "
 	_build_top_bar()
-	_build_build_bar()
+	_build_build_button()
 	_build_place_bar()
 	_build_info_panel()
 	_build_toast()
@@ -160,19 +192,22 @@ func refresh(state: BaseState, selected_id: int, placing: bool, ghost_ok: bool, 
 	_drone_ring.set_counts(state.builders_free(), state.builders_total())
 
 	var has_selection := selected_id != 0 and state.buildings.has(selected_id)
-	_build_bar.visible = not placing and not has_selection
+	# Placing, painting or selecting a building in the world closes the build panel.
+	if placing or has_selection:
+		_slide_menu(false)
+	_build_button.visible = not placing
 	_place_bar.visible = placing
 	_place_button.text = "Done" if painting else "Place"
 	_place_button.disabled = not ghost_ok and not painting
 	_info_panel.visible = not placing and has_selection
-	if _build_bar.visible:
+	if _menu_open:
 		_refresh_entries(state)
 	if _info_panel.visible:
 		_refresh_info(state, state.buildings[selected_id])
 
 
 ## Placement began, ended or its ghost moved. A move changes only the Place button, so
-## the top bar and the entries wait for the next state change or tick; a start or an end
+## the top bar and the cards wait for the next state change or tick; a start or an end
 ## swaps the bottom bar, which takes the full refresh.
 func refresh_placing(state: BaseState, selected_id: int, placing: bool, ghost_ok: bool, painting: bool) -> void:
 	if placing and _place_bar.visible:
@@ -190,6 +225,18 @@ func apply_safe_area(inset: Rect2) -> void:
 	_root.offset_top = inset.position.y
 	_root.offset_right = inset.end.x - full.x
 	_root.offset_bottom = inset.end.y - full.y
+	# The build panel spans the screen's width and reaches its bottom edge, with its content
+	# padded into the safe area.
+	_menu_inset.add_theme_constant_override("margin_left", roundi(inset.position.x))
+	_menu_inset.add_theme_constant_override("margin_right", roundi(full.x - inset.end.x))
+	_menu_inset.add_theme_constant_override("margin_bottom", roundi(full.y - inset.end.y))
+	_menu.custom_minimum_size.y = minf(MENU_HEIGHT, full.y * MENU_MAX_SHARE)
+	if _menu_open:
+		# Open, or opening: on the bottom edge at its own height, which the panel grows upward
+		# to. A slide under way was aimed at the old screen's bottom edge, so it stops here.
+		_menu_tween.kill()
+		_menu.offset_top = 0.0
+		_menu.offset_bottom = 0.0
 
 
 ## DisplayServer reports the safe area in screen pixels; on desktop it is the screen's
@@ -232,15 +279,34 @@ static func error_text(code: String) -> String:
 
 # --- Queries for the harness -----------------------------------------------------
 
+func build_button() -> Button:
+	return _build_button
+
+
+## Whether the build panel is open, or sliding open.
+func is_menu_open() -> bool:
+	return _menu_open
+
+
+## The build panel itself; hidden while closed.
+func build_panel() -> Control:
+	return _menu
+
+
+func close_button() -> Button:
+	return _close_button
+
+
 func tab_button(category: String) -> Button:
 	return _tab_buttons[category]
 
 
+## A build card.
 func entry_button(type: String) -> Button:
 	return _entries[type]
 
 
-## An entry's third line: built/max, or why it cannot be built.
+## A card's last line: built / max, or why it cannot be built.
 func entry_status(type: String) -> String:
 	return _entry_status[type].text
 
@@ -268,25 +334,66 @@ func reset_button() -> Button:
 	return _reset_button
 
 
+# --- The build panel -------------------------------------------------------------
+
+## Build toggles the panel. Opening it closes a selected building's info panel first, as
+## its Close would: the two never show together.
+func _on_build_button() -> void:
+	if not _menu_open and _info_panel.visible:
+		close_pressed.emit()
+	_slide_menu(not _menu_open)
+
+
+func _on_card_pressed(type: String) -> void:
+	_slide_menu(false)
+	build_pressed.emit(type)
+
+
+## Slides the panel up from below the screen's bottom edge, or back down and out of the
+## way: hidden once down, so it blocks nothing. A new slide replaces one under way.
+func _slide_menu(open: bool) -> void:
+	if open == _menu_open:
+		return
+	_menu_open = open
+	if _menu_tween != null:
+		_menu_tween.kill()
+	var bottom := get_viewport().get_visible_rect().size.y
+	if open:
+		if not _menu.visible:
+			# On the bottom edge at its own height, then moved down out of sight.
+			_menu.offset_top = 0.0
+			_menu.offset_bottom = 0.0
+			_menu.position.y = bottom
+			_menu.show()
+		if _state != null:
+			_refresh_entries(_state)
+	_menu_tween = create_tween()
+	var target := bottom - _menu.size.y if open else bottom
+	_menu_tween.tween_property(_menu, "position:y", target, MENU_OPEN_SECONDS if open else MENU_CLOSE_SECONDS) \
+		.set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_OUT if open else Tween.EASE_IN)
+	if not open:
+		_menu_tween.tween_callback(_menu.hide)
+
+
 # --- Refresh helpers -------------------------------------------------------------
 
-## Only the selected tab's entries; the others are hidden.
+## Only the selected tab's cards; the others are hidden. A card that cannot be built now
+## dims its name and cost and gives its reason, still readable, in place of its count.
 func _refresh_entries(state: BaseState) -> void:
 	for type: String in _entries:
 		if _catalog.category_of(type) != _tab:
 			continue
-		var button: Button = _entries[type]
 		var error := state.check_can_build(type)
 		var status: Label = _entry_status[type]
 		status.text = _entry_status_text(state, type, error)
-		button.disabled = error != ""
-		var content: Control = status.get_parent()
-		content.modulate.a = 1.0 if error == "" else 0.45
+		status.theme_type_variation = &"CardCount" if error == "" else &"CardReason"
+		_entries[type].disabled = error != ""
+		_entry_heading[type].modulate.a = 1.0 if error == "" else DISABLED_ALPHA
 
 
 func _entry_status_text(state: BaseState, type: String, error: String) -> String:
 	if error == "":
-		return "%d/%d" % [state.count_of(type), _catalog.max_count(type, state.cc_level())]
+		return "%d / %d" % [state.count_of(type), _catalog.max_count(type, state.cc_level())]
 	var first := _catalog.level_stats(type, 1)
 	if error == BaseState.ERR_CC_LEVEL:
 		return "Needs Command Center %d" % int(first.get("requires_cc", 1))
@@ -302,13 +409,16 @@ func _entry_status_text(state: BaseState, type: String, error: String) -> String
 	return error_text(error)
 
 
+## The selected tab takes the TabSelected style, the others TabButton's.
 func _select_tab(category: String) -> void:
 	_tab = category
+	for id: String in _tab_buttons:
+		_tab_buttons[id].theme_type_variation = &"TabSelected" if id == category else &"TabButton"
 	_tab_buttons[category].button_pressed = true
 	for type: String in _entries:
 		_entries[type].visible = _catalog.category_of(type) == category
 	_entry_scroll.scroll_horizontal = 0
-	if _state != null and _build_bar.visible:
+	if _state != null and _menu_open:
 		_refresh_entries(_state)
 
 
@@ -490,72 +600,145 @@ func _build_meter(parent: Control, res: String, stripe: Texture2D) -> void:
 	_meter_labels[res] = label
 
 
-## A row of category tabs over a horizontal strip of entries. Every menu type gets an
-## entry up front; a tab shows its category's entries, in menu_order order.
-func _build_build_bar() -> void:
-	var panel := PanelContainer.new()
-	_root.add_child(panel)
-	_anchor_bottom(panel, true)
+## Bottom right: toggles the build panel.
+func _build_build_button() -> void:
+	_build_button = _button("BUILD", BUILD_SIZE, &"BuildButton")
+	_build_button.pressed.connect(_on_build_button)
+	_root.add_child(_build_button)
+	_build_button.set_anchors_preset(Control.PRESET_BOTTOM_RIGHT)
+	_build_button.grow_horizontal = Control.GROW_DIRECTION_BEGIN
+	_build_button.grow_vertical = Control.GROW_DIRECTION_BEGIN
+	_build_button.offset_left = -MARGIN - BUILD_SIZE.x
+	_build_button.offset_right = -MARGIN
+	_build_button.offset_top = -MARGIN - BUILD_SIZE.y
+	_build_button.offset_bottom = -MARGIN
+
+
+## The tabs and the close button over a horizontal strip of cards, beside a column kept clear
+## for the Build button. Every menu type gets a card up front; a tab shows its category's
+## cards, in menu_order order. The panel stops every touch on it from reaching the world;
+## its layout containers pass touches on to it.
+func _build_menu() -> void:
+	_menu = PanelContainer.new()
+	_menu.theme = _theme
+	_menu.theme_type_variation = &"MenuPanel"
+	_menu.mouse_filter = Control.MOUSE_FILTER_STOP
+	_menu.visible = false
+	add_child(_menu)
+	_menu.set_anchors_preset(Control.PRESET_BOTTOM_WIDE)
+	_menu.grow_vertical = Control.GROW_DIRECTION_BEGIN
+	_menu.offset_left = 0.0
+	_menu.offset_right = 0.0
+	_menu.offset_top = 0.0
+	_menu.offset_bottom = 0.0
+	_menu_inset = MarginContainer.new()
+	_menu_inset.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_menu.add_child(_menu_inset)
 	var column := VBoxContainer.new()
-	column.add_theme_constant_override("separation", 8)
-	panel.add_child(column)
+	column.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	column.add_theme_constant_override("separation", 12)
+	_menu_inset.add_child(column)
+
 	var tabs := HBoxContainer.new()
-	tabs.add_theme_constant_override("separation", 8)
+	tabs.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	tabs.add_theme_constant_override("separation", 10)
 	column.add_child(tabs)
 	var group := ButtonGroup.new()
 	for category: String in _catalog.categories:
-		var tab := _button(_catalog.category_name(category), TAB_SIZE)
+		var tab := _button(_catalog.category_name(category), TAB_SIZE, &"TabButton")
 		tab.toggle_mode = true
 		tab.button_group = group
 		tab.pressed.connect(func() -> void: _select_tab(category))
 		tabs.add_child(tab)
 		_tab_buttons[category] = tab
+	var gap := Control.new()
+	gap.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	gap.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	tabs.add_child(gap)
+	_close_button = _button("X", CLOSE_SIZE, &"CloseButton")
+	_close_button.pressed.connect(func() -> void: _slide_menu(false))
+	tabs.add_child(_close_button)
+
+	var row := HBoxContainer.new()
+	row.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	row.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	row.add_theme_constant_override("separation", 0)
+	column.add_child(row)
 	_entry_scroll = ScrollContainer.new()
 	_entry_scroll.vertical_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
-	_entry_scroll.custom_minimum_size = Vector2(0, ENTRY_SIZE.y + 8)
-	column.add_child(_entry_scroll)
-	var row := HBoxContainer.new()
-	row.add_theme_constant_override("separation", 10)
-	_entry_scroll.add_child(row)
+	_entry_scroll.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	_entry_scroll.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	_entry_scroll.custom_minimum_size = Vector2(0, CARD_SIZE.y + 22)
+	row.add_child(_entry_scroll)
+	# Room for the cards' shadows, which fall outside them, at the strip's end and bottom.
+	var room := MarginContainer.new()
+	room.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	room.add_theme_constant_override("margin_right", 6)
+	room.add_theme_constant_override("margin_bottom", 6)
+	_entry_scroll.add_child(room)
+	var cards := HBoxContainer.new()
+	cards.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	cards.add_theme_constant_override("separation", 12)
+	room.add_child(cards)
 	for type: String in _catalog.menu_order:
-		row.add_child(_build_entry(type))
-	_build_bar = panel
+		cards.add_child(_build_entry(type))
+	# The Build button stays over the open panel at the safe area's corner; nothing goes under it.
+	var clear := Control.new()
+	clear.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	clear.custom_minimum_size = Vector2(BUILD_SIZE.x + MARGIN, 0)
+	row.add_child(clear)
 	_select_tab(_catalog.categories[0])
 
 
-## Three lines: the name, the level 1 cost (each amount in its resource's colour), and
-## the status line `_refresh_entries` fills.
+## A card: the category's stripe along its top, then three lines: the name, the level 1
+## cost (each amount in its resource's colour), and the status line `_refresh_entries` fills.
 func _build_entry(type: String) -> Button:
-	var button := _button("", ENTRY_SIZE)
-	# PASS, so a drag that starts on an entry reaches the ScrollContainer and scrolls the
+	var button := _button("", CARD_SIZE)
+	# PASS, so a drag that starts on a card reaches the ScrollContainer and scrolls the
 	# strip; the panel behind still stops the touch from reaching the world.
 	button.mouse_filter = Control.MOUSE_FILTER_PASS
-	button.pressed.connect(func() -> void: build_pressed.emit(type))
+	button.pressed.connect(_on_card_pressed.bind(type))
+	var stripe := Panel.new()
+	stripe.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	stripe.theme_type_variation = &"CardStripe"
+	var stripe_color: Color = CATEGORY_STRIPE.get(_catalog.category_of(type), ACCENT)
+	stripe.self_modulate = stripe_color
+	button.add_child(stripe)
+	stripe.set_anchors_preset(Control.PRESET_TOP_WIDE)
+	stripe.offset_left = BORDER
+	stripe.offset_right = -BORDER
+	stripe.offset_top = BORDER
+	stripe.offset_bottom = BORDER + STRIPE_HEIGHT
 	var content := VBoxContainer.new()
 	content.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	content.alignment = BoxContainer.ALIGNMENT_CENTER
-	content.add_theme_constant_override("separation", 0)
+	content.add_theme_constant_override("separation", 2)
 	button.add_child(content)
 	content.set_anchors_preset(Control.PRESET_FULL_RECT)
-	content.offset_left = 8
-	content.offset_top = 8
-	content.offset_right = -8
-	content.offset_bottom = -8
-	var name_label := _entry_label(content, _catalog.display_name(type), 18, TEXT)
+	content.offset_left = 10
+	content.offset_top = BORDER + STRIPE_HEIGHT + 2
+	content.offset_right = -10
+	content.offset_bottom = -BORDER - 2
+	var heading := VBoxContainer.new()
+	heading.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	heading.add_theme_constant_override("separation", 0)
+	content.add_child(heading)
+	var name_label := _card_label(heading, _catalog.display_name(type), &"CardName")
 	name_label.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
 	var cost_row := HBoxContainer.new()
 	cost_row.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	cost_row.alignment = BoxContainer.ALIGNMENT_CENTER
 	cost_row.add_theme_constant_override("separation", 12)
-	content.add_child(cost_row)
+	heading.add_child(cost_row)
 	var cost: Dictionary = _catalog.level_stats(type, 1).get("cost", {})
 	if cost.is_empty():
-		_entry_label(cost_row, "Free", 16, TEXT)
+		_card_label(cost_row, "Free", &"CardCost")
 	for res: Variant in cost:
-		var color := Color.from_string(_catalog.resource_color(str(res)), TEXT)
-		_entry_label(cost_row, Format.amount(int(cost[res])), 16, color)
-	var status := _entry_label(content, "", 16, TEXT)
+		var amount := _card_label(cost_row, Format.amount(int(cost[res])), &"CardCost")
+		amount.add_theme_color_override("font_color", _resource_color(str(res)))
+	var status := _card_label(content, "", &"CardCount")
 	status.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
+	_entry_heading[type] = heading
 	_entry_status[type] = status
 	_entries[type] = button
 	return button
@@ -565,7 +748,7 @@ func _build_entry(type: String) -> Button:
 func _build_place_bar() -> void:
 	var panel := PanelContainer.new()
 	_root.add_child(panel)
-	_anchor_bottom(panel, false)
+	_anchor_bottom(panel)
 	var row := HBoxContainer.new()
 	row.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	row.add_theme_constant_override("separation", 16)
@@ -583,7 +766,7 @@ func _build_info_panel() -> void:
 	var panel := PanelContainer.new()
 	panel.custom_minimum_size = Vector2(460, 0)
 	_root.add_child(panel)
-	_anchor_bottom(panel, false)
+	_anchor_bottom(panel)
 	var column := VBoxContainer.new()
 	column.add_theme_constant_override("separation", 8)
 	panel.add_child(column)
@@ -642,12 +825,11 @@ func _build_debug_buttons() -> void:
 	_reset_button = reset
 
 
-func _entry_label(parent: Control, text: String, font_size: int, color: Color) -> Label:
+func _card_label(parent: Control, text: String, variation: StringName) -> Label:
 	var label := Label.new()
 	label.text = text
+	label.theme_type_variation = variation
 	label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	label.add_theme_font_size_override("font_size", font_size)
-	label.add_theme_color_override("font_color", color)
 	parent.add_child(label)
 	return label
 
@@ -661,18 +843,13 @@ func _button(text: String, min_size: Vector2, variation: StringName = &"") -> Bu
 	return button
 
 
-## Pins a control to the bottom edge; it grows upward to fit its content.
-func _anchor_bottom(control: Control, full_width: bool) -> void:
-	if full_width:
-		control.set_anchors_preset(Control.PRESET_BOTTOM_WIDE)
-		control.offset_left = MARGIN
-		control.offset_right = -MARGIN
-	else:
-		control.set_anchors_preset(Control.PRESET_CENTER_BOTTOM)
-		control.grow_horizontal = Control.GROW_DIRECTION_BOTH
-		control.offset_left = 0
-		control.offset_right = 0
+## Pins a control to the bottom centre; it grows upward to fit its content.
+func _anchor_bottom(control: Control) -> void:
+	control.set_anchors_preset(Control.PRESET_CENTER_BOTTOM)
+	control.grow_horizontal = Control.GROW_DIRECTION_BOTH
 	control.grow_vertical = Control.GROW_DIRECTION_BEGIN
+	control.offset_left = 0
+	control.offset_right = 0
 	control.offset_top = -MARGIN
 	control.offset_bottom = -MARGIN
 
@@ -709,8 +886,20 @@ func _make_theme() -> Theme:
 	ui.set_color("font_color", "Label", TEXT)
 	ui.set_color("font_outline_color", "Label", INK)
 
-	# Panels: the build bar, the info panel and the place bar take PanelContainer's.
+	# Panels: the info panel and the place bar take PanelContainer's; the rest are variations.
 	ui.set_stylebox("panel", "PanelContainer", _shape(PANEL, 12))
+	var menu := StyleBoxFlat.new()
+	menu.bg_color = PANEL
+	menu.border_color = INK
+	menu.border_width_top = BORDER
+	menu.corner_radius_top_left = 16
+	menu.corner_radius_top_right = 16
+	menu.content_margin_left = MARGIN
+	menu.content_margin_right = MARGIN
+	menu.content_margin_top = 12
+	menu.content_margin_bottom = MARGIN
+	ui.set_type_variation(&"MenuPanel", &"PanelContainer")
+	ui.set_stylebox("panel", &"MenuPanel", menu)
 	var toast := _shape(PANEL, 10)
 	toast.content_margin_left = 18
 	toast.content_margin_right = 18
@@ -729,6 +918,14 @@ func _make_theme() -> Theme:
 	frame.set_corner_radius_all(10)
 	ui.set_type_variation(&"MeterFrame", &"Panel")
 	ui.set_stylebox("panel", &"MeterFrame", frame)
+	# White, tinted to the category by the stripe's self_modulate; its top corners follow the
+	# card's inside its border.
+	var stripe := StyleBoxFlat.new()
+	stripe.bg_color = Color.WHITE
+	stripe.corner_radius_top_left = 12 - BORDER
+	stripe.corner_radius_top_right = 12 - BORDER
+	ui.set_type_variation(&"CardStripe", &"Panel")
+	ui.set_stylebox("panel", &"CardStripe", stripe)
 
 	# Buttons: a card unless a variation says otherwise. None takes focus.
 	_button_shapes(ui, &"Button", CARD, CARD, 12)
@@ -737,18 +934,29 @@ func _make_theme() -> Theme:
 		ui.set_color(item, "Button", TEXT)
 	ui.set_color("font_disabled_color", "Button", Color(TEXT, DISABLED_ALPHA))
 	ui.set_color("font_outline_color", "Button", INK)
+	_button_variation(ui, &"BuildButton", GOLD, GOLD_PRESSED, 12, DISPLAY_FONT, 30, 4)
 	_button_variation(ui, &"UpgradeButton", GOLD, GOLD_PRESSED, 12, BODY_FONT, 20, 3)
 	_button_variation(ui, &"ConfirmButton", ACCENT, ACCENT.darkened(0.15), 12, DISPLAY_FONT, 22, 0, INK)
 	_button_variation(ui, &"BarButton", CARD, CARD, 12, DISPLAY_FONT, 22, 0)
 	_button_variation(ui, &"DebugButton", CARD, CARD, 12, DISPLAY_FONT, 20, 0)
+	_button_variation(ui, &"CloseButton", CARD, CARD, 12, DISPLAY_FONT, 28, 3)
+	_button_variation(ui, &"TabButton", CARD, CARD, 10, DISPLAY_FONT, 24, 3)
+	# The selected tab: cyan in every state, ink text with no outline.
+	_button_variation(ui, &"TabSelected", ACCENT, ACCENT, 10, DISPLAY_FONT, 24, 0, INK)
+	for item: String in ["normal", "hover", "pressed", "hover_pressed"]:
+		ui.set_stylebox(item, &"TabSelected", _shape(ACCENT, 10, BUTTON_MARGIN))
 
+	_label_variation(ui, &"CardName", 20, TEXT, 2)
+	_label_variation(ui, &"CardCost", 18, TEXT, 0)
+	_label_variation(ui, &"CardCount", 16, TEXT_DIM, 0)
+	_label_variation(ui, &"CardReason", 15, TEXT_DIM, 0)
 	_label_variation(ui, &"MeterText", 18, TEXT, 2, _meter_font())
 	_label_variation(ui, &"InfoTitle", 24, TEXT, 0, DISPLAY_FONT)
 	_label_variation(ui, &"InfoDetail", 17, TEXT, 0)
 	_label_variation(ui, &"InfoNote", 17, WARNING, 0)
 	_label_variation(ui, &"ToastText", 18, TEXT, 0)
 
-	# The entry strip's scroll bar: a dim grabber on an ink track.
+	# The card strip's scroll bar: a dim grabber on an ink track.
 	var track := _flat(Color(INK, 0.6), 4)
 	ui.set_stylebox("scroll", "HScrollBar", track)
 	ui.set_stylebox("scroll_focus", "HScrollBar", track)
