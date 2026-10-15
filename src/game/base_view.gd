@@ -9,8 +9,9 @@ extends Node3D
 ## The terrain, the rocks and the crystal outcrops are generated from SCENERY_SEED, so every
 ## player's base sits in the same landscape: a ring of dunes, craters, mesas and a dry channel
 ## rising from low, rough ground beside the curb along an edge that wanders, smooth shaded and
-## painted from the material kit's dust and rock by slope, with chamfered rocks and glowing crystal
-## clusters on it. Each is one mesh with its ink outline.
+## painted from the material kit's dust and rock by slope, with chamfered rocks, small ones strewn
+## beside the curb as rubble, and glowing crystal clusters on it. Each is one mesh with its ink
+## outline.
 
 const GROUND_SHADER := preload("res://src/game/ground.gdshader")
 ## The field texture the ground is drawn from, imported as an Image (tools/gen_textures.gd).
@@ -76,6 +77,11 @@ const ROCK_COUNT := 80
 const ROCK_SMALLEST := 0.4
 const ROCK_LARGEST := 2.5
 const ROCK_STACKED := 25
+## The rubble beside the curb: how many small rocks, their radii, and how far outside the field
+## they lie, spread evenly round its four sides.
+const RUBBLE_ROCKS := 36
+const RUBBLE_ROCK_RADIUS := Vector2(0.15, 0.4)
+const RUBBLE_ROCK_OUT := Vector2(1.6, 6.6)
 ## The crystal outcrops: how many clusters, shards in each, the shards' lengths, and how close any
 ## part of one may come to the field.
 const OUTCROP_COUNT := Vector2i(6, 10)
@@ -149,8 +155,13 @@ func setup(size: Vector2i) -> void:
 	_build_boundary()
 	var rng := SeededRng.new(SCENERY_SEED)
 	_build_terrain(rng)
-	_build_rocks(rng)
+	var stones := LowPolyMesh.new()
+	var stone_spots := _build_rocks(stones, rng)
 	_build_outcrops(rng)
+	# The rubble draws from the seed last, so the rocks and the outcrops keep their places.
+	_scatter_rubble(stones, stone_spots, rng)
+	rocks = _add_mesh(stones.to_mesh(), true)
+	rocks_outline = _add_mesh(stones.to_outline_mesh(), false)
 	walls = WallMesh.new()
 	walls.setup(self)
 	add_child(walls)
@@ -608,11 +619,11 @@ func _clear(at: Vector2, extent: float) -> bool:
 
 
 ## Chamfered rocks scattered on the terrain clear of the curb, about a quarter of those over 0.8
-## in radius with a smaller rock on top, all in one mesh with its outline. Each sits on the lowest ground under it, so it
-## does not float on a slope.
-func _build_rocks(rng: SeededRng) -> void:
+## in radius with a smaller rock on top, into `mesh`. Each sits on the lowest ground under it, so
+## it does not float on a slope. Returns each rock's (x, z, reach).
+func _build_rocks(mesh: LowPolyMesh, rng: SeededRng) -> Array[Vector3]:
 	var half := Vector2(grid_size) * 0.5
-	var mesh := LowPolyMesh.new()
+	var spots: Array[Vector3] = []
 	var placed := 0
 	while placed < ROCK_COUNT:
 		var angle := TAU * rng.range_int(0, 3599) / 3600.0
@@ -624,17 +635,52 @@ func _build_rocks(rng: SeededRng) -> void:
 		if _out_of_field(x, z) < radius + 1.5:
 			continue
 		placed += 1
-		var ground := terrain_height(x, z)
-		for k: int in 4:
-			var side := Vector2(cos(k * PI * 0.5), sin(k * PI * 0.5)) * radius * 0.8
-			ground = minf(ground, terrain_height(x + side.x, z + side.y))
-		var top := _rock(mesh, Vector3(x, ground - 0.1 * radius, z), radius, rng)
+		spots.append(Vector3(x, z, radius * 1.05))
+		var top := _rock(mesh, Vector3(x, _lowest_ground(x, z, radius) - 0.1 * radius, z), radius, rng)
 		if radius > 0.8 and rng.range_int(0, 99) < ROCK_STACKED:
 			var lean := Vector2(rng.range_int(-25, 25), rng.range_int(-25, 25)) * radius / 100.0
 			var smaller := radius * rng.range_int(40, 55) / 100.0
 			_rock(mesh, Vector3(x + lean.x, top - 0.1 * radius, z + lean.y), smaller, rng)
-	rocks = _add_mesh(mesh.to_mesh(), true)
-	rocks_outline = _add_mesh(mesh.to_outline_mesh(), false)
+	return spots
+
+
+## Rubble beside the curb: RUBBLE_ROCKS small rocks into `mesh`, a quarter along each side of the
+## field, each in a stretch of the side of its own and a random RUBBLE_ROCK_OUT out, so they spread
+## evenly and form no line. A rock that would come near a crater or a mesa (_clear), the channel, a
+## rock in `taken` (each (x, z, reach); it adds its own) or an outcrop tries again in its stretch,
+## up to 20 times. Each rests on the lowest ground under it.
+func _scatter_rubble(mesh: LowPolyMesh, taken: Array[Vector3], rng: SeededRng) -> void:
+	var half := Vector2(grid_size) * 0.5
+	var stretches := RUBBLE_ROCKS / 4
+	for k: int in RUBBLE_ROCKS:
+		# The side's outward direction, +x, +z, -x and -z in turn, and the direction along it.
+		var normal: Vector2 = [Vector2.RIGHT, Vector2.DOWN, Vector2.LEFT, Vector2.UP][k % 4]
+		var along := Vector2(-normal.y, normal.x)
+		for attempt: int in 20:
+			var radius := lerpf(RUBBLE_ROCK_RADIUS.x, RUBBLE_ROCK_RADIUS.y, rng.range_int(0, 100) / 100.0)
+			var out := lerpf(RUBBLE_ROCK_OUT.x, RUBBLE_ROCK_OUT.y, rng.range_int(0, 1000) / 1000.0)
+			var t := (k / 4 + rng.range_int(0, 1000) / 1000.0) / stretches * 2.0 - 1.0
+			var at := normal * (absf(normal.dot(half)) + out) + along * t * absf(along.dot(half))
+			var clear := _clear(at, radius) and _off_channel(at, radius)
+			for spot: Vector3 in taken:
+				clear = clear and at.distance_to(Vector2(spot.x, spot.y)) > spot.z + radius + 0.2
+			# No part of an outcrop reaches 3 from its centre.
+			for spot: Vector3 in outcrop_spots:
+				clear = clear and at.distance_to(Vector2(spot.x, spot.z)) > radius + 3.0
+			if clear:
+				taken.append(Vector3(at.x, at.y, radius * 1.05))
+				_rock(mesh, Vector3(at.x, _lowest_ground(at.x, at.y, radius) - 0.2 * radius, at.y), radius, rng)
+				break
+
+
+## The lowest ground under a rock of `radius` at (`x`, `z`): at its middle and at four points most
+## of the way to its edge.
+func _lowest_ground(x: float, z: float, radius: float) -> float:
+	var ground := terrain_height(x, z)
+	for k: int in 4:
+		var side := Vector2(cos(k * PI * 0.5), sin(k * PI * 0.5)) * radius * 0.8
+		ground = minf(ground, terrain_height(x + side.x, z + side.y))
+	return ground
 
 
 ## One rock, a chamfered chunk: a jittered ring of corners on the ground, a shoulder ring a
@@ -748,8 +794,7 @@ func terrain_height(x: float, z: float) -> float:
 	var distance := sqrt(x * x + z * z)
 	# The channel wanders at most CHANNEL_MEANDER from its course: a point well off it is skipped.
 	if distance > _channel.z and x * _channel_course.x + z * _channel_course.y > distance * cos(CHANNEL_MEANDER + 0.3):
-		var course := _channel.x + CHANNEL_MEANDER * sin(distance / 9.0 + _channel.y)
-		var across := angle_difference(course, atan2(z, x)) * distance
+		var across := _channel_across(x, z, distance)
 		if absf(across) < CHANNEL_WIDTH:
 			var u := 1.0 - (across / CHANNEL_WIDTH) * (across / CHANNEL_WIDTH)
 			height -= CHANNEL_DEPTH * u * u * smoothstep(_channel.z, _channel.z + 5.0, distance)
@@ -773,6 +818,19 @@ func terrain_height(x: float, z: float) -> float:
 			var top := 1.0 - smoothstep(edge - MESA_WALL, edge + MESA_FOOT, sqrt(dx * dx + dz * dz))
 			height = lerpf(height, mesa.w, top)
 	return height * smoothstep(TERRAIN_FLAT, full_out, out) + rubble
+
+
+## How far across the dry channel's meandering course a point `distance` from the centre lies, in
+## world units, either way.
+func _channel_across(x: float, z: float, distance: float) -> float:
+	var course := _channel.x + CHANNEL_MEANDER * sin(distance / 9.0 + _channel.y)
+	return angle_difference(course, atan2(z, x)) * distance
+
+
+## Whether a point reaching `extent` from `at` keeps out of the dry channel's bed.
+func _off_channel(at: Vector2, extent: float) -> bool:
+	var distance := at.length()
+	return distance + extent < _channel.z or absf(_channel_across(at.x, at.y, distance)) > CHANNEL_WIDTH + extent
 
 
 ## How far out from the field the terrain's relief is full at a point: between TERRAIN_BLEND_NEAR
