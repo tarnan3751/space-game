@@ -180,7 +180,7 @@ the origin, cell (x, y) on world (x, z).
 | `world_to_cell(point)` | The cell under a ground point (floor). |
 | `footprint_cell_at(point, size)` | The top-left cell of a `size` footprint centred as closely as possible on a point (round). |
 | `area()` | The buildable area as a `Rect2` in world x/z; the camera's bounds. |
-| `sync(state)` | Makes `views` match `state.buildings`: frees views whose building is gone, changed type or has a new finished level (except the `dragging_id` view, which keeps its model until it is dropped), creates missing ones, pushes `show_status` to each, and for all but `dragging_id` sets the position, un-lifts, and shows the SELECTED tile on `selected_id`. Last it brings the merged wall mesh up to date (`_sync_walls`, **Walls**). |
+| `sync(state)` | Makes `views` match `state.buildings`: frees views whose building is gone, changed type or has a new finished level (except the `dragging_id` view, which keeps its model until it is dropped), first handing a view's construction drone to the base view (`release_drone`) and, once the views are made, telling it to leave over the new view's site (`site_height()`), creates missing ones, pushes `show_status` to each, and for all but `dragging_id` sets the position, un-lifts, and shows the SELECTED tile on `selected_id`. Last it brings the merged wall mesh up to date (`_sync_walls`, **Walls**). |
 | `walls` | The `WallMesh` that draws every finished wall but the dragged one. |
 | `set_grid_highlight(on)` | Brightens the ground's cell lines (`GRID_LINES_PLACING`) or dims them back (`GRID_LINES`); `PlacementController` calls it as placement begins and ends. |
 | `clear()` | Frees every view (used when the state is replaced). |
@@ -241,6 +241,19 @@ upgrade and resume where they stopped (the surface effects keep running: they co
 shaders' `TIME`); a view with nothing to move turns processing off in `_ready`, so walls and
 traps cost nothing per frame.
 
+While the building is busy a `ConstructionDrone` works over the site (`art-style.md`,
+**Construction drone**): `show_status` creates one the first time it reports `busy` with none
+there, over the scaffold on a first build and over the model on an upgrade (an instant build is
+never busy and gets none), and tells it to `leave(site_height())` once it reports the building
+not busy. The view turns processing on while it has a drone and drives it from `_process`
+(`advance(delta)`); when the drone has left and freed itself the view drops it and processes
+only if something moves. A finished level replaces the view, so `BaseView.sync` first calls
+`release_drone`, which re-parents the drone to the base view, where it keeps its place in the
+world and drives itself; once the new view exists, `sync` tells it to leave over that view's
+site (`site_height()`, the top of the scaffold or the model it shows), so its climb starts clear
+of the finished model, and it frees itself after its climb. `drone()` returns the view's drone
+(null when none), for the harness. `BaseView.clear()` frees the drones with the views.
+
 `BuildingModels.create(type, level, size)` returns a `Node3D` holding the static body and its
 ink outline, and up to three moving parts (today one each: the comms dish, the drone bay's
 beacon, the drill, the harvester's emitter, the siphon and gravity well rings, the research and
@@ -252,7 +265,9 @@ category's file under `src/game/models/`; `MODELS` gives each type the footprint
 built for and its level count. A level above that shows the top model, a catalog size other than
 the footprint scales the model, and an unknown type gets a hull block with a hazard stripe and
 one warning. Meshes are built once per type and level and cached in a static dictionary; the
-nodes are per view. `create_scaffold(size)` is one cached, outlined model in hazard stripes. How a
+nodes are per view. `create_scaffold(size)` is one cached, outlined model in hazard stripes;
+`create_drone()` and `create_drone_effect(part)` build and cache the construction drone and its
+laser's beam and flare the same way. How a
 model is built and what it must keep (the contract, the budgets, the vocabulary) is in
 `art-style.md`, **Models**.
 

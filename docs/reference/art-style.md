@@ -20,6 +20,7 @@ camera and the views' wiring are in `input-camera.md`.
 | `src/game/field_marks.gdshaderinc` | the field texture's tiles, the marks' light and the grain, shared by the ground and the terrain |
 | `src/game/base_view.gd` | builds the ground, the curb, the terrain ring, the rocks and the outcrops (**Environment**) |
 | `src/game/building_models.gd`, `src/game/models/` | the dispatcher and one model file per category, `Parts` in `models/parts.gd` |
+| `src/game/construction_drone.gd`, `src/game/models/drone.gd` | the builder drone over a busy site, its flight and its laser (**Construction drone**) |
 | `assets/textures/kit/` | the sixteen layers, committed PNGs |
 | `assets/textures/field.png` | the field texture, a committed PNG |
 | `assets/textures/terrain_rock.png` | the terrain's rock texture, a committed PNG |
@@ -376,6 +377,44 @@ triangles as the gallery counts them.
 | `flak_mine` | hazard-banded pod, upward barrels with glowing bores round a lens | none | 574 |
 | `mega_mine` | big armoured dome on a hazard band ringed with red lights | none | 1,214 |
 
+### Construction drone
+
+While a building is constructed or upgraded, a builder drone works over it
+(`ConstructionDrone`; `input-camera.md`, **BuildingView**, for when it is spawned and freed).
+
+- **The model** (`models/drone.gd`, `DroneModels.build_drone`): the drone bay's parked drone with
+  a builder's marks. A 12-sided saucer on `HULL_LIGHT_ROUND`, a `GLASS` canopy, an `ENERGY` eye
+  at its front (+Z), four `ROD` arms on the diagonals to `HULL_MID_ROUND` ducts, each banded in
+  hazard stripes round a rotor blur disc (`ROTOR`, glossy glass for now), and a gunmetal tool arm
+  under the nose ending in an `ENERGY` emitter lens (`EMITTER`). It is built round its own centre
+  at the bay's size and shown 1.4 times larger (`SCALE`), so it reads at the starting zoom.
+  `BuildingModels.create_drone()` builds and caches it like a model: a body and its outline.
+- **The flight** (constants on `ConstructionDrone`): it descends over 0.8 s, easing out, from 3.5
+  above the orbit's height over the footprint's centre, then cycles. It orbits the centre at
+  half the footprint plus 0.45, 1.4 high (higher over a tall site: the same clearance as the
+  hover, below), bobbing 0.08 (period 1.8 s), at 0.9 units a second, facing its motion and banked
+  12 degrees into the turn. After 2.2 s it picks a work point, flies to it easing in and out,
+  tilts its nose down 15 degrees, fires for 1.3 s and flies back to the orbit. Leaving, it stops
+  firing, rises 3.5 over 0.7 s and frees itself; the climb starts no lower than clear of what the
+  site shows by then, so a drone whose build just finished starts above the new model.
+- **The work points.** At spawn it keeps the faces of the shown site's body mesh (the scaffold or
+  the model) that face the camera (the normal's dot with the view direction above 0.3, so up-
+  facing ones too) and reach between 0.3 and 0.8 of its height. Each shot picks one of them, a
+  height in that band within the face and a point across the face there, from a hash of the
+  building's id and the shot count, so a run repeats. It hovers 0.9 above the point, nudged 0.3
+  outward along the face's horizontal normal, with its lowest point (tilted to fire, at the bottom
+  of its bob) held at least 0.3 above the site's top; the beam slants down to the point.
+- **The laser**: a thin unlit `ENERGY` prism (radius 0.025, not outlined), one unit long
+  (`create_drone_effect("beam")`) under a node stretched from the emitter to the work point, so
+  no mesh is rebuilt per shot; at the point a flare (`create_drone_effect("flare")`): an unlit
+  cyan dome (radius 0.14) and five hazard-yellow spark shards fanned round it, 0.08 to 0.14 long
+  past its edge so their tips reach about 0.25 out, each seen from both sides.
+  Both are shown only while firing (`visible`). The beam, the flare's dome, the sparks and the
+  rotor blur each have a surface of their own on `DroneModels`, for the effects to come.
+- **Instances**: the body, its outline, the beam and the flare, four, made at spawn; nothing is
+  allocated per frame. Only the body casts a shadow. Drones exist only while a building is busy
+  (and for the 0.7 s of leaving), so there are about as many as the base has busy drones.
+
 ## Animation
 
 Two ways for a model to move: **surface effects**, which the shaders animate from `TIME` per
@@ -551,7 +590,7 @@ only when it is the toon surface, so its holograms keep their look.
 | --- | --- |
 | Selected (`set_footprint(SELECTED)`) or lifted (`set_lifted(true)`, while dragged) | the outline instances take `ink_selected` (core gold); the footprint tile shows as before |
 | Placement ghost (`set_ghost(valid)`, from `PlacementController` as its spot is checked) | the body instances take `ghost_valid` or `ghost_invalid`: the toon shader with energy cyan or defence red mixed in at 0.65; the outline stays plain ink, though the ghost is lifted |
-| Under construction | the scaffold, a model like any other, outlined |
+| Under construction | the scaffold, a model like any other, outlined; a construction drone works over it, and over a building being upgraded (**Construction drone**) |
 
 A wall drawn by the merged wall mesh hides its own model, outlines included (`set_merged`), so a
 selected merged wall shows its footprint tile and no gold, and the merged outline stays plain ink.
@@ -779,8 +818,8 @@ terrain's rock texture, one 512×512 RGBA8 image, is about 1.4 MB with its mipma
 shader has two samplers (the field texture and the rock texture) and takes three texture reads a
 fragment (the field's marks and the rock texture along x and along z), with five value noises.
 Keep `_process` free of allocation, and keep every building to its eight instances
-(**Animation**). The shader effects cost a few integer tests and a sine or two a vertex and a
-fragment, and no draw; a moving part costs two draws (its body and its outline) plus the body's
-shadow draw, and a mesh with HOLO parts one more draw in the transparent pass. The finished walls
-are one merged mesh, a fixed handful of draws however many there are (`input-camera.md`,
-**Walls**).
+(**Animation**); a busy building adds its construction drone's four. The shader effects cost a
+few integer tests and a sine or two a vertex and a fragment, and no draw; a moving part costs two
+draws (its body and its outline) plus the body's shadow draw, and a mesh with HOLO parts one more
+draw in the transparent pass. The finished walls are one merged mesh, a fixed handful of draws
+however many there are (`input-camera.md`, **Walls**).

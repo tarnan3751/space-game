@@ -200,6 +200,8 @@ func set_grid_highlight(on: bool) -> void:
 
 ## Creates, updates and removes building views to match the state.
 func sync(state: BaseState) -> void:
+	# A freed view's construction drone, by building id: it leaves over the new view's site.
+	var leaving: Dictionary[int, ConstructionDrone] = {}
 	for id: int in views.keys():
 		var stale: bool = not state.buildings.has(id)
 		if not stale:
@@ -208,6 +210,9 @@ func sync(state: BaseState) -> void:
 			stale = views[id].building_type != building.type \
 				or (views[id].building_level != building.level and id != dragging_id)
 		if stale:
+			var drone := views[id].release_drone(self)
+			if drone != null:
+				leaving[id] = drone
 			views[id].queue_free()
 			views.erase(id)
 
@@ -226,6 +231,8 @@ func sync(state: BaseState) -> void:
 		view.set_lifted(false)
 		var mode := BuildingView.Footprint.SELECTED if id == selected_id else BuildingView.Footprint.NONE
 		view.set_footprint(mode)
+	for id: int in leaving:
+		leaving[id].leave(views[id].site_height() if views.has(id) else 0.0)
 	_sync_walls(state)
 
 

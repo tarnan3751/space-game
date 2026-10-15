@@ -64,7 +64,7 @@ or `data/`.
 | Core and economy: catalog, base state, commands, timers, production, grid, seeded RNG | `src/core/` | `docs/reference/core-economy.md` |
 | Data format: `rules.json`, `buildings.json`, the fixtures, the save file | `data/`, `test/support/fixtures/` | `docs/reference/data-format.md` |
 | Input and camera: the scene, camera, gestures, placement, views | `src/game/` (all but the HUD's and the art style's files) | `docs/reference/input-camera.md` |
-| Art style: the look, light, colours, the material kit, `LowPolyMesh`, outlines, models, animation, view states | `src/game/models/`, `src/game/*.gdshader*`, `material_kit.gd`, `surf.gd`, `motion.gd`, `low_poly_mesh.gd`, `assets/textures/kit/`, `assets/textures/*.png`, `tools/gen_textures.gd` | `docs/reference/art-style.md` |
+| Art style: the look, light, colours, the material kit, `LowPolyMesh`, outlines, models, animation, the construction drone, view states | `src/game/models/`, `construction_drone.gd`, `src/game/*.gdshader*`, `material_kit.gd`, `surf.gd`, `motion.gd`, `low_poly_mesh.gd`, `assets/textures/kit/`, `assets/textures/*.png`, `tools/gen_textures.gd` | `docs/reference/art-style.md` |
 | HUD: the theme and fonts, top bar (meters, drone ring), Build button and build panel, place bar, info panel, toasts | `src/game/hud.gd`, `hud_icon.gd`, `drone_ring.gd`, `format.gd`, `assets/fonts/` | `docs/reference/hud.md` |
 | Testing and tools: runner, fixtures, gate, harness, landing, API dump | `test/`, `tools/` | `docs/reference/testing-tools.md`, `tools/harness/README.md` |
 
@@ -120,12 +120,13 @@ docs/            project_overview.md (scope, status, roadmap, decisions); refere
 scenes/          main.tscn only
 src/core/        catalog, base_state, building_state, base_grid, seeded_rng
 src/game/        main, template_base, iso_camera, world_input, placement_controller, base_view,
-                 building_view, building_models, wall_mesh, low_poly_mesh, surf, motion, material_kit,
-                 hud, hud_icon, drone_ring, format, toon.gdshader, toon_common.gdshaderinc,
-                 effects.gdshaderinc, ink.gdshader, holo.gdshader, ground.gdshader, terrain.gdshader,
-                 field_marks.gdshaderinc
+                 building_view, construction_drone, building_models, wall_mesh, low_poly_mesh, surf,
+                 motion, material_kit, hud, hud_icon, drone_ring, format, toon.gdshader,
+                 toon_common.gdshaderinc, effects.gdshaderinc, ink.gdshader, holo.gdshader,
+                 ground.gdshader, terrain.gdshader, field_marks.gdshaderinc
 src/game/models/ parts (the model being built, shared helpers and surfaces), then one file of
-                 model builders per category: core, resources, army, defense, traps, walls
+                 model builders per category: core, resources, army, defense, traps, walls; and
+                 drone, the construction drone and its laser
 test/core/       test_*.gd (one file per core area)
 test/support/    TestCase base class, fixtures and fixture JSON
 tools/           run_tests.sh, test_runner.gd, gates.sh, land_series.sh, dump_api.sh,

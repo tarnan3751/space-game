@@ -9,6 +9,10 @@ extends Node3D
 ## turn core gold (ink_selected) until both end, when the override is cleared (null); a
 ## placement ghost keeps plain ink outlines, lifted as it is, and its bodies take the valid or
 ## invalid ghost tint (set_ghost) for as long as it lives.
+##
+## While the building is busy a ConstructionDrone works over it, driven from _process; when the
+## work ends the drone leaves, and if the view is freed first (a finished level replaces it)
+## BaseView hands the leaving drone over (release_drone).
 
 enum Footprint { NONE, SELECTED, VALID, INVALID }
 
@@ -53,6 +57,8 @@ var _time: float = 0.0
 var _animate: bool = true
 ## BaseView's merged wall mesh draws this building, so its own model is hidden (set_merged).
 var _merged: bool = false
+## The builder drone over the site while the building is busy, and while it leaves.
+var _drone: ConstructionDrone = null
 
 
 ## Call once, before adding to the tree. `level` picks the model (level 1's while it is 0).
@@ -111,6 +117,13 @@ func show_status(level: int, busy: bool, target_level: int, seconds_left: int) -
 	_scaffold.visible = level < 1
 	_animate = level >= 1 and not busy
 	_label.visible = busy
+	if busy and _drone == null:
+		_drone = ConstructionDrone.new()
+		_drone.setup(building_id, footprint_size, _scaffold if level < 1 else _model)
+		add_child(_drone)
+		set_process(true)
+	elif not busy and _drone != null:
+		_drone.leave(site_height())
 	if busy:
 		var what := "Building" if level < 1 else "Lv %d" % target_level
 		_label.text = "%s  %s" % [what, Format.duration(seconds_left)]
@@ -161,7 +174,32 @@ func set_ghost(valid: bool) -> void:
 			body.set_surface_override_material(0, material)
 
 
+## The builder drone over the site (working or leaving), null when there is none.
+func drone() -> ConstructionDrone:
+	return _drone
+
+
+## The top of what the view shows now: the scaffold while the level show_status was last given
+## is 0, else the model. Not building_level: a view kept while it is dragged shows its finished
+## model before it is rebuilt.
+func site_height() -> float:
+	return ConstructionDrone.top_of(_scaffold if _scaffold.visible else _model)
+
+
+## Hands a drone that is still over the site to `parent`, where it finishes its work or its
+## leaving: the view is about to be freed. Returns it, or null when there is none.
+func release_drone(parent: Node) -> ConstructionDrone:
+	var drone := _drone
+	if drone != null:
+		drone.release(parent)
+		_drone = null
+	return drone
+
+
 func _process(delta: float) -> void:
+	if _drone != null and not _drone.advance(delta):
+		_drone = null
+		set_process(not _movers.is_empty())
 	if not _animate:
 		return
 	_time += delta

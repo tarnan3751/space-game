@@ -256,6 +256,20 @@ which stays merged with no gold outline (its own model, whose outlines turn gold
 and lifts it: the mesh drops it and its neighbours' joints, its own post shows, and carried back
 and dropped it rejoins the cross; screenshots show it selected and in the air.
 
+`scenarios/construction_drone.gd` checks the builder drone (`docs/reference/art-style.md`,
+**Construction drone**) on the real build times. A Metal Silo placed on a fresh base gets a
+drone of four instances over its scaffold and its view processes; the drone descends on arrival
+(its height half a second apart), moves on round the site, and fires within ten seconds, the
+beam running from the drone down to a point on the site within the footprint (plus the models'
+0.15 slack) and the work band, its lowest point clearing the site's top by `CLEARANCE`. Advanced
+past completion and synced, the finished silo's new view has no drone and does not process,
+while the old drone leaves under the base view, starting clear of the finished model, climbs and
+frees itself. Then, with the metal and the crystal topped up by the scenario (the start's
+amounts and caps do not cover both), the Command Center goes to level 2 and an upgrade of the
+silo gets a drone again, clear of the model on its orbit a second in and firing at it with the
+same checks. It screenshots the drone arriving, firing at the scaffold, leaving and firing at
+the upgrading silo, at camera size 10 on the silo.
+
 `scenarios/template_base.gd` checks the debug build's Template base (`TemplateBase`,
 `docs/reference/input-camera.md`): it presses the HUD's button (`template_button()`) and checks
 that every type but the walls is there exactly once and the walls are the enclosure's pieces,

@@ -33,6 +33,7 @@ const ArmyModels := preload("res://src/game/models/army.gd")
 const DefenseModels := preload("res://src/game/models/defense.gd")
 const TrapModels := preload("res://src/game/models/traps.gd")
 const WallModels := preload("res://src/game/models/walls.gd")
+const DroneModels := preload("res://src/game/models/drone.gd")
 
 ## [the footprint size a model is built for, the levels it has models for] per type.
 const MODELS := {
@@ -137,6 +138,40 @@ static func create_scaffold(size: int) -> Node3D:
 	var root := Node3D.new()
 	_add_parts(root, meshes)
 	return root
+
+
+## The construction drone (ConstructionDrone): its body and its outline, built once and cached
+## like a model.
+static func create_drone() -> Node3D:
+	var meshes := _drone_meshes("drone")
+	var root := Node3D.new()
+	_add_instances(root, meshes.body, meshes.outline)
+	return root
+
+
+## The drone's laser (`"beam"`, one unit long up +Y) or the flare where it hits (`"flare"`): one
+## instance, unlit, with no outline and casting no shadow.
+static func create_drone_effect(part: String) -> MeshInstance3D:
+	var instance := MeshInstance3D.new()
+	instance.mesh = _drone_meshes(part).body
+	instance.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	return instance
+
+
+static func _drone_meshes(part: String) -> Meshes:
+	var key := "drone/" + part
+	var meshes: Meshes = _cache.get(key)
+	if meshes == null:
+		var p := Parts.new()
+		match part:
+			"drone":
+				DroneModels.build_drone(p)
+			"beam":
+				DroneModels.build_beam(p)
+			"flare":
+				DroneModels.build_flare(p)
+		meshes = _store(key, p)
+	return meshes
 
 
 static func _store(key: String, p: Parts) -> Meshes:
