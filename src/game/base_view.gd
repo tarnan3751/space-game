@@ -22,10 +22,13 @@ const SCENERY_SEED := 7
 const GRID_LINES := 0.1
 const GRID_LINES_PLACING := 0.45
 ## The terrain reaches TERRAIN_EXTENT from the centre in x and z, on a lattice of 1 unit within
-## TERRAIN_FINE_REACH of the centre and of TERRAIN_COARSE beyond.
+## TERRAIN_FINE_REACH of the centre and of TERRAIN_COARSE beyond, cut to half a unit within
+## TERRAIN_MESA_REACH of a mesa's outline, so its steep wall meets the level ground over several
+## points.
 const TERRAIN_EXTENT := 100.0
 const TERRAIN_FINE_REACH := 50.0
 const TERRAIN_COARSE := 2
+const TERRAIN_MESA_REACH := 3.0
 ## Outside the field the ground stays flat out to TERRAIN_FLAT (under the curb) and reaches its
 ## full relief between TERRAIN_BLEND_NEAR and TERRAIN_BLEND_FAR out, wandering along the edge
 ## (blend_end), so no ramp runs straight along a side. Rubble, RUBBLE high either way, roughens
@@ -363,11 +366,11 @@ func _add_mesh(mesh: Mesh, casts_shadow: bool) -> MeshInstance3D:
 
 ## The land around the field: a smooth-shaded ring out to TERRAIN_EXTENT whose inner edge lies on
 ## the field's at y = 0, built as one indexed mesh from a lattice of points (TERRAIN_FINE_REACH,
-## TERRAIN_COARSE). Where the coarse cells meet the fine ones, a coarse cell fans out from the
-## fine point in the middle of its edge, so no point lies on another cell's edge. Each point's
-## normal comes from its lattice neighbours' heights, once, and the ink outline (one more mesh,
-## on the same points and normals) inks the ridges and crater rims the camera sees over. Each
-## point is tinted by slope and place (ROCK_SLOPE_Y, SHADOW_SLOPE_Y, CRATER_FLOOR), a tint the
+## TERRAIN_COARSE, TERRAIN_MESA_REACH). Where larger cells meet smaller ones, a larger cell fans
+## out from the point in the middle of its edge, so no point lies on another cell's edge. Each
+## point's normal comes from its lattice neighbours' heights, once, and the ink outline (one more
+## mesh, on the same points and normals) inks the ridges and crater rims the camera sees over.
+## Each point is tinted by slope and place (ROCK_SLOPE_Y, SHADOW_SLOPE_Y, CRATER_FLOOR), a tint the
 ## faces between points blend and the terrain shader draws over (MaterialKit.terrain). The
 ## terrain receives shadows and casts none.
 func _build_terrain(rng: SeededRng) -> void:
@@ -376,17 +379,54 @@ func _build_terrain(rng: SeededRng) -> void:
 		_noise[i] = rng.range_int(0, 1000) / 1000.0
 	_place_features(rng)
 
-	# Lattice point (i, j) is world (i - half.x, j - half.y), so the field spans [0, grid_size].
-	# Fine points fill [fine_low, fine_high] but the field's inside, coarse ones every
-	# TERRAIN_COARSE out to [low, high]; both ranges are even, so the lattices meet.
+	# The lattice is in half units: point (i, j) is world (i / 2 - half.x, j / 2 - half.y), so the
+	# field spans [0, 2 grid_size]. Fine cells, 1 unit square, fill [fine_low, fine_high] but the
+	# field's inside, and coarse ones, TERRAIN_COARSE square, fill the rest out to [low, high]; both
+	# ranges are multiples of the coarse cell, so the lattices meet. Fine cells within the mesas'
+	# reach (_refined) are cut into four.
 	var half := Vector2(grid_size) * 0.5
-	var fine_low := -Vector2i(ceili(TERRAIN_FINE_REACH - half.x), ceili(TERRAIN_FINE_REACH - half.y))
-	var fine_high := grid_size - fine_low + Vector2i(grid_size.x % 2, grid_size.y % 2)
-	var reach := TERRAIN_COARSE * ceili((TERRAIN_EXTENT - TERRAIN_FINE_REACH) / TERRAIN_COARSE)
+	var coarse := 2 * TERRAIN_COARSE
+	var fine_low := -2 * Vector2i(ceili(TERRAIN_FINE_REACH - half.x), ceili(TERRAIN_FINE_REACH - half.y))
+	var fine_high := 2 * (grid_size + Vector2i(grid_size.x % 2, grid_size.y % 2)) - fine_low
+	var reach := coarse * ceili((TERRAIN_EXTENT - TERRAIN_FINE_REACH) / TERRAIN_COARSE)
 	var low := fine_low - Vector2i(reach, reach)
 	var high := fine_high + Vector2i(reach, reach)
 	var columns := high.x - low.x + 1
 	var rows := high.y - low.y + 1
+
+	# The cells, each as its first corner and its size in half units (1 a refined one); the points,
+	# each one's size, the smallest of the cells it is a corner of (0 off the lattice); and their
+	# places on the lattice, in order.
+	var cells: Array[Vector3i] = []
+	var spans := PackedInt32Array()
+	spans.resize(columns * rows)
+	var places := PackedInt32Array()
+	for j: int in range(low.y, high.y, coarse):
+		for i: int in range(low.x, high.x, coarse):
+			if i < fine_low.x or i >= fine_high.x or j < fine_low.y or j >= fine_high.y:
+				cells.append(Vector3i(i, j, coarse))
+	for j: int in range(fine_low.y, fine_high.y, 2):
+		for i: int in range(fine_low.x, fine_high.x, 2):
+			if i < 0 or i >= 2 * grid_size.x or j < 0 or j >= 2 * grid_size.y:
+				# A refined cell keeps a fine cell's width from the coarse ones, so a coarse cell's
+				# edge holds at most one point between its corners.
+				var inside := i > fine_low.x and i < fine_high.x - 2 and j > fine_low.y and j < fine_high.y - 2
+				var refined := inside and _refined((i + 1) * 0.5 - half.x, (j + 1) * 0.5 - half.y)
+				cells.append(Vector3i(i, j, 1 if refined else 2))
+	for cell: Vector3i in cells:
+		var first := (cell.y - low.y) * columns + cell.x - low.x
+		var span := 2 if cell.z == 1 else cell.z
+		var corners := PackedInt32Array([first, first + span, first + span * columns, first + span * columns + span])
+		if cell.z == 1:
+			corners.append_array(PackedInt32Array([first + 1, first + columns, first + columns + 1,
+				first + columns + 2, first + 2 * columns + 1]))
+		for place: int in corners:
+			if spans[place] == 0:
+				places.append(place)
+				spans[place] = cell.z
+			elif cell.z < spans[place]:
+				spans[place] = cell.z
+	places.sort()
 
 	# The points, each with its vertex in `ids` (-1 off the lattice) and its height in `heights`.
 	var ids := PackedInt32Array()
@@ -395,33 +435,13 @@ func _build_terrain(rng: SeededRng) -> void:
 	var heights := PackedFloat32Array()
 	heights.resize(columns * rows)
 	var vertices := PackedVector3Array()
-	var places := PackedInt32Array()
-	var coarse_columns := PackedInt32Array(range(low.x, high.x + 1, TERRAIN_COARSE))
-	for j: int in range(low.y, high.y + 1):
-		var coarse_row := (j - low.y) % TERRAIN_COARSE == 0
-		var row := coarse_columns
-		if j >= fine_low.y and j <= fine_high.y:
-			row = PackedInt32Array()
-			if coarse_row:
-				row.append_array(PackedInt32Array(range(low.x, fine_low.x, TERRAIN_COARSE)))
-			if j > 0 and j < grid_size.y:
-				row.append_array(PackedInt32Array(range(fine_low.x, 1)))
-				row.append_array(PackedInt32Array(range(grid_size.x, fine_high.x + 1)))
-			else:
-				row.append_array(PackedInt32Array(range(fine_low.x, fine_high.x + 1)))
-			if coarse_row:
-				row.append_array(PackedInt32Array(range(fine_high.x + TERRAIN_COARSE, high.x + 1, TERRAIN_COARSE)))
-		elif not coarse_row:
-			continue
-		var z := j - half.y
-		for i: int in row:
-			var place := (j - low.y) * columns + i - low.x
-			var x := i - half.x
-			var y := terrain_height(x, z)
-			ids[place] = vertices.size()
-			heights[place] = y
-			places.append(place)
-			vertices.append(Vector3(x, y, z))
+	for place: int in places:
+		var x := (place % columns + low.x) * 0.5 - half.x
+		var z := (place / columns + low.y) * 0.5 - half.y
+		var y := terrain_height(x, z)
+		ids[place] = vertices.size()
+		heights[place] = y
+		vertices.append(Vector3(x, y, z))
 
 	var normals := PackedVector3Array()
 	var colors := PackedColorArray()
@@ -429,10 +449,7 @@ func _build_terrain(rng: SeededRng) -> void:
 		var place := places[v]
 		var column := place % columns
 		var row := place / columns
-		var step := 1
-		if column < fine_low.x - low.x or column > fine_high.x - low.x \
-				or row < fine_low.y - low.y or row > fine_high.y - low.y:
-			step = TERRAIN_COARSE
+		var step := spans[place]
 		# The rise across the point along x and z: between its neighbours `step` either side, or
 		# 2 `step` where the lattice coarsens, or the point itself at an edge.
 		var east := place
@@ -458,9 +475,9 @@ func _build_terrain(rng: SeededRng) -> void:
 		var along_x := 0.0
 		var along_z := 0.0
 		if east != west:
-			along_x = (heights[east] - heights[west]) / (east - west)
+			along_x = (heights[east] - heights[west]) / ((east - west) * 0.5)
 		if south != north:
-			along_z = (heights[south] - heights[north]) / ((south - north) / columns)
+			along_z = (heights[south] - heights[north]) / ((south - north) / columns * 0.5)
 		var normal := Vector3(-along_x, 1.0, -along_z).normalized()
 		normals.append(normal)
 		var at := vertices[v]
@@ -475,60 +492,48 @@ func _build_terrain(rng: SeededRng) -> void:
 			var lit_side := smoothstep(LIT_SLOPE_Y + 0.03, LIT_SLOPE_Y - 0.03, normal.y) * smoothstep(0.1, 0.2, facing)
 			# The craters all lie inside the fine lattice.
 			var floor_weight := 0.0
-			if step == 1:
+			if step < coarse:
 				floor_weight = _crater_floor(at.x, at.z)
 			tint = MaterialKit.TERRAIN.lerp(MaterialKit.TERRAIN_LIGHT, lit_side) \
 				.lerp(MaterialKit.TERRAIN_DARK, maxf(shadow_side, floor_weight)) \
 				.lerp(MaterialKit.ROCK, steep)
 		colors.append(tint)
 
-	# The cells' triangles, going round as (i, j), (i + 1, j), (i + 1, j + 1), (i, j + 1), which
-	# faces up; the diagonals alternate, so the faces do not all lean one way.
+	# Each cell's triangles, going round as (i, j), (i + span, j), (i + span, j + span),
+	# (i, j + span), which faces up; a refined cell's four quarters each the same. A cell with no
+	# point in the middle of an edge is two triangles whose diagonals alternate, so the faces do not
+	# all lean one way; one beside smaller cells fans out from the first such point, so no point
+	# lies on another cell's edge.
 	var indices := PackedInt32Array()
-	for j: int in range(fine_low.y, fine_high.y):
-		for i: int in range(fine_low.x, fine_high.x):
-			if i >= 0 and i < grid_size.x and j >= 0 and j < grid_size.y:
-				continue
-			var place := (j - low.y) * columns + i - low.x
-			var a := ids[place]
-			var b := ids[place + 1]
-			var c := ids[place + columns + 1]
-			var d := ids[place + columns]
-			indices.append(a)
-			indices.append(b)
-			if (i + j) % 2 == 0:
-				indices.append(c)
-				indices.append(a)
-			else:
-				indices.append(d)
-				indices.append(b)
-			indices.append(c)
-			indices.append(d)
-	var span := TERRAIN_COARSE
-	for j: int in range(low.y, high.y, span):
-		for i: int in range(low.x, high.x, span):
-			if i >= fine_low.x and i < fine_high.x and j >= fine_low.y and j < fine_high.y:
-				continue
-			var place := (j - low.y) * columns + i - low.x
-			var corners := PackedInt32Array([ids[place], ids[place + span], ids[place + span * columns + span],
-				ids[place + span * columns]])
-			# The fine point in the middle of an edge the cell shares with the fine lattice, if any.
-			var middles := PackedInt32Array([ids[place + 1], ids[place + columns + span],
-				ids[place + span * columns + 1], ids[place + columns]])
-			var fan := -1
-			for k: int in 4:
-				if middles[k] >= 0:
-					fan = k
-			if fan >= 0:
-				var m := middles[fan]
-				for k: int in range(1, 4):
-					indices.append_array(PackedInt32Array([m, corners[(fan + k) % 4], corners[(fan + k + 1) % 4]]))
-			elif ((i - low.x) / span + (j - low.y) / span) % 2 == 0:
-				indices.append_array(PackedInt32Array([corners[0], corners[1], corners[2],
-					corners[0], corners[2], corners[3]]))
-			else:
-				indices.append_array(PackedInt32Array([corners[0], corners[1], corners[3],
-					corners[1], corners[2], corners[3]]))
+	for cell: Vector3i in cells:
+		var span := cell.z
+		var place := (cell.y - low.y) * columns + cell.x - low.x
+		if span == 1:
+			for quarter: int in 4:
+				var at := place + quarter % 2 + quarter / 2 * columns
+				indices.append_array(_cell_quad(ids[at], ids[at + 1], ids[at + columns + 1], ids[at + columns],
+					(cell.x + quarter % 2 - low.x + cell.y + quarter / 2 - low.y) % 2 == 0))
+			continue
+		var middle := span / 2
+		# Going round: each corner, then the point in the middle of the edge after it, or -1.
+		var loop := PackedInt32Array([ids[place], ids[place + middle], ids[place + span],
+			ids[place + middle * columns + span], ids[place + span * columns + span],
+			ids[place + span * columns + middle], ids[place + span * columns], ids[place + middle * columns]])
+		var fan := -1
+		for k: int in [1, 3, 5, 7]:
+			if loop[k] >= 0:
+				fan = k
+				break
+		if fan < 0:
+			indices.append_array(_cell_quad(loop[0], loop[2], loop[4], loop[6],
+				((cell.x - low.x) / span + (cell.y - low.y) / span) % 2 == 0))
+			continue
+		var around := PackedInt32Array()
+		for k: int in range(1, 8):
+			if loop[(fan + k) % 8] >= 0:
+				around.append(loop[(fan + k) % 8])
+		for k: int in around.size() - 1:
+			indices.append_array(PackedInt32Array([loop[fan], around[k], around[k + 1]]))
 
 	var arrays := []
 	arrays.resize(Mesh.ARRAY_MAX)
@@ -548,6 +553,14 @@ func _build_terrain(rng: SeededRng) -> void:
 	body.surface_set_material(0, material)
 	terrain = _add_mesh(body, false)
 	terrain_outline = _add_mesh(hull, false)
+
+
+## The two triangles of a terrain cell going round `a`, `b`, `c`, `d` (which faces up), split along
+## a-c when `even`, else along b-d.
+static func _cell_quad(a: int, b: int, c: int, d: int, even: bool) -> PackedInt32Array:
+	if even:
+		return PackedInt32Array([a, b, c, a, c, d])
+	return PackedInt32Array([a, b, d, b, c, d])
 
 
 ## Places the terrain's features from `rng`, inside the fine lattice: two mesas towards the far
@@ -804,6 +817,18 @@ func terrain_height(x: float, z: float) -> float:
 			var top := 1.0 - smoothstep(edge - MESA_WALL, edge + MESA_FOOT, sqrt(dx * dx + dz * dz))
 			height = lerpf(height, mesa.w, top)
 	return height * smoothstep(TERRAIN_FLAT, full_out, out) + rubble
+
+
+## Whether a point lies within TERRAIN_MESA_REACH of a mesa's outline (_mesa_edge), where the
+## terrain's lattice is cut to half a unit.
+func _refined(x: float, z: float) -> bool:
+	for k: int in mesas.size():
+		var dx := x - mesas[k].x
+		var dz := z - mesas[k].y
+		if dx * dx + dz * dz < (mesas[k].z * 1.2 + TERRAIN_MESA_REACH) * (mesas[k].z * 1.2 + TERRAIN_MESA_REACH) \
+				and sqrt(dx * dx + dz * dz) < _mesa_edge(k, dx, dz) + TERRAIN_MESA_REACH:
+			return true
+	return false
 
 
 ## How far across the dry channel's meandering course a point `distance` from the centre lies, in

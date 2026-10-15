@@ -13,7 +13,7 @@ extends HarnessScenario
 ## curb, the crater and the outcrop the camera's bounds are widened, as a player cannot centre the
 ## view off the field).
 
-const TERRAIN_BUDGET := 35000
+const TERRAIN_BUDGET := 38000
 const OUTCROP_GAP := 4.0
 const EDGE_OUT := 3.0
 const EDGE_SPREAD := 0.1
