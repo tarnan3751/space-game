@@ -20,6 +20,10 @@ extends RefCounted
 ## above a low plated base. Caps are never wider than their post. Every segment ends on the cell
 ## edge in a cap left out of the ink outline, so two segments that meet there draw one unbroken
 ## outline, and every level shares the curb, so mixed levels still meet at the base.
+##
+## The energy is animated by its surfaces (**Animation**): the strips of L3 and L4 carry a current
+## that runs along the wall, towards world +x or +z whichever way the segment points, so it runs on
+## unbroken along a straight run; L5's field shimmers upward and pulses.
 
 const PLUS_X := 1
 const MINUS_X := 2
@@ -61,10 +65,20 @@ static var GOLD := Parts.GOLD_TRIM
 static var SLATE := Surf.make(MaterialKit.Layer.PLATE, MaterialKit.WALL, 1.5)
 static var SLATE_RIVETED := Surf.make(MaterialKit.Layer.PLATE, MaterialKit.WALL, 2.5)
 static var SLATE_RIBBED := Surf.make(MaterialKit.Layer.PIPE, MaterialKit.WALL, 2.0)
-## Emissive strips and the field are too thin to ink.
-static var ENERGY := Surf.make(MaterialKit.Layer.GLOW, MaterialKit.ENERGY, 1.0, Surf.UNLIT, false, false)
-static var ENERGY_BRIGHT := Surf.make(MaterialKit.Layer.GLOW, MaterialKit.ENERGY.lightened(0.4), 1.0,
-	Surf.UNLIT, false, false)
+## Emissive strips and the field are too thin to ink. The glow layer's stripes are drawn a third
+## as fine (FLOW_SCALE), so a current shows at the closest zoom, and a half-segment is then about
+## two whole stripes long, so the stripes run on unbroken from one wall to the next. The strips'
+## stripes cross them, so their FLOW runs along the strip: at 0.6 about 1.2 units a second, the
+## brighter strip a little faster.
+const FLOW_SCALE := 1.0 / 3.0
+static var ENERGY := Surf.make(MaterialKit.Layer.GLOW, MaterialKit.ENERGY, FLOW_SCALE,
+	Surf.UNLIT | Surf.FLOW, false, false, 0.6)
+static var ENERGY_BRIGHT := Surf.make(MaterialKit.Layer.GLOW, MaterialKit.ENERGY.lightened(0.4), FLOW_SCALE,
+	Surf.UNLIT | Surf.FLOW, false, false, 0.65)
+## The field: its stripes run along it, so its FLOW lifts them up the panel (V runs down a side
+## face), about 0.6 units a second, as it pulses.
+static var FIELD := Surf.make(MaterialKit.Layer.GLOW, MaterialKit.ENERGY, FLOW_SCALE,
+	Surf.UNLIT | Surf.FLOW | Surf.PULSE, false, false, 0.45)
 
 ## Built pieces by level * 16 + mask.
 static var _pieces: Dictionary[int, Piece] = {}
@@ -136,18 +150,31 @@ static func _segments(m: LowPolyMesh, level: int, bit: int) -> void:
 			_sweep(m, bit, _trapezoid(Vector2(band.x, 0.0), band), base + 0.35 * height, SLATE)
 		3:
 			_sweep(m, bit, _chamfered(SEGMENT_HALF, height, 0.04), base, SLATE_RIBBED)
-			_sweep(m, bit, _trapezoid(Vector2(0.05, 0.0), Vector2(0.05, 0.025)), top, ENERGY)
+			_strip(m, bit, 0.1, top, ENERGY)
 		4:
 			var skirt := 0.45 * height
 			_sweep(m, bit, _trapezoid(Vector2(SEGMENT_HALF + 0.02, 0.0), Vector2(SEGMENT_HALF, skirt)),
 				base, SLATE_RIVETED)
 			_sweep(m, bit, _chamfered(SEGMENT_HALF - 0.03, height - skirt, 0.04), base + skirt, SLATE)
-			_sweep(m, bit, _trapezoid(Vector2(0.06, 0.0), Vector2(0.06, 0.025)), top, ENERGY_BRIGHT)
+			_strip(m, bit, 0.12, top, ENERGY_BRIGHT)
 		_:
 			# A low plated base, and the energy field above it.
 			var slab := 0.4 * height
 			_sweep(m, bit, _chamfered(SEGMENT_HALF, slab, 0.03), base, SLATE_RIVETED)
-			_sweep(m, bit, _trapezoid(Vector2(0.03, 0.0), Vector2(0.03, height - slab)), base + slab, ENERGY)
+			_sweep(m, bit, _trapezoid(Vector2(0.03, 0.0), Vector2(0.03, height - slab)), base + slab, FIELD)
+
+
+## An energy strip `width` wide and 0.025 high on top of the half-segment toward neighbour `bit`,
+## at height `y`: a box built along its own z and turned onto world +x or +z, so its top's texture
+## V runs along the wall the same way on both halves of every segment and a FLOW current runs on
+## from one wall to the next. (A swept face takes its UVs in the piece's space, where a strip
+## along x would have its glow stripes running along it, and its flow across.)
+static func _strip(m: LowPolyMesh, bit: int, width: float, y: float, surf: Surf) -> void:
+	var along := Vector3(NEIGHBOURS[bit].x, 0, NEIGHBOURS[bit].y)
+	var length := 0.5 - SEGMENT_FROM
+	var yaw := 90.0 if along.x != 0.0 else 0.0
+	m.box(Vector3(width, 0.025, length), along * (SEGMENT_FROM + 0.5) * 0.5 + Vector3(0, y, 0), surf,
+		Vector3(0, yaw, 0))
 
 
 ## The post's full height: its body, its cap and, on the top level, the crown.

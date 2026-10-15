@@ -574,11 +574,17 @@ included:
 | --- | --- | --- |
 | 1 | Squat, 0.55 | Slate plates |
 | 2 | 0.64, gunmetal cap | Riveted slate armour with a band |
-| 3 | Ribbed (the `pipe` layer), 0.72, gunmetal cap | Ribbed slate, an energy cyan strip along the top |
-| 4 | A plated pylon with wide chamfers, 0.81, gunmetal cap | Double plated: a sloped riveted skirt under a slate plate, a brighter strip |
-| 5 | The level 4 post with a gold crown, 0.9 | A low riveted base under an energy field panel |
+| 3 | Ribbed (the `pipe` layer), 0.72, gunmetal cap | Ribbed slate, an energy cyan strip along the top, a current flowing along it |
+| 4 | A plated pylon with wide chamfers, 0.81, gunmetal cap | Double plated: a sloped riveted skirt under a slate plate, a brighter strip, its current a little faster |
+| 5 | The level 4 post with a gold crown, 0.9 | A low riveted base under an energy field panel, shimmering upward as it pulses |
 
-The strips and the field are unlit (`glow`, flags 1) and, being thin, have no ink. A segment's
+The strips and the field are unlit on the `glow` layer at a third of its scale (`FLOW_SCALE`), so
+its stripes are coarse enough to see move, and, being thin, have no ink. A strip is a box built
+along its own z and turned onto world +x or +z, so its top's stripes cross it on every segment and
+its FLOW (0.6, 0.65 on level 4) carries them towards +x or +z on both halves of a segment: the
+current runs on along a run, from wall to wall, a half-segment being about two whole stripes long.
+The field is a swept panel whose stripes run along it, so its FLOW (0.45) lifts them up the panel,
+with PULSE. A segment's
 end on the cell edge is a cap painted like the segment but left out of the outline, so two
 segments that meet there draw one unbroken ink line; where walls of different levels meet, the
 taller segment's end shows as a step without an ink edge, and every level's curb meets the next.
