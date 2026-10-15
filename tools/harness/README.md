@@ -133,8 +133,8 @@ in the catalog, laid out on the grid in rows by category (`"core"`, then
 does not fit on the grid at once, so rows that do not fit start a new page. Each page gets an
 overview screenshot (at the widest zoom, held for 2.1 seconds so that the frame rate, which
 counts the last whole second, covers one with the page already set up, after which it says the
-draw calls and the frame rate there), each row a close-up, and each row's first building a detail
-shot at the closest zoom (camera size 10), where outlines, bands and textures can be read; all
+draw calls, the frame rate and the render thread's CPU time for the frame there), each row a
+close-up, and each row's first building a detail shot at the closest zoom (camera size 10), where outlines, bands and textures can be read; all
 are framed through `camera.zoom_at` and `camera.pan`. The frame rate is only meaningful when
 nothing else is loading the machine.
 In both modes it checks every model: one or two body `MeshInstance3D` (the static body and the

@@ -2,7 +2,9 @@ extends HarnessScenario
 ## The model gallery: one BuildingView per building type and level in the catalog, laid out on
 ## the grid in category rows, with an overview screenshot of each page of rows (saying the draw
 ## calls and the frame rate there), a close-up of each row, and a detail shot of each row's
-## first building at the closest zoom, where outlines, bands and textures can be read.
+## first building at the closest zoom, where outlines, bands and textures can be read. The
+## overview's line also says the render thread's CPU time for the frame, measured on the root
+## viewport.
 ##
 ## Checks every model: one or two body MeshInstance3D (the static body, the spinning part), each
 ## with an outline instance beside it on the ink material casting no shadow; every vertex's kit
@@ -53,6 +55,8 @@ func run(main: MainScript) -> void:
 		models += int(entry["levels"])
 	check(laid_out == models, "every type and level is laid out (%d of %d)" % [laid_out, models])
 	var pages := _paginate(rows, grid.y)
+	var viewport_rid := main.get_viewport().get_viewport_rid()
+	RenderingServer.viewport_set_measure_render_time(viewport_rid, true)
 	for page_index: int in pages.size():
 		var gallery := Node3D.new()
 		main.add_child(gallery)
@@ -72,9 +76,10 @@ func run(main: MainScript) -> void:
 			say("page %d, %s row at y %d: %s" % [page_index + 1, row["category"], row["y"], ", ".join(names)])
 		_frame(main, main.base_view.cell_to_world(Vector2i(grid.x / 2, grid.y / 2), 0), OVERVIEW_SIZE)
 		await main.get_tree().create_timer(SETTLE_SECONDS).timeout
-		say("page %d overview: %d draw calls, %d fps" % [page_index + 1,
+		say("page %d overview: %d draw calls, %d fps, %.2f ms render CPU" % [page_index + 1,
 			Performance.get_monitor(Performance.RENDER_TOTAL_DRAW_CALLS_IN_FRAME),
-			Performance.get_monitor(Performance.TIME_FPS)])
+			Performance.get_monitor(Performance.TIME_FPS),
+			RenderingServer.viewport_get_measured_render_time_cpu(viewport_rid)])
 		await screenshot("page%d-overview" % (page_index + 1))
 		for row_index: int in page.size():
 			var row: Dictionary = page[row_index]
