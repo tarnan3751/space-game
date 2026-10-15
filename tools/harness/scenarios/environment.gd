@@ -2,13 +2,22 @@ extends HarnessScenario
 ## The environment on a fresh base (docs/reference/art-style.md, **Environment**). Checks that the
 ## terrain, the curb, the rocks and the outcrops are each a body with an ink outline that casts no
 ## shadow (the terrain's and the curb's bodies none either); the terrain's triangle budget; that no
-## part of an outcrop comes within OUTCROP_GAP of the field; and that at the widest zoom in a WIDE
-## window, the focus at each corner of its bounds, the ray from every screen corner meets the
-## terrain. Screenshots: the start zoom, the closest on the field, the widest in the WIDE window, and
-## a crater and an outcrop centred (the camera's bounds widened, as a player cannot centre the ring).
+## part of an outcrop comes within OUTCROP_GAP of the field; that along each side of the field,
+## EDGE_OUT units out, the ground is uneven (its height spreads by more than EDGE_SPREAD) and low
+## (never over EDGE_HIGHEST), and the distance at which the relief is full (BaseView.blend_end)
+## wanders by more than BLEND_WANDER; and that at the widest zoom in a WIDE window, the focus at
+## each corner of its bounds, the ray from every screen corner meets the terrain. Screenshots: the
+## start zoom, the closest on the field, about six plates close up, the curb at the middle of each
+## side, the widest in the WIDE window, and a crater and an outcrop centred (for the curb, the
+## crater and the outcrop the camera's bounds are widened, as a player cannot centre the view off
+## the field).
 
 const TERRAIN_BUDGET := 35000
 const OUTCROP_GAP := 4.0
+const EDGE_OUT := 3.0
+const EDGE_SPREAD := 0.1
+const EDGE_HIGHEST := 0.4
+const BLEND_WANDER := 3.0
 const WIDE := Vector2i(1560, 720)
 
 
@@ -32,8 +41,33 @@ func run(main: MainScript) -> void:
 	for at: Vector3 in view.outcrops.mesh.surface_get_arrays(0)[Mesh.ARRAY_VERTEX]:
 		nearest = minf(nearest, (Vector2(absf(at.x), absf(at.z)) - field.end).max(Vector2.ZERO).length())
 	check(nearest >= OUTCROP_GAP, "%d outcrops, the nearest %.1f from the field" % [view.outcrop_spots.size(), nearest])
+	# Each side by the screen corner it faces, and its outward direction in world x and z.
+	var sides := {"top-left": Vector2(-1, 0), "top-right": Vector2(0, -1), "bottom-right": Vector2(1, 0),
+		"bottom-left": Vector2(0, 1)}
+	for side: String in sides:
+		var out: Vector2 = sides[side]
+		# The lowest and highest ground, and the nearest and farthest the relief is full.
+		var heights := Vector2(INF, -INF)
+		var full := Vector2(INF, -INF)
+		for k: int in 40:
+			var along := Vector2(out.y, out.x) * field.end * ((k + 0.5) / 20.0 - 1.0)
+			var at := out * (field.end + Vector2.ONE * EDGE_OUT) + along
+			var height := view.terrain_height(at.x, at.y)
+			var full_out := view.blend_end(at.x, at.y)
+			heights = Vector2(minf(heights.x, height), maxf(heights.y, height))
+			full = Vector2(minf(full.x, full_out), maxf(full.y, full_out))
+		check(heights.y - heights.x > EDGE_SPREAD and heights.y <= EDGE_HIGHEST and full.y - full.x > BLEND_WANDER,
+			"%.0f out from the %s side the ground is %.2f to %.2f high, its relief full %.1f to %.1f out"
+			% [EDGE_OUT, side, heights.x, heights.y, full.x, full.y])
 	await _shot(main, "start", Vector3.ZERO, main.camera.size)
 	await _shot(main, "closest-field", view.cell_to_world(Vector2i(9, 9), 1), IsoCamera.MIN_ZOOM_SIZE)
+	await _shot(main, "plates", view.cell_to_world(Vector2i(12, 26), 1), 12.0)
+	main.camera.bounds = field.grow(BaseView.TERRAIN_EXTENT - field.end.x)
+	var curb := field.end + Vector2.ONE * (BaseView.CURB_GAP + BaseView.CURB_WIDTH * 0.5)
+	for side: String in sides:
+		var out: Vector2 = sides[side]
+		await _shot(main, "edge-" + side, Vector3(out.x * curb.x, 0.0, out.y * curb.y), 16.0)
+	main.camera.bounds = field
 	main.get_window().size = WIDE
 	main.camera.zoom_at(main.camera.size / IsoCamera.MAX_ZOOM_SIZE, Vector2.ZERO)
 	for corner: Vector2 in [field.position, field.end, field.end * Vector2(1, -1), field.end * Vector2(-1, 1)]:
