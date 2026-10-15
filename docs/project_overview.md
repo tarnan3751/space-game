@@ -111,9 +111,6 @@ for the real numbers).
   model contract in `docs/reference/art-style.md`.
 - **The save is local and unversioned beyond `"version": 1`**; the server will hold the base
   later and nothing below `main.gd` changes.
-- **No sky.** Within the camera's limits the terrain ring fills the view on every aspect up to
-  about 2.98:1, so the clear colour shows only on wider screens. A sky (a panorama behind the
-  ring) is a later item, should the terrain's extent or the zoom range change.
 - `hp`, `damage`, `range_cells`, `fire_ms`, `hidden`, `targets` and `capacity` in
   `data/buildings.json` are display-only: the HUD's info panel shows each where it exists, and
   none of them drives anything until the battle sim (step 4).

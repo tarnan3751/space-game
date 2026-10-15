@@ -15,8 +15,8 @@ material kit, `LowPolyMesh`, the shaders, the outlines, the view states, the wal
    In a debug build (`OS.is_debug_build()`) without a `--no-cheats` user argument
    (`NO_CHEATS_ARG`), `cheats` is set and `catalog.apply_dev_cheats()` makes every level free
    and one second at most (`core-economy.md`); the HUD is told through `hud.cheats` (`hud.md`).
-2. The environment: a `WorldEnvironment` (deep space background, cool ambient light, linear
-   tonemap) and one warm key light, a `DirectionalLight3D` with a soft single-split shadow
+2. The environment: a `WorldEnvironment` (a sky of deep space, stars and haze, cool ambient light,
+   linear tonemap) and one warm key light, a `DirectionalLight3D` with a soft single-split shadow
    (`art-style.md`, **Light and shading**).
 3. `BaseView` (ground, scenery, building views), `IsoCamera` (made current), `WorldInput`,
    `Hud`, then `PlacementController`, which is given the view, the camera and the clock
@@ -226,7 +226,7 @@ same landscape. How each looks is in `art-style.md`, **Environment**:
   marches the view's rays over, and `blend_end(x, z)` how far out from the field its relief is full
   there, which the harness checks wanders along each side. At the widest zoom it fills the view
   with the focus anywhere on the grid on every aspect up to about 2.98:1 (a 19.5:9 phone is
-  2.17:1); beyond that the clear colour shows.
+  2.17:1); beyond that the sky shows.
 - **The rocks**: `ROCK_COUNT` (80) chamfered rocks, some stacked, on the terrain clear of the
   curb, and `RUBBLE_ROCKS` (36) small ones strewn round the field 1.6 to 6.6 units out, all in one
   mesh with its outline.

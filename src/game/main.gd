@@ -191,13 +191,26 @@ static func _save_path_from_args() -> String:
 
 
 ## The comic style's light (docs/reference/art-style.md, **Light and shading**): deep space
-## behind, a cool ambient for the sides the sun misses, and one warm key light whose filtered,
-## single-split shadow the toon shader draws into its shadow band with a dotted edge. Linear
-## tonemapping, so the accent colours come out as picked.
+## behind, with stars and a nebula haze (sky.gdshader), a cool ambient for the sides the sun misses,
+## and one warm key light whose filtered, single-split shadow the toon shader draws into its shadow
+## band with a dotted edge. Linear tonemapping, so the accent colours come out as picked.
 func _build_environment() -> void:
 	var environment := Environment.new()
-	environment.background_mode = Environment.BG_COLOR
-	environment.background_color = MaterialKit.SPACE
+	# The sky is drawn on the view's plane, so it takes the camera's fixed angle. It lights
+	# nothing: the ambient light is a colour and there are no reflections.
+	var sky_material := ShaderMaterial.new()
+	sky_material.shader = preload("res://src/game/sky.gdshader")
+	sky_material.set_shader_parameter("view_basis",
+		Basis.from_euler(Vector3(deg_to_rad(IsoCamera.PITCH_DEG), deg_to_rad(IsoCamera.YAW_DEG), 0.0)))
+	sky_material.set_shader_parameter("space", MaterialKit.SPACE)
+	sky_material.set_shader_parameter("haze", MaterialKit.TERRAIN)
+	sky_material.set_shader_parameter("star_tint", MaterialKit.ENERGY)
+	var sky := Sky.new()
+	sky.sky_material = sky_material
+	sky.radiance_size = Sky.RADIANCE_SIZE_32
+	environment.background_mode = Environment.BG_SKY
+	environment.sky = sky
+	environment.reflected_light_source = Environment.REFLECTION_SOURCE_DISABLED
 	environment.ambient_light_source = Environment.AMBIENT_SOURCE_COLOR
 	environment.ambient_light_color = MaterialKit.AMBIENT
 	environment.ambient_light_energy = 0.35

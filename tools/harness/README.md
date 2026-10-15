@@ -196,24 +196,29 @@ fresh base's draw calls and frame rate.
 (`docs/reference/art-style.md`, **Environment**): the terrain, the perimeter, the rocks and the
 crystal outcrops are each a body with an ink outline on `MaterialKit.ink()` that casts no shadow,
 the terrain's body casting none either; the perimeter's body casts a shadow and is two surfaces,
-the toon's and the holograms' (its fence); the terrain's triangles are within 38,000; no
+the toon's and the holograms' (its fence); the background is a sky (`BG_SKY`) drawn by a
+`ShaderMaterial`; the terrain's triangles are within 38,000; no
 vertex of an outcrop lies within 4 units of the field; along each side of the field, 3 units out,
 at 40 evenly spaced points, the terrain's heights spread by more than 0.1 (the ground is uneven)
 and never pass 0.4 (it stays low by the curb), and the distance out at which its relief is full
 (`BaseView.blend_end`) spreads by more than 3 units (the edge wanders; the terrain before the
 wandering edge fails both, its ground there 0.83 to 0.88 high and its relief full 3 out
 everywhere); and at the widest zoom, in a 1560x720 window (a 19.5:9 phone) and with the focus at
-each corner of its bounds, the ray from every corner of the screen meets the terrain, so the clear
-colour never shows: marched in half-unit steps over `BaseView.terrain_height`, it must enter the
+each corner of its bounds, the ray from every corner of the screen meets the terrain, so the sky
+never shows: marched in half-unit steps over `BaseView.terrain_height`, it must enter the
 terrain's extent above the ground (not under its raised outer edge) and meet the ground before it
-leaves. Those checks are worked out from `BaseView` and the camera's transform, so they hold
+leaves; and in a 1400x400 window (3.5:1), focused on the field's nearest corner, it does not, so
+that view shows the sky. Those checks are worked out from `BaseView` and the camera's transform, so they hold
 headless. It screenshots the start zoom, the closest zoom on the field (its marks and the grid),
 the closest zoom on a point where four of the field texture's tiles meet (`tile-corner`, where
 nothing should show the tiles' edges), a wider stretch of the field at camera size 12 (`tiles`),
 the perimeter at the middle of each side of the field at size 16 (`edge-top-left`, `edge-top-right`,
 `edge-bottom-right`, `edge-bottom-left`, by the screen corner each side faces), the middle of the
 +z side and the +x +z corner of the perimeter at the closest zoom (`perimeter-side`,
-`perimeter-corner`), the widest zoom in the wide window, a crater and an outcrop each centred,
+`perimeter-corner`), the widest zoom in the wide window and in the 3.5:1 one on the nearest
+corner (`widest-wider`: stars beyond the ring, no bare colour), the widest zoom in a 1600x400
+window on the field's left corner (`widest-haze`: the sky's haze band beyond the ring's lower
+left), a crater and an outcrop each centred,
 the first mesa's wall where it faces the camera at the closest zoom (`mesa`, its foot and its rim)
 and the mesa at size 24 (`mesas`); for the perimeter, the crater, the outcrop and the mesa it
 widens the camera's bounds to the terrain's, since the player cannot centre the view off the

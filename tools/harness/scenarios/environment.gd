@@ -2,18 +2,21 @@ extends HarnessScenario
 ## The environment on a fresh base (docs/reference/art-style.md, **Environment**). Checks that the
 ## terrain, the perimeter, the rocks and the outcrops are each a body with an ink outline that casts
 ## no shadow (the terrain's body none either, the perimeter's one); that the perimeter's body is two
-## surfaces, the toon's and the holograms' (its fence); the terrain's triangle budget; that no
-## part of an outcrop comes within OUTCROP_GAP of the field; that along each side of the field,
-## EDGE_OUT units out, the ground is uneven (its height spreads by more than EDGE_SPREAD) and low
-## (never over EDGE_HIGHEST), and the distance at which the relief is full (BaseView.blend_end)
-## wanders by more than BLEND_WANDER; and that at the widest zoom in a WIDE window, the focus at
-## each corner of its bounds, the ray from every screen corner meets the terrain. Screenshots: the
-## start zoom, the closest on the field, the closest on a point where four of the field texture's
-## tiles meet (nothing should show where they do), a wider stretch of the field, the perimeter at
-## the middle of each side, a side and a corner of it at the closest zoom, the widest in the WIDE window, and
-## a crater, an outcrop and the first mesa's wall centred, then the mesa wider (for the perimeter,
-## the crater, the outcrop and the mesa the camera's bounds are widened, as a player cannot centre
-## the view off the field).
+## surfaces, the toon's and the holograms' (its fence); that the background is a sky drawn by a
+## shader; the terrain's triangle budget; that no part of an outcrop comes within OUTCROP_GAP of the
+## field; that along each side of the field, EDGE_OUT units out, the ground is uneven (its height
+## spreads by more than EDGE_SPREAD) and low (never over EDGE_HIGHEST), and the distance at which
+## the relief is full (BaseView.blend_end) wanders by more than BLEND_WANDER; that at the widest
+## zoom in a WIDE window, the focus at each corner of its bounds, the ray from every screen corner
+## meets the terrain; and that in a WIDER window, focused on the field's nearest corner, it does
+## not, so the sky shows. Screenshots: the start zoom, the closest on the field, the closest on a
+## point where four of the field texture's tiles meet (nothing should show where they do), a wider
+## stretch of the field, the perimeter at the middle of each side, a side and a corner of it at the
+## closest zoom, the widest in the WIDE window and in the WIDER one on the nearest corner (stars
+## beyond the ring, no bare colour), the widest in the WIDEST one on the field's left corner (the
+## sky's haze band beyond the ring's lower left), a crater, an outcrop and the first mesa's wall centred
+## (its foot and rim), then the mesa wider (for the perimeter, the crater, the outcrop and the mesa
+## the camera's bounds are widened, as a player cannot centre the view off the field).
 
 const TERRAIN_BUDGET := 38000
 const OUTCROP_GAP := 4.0
@@ -22,6 +25,10 @@ const EDGE_SPREAD := 0.1
 const EDGE_HIGHEST := 0.4
 const BLEND_WANDER := 3.0
 const WIDE := Vector2i(1560, 720)
+## A window wider than the ring fills at the widest zoom, where the sky shows.
+const WIDER := Vector2i(1400, 400)
+## Wider still (4:1), for the sky's haze band beyond the ring's lower left.
+const WIDEST := Vector2i(1600, 400)
 
 
 func run(main: MainScript) -> void:
@@ -37,6 +44,13 @@ func run(main: MainScript) -> void:
 		check(body != null and body.mesh != null and outline != null and outline.mesh != null
 			and outline.cast_shadow == off and outline.mesh.surface_get_material(0) == MaterialKit.ink()
 			and (pairs[name][2] or body.cast_shadow == off), "the %s: a body and an ink outline casting no shadow" % name)
+	var sky: Sky = null
+	for child: Node in main.get_children():
+		if child is WorldEnvironment:
+			var environment := (child as WorldEnvironment).environment
+			if environment.background_mode == Environment.BG_SKY:
+				sky = environment.sky
+	check(sky != null and sky.sky_material is ShaderMaterial, "the background is a sky drawn by a shader")
 	var perimeter := view.boundary.mesh
 	check(view.boundary.cast_shadow != off and perimeter.get_surface_count() == 2
 		and perimeter.surface_get_material(0) == MaterialKit.toon()
@@ -89,6 +103,18 @@ func run(main: MainScript) -> void:
 		check(_ring_fills_view(view, main.camera, float(WIDE.x) / WIDE.y),
 			"the ring fills a %s view at the widest zoom focused on %s" % [WIDE, corner])
 	await _shot(main, "widest-wide", Vector3.ZERO, IsoCamera.MAX_ZOOM_SIZE)
+	main.get_window().size = WIDER
+	main.camera.focus = Vector3(field.end.x, 0.0, field.end.y)
+	main.camera.nudge(Vector3.ZERO)
+	check(not _ring_fills_view(view, main.camera, float(WIDER.x) / WIDER.y),
+		"a %s view at the widest zoom focused on %s sees past the ring" % [WIDER, field.end])
+	await _shot(main, "widest-wider", Vector3(field.end.x, 0.0, field.end.y), IsoCamera.MAX_ZOOM_SIZE)
+	# The haze band lies across the lower left of the sky: the field's left corner in a wider window.
+	main.get_window().size = WIDEST
+	var left := Vector3(field.position.x, 0.0, field.end.y)
+	await _shot(main, "widest-haze", left, IsoCamera.MAX_ZOOM_SIZE)
+	say("haze shot in a %s window" % main.get_window().size)
+	main.get_window().size = WIDE
 	main.camera.bounds = field.grow(BaseView.TERRAIN_EXTENT - field.end.x)
 	await _shot(main, "crater", Vector3(view.craters[0].x, 0.0, view.craters[0].y), 24.0)
 	await _shot(main, "outcrop", view.outcrop_spots[0], 12.0)

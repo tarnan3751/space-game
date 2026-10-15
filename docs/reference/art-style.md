@@ -13,6 +13,7 @@ camera and the views' wiring are in `input-camera.md`.
 | `src/game/toon.gdshader`, `toon_common.gdshaderinc` | the body shader and the light it shares with the ground and the terrain |
 | `src/game/effects.gdshaderinc` | the surface flags and their time-driven effects, shared by the toon, ink and holo shaders (**Animation**) |
 | `src/game/ink.gdshader` | the outline shader |
+| `src/game/sky.gdshader` | the sky beyond the terrain ring (**Light and shading**) |
 | `src/game/holo.gdshader` | the hologram surface (**Animation**) |
 | `src/game/motion.gd` | `Motion`: how a moving part moves (**Animation**) |
 | `src/game/ground.gdshader` | the buildable field: its ground, its marks, the grid |
@@ -40,8 +41,7 @@ a faceted primitive.
 
 ## Light and shading
 
-`main.gd` builds the environment: deep space behind (`SPACE`, `0D0B1A`, the clear colour, which
-the terrain ring hides at every zoom on screens up to about 2.98:1; there is no sky), a cool ambient
+`main.gd` builds the environment: deep space behind (**The sky**, below), a cool ambient
 (`AMBIENT`, `8C8CFF` at 0.35), linear tonemapping (filmic desaturates the accents), and one
 `DirectionalLight3D`, the key light: warm white (`SUN`, `FFF4E0`) at energy 1.0, from the upper
 left of the view (rotation −55°, −30°), casting one `SHADOW_ORTHOGONAL` split. There is no second
@@ -110,6 +110,21 @@ toe makes the shadow a little darker.
 
 There is no rim light: with the orthographic camera a fresnel rim falls under the ink outline,
 which already lifts every silhouette off what is behind it.
+
+**The sky** (`sky.gdshader`, a `ShaderMaterial` in the environment's `Sky`, background `BG_SKY`):
+deep space (`SPACE`, `0D0B1A`) with one faint band of nebula haze, `TERRAIN` violet at most 16 %
+over it, broken into clouds by two octaves of value noise, and a sparse field of small hard-edged
+stars, about 0.8 % of the sky, white and pale cyan (`ENERGY` mixed 55 % towards white): dots of two sizes and, the largest, four-pointed
+comic sparkles. Nothing moves. The terrain
+ring hides it at every zoom on screens up to about 2.98:1, so it shows only beyond the ring on
+wider screens (**Environment**). The camera is orthographic, and for one the renderer hands the
+sky shader the direction `basis * (x, y, -1)` at a point x, y world units from the view's middle,
+so the shader draws the sky on the view's plane (`view_basis`, from `IsoCamera`'s fixed angle,
+turns the direction back into x and y): it lies still behind the panning ground like a sky at
+infinity and scales with the zoom, at which it shows only near the widest, a world unit about
+16 px. It lights nothing: the ambient light is a colour, reflections are off
+(`REFLECTION_SOURCE_DISABLED`) and its radiance map is the smallest. It costs one hash, two value
+noises and a few dozen instructions per background pixel, and no texture.
 
 Engine notes, each learned the hard way: `light()` may not `return`; the renderer hands
 `COLOR` to the shader already in linear (converting it again crushes dark tints to black);
@@ -871,8 +886,8 @@ The noise-chosen dust drifts the tint once had are gone: they were soft single-t
 At the widest zoom the ring fills the view with the focus anywhere on the grid on every aspect up
 to about 2.98:1, measured by marching the rays from the screen's corners over the terrain with the
 focus at each corner of its bounds (a 19.5:9 phone is 2.17:1, and the `environment` scenario checks
-1560x720). Beyond that the clear colour shows first along the bottom of the screen, where the rays
-pass under the ring's raised outer edge. There is no sky.
+1560x720). Beyond that the sky (**Light and shading**) shows first along the bottom of the screen,
+where the rays pass under the ring's raised outer edge.
 
 **The scenery**:
 
