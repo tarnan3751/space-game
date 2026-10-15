@@ -33,6 +33,8 @@ const MARGIN := 16
 const TAB_SIZE := Vector2(140, 48)
 const ENTRY_SIZE := Vector2(224, 96)
 
+## The dev cheats are on (main.gd): the resource panels read "∞" instead of amount / cap.
+var cheats: bool = false
 var _catalog: Catalog
 ## Holds every part; positioned on the safe area.
 var _root: Control
@@ -94,10 +96,14 @@ func refresh(state: BaseState, selected_id: int, placing: bool, ghost_ok: bool, 
 	# other side. Every refresh, the 1 s tick's included, checks it.
 	_fit_safe_area()
 	for res: String in _resource_labels:
-		# A resource the base has no storage for yet (antimatter, early on) is hidden.
+		# A resource the base has no storage for yet (antimatter, early on) is hidden, unless
+		# the cheats make every resource infinite.
 		var capacity := state.capacity(res)
 		var panel: Control = _resource_labels[res].get_parent()
-		panel.visible = capacity > 0
+		panel.visible = capacity > 0 or cheats
+		if cheats:
+			_resource_labels[res].text = "%s  ∞" % _catalog.resource_name(res)
+			continue
 		var rate := state.production_per_hour(res)
 		var rate_text := "   +%s/h" % Format.amount(rate) if rate > 0 else ""
 		_resource_labels[res].text = "%s  %s / %s%s" % [

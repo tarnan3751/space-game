@@ -7,13 +7,21 @@ extends Node3D
 ##
 ## A `--save-path=<file>` user argument (after `--` on the command line) replaces the
 ## save file, so the harness and the gates never touch the real one.
+##
+## A debug build (every run from the editor binary) applies the dev cheats
+## (Catalog.apply_dev_cheats: every level free and built in one second at most) and the HUD
+## shows the resources as infinite. A `--no-cheats` user argument keeps the real numbers; the
+## harness passes it.
 
 const DEFAULT_SAVE_PATH := "user://base.json"
 const SAVE_PATH_ARG := "--save-path="
+const NO_CHEATS_ARG := "--no-cheats"
 const SAVE_EVERY_TICKS := 10
 
 ## Where this run loads and saves the base.
 var save_path: String = DEFAULT_SAVE_PATH
+## Whether this run's catalog has the dev cheats applied.
+var cheats: bool = false
 
 var catalog: Catalog
 var state: BaseState
@@ -31,6 +39,9 @@ func _ready() -> void:
 	if catalog.load_error != "":
 		push_error("Game data is invalid: " + catalog.load_error)
 		return
+	cheats = OS.is_debug_build() and not OS.get_cmdline_user_args().has(NO_CHEATS_ARG)
+	if cheats:
+		catalog.apply_dev_cheats()
 
 	_build_environment()
 
@@ -47,6 +58,7 @@ func _ready() -> void:
 	add_child(world_input)
 
 	hud = Hud.new()
+	hud.cheats = cheats
 	add_child(hud)
 	hud.setup(catalog)
 
