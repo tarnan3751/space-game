@@ -1,28 +1,34 @@
 class_name TemplateBase
 extends RefCounted
 ## The debug build's showcase base (the HUD's Template base, main._template_base): every type in
-## the catalog, hidden ones included, at its top level and finished, grouped by category (one of
-## each, the walls an enclosure), with every resource at its cap. build() returns a save
-## dictionary in to_dict()'s shape (docs/reference/data-format.md, **The save file**) for main.gd
-## to load through BaseState.from_dict; it never touches the save itself.
+## the catalog, hidden ones included, as many of each as the top Command Center level allows
+## (Catalog.max_count at max_cc_level), all at their top level and finished, grouped by category
+## with the walls as fences between the groups, and every resource at its cap. build() returns a
+## save dictionary in to_dict()'s shape (docs/reference/data-format.md, **The save file**) for
+## main.gd to load through BaseState.from_dict; it never touches the save itself.
 ##
-## Everything comes from the catalog, so a roster change still lays out. The bands are "core"
-## (the Command Center), then catalog.categories in tab order, from the top of the field (cell
-## y 0) down. In a band, the types in menu order run left to right from x 0, GAP cells apart;
-## one that would pass the field's right edge starts a new row GAP below the tallest footprint
-## of the row before, and the next band starts the same way below the last row. The walls band
-## (PlacementController.PAINT_CATEGORY) is an enclosure of its first type instead: a WALL_SIZE
-## outline split by a run from the middle of its top side to the middle of its bottom, so it
-## shows corners, T junctions and straight runs; it narrows to a field narrower than it. A
-## building that does not fit is left out, with an error naming the first, rather than overlap.
+## Everything comes from the catalog, so a roster change still lays out. The bands are
+## catalog.categories in tab order but the walls (PlacementController.PAINT_CATEGORY), from the
+## top of the field (cell y 0) down, with the Command Center ("core") leading the first. In a
+## band, the types in menu order run left to right from x 0, each type's copies side by side,
+## GAP cells between footprints; one that would pass the field's right edge starts a new row GAP
+## below the tallest footprint of the row before. The row under each band is a fence: walls of
+## the paint category, one per cell from x 0 rightwards until they run out, and the next band
+## starts on the row after it, so buildings touch the fence on both sides. Walls left over once
+## every band has its fence carry on in further rows below. With the shipped roster the bands
+## are 12, 10, 12 and 2 rows deep (resources, army, defence, traps), and with their fences (the
+## 150 walls are three full fences and 30 under the traps) they fill all 40 rows: a band a row
+## deeper no longer fits. A building that does not fit is left out, with an error naming the
+## first, rather than overlap.
 
 const GAP := 1
-const WALL_SIZE := Vector2i(12, 6)
 
 var _catalog: Catalog
 ## What is laid out so far, so nothing overlaps or leaves the field.
 var _grid: BaseGrid
 var _buildings: Array[Dictionary] = []
+## The wall pieces still to lay in fences, one type per piece.
+var _walls := PackedStringArray()
 ## The first type that did not fit; "" while everything has.
 var _left_out: String = ""
 
@@ -38,20 +44,29 @@ static func build(catalog: Catalog, grid: Vector2i, now: int) -> Dictionary:
 	for type: String in catalog.types():
 		if not order.has(type):
 			order.append(type)
-	var bands := PackedStringArray([Catalog.CORE_CATEGORY])
-	bands.append_array(catalog.categories)
+	var cc_level := catalog.max_cc_level()
+	for type: String in order:
+		if catalog.category_of(type) == PlacementController.PAINT_CATEGORY:
+			for i: int in catalog.max_count(type, cc_level):
+				template._walls.append(type)
 	var y := 0
-	for category: String in bands:
+	var leading := PackedStringArray([Catalog.CORE_CATEGORY])
+	for category: String in catalog.categories:
+		if category == PlacementController.PAINT_CATEGORY:
+			continue
+		leading.append(category)
 		var types := PackedStringArray()
-		for type: String in order:
-			if catalog.category_of(type) == category:
-				types.append(type)
+		for band_category: String in leading:
+			for type: String in order:
+				if catalog.category_of(type) == band_category:
+					for i: int in catalog.max_count(type, cc_level):
+						types.append(type)
+		leading.clear()
 		if types.is_empty():
 			continue
-		if category == PlacementController.PAINT_CATEGORY:
-			y = template._enclosure(types[0], y)
-		else:
-			y = template._band(types, y)
+		y = template._fence(template._band(types, y))
+	while not template._walls.is_empty():
+		y = template._fence(y)
 	if template._left_out != "":
 		push_error("The template base does not fit the field: %s and any later building that did not fit are left out"
 			% template._left_out)
@@ -76,7 +91,8 @@ static func build(catalog: Catalog, grid: Vector2i, now: int) -> Dictionary:
 	return data
 
 
-## Lays `types` out in rows from (0, y); returns the first row of the next band.
+## Lays `types` out in rows from (0, y), a type's copies side by side; returns the row under
+## the band.
 func _band(types: PackedStringArray, y: int) -> int:
 	var x := 0
 	var depth := 0
@@ -89,17 +105,17 @@ func _band(types: PackedStringArray, y: int) -> int:
 		_add(type, Vector2i(x, y))
 		x += size + GAP
 		depth = maxi(depth, size)
-	return y + depth + GAP
+	return y + depth
 
 
-## The wall enclosure from (0, y): its outline and the run down its middle.
-func _enclosure(type: String, y: int) -> int:
-	var width := mini(WALL_SIZE.x, _grid.width)
-	for dy: int in WALL_SIZE.y:
-		for dx: int in width:
-			if dy == 0 or dy == WALL_SIZE.y - 1 or dx == 0 or dx == width - 1 or dx == width / 2:
-				_add(type, Vector2i(dx, y + dy))
-	return y + WALL_SIZE.y + GAP
+## A fence along row y from x 0, as many of the walls still to lay as the row holds; returns
+## the first row of the next band.
+func _fence(y: int) -> int:
+	var count := mini(_walls.size(), _grid.width)
+	for x: int in count:
+		_add(_walls[x], Vector2i(x, y))
+	_walls = _walls.slice(count)
+	return y + GAP
 
 
 func _add(type: String, cell: Vector2i) -> void:

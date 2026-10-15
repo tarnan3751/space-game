@@ -1,17 +1,22 @@
 extends HarnessScenario
 ## The debug build's Template base (TemplateBase, main._template_base), pressed through the HUD's
-## button. Checks every type but the walls exactly once, the walls the enclosure's pieces, all at
-## the top level and finished; no two footprints overlapping and all inside the grid; every
-## resource at its cap; every drone free, on the ring too; every moving part moving; the save
-## written to the run's own file, user://base.json untouched. Screenshots: the whole base at the
-## widest zoom in a WIDE window, then each band at BAND_ZOOM centred on it (the Command Center's
-## with the first category's), in even parts PART_CELLS wide at most so none runs under the HUD
-## or off the screen, each again a second later where a part turns. The first shot waits until
-## the "Template base" toast, which covers the Command Center's antenna, has faded.
+## button. Checks every type at its count for the top Command Center level, all at the top level
+## and finished; no two footprints overlapping and all inside the grid; every wall joined to
+## another (each is part of a fence); every resource at its cap; every drone free, on the ring
+## too; every moving part moving; the save written to the run's own file, user://base.json
+## untouched. Screenshots: the whole base at the widest zoom in a WIDE window, then each band
+## with the fence under it (the Command Center's with the first category's), in even parts
+## PART_CELLS wide at most, each centred and at BAND_ZOOM or as far out as it takes for the part
+## and its models to fill no more than FILL of the screen, so none runs under the HUD or off the
+## screen; each again a second later where a part turns. The first shot waits until the
+## "Template base" toast, which covers the Command Center's antenna, has faded.
 
 const WIDE := Vector2i(1560, 720)
 const BAND_ZOOM := 16.0
 const PART_CELLS := 16
+## The share of the screen a band part may fill, and the height its models are allowed for.
+const FILL := 0.7
+const MODEL_HEIGHT := 4.0
 ## How long the moving parts are sampled, and how many frames apart.
 const MOVE_SAMPLE_SECONDS := 1.5
 const MOVE_SAMPLE_FRAMES := 4
@@ -28,10 +33,9 @@ func run(main: MainScript) -> void:
 	var toast := main.get_tree().create_timer(TOAST_SECONDS)
 	var state: BaseState = main.state
 	var catalog: Catalog = state.catalog
-	var pieces := 2 * mini(TemplateBase.WALL_SIZE.x, catalog.grid_size.x) + 3 * (TemplateBase.WALL_SIZE.y - 2)
 	for type: String in catalog.types():
-		var expected := pieces if catalog.category_of(type) == PlacementController.PAINT_CATEGORY else 1
-		check(state.count_of(type) == expected, "%d %s" % [state.count_of(type), type])
+		var expected := catalog.max_count(type, catalog.max_cc_level())
+		check(state.count_of(type) == expected, "%d of %d %s" % [state.count_of(type), expected, type])
 	var grid := BaseGrid.new(catalog.grid_size.x, catalog.grid_size.y)
 	var fits := true
 	var topped := 0
@@ -42,6 +46,18 @@ func run(main: MainScript) -> void:
 		topped += 1 if building.level == catalog.max_level(building.type) and not building.is_busy() else 0
 	check(fits and topped == state.buildings.size(),
 		"%d of %d at the top level and finished, none overlapping or off the grid" % [topped, state.buildings.size()])
+	var walls := 0
+	var joined := 0
+	for building: BuildingState in state.buildings.values():
+		if catalog.category_of(building.type) != PlacementController.PAINT_CATEGORY:
+			continue
+		walls += 1
+		for step: Vector2i in [Vector2i.LEFT, Vector2i.RIGHT, Vector2i.UP, Vector2i.DOWN]:
+			var next: BuildingState = state.buildings.get(grid.occupant_at(building.cell + step))
+			if next != null and catalog.category_of(next.type) == PlacementController.PAINT_CATEGORY:
+				joined += 1
+				break
+	check(walls > 0 and joined == walls, "%d of %d walls joined to another" % [joined, walls])
 	for res: String in catalog.resources:
 		var cap := state.capacity(res)
 		check(state.resources[res] == cap, "%s %d of a cap of %d" % [res, state.resources[res], cap])
@@ -83,18 +99,34 @@ func run(main: MainScript) -> void:
 	main.get_window().size = WIDE
 	await _shot(main, "whole", Vector3.ZERO, IsoCamera.MAX_ZOOM_SIZE)
 	for band: String in catalog.categories:
-		var box: Rect2i = bands[band]
+		if band == PlacementController.PAINT_CATEGORY:
+			continue
+		# The band with the fence under it.
+		var box: Rect2i = (bands[band] as Rect2i).grow_side(SIDE_BOTTOM, 1)
 		var parts := ceili(box.size.x / float(PART_CELLS))
 		for i: int in parts:
 			var part := Rect2i(box.position.x + box.size.x * i / parts, box.position.y, 0, box.size.y)
 			part.end.x = box.position.x + box.size.x * (i + 1) / parts
 			var name := "band-%s-%d" % [band, i + 1] if parts > 1 else "band-" + band
 			var at := main.base_view.cell_to_world(part.position, 0) + Vector3(part.size.x, 0, part.size.y) * 0.5
-			await _shot(main, name, at, BAND_ZOOM)
+			await _shot(main, name, at, _fit(main, part))
 			if turning.any(func(mover: Node3D) -> bool:
 					return part.has_point(main.base_view.world_to_cell(mover.global_position))):
 				await main.get_tree().create_timer(1.0).timeout
 				await screenshot(name + "-later")
+
+
+## The camera size at which `part`, MODEL_HEIGHT tall, fills FILL of the screen; BAND_ZOOM at
+## the least.
+func _fit(main: MainScript, part: Rect2i) -> float:
+	var screen := main.get_viewport().get_visible_rect().size
+	var corner := main.base_view.cell_to_world(part.position, 0)
+	var box := Rect2(main.camera.unproject_position(corner), Vector2.ZERO)
+	for x: int in [0, part.size.x]:
+		for z: int in [0, part.size.y]:
+			for y: float in [0.0, MODEL_HEIGHT]:
+				box = box.expand(main.camera.unproject_position(corner + Vector3(x, y, z)))
+	return maxf(BAND_ZOOM, main.camera.size * maxf(box.size.x / screen.x, box.size.y / screen.y) / FILL)
 
 
 ## Centres the view on `at` at camera size `size`, then screenshots it once the window caught up.

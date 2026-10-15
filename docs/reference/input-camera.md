@@ -51,17 +51,23 @@ for offline progress; an unreadable file starts a new base with a warning. `_res
 **The template base.** `_template_base` (the debug row's Template base, `hud.md`) installs a
 showcase base the same way and saves at once: `TemplateBase.build(catalog, grid, now)`
 (`template_base.gd`) returns a save dictionary (`data-format.md`, **The save file**), loaded
-through `BaseState.from_dict`. Every type in the catalog, hidden ones included, is there at its
-top level and finished, grouped by category, and every resource is at the cap of the base as
-laid out, which a throwaway `BaseState` works out. The bands are `core`, then
-`catalog.categories` in tab order, from the top of the field (cell y 0) down; in a band, one of
-each type, in `menu_order`, runs left to right from x 0 a cell apart, wrapping to a new row a
-cell below the row's tallest footprint when the next would pass the field's right edge. The
-walls band (`PlacementController.PAINT_CATEGORY`) is an enclosure of its first type instead,
-`WALL_SIZE` (12×6) with a run from the middle of its top side to the middle of its bottom, so it
-shows corners, T junctions and straight runs; it narrows to a narrower field. The layout is
-checked on a `BaseGrid` as it is made: a building that does not fit is left out, with an error
-naming the first, rather than overlap. The `template_base` harness scenario checks it
+through `BaseState.from_dict`. Every type in the catalog, hidden ones included, is there as many
+times as the top Command Center level allows (`max_count` at `max_cc_level()`), at its top level
+and finished, grouped by category with the walls as fences between the groups, and every
+resource is at the cap of the base as laid out, which a throwaway `BaseState` works out. The
+bands are `catalog.categories` in tab order but the walls (`PlacementController.PAINT_CATEGORY`),
+from the top of the field (cell y 0) down, with the Command Center (`core`) leading the first;
+in a band, the types in `menu_order` run left to right from x 0, each type's copies side by
+side, a cell apart, wrapping to a new row a cell below the row's tallest footprint when the
+next would pass the field's right edge. The row under each band is a fence: walls of the paint
+category, one per cell from x 0 rightwards until they run out, and the next band starts on the
+row after it, so buildings touch a fence on both sides; walls left over once every band has its
+fence carry on in rows below. With the shipped roster the bands are 12, 10, 12 and 2 rows deep
+(resources, army, defence, traps), so with their fences (the last a run of 30 under the traps:
+the 150 walls are three full fences and that) they fill all 40 rows of the field: a roster
+change that deepens a band by a row no longer fits. The layout is checked on a `BaseGrid` as it is
+made: a building that does not fit is left out, with an error naming the first, rather than
+overlap. The `template_base` harness scenario checks it
 (`tools/harness/README.md`).
 
 ## IsoCamera (`iso_camera.gd`)

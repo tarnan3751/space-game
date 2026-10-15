@@ -319,15 +319,18 @@ extractor, at camera size 10.
 
 `scenarios/template_base.gd` checks the debug build's Template base (`TemplateBase`,
 `docs/reference/input-camera.md`): it presses the HUD's button (`template_button()`) and checks
-that every type but the walls is there exactly once and the walls are the enclosure's pieces,
-all at their top level and finished; that no two footprints overlap and all lie inside the grid
-(on a `BaseGrid` of its own); that every resource is at its cap; that every drone is free, on
+that every type is there at its count for the top Command Center level (`max_count` at
+`max_cc_level()`), all at their top level and finished; that no two footprints overlap and all
+lie inside the grid (on a `BaseGrid` of its own); that every wall has another wall beside it,
+so each is part of a fence; that every resource is at its cap; that every drone is free, on
 the ring too; that the base was saved to the run's own file while `user://base.json`'s
 modification time stayed the same; and that every moving part of every model (each node
 carrying `BuildingModels.MOVE_META`) moves: sampled every four frames for 1.5 seconds, a part
 passes once any sample differs from its first pose, so a hammer's hold or a period that divides
 the gap cannot hide it. Once the "Template base" toast has faded (2.5 seconds after the press),
 it screenshots the whole base at the widest zoom in a 1560x720 window, then each category's
-band at camera size 16 centred on it (the Command Center's with the first category's), a band
-wider than 16 cells in even parts so none runs under the HUD or off the screen, each part again
-a second later where a part turns in it, to compare the two.
+band with the fence under it (the Command Center's with the first category's; the walls have no
+band of their own), a band wider than 16 cells in even parts, each part centred and at camera
+size 16 or as far out as it takes for the part, with 4 units of model height, to fill no more
+than 70% of the screen, so none runs under the HUD or off the screen; each part again a second
+later where a part turns in it, to compare the two.
