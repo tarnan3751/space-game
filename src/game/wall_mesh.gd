@@ -3,8 +3,9 @@ extends Node3D
 ## Every finished wall of the base drawn as one merged mesh: each wall is the piece of its
 ## level and neighbour mask (models/walls.gd), so a painted line reads as one barrier and
 ## corners, T-junctions and crossings join. Two walls connect when they share a cell edge,
-## whatever their levels; diagonal walls do not. A wall under upgrade keeps its finished
-## level's piece.
+## whatever their levels; diagonal walls do not. Where a neighbour's solid segment stands lower
+## (WallModels.solid_top), the piece's segment towards it ends in an inked step (its lower
+## mask). A wall under upgrade keeps its finished level's piece.
 ##
 ## BaseView owns one and rebuilds it only when the set of walls it draws changes, once a frame
 ## at most. A rebuild copies each piece's arrays into the merged ones with the engine's bulk
@@ -55,7 +56,7 @@ func rebuild(state: BaseState, skip_id: int) -> void:
 	var bodies := Merged.new()
 	var outlines := Merged.new()
 	for cell: Vector2i in _levels:
-		var piece := WallModels.piece(_levels[cell], mask_at(cell))
+		var piece := WallModels.piece(_levels[cell], mask_at(cell), _lower_mask_at(cell))
 		var at := Transform3D(Basis(), _base_view.cell_to_world(cell, 1))
 		bodies.append(piece.body, at)
 		outlines.append(piece.outline, at)
@@ -70,6 +71,18 @@ func mask_at(cell: Vector2i) -> int:
 	var mask := 0
 	for bit: int in WallModels.NEIGHBOURS.size():
 		if _levels.has(cell + WallModels.NEIGHBOURS[bit]):
+			mask |= 1 << bit
+	return mask
+
+
+## The bits of the walls beside `cell` whose solid segment stands lower than its own
+## (WallModels.solid_top: by height, not level, since the top level's is a low slab).
+func _lower_mask_at(cell: Vector2i) -> int:
+	var own := WallModels.solid_top(_levels[cell])
+	var mask := 0
+	for bit: int in WallModels.NEIGHBOURS.size():
+		var neighbour := cell + WallModels.NEIGHBOURS[bit]
+		if _levels.has(neighbour) and WallModels.solid_top(_levels[neighbour]) < own:
 			mask |= 1 << bit
 	return mask
 

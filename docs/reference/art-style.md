@@ -641,13 +641,23 @@ current runs on along a run, from wall to wall, a half-segment being about two w
 The field is a swept panel whose stripes run along it, so its FLOW (0.45) lifts them up the panel,
 with PULSE. A segment's
 end on the cell edge is a cap painted like the segment but left out of the outline, so two
-segments that meet there draw one unbroken ink line; where walls of different levels meet, the
-taller segment's end shows as a step without an ink edge, and every level's curb meets the next.
+segments that meet there draw one unbroken ink line. Where walls of different levels meet, the
+taller segment's end shows as a step, and its caps are outlined (the curb's excepted, so every
+level's curb meets the next unbroken). Taller goes by height, not level: `solid_top(level)` is
+the top of a level's solid segment, the segment itself on levels 1 to 4 (about 0.47 to 0.69)
+and on level 5 the low slab under its unoutlined field (about 0.34), so a level 5 wall is the
+lowest and every other level steps down to it. A piece takes a second mask, `lower_mask`, of
+the neighbours whose solid top is lower (the same bits, a subset of the mask). Only the outline
+differs; the body is the same whatever `lower_mask` says (each cap keeps its segment's paint
+and phase). The step's ink edge shows where its
+end stands above the lower wall; beside a post nearly as high as the step (an L4 segment next
+to an L2 post) it is a short dark mark over the post's cap.
 
-`piece(level, mask)` builds a piece on first use and keeps its body and outline arrays
-(`to_arrays`, `to_outline_arrays`), 5 levels by 16 masks at most (a higher level shows level
-5's); every piece stays within the 250 body triangles of a wall piece (`wall_junctions` checks
-all 80). `build_barrier_wall`, which `BuildingModels.create("barrier_wall", level, 1)` dispatches
+`piece(level, mask, lower_mask = 0)` builds a piece on first use and keeps its body and outline
+arrays (`to_arrays`, `to_outline_arrays`), cached by level, mask and lower mask (a higher level
+shows level 5's); every piece stays within the 250 body triangles of a wall piece
+(`wall_junctions` checks all 80 masks and levels, that each piece's body is the same whatever
+its lower mask, and the merged outline against its pieces' with their steps). `build_barrier_wall`, which `BuildingModels.create("barrier_wall", level, 1)` dispatches
 to, is the lone post (mask 0): the paint brush, a lifted wall and the gallery show it.
 
 The merged mesh keeps each piece's UV2 and colour, so PULSE, BLINK and FLOW work on wall pieces.

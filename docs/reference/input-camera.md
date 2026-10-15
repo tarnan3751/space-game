@@ -296,13 +296,16 @@ half-segment toward each orthogonal neighbour that is also a finished wall (the 
 bits and the look per level are in `art-style.md`, **Walls**). Two adjacent walls meet on their
 shared edge and each draws its own level's style, so a painted line reads as one barrier and
 corners, T-junctions and crossings close. Walls connect four-connected, at any levels, never
-diagonally; a wall under upgrade keeps its finished level's piece.
+diagonally; where a neighbour's solid segment stands lower (`solid_top` in `art-style.md`,
+**Walls**: by height, so a level 5 wall's low slab is the lowest), the piece's segment towards it
+ends in an outlined step (its lower mask). A wall under upgrade keeps its finished
+level's piece.
 
 | `WallMesh` member | What |
 | --- | --- |
 | `body`, `outline` | Its two `MeshInstance3D`: the pieces' bodies and their ink outlines. The outline casts no shadow. |
 | `draws(catalog, building)` | Static: whether the merged mesh draws a building, a wall (category `PlacementController.PAINT_CATEGORY`, `"walls"`) with `level >= 1`. Every type of that category is drawn as barrier pieces, so it must be 1x1. |
-| `rebuild(state, skip_id)` | Collects every wall `draws` accepts but `skip_id`, computes each one's mask from the others' cells, and appends each piece's body and outline arrays, moved to its cell, into one `ArrayMesh` for each. The copy is the engine's bulk calls (`Transform3D * PackedVector3Array`, `append_array`), nothing per vertex in script. |
+| `rebuild(state, skip_id)` | Collects every wall `draws` accepts but `skip_id`, computes each one's mask from the others' cells and its lower mask from their solid tops, and appends each piece's body and outline arrays, moved to its cell, into one `ArrayMesh` for each. The copy is the engine's bulk calls (`Transform3D * PackedVector3Array`, `append_array`), nothing per vertex in script. |
 | `mask_at(cell)` | The mask of the wall drawn on a cell at the last rebuild, `-1` when none is. |
 
 `BaseView.sync` ends with `_sync_walls`: every wall view the mesh draws gets

@@ -19,7 +19,10 @@ extends RefCounted
 ## double-plated segments with a brighter strip; L5 a gold crown on the cap and an energy field
 ## above a low plated base. Caps are never wider than their post. Every segment ends on the cell
 ## edge in a cap left out of the ink outline, so two segments that meet there draw one unbroken
-## outline, and every level shares the curb, so mixed levels still meet at the base.
+## outline, except towards a wall whose solid segment is lower (`lower_mask`, the same bits;
+## solid_top() says how high each level's stands, the top level's being the low slab under its
+## field): there the taller segment's end is a step, and its caps are outlined. Every level
+## shares the curb, whose cap is never outlined, so mixed levels still meet at the base.
 ##
 ## The energy is animated by its surfaces (**Animation**): the strips of L3 and L4 carry a current
 ## that runs along the wall, towards world +x or +z whichever way the segment points, so it runs on
@@ -43,6 +46,8 @@ const FOOTING_HEIGHT := 0.08
 ## The curb every segment stands on: a trapezoid, (half width, height) at its foot and top.
 const CURB_FOOT := Vector2(0.24, 0.0)
 const CURB_TOP := Vector2(0.22, 0.06)
+## The top level's plated base: this share of its segment's height, the field above it.
+const SLAB_SHARE := 0.4
 
 ## Per level: [post width, body top, post chamfer, cap width (0 for none), cap height]. A post
 ## is at most 0.46 of the cell and its cap never wider than it.
@@ -80,7 +85,7 @@ static var ENERGY_BRIGHT := Surf.make(MaterialKit.Layer.GLOW, MaterialKit.ENERGY
 static var FIELD := Surf.make(MaterialKit.Layer.GLOW, MaterialKit.ENERGY, FLOW_SCALE,
 	Surf.UNLIT | Surf.FLOW | Surf.PULSE, false, false, 0.45)
 
-## Built pieces by level * 16 + mask.
+## Built pieces by (level * 16 + mask) * 16 + lower_mask.
 static var _pieces: Dictionary[int, Piece] = {}
 
 
@@ -91,14 +96,16 @@ class Piece:
 	var outline: Array
 
 
-## The piece for `level` and `mask`, built on first use and kept (LEVELS * 16 at most).
-static func piece(level: int, mask: int) -> Piece:
+## The piece for `level` and `mask`, its segments towards the neighbours in `lower_mask` (walls
+## whose solid_top() is lower, a subset of `mask`) ending in an outlined step; built on first use
+## and kept. The body is the same whatever `lower_mask` says: only the outline differs.
+static func piece(level: int, mask: int, lower_mask: int = 0) -> Piece:
 	var shown := clampi(level, 1, LEVELS)
-	var key := shown * 16 + mask
+	var key := (shown * 16 + mask) * 16 + lower_mask
 	var built: Piece = _pieces.get(key)
 	if built == null:
 		var m := LowPolyMesh.new()
-		_add_piece(m, shown, mask)
+		_add_piece(m, shown, mask, lower_mask)
 		built = Piece.new()
 		built.body = m.to_arrays()
 		built.outline = m.to_outline_arrays()
@@ -111,11 +118,11 @@ static func build_barrier_wall(p: Parts, level: int) -> void:
 	_add_piece(p.body, level, 0)
 
 
-static func _add_piece(m: LowPolyMesh, level: int, mask: int) -> void:
+static func _add_piece(m: LowPolyMesh, level: int, mask: int, lower_mask: int = 0) -> void:
 	_post(m, level)
 	for bit: int in NEIGHBOURS.size():
 		if mask & (1 << bit) != 0:
-			_segments(m, level, bit)
+			_segments(m, level, bit, lower_mask & (1 << bit) != 0)
 
 
 ## The footing, the post, its cap and, on the top level, the crown.
@@ -135,33 +142,45 @@ static func _post(m: LowPolyMesh, level: int) -> void:
 		m.box_chamfered(Vector3(CROWN.x, CROWN.y, CROWN.x), 0.03, Vector3(0, top + cap_height, 0), GOLD)
 
 
-## The half-segment toward neighbour `bit`, in the level's style, on the shared curb.
-static func _segments(m: LowPolyMesh, level: int, bit: int) -> void:
-	_sweep(m, bit, _trapezoid(CURB_FOOT, CURB_TOP), 0.0, CONCRETE)
+## How high the solid part of a level's segment stands: the segment's top, or on the top level
+## the top of the low slab under its unoutlined field. A wall's segment steps down to a
+## neighbour whose solid top is lower (WallMesh's lower mask).
+static func solid_top(level: int) -> float:
+	var shown := clampi(level, 1, LEVELS)
+	var top := SEGMENT_SHARE * _post_height(shown)
+	if shown < LEVELS:
+		return top
+	return CURB_TOP.y + SLAB_SHARE * (top - CURB_TOP.y)
+
+
+## The half-segment toward neighbour `bit`, in the level's style, on the shared curb. A `step`
+## (the neighbour's solid segment is lower) outlines its end caps but the curb's.
+static func _segments(m: LowPolyMesh, level: int, bit: int, step: bool) -> void:
+	_sweep(m, bit, _trapezoid(CURB_FOOT, CURB_TOP), 0.0, CONCRETE, false)
 	var base := CURB_TOP.y
 	var top := SEGMENT_SHARE * _post_height(level)
 	var height := top - base
 	match level:
 		1:
-			_sweep(m, bit, _chamfered(SEGMENT_HALF, height, 0.04), base, SLATE)
+			_sweep(m, bit, _chamfered(SEGMENT_HALF, height, 0.04), base, SLATE, step)
 		2:
-			_sweep(m, bit, _chamfered(SEGMENT_HALF, height, 0.04), base, SLATE_RIVETED)
+			_sweep(m, bit, _chamfered(SEGMENT_HALF, height, 0.04), base, SLATE_RIVETED, step)
 			var band := Vector2(SEGMENT_HALF + 0.02, 0.25 * height)
-			_sweep(m, bit, _trapezoid(Vector2(band.x, 0.0), band), base + 0.35 * height, SLATE)
+			_sweep(m, bit, _trapezoid(Vector2(band.x, 0.0), band), base + 0.35 * height, SLATE, step)
 		3:
-			_sweep(m, bit, _chamfered(SEGMENT_HALF, height, 0.04), base, SLATE_RIBBED)
+			_sweep(m, bit, _chamfered(SEGMENT_HALF, height, 0.04), base, SLATE_RIBBED, step)
 			_strip(m, bit, 0.1, top, ENERGY)
 		4:
 			var skirt := 0.45 * height
 			_sweep(m, bit, _trapezoid(Vector2(SEGMENT_HALF + 0.02, 0.0), Vector2(SEGMENT_HALF, skirt)),
-				base, SLATE_RIVETED)
-			_sweep(m, bit, _chamfered(SEGMENT_HALF - 0.03, height - skirt, 0.04), base + skirt, SLATE)
+				base, SLATE_RIVETED, step)
+			_sweep(m, bit, _chamfered(SEGMENT_HALF - 0.03, height - skirt, 0.04), base + skirt, SLATE, step)
 			_strip(m, bit, 0.12, top, ENERGY_BRIGHT)
 		_:
 			# A low plated base, and the energy field above it.
-			var slab := 0.4 * height
-			_sweep(m, bit, _chamfered(SEGMENT_HALF, slab, 0.03), base, SLATE_RIVETED)
-			_sweep(m, bit, _trapezoid(Vector2(0.03, 0.0), Vector2(0.03, height - slab)), base + slab, FIELD)
+			var slab := SLAB_SHARE * height
+			_sweep(m, bit, _chamfered(SEGMENT_HALF, slab, 0.03), base, SLATE_RIVETED, step)
+			_sweep(m, bit, _trapezoid(Vector2(0.03, 0.0), Vector2(0.03, height - slab)), base + slab, FIELD, step)
 
 
 ## An energy strip `width` wide and 0.025 high on top of the half-segment toward neighbour `bit`,
@@ -202,8 +221,10 @@ static func _trapezoid(foot: Vector2, top: Vector2) -> PackedVector2Array:
 ## Sweeps `profile`, a convex cross-section of (across, height) points from one bottom corner
 ## over the top to the other, from SEGMENT_FROM to the cell edge toward neighbour `bit`, lifted
 ## by `y`. The bottom and the end inside the post are left out; the end on the cell edge is a
-## cap in the same paint, left out of the outline.
-static func _sweep(m: LowPolyMesh, bit: int, profile: PackedVector2Array, y: float, surf: Surf) -> void:
+## cap in the same paint and phase, left out of the outline unless it is `inked` (a step down to
+## a lower wall) and the segment is outlined.
+static func _sweep(m: LowPolyMesh, bit: int, profile: PackedVector2Array, y: float, surf: Surf,
+		inked: bool) -> void:
 	var along := Vector3(NEIGHBOURS[bit].x, 0, NEIGHBOURS[bit].y)
 	var across := Vector3(along.z, 0, -along.x)
 	var inner := PackedVector3Array()
@@ -219,7 +240,8 @@ static func _sweep(m: LowPolyMesh, bit: int, profile: PackedVector2Array, y: flo
 		var side := PackedVector3Array([inner[i], outer[i], outer[i + 1], inner[i + 1]])
 		var out := (inner[i] + inner[i + 1]) * 0.5 - along * SEGMENT_FROM - axis
 		m.polygon(_facing(side, out), surf)
-	var cap := Surf.make(surf.layer, surf.tint, surf.uv_scale, surf.flags, surf.smooth, false)
+	var cap := Surf.make(surf.layer, surf.tint, surf.uv_scale, surf.flags, surf.smooth, inked and surf.outline,
+		surf.phase)
 	m.polygon(_facing(outer, along), cap)
 
 

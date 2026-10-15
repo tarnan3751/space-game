@@ -261,12 +261,17 @@ zoom, the place bar with Done, and the ghost and the bay at the edge. A held dra
 number of frames, so how far depends on the frame rate; the checks hold at any distance.
 
 `scenarios/wall_junctions.gd` checks walls that connect. It grows a fresh base to Command
-Center 5, paints a straight run, a corner, a T, a cross and a ramp (a run whose walls end at
-levels 1 to 5) by tapping, and upgrades them together to level 3, then 5. At each level it
-checks the merged wall mesh: every wall view hides its model, the mask of a named cell in each
-shape (`WallMesh.mask_at`), every wall's mask against the rule (four-connected, any levels),
-and the mesh's triangles against the sum of its pieces'; and it screenshots the pattern at the
-closest zoom (level 1 also with the paint brush beside it). It checks that a wall's own model,
+Center 5, paints a straight run, a corner, a T, a cross, a ramp (a run whose walls end at
+levels 1 to 5) and a two-level L and T (arms that stop at level 1, 2 or 3) by tapping, and
+upgrades them together to level 3, then 5. At each level it checks the merged wall mesh: every
+wall view hides its model, the mask of a named cell in each shape (`WallMesh.mask_at`), every
+wall's mask against the rule (four-connected, any levels), the mesh's triangles against the sum
+of its pieces', and the outline's triangles against the sum of its pieces' outlines, each
+outlining its steps down to neighbours whose solid segment is lower (by height: a level 5
+wall's low slab is the lowest); at levels 3 and 5 named walls of the two-level shapes show, or
+do not show, those steps' extra ink triangles, an L3 beside an L5 inking and the L5 not. It
+checks every piece's body is the same whatever its lower mask. It screenshots the pattern at the closest
+zoom (level 1 also with the paint brush beside it). It checks that a wall's own model,
 which the brush and the gallery show, is the lone post, and that every piece of every level
 and mask is within the 250 body triangles of a wall piece. Last, it selects the cross's centre,
 which stays merged with no gold outline (its own model, whose outlines turn gold, stays hidden),
