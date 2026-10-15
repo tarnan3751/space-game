@@ -137,20 +137,26 @@ draw calls, the frame rate and the render thread's CPU time for the frame there)
 close-up, and each row's first building a detail shot at the closest zoom (camera size 10), where outlines, bands and textures can be read; all
 are framed through `camera.zoom_at` and `camera.pan`. The frame rate is only meaningful when
 nothing else is loading the machine.
-In both modes it checks every model: one or two body `MeshInstance3D` (the static body and the
-spinning part), each with an outline instance beside it on `MaterialKit.ink()` that casts no
-shadow; no vertex's kit layer (`UV2.x`) beyond the kit's last; and the body triangles within the
-budget for its footprint (`docs/reference/art-style.md`, **Budgets**: 600 for 1x1, 2,000 for
-2x2, 3,000 for 3x3, 5,000 for 4x4 and 5x5, 250 for a wall piece); and its reach in x and z
-within half its footprint plus 0.15 units (`EXTENT_SLACK`): the static body's bounds, and a
-spinning part's sweep (its vertices' largest distance from the pivot axis plus the pivot's
-offset from the centre), both at the model's scale. A failure says by how much it reaches over;
+In both modes it checks every model: one to four body `MeshInstance3D` (the static body and up
+to three moving parts), each with an outline instance beside it on `MaterialKit.ink()` that casts
+no shadow, unless every vertex of it carries a flag that is never outlined (`Surf.NO_OUTLINE`:
+FLICKER, JITTER, HOLO); no vertex's kit layer (`UV2.x`) beyond the kit's last; the body
+triangles, every surface counted, within the budget for its footprint
+(`docs/reference/art-style.md`, **Budgets**: 600 for 1x1, 2,000 for 2x2, 3,000 for 3x3, 5,000
+for 4x4 and 5x5, 250 for a wall piece); and its reach in x and z within half its footprint plus
+0.15 units (`EXTENT_SLACK`): the static body's bounds, and each moving part's reach over its
+whole motion, at the model's scale. A SPIN part's vertices sweep circles about its axis (each
+reaches its circle's centre's offset plus its radius, plus the pivot's offset from the centre);
+a SWING part's bounds are turned every 5 degrees from -amplitude to +amplitude, both ends
+included; a SLIDE part's are shifted to both ends. A failure says by how much it reaches over;
 nothing checks the height.
 
 `scenarios/view_states.gd` checks the comic style's view states on a fresh base, each with a
 close-up screenshot: the selected Command Center's outlines in gold (and the override cleared on
 deselecting), the placement ghost's body tinted valid on a free spot and invalid on the Command
-Center with its outline left plain ink, and a new building's scaffold. It first says the fresh base's draw calls and frame rate.
+Center with its outline left plain ink (a body whose surface 0 is a hologram passes with no
+override, since a ghost leaves holograms alone), and a new building's scaffold. It first says the
+fresh base's draw calls and frame rate.
 
 `scenarios/environment.gd` checks the ground and the scenery on a fresh base
 (`docs/reference/art-style.md`, **Environment**): the terrain, the curb, the rocks and the crystal
@@ -237,8 +243,10 @@ that every type but the walls is there exactly once and the walls are the enclos
 all at their top level and finished; that no two footprints overlap and all lie inside the grid
 (on a `BaseGrid` of its own); that every resource is at its cap; that every drone is free, on
 the ring too; that the base was saved to the run's own file while `user://base.json`'s
-modification time stayed the same; and that every turning part of every model turns in a
-second. It screenshots the whole base at the widest zoom in a 1560x720
+modification time stayed the same; and that every moving part of every model (each node
+carrying `BuildingModels.MOVE_META`) moves: sampled every four frames for 1.5 seconds, a part
+passes once any sample differs from its first pose, so a hammer's hold or a period that divides
+the gap cannot hide it. It screenshots the whole base at the widest zoom in a 1560x720
 window, then each category's band at camera size 16 centred on it (the Command Center's with
 the first category's), a band wider than 16 cells in even parts so none runs under the HUD or off
 the screen, each part again a second later where a part turns in it, to compare the two.

@@ -5,12 +5,13 @@ extends RefCounted
 ## contract any model keeps (and an imported one must keep): origin at the footprint centre
 ## on the ground, +Y up, fitting inside size x size cells.
 ##
-## A model is a Node3D holding the static body's MeshInstance3D and its ink outline's, and at
-## most one spinning part: a Node3D at the pivot carrying the SPIN_META meta (its speed in
-## radians per second), which turns around Y while the building is finished and idle, with the
-## spinning mesh and its outline under it. So a model has at most four MeshInstance3D, two of
-## them outlines (OUTLINE_META), which cast no shadow. The meshes are built once per type and
-## level and shared; the nodes are per view. A level above a type's models shows its top model.
+## A model is a Node3D holding the static body's MeshInstance3D and its ink outline's, and up
+## to Parts.MAX_MOVING moving parts: each a Node3D at its pivot carrying the MOVE_META meta (its
+## Motion), which BuildingView moves while the building is finished and idle, with the part's
+## mesh and its outline under it. So a model has at most eight MeshInstance3D, half of them at
+## most outlines (OUTLINE_META), which cast no shadow; a part with nothing to outline (only
+## hologram, flicker or jitter parts) has none. The meshes are built once per type and level and
+## shared; the nodes are per view. A level above a type's models shows its top model.
 ##
 ## Each category shares a look: every building but a wall stands on the concrete foundation pad
 ## (Parts.foundation) in its category's accent colour (docs/reference/art-style.md), and walls
@@ -21,7 +22,8 @@ extends RefCounted
 ## category's file under src/game/models/ (core, resources, army, defense, traps, walls), and
 ## the helpers they share are on Parts (models/parts.gd).
 
-const SPIN_META := "spin_speed"
+## Set on a moving part's node: its Motion.
+const MOVE_META := "motion"
 ## Set on the outline instances, so a view can tell them from the bodies.
 const OUTLINE_META := "outline"
 
@@ -77,11 +79,16 @@ class Meshes:
 	var body: ArrayMesh
 	## Null when no part is outlined.
 	var outline: ArrayMesh
-	## Null when nothing spins.
-	var spin: ArrayMesh
-	var spin_outline: ArrayMesh
+	var moving: Array[Moving] = []
+
+
+## A moving part's meshes, where it rests, and how it moves.
+class Moving:
+	var body: ArrayMesh
+	## Null when no part is outlined.
+	var outline: ArrayMesh
 	var pivot := Vector3.ZERO
-	var speed := 0.0
+	var motion: Motion
 
 
 static func create(type: String, level: int, size: int) -> Node3D:
@@ -107,13 +114,15 @@ static func create(type: String, level: int, size: int) -> Node3D:
 		else:
 			CoreModels.build_generic(p, size)
 		meshes = _store(key, p)
-	_add_instances(root, meshes.body, meshes.outline)
-	if meshes.spin != null:
-		var spinner := Node3D.new()
-		spinner.position = meshes.pivot
-		spinner.set_meta(SPIN_META, meshes.speed)
-		root.add_child(spinner)
-		_add_instances(spinner, meshes.spin, meshes.spin_outline)
+	_add_parts(root, meshes)
+	return root
+
+
+## A model's nodes for meshes built from `p`, uncached: for a caller that builds its own parts
+## (the effects harness rig).
+static func instantiate(p: Parts) -> Node3D:
+	var root := Node3D.new()
+	_add_parts(root, _meshes(p))
 	return root
 
 
@@ -126,21 +135,41 @@ static func create_scaffold(size: int) -> Node3D:
 		CoreModels.build_scaffold(p, size)
 		meshes = _store(key, p)
 	var root := Node3D.new()
-	_add_instances(root, meshes.body, meshes.outline)
+	_add_parts(root, meshes)
 	return root
 
 
 static func _store(key: String, p: Parts) -> Meshes:
+	var meshes := _meshes(p)
+	_cache[key] = meshes
+	return meshes
+
+
+static func _meshes(p: Parts) -> Meshes:
 	var meshes := Meshes.new()
 	meshes.body = p.body.to_mesh()
 	meshes.outline = p.body.to_outline_mesh()
-	if p.spin.triangle_count() > 0:
-		meshes.spin = p.spin.to_mesh()
-		meshes.spin_outline = p.spin.to_outline_mesh()
-		meshes.pivot = p.pivot
-		meshes.speed = p.speed
-	_cache[key] = meshes
+	for i: int in p.movers.size():
+		if p.movers[i].triangle_count() == 0:
+			continue
+		var moving := Moving.new()
+		moving.body = p.movers[i].to_mesh()
+		moving.outline = p.movers[i].to_outline_mesh()
+		moving.pivot = p.pivots[i]
+		moving.motion = p.motions[i]
+		meshes.moving.append(moving)
 	return meshes
+
+
+## The body's instances under `root`, then a node at each moving part's pivot with its instances.
+static func _add_parts(root: Node3D, meshes: Meshes) -> void:
+	_add_instances(root, meshes.body, meshes.outline)
+	for moving: Moving in meshes.moving:
+		var node := Node3D.new()
+		node.position = moving.pivot
+		node.set_meta(MOVE_META, moving.motion)
+		root.add_child(node)
+		_add_instances(node, moving.body, moving.outline)
 
 
 ## A body's MeshInstance3D under `parent`, and its outline's beside it (casting no shadow).

@@ -50,9 +50,7 @@ static func build_laser_turret(p: Parts, level: int) -> void:
 			m.box_chamfered(Vector3(0.62, 0.22, 0.08), 0.02, Parts.around(1.1, degrees, Parts.PAD_HEIGHT + 0.06), ARMOUR,
 				Vector3(0, 90.0 - degrees, 0))
 	# The head is built turned to SCREEN_RIGHT - 25, so a still frame shows the barrels' length.
-	p.pivot = Vector3(0, top + 0.12, 0)
-	p.speed = 0.4
-	var head := p.spin
+	var head := p.moving(Vector3(0, top + 0.12, 0), Motion.spin(Vector3.UP, 0.4))
 	var heading := Vector3(0, SCREEN_RIGHT - 25.0, 0)
 	var along := Vector3(90, SCREEN_RIGHT - 25.0, 0)
 	Parts.drum(head, 0.62, 0.32, 0.05, 20, Vector3.ZERO, SHELL)
@@ -242,9 +240,7 @@ static func build_flak_cannon(p: Parts, level: int) -> void:
 				SHELL_MID, heading + Vector3(0, 0, -90 * side))
 	var mast_foot := Parts.around(0.92, 135.0, top)
 	m.prism(0.06, 0.05, deck + 0.45 - top, 16, mast_foot, Parts.GUNMETAL)
-	p.pivot = mast_foot + Vector3(0, deck + 0.45 - top, 0)
-	p.speed = 1.2
-	var radar := p.spin
+	var radar := p.moving(mast_foot + Vector3(0, deck + 0.45 - top, 0), Motion.spin(Vector3.UP, 1.2))
 	var face := Vector3(70, 0, 0)
 	radar.lathe(PackedVector2Array([
 		Vector2(0.06, 0), Vector2(0.32, 0.1), Vector2(0.3, 0.13), Vector2(0, 0.04),
@@ -322,9 +318,7 @@ static func build_gravity_well(p: Parts, level: int) -> void:
 		_gyro(m, core, 0.38, 0.04, Vector3(62, 0, 25), SHELL)
 	if level >= 3:
 		_gyro(m, core, 0.29, 0.035, Vector3(-55, 0, -35), GOLD)
-	p.pivot = core + Vector3(0, 0.5, 0)
-	p.speed = 1.5
-	var rotor := p.spin
+	var rotor := p.moving(core + Vector3(0, 0.5, 0), Motion.spin(Vector3.UP, 1.5))
 	Parts.torus(rotor, 0.42, 0.05, 16, 10, Vector3(0, -0.05, 0), SHELL)
 	Parts.drum(rotor, 0.1, 0.1, 0.03, 16, Vector3(0, -0.05, 0), Parts.GUNMETAL)
 	for k: int in 3:

@@ -44,8 +44,12 @@ var _lifted: bool = false
 var _ghost_tint: Material = null
 ## Whether the outlines carry the selected ink now.
 var _inked: bool = false
-var _spinners: Array[Node3D] = []
-var _spin_speeds: PackedFloat32Array = PackedFloat32Array()
+## The model's moving parts, each with its Motion and its rest position, and the seconds the
+## view has spent animating them (it stands still while the building is busy).
+var _movers: Array[Node3D] = []
+var _motions: Array[Motion] = []
+var _rests: PackedVector3Array = PackedVector3Array()
+var _time: float = 0.0
 var _animate: bool = true
 ## BaseView's merged wall mesh draws this building, so its own model is hidden (set_merged).
 var _merged: bool = false
@@ -60,7 +64,7 @@ func setup(id: int, type: String, level: int, size: int) -> void:
 
 	_model = BuildingModels.create(type, maxi(level, 1), size)
 	add_child(_model)
-	_collect_spinners(_model)
+	_collect_movers(_model)
 	_scaffold = BuildingModels.create_scaffold(size)
 	add_child(_scaffold)
 	_collect_meshes(_model)
@@ -98,7 +102,7 @@ func setup(id: int, type: String, level: int, size: int) -> void:
 func _ready() -> void:
 	# Nothing to animate (walls, traps) costs nothing per frame. Not in setup(): entering the
 	# tree turns processing on for any script with _process.
-	set_process(not _spinners.is_empty())
+	set_process(not _movers.is_empty())
 
 
 ## level 0 = first construction (scaffold). busy = constructing or upgrading.
@@ -153,14 +157,16 @@ func set_ghost(valid: bool) -> void:
 	_ghost_tint = material
 	_update_outlines()
 	for body: MeshInstance3D in _bodies:
-		body.set_surface_override_material(0, material)
+		if body.mesh.surface_get_material(0) == MaterialKit.toon():
+			body.set_surface_override_material(0, material)
 
 
 func _process(delta: float) -> void:
 	if not _animate:
 		return
-	for i: int in _spinners.size():
-		_spinners[i].rotate_y(_spin_speeds[i] * delta)
+	_time += delta
+	for i: int in _movers.size():
+		_movers[i].transform = _motions[i].transform_at(_time, _rests[i])
 
 
 func _update_outlines() -> void:
@@ -183,9 +189,11 @@ func _collect_meshes(node: Node) -> void:
 		_collect_meshes(child)
 
 
-func _collect_spinners(node: Node) -> void:
+func _collect_movers(node: Node) -> void:
 	for child: Node in node.get_children():
-		if child is Node3D and child.has_meta(BuildingModels.SPIN_META):
-			_spinners.append(child as Node3D)
-			_spin_speeds.append(float(child.get_meta(BuildingModels.SPIN_META)))
-		_collect_spinners(child)
+		if child is Node3D and child.has_meta(BuildingModels.MOVE_META):
+			var mover := child as Node3D
+			_movers.append(mover)
+			_motions.append(mover.get_meta(BuildingModels.MOVE_META) as Motion)
+			_rests.append(mover.position)
+		_collect_movers(child)

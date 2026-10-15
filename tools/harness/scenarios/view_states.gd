@@ -44,11 +44,19 @@ func run(main: MainScript) -> void:
 	await _shot("construction")
 
 
-## Whether every outline (or body) instance under a view's model and scaffold overrides with `material`.
+## Whether every outline (or body) instance under a view's model and scaffold overrides with
+## `material`. A body whose surface 0 is a hologram (a moving part made only of HOLO parts) is
+## never overridden, by design, so it passes with no override.
 func _all_overridden(view: BuildingView, outlines: bool, material: Material) -> bool:
-	for mesh: Node in view.find_children("*", "MeshInstance3D", true, false):
-		if mesh.has_meta(BuildingModels.OUTLINE_META) == outlines and mesh.get_parent() != view \
-				and (mesh as MeshInstance3D).get_surface_override_material(0) != material:
+	for node: Node in view.find_children("*", "MeshInstance3D", true, false):
+		var mesh := node as MeshInstance3D
+		if mesh.has_meta(BuildingModels.OUTLINE_META) != outlines or mesh.get_parent() == view:
+			continue
+		var override := mesh.get_surface_override_material(0)
+		if mesh.mesh.surface_get_material(0) == MaterialKit.holo():
+			if override != null:
+				return false
+		elif override != material:
 			return false
 	return true
 

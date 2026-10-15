@@ -1,7 +1,7 @@
 class_name Parts
 extends RefCounted
-## A building model while it is built (BuildingModels.create): the static body, the part that
-## spins around `pivot` at `speed` radians a second, and what the per-category model files
+## A building model while it is built (BuildingModels.create): the static body, up to
+## MAX_MOVING moving parts (moving()), and what the per-category model files
 ## (src/game/models/) share: the helpers, the common surfaces, and SURFACES, the table that
 ## paints the colour names the models were first written with onto the material kit
 ## (docs/reference/art-style.md).
@@ -52,10 +52,25 @@ static var GOLD_ROUND := Surf.make(MaterialKit.Layer.FLAT, MaterialKit.CORE_GOLD
 
 static var _surfs: Dictionary[String, Surf] = {}
 
+## Moving parts a model may have.
+const MAX_MOVING := 3
+
 var body := LowPolyMesh.new()
-var spin := LowPolyMesh.new()
-var pivot := Vector3.ZERO
-var speed := 0.0
+## The moving parts, each with its pivot and Motion, in the order moving() made them.
+var movers: Array[LowPolyMesh] = []
+var pivots := PackedVector3Array()
+var motions: Array[Motion] = []
+
+
+## A new moving part, which moves about `pivot` as `motion` says: build it in its own space,
+## with the pivot at its origin.
+func moving(pivot: Vector3, motion: Motion) -> LowPolyMesh:
+	assert(movers.size() < MAX_MOVING, "a model has at most %d moving parts" % MAX_MOVING)
+	var mesh := LowPolyMesh.new()
+	movers.append(mesh)
+	pivots.append(pivot)
+	motions.append(motion)
+	return mesh
 
 
 ## The kit surface of a colour name in SURFACES, made once and shared.

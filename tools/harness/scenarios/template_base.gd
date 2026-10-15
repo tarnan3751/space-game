@@ -2,7 +2,7 @@ extends HarnessScenario
 ## The debug build's Template base (TemplateBase, main._template_base), pressed through the HUD's
 ## button. Checks every type but the walls exactly once, the walls the enclosure's pieces, all at
 ## the top level and finished; no two footprints overlapping and all inside the grid; every
-## resource at its cap; every drone free, on the ring too; every turning part turning; the save
+## resource at its cap; every drone free, on the ring too; every moving part moving; the save
 ## written to the run's own file, user://base.json untouched. Screenshots: the whole base at the
 ## widest zoom in a WIDE window, then each band at BAND_ZOOM centred on it (the Command Center's
 ## with the first category's), in even parts PART_CELLS wide at most so none runs under the HUD
@@ -11,6 +11,9 @@ extends HarnessScenario
 const WIDE := Vector2i(1560, 720)
 const BAND_ZOOM := 16.0
 const PART_CELLS := 16
+## How long the moving parts are sampled, and how many frames apart.
+const MOVE_SAMPLE_SECONDS := 1.5
+const MOVE_SAMPLE_FRAMES := 4
 
 
 func run(main: MainScript) -> void:
@@ -45,7 +48,7 @@ func run(main: MainScript) -> void:
 	check(main.save_path == harness.save_path and (saved["buildings"] as Array).size() == state.buildings.size()
 		and real_saved.call() == real_saved_before, "saved to %s, %s untouched" % [main.save_path, real])
 
-	# Each band's footprints, and every turning part with its angle.
+	# Each band's footprints, and every turning part with its pose.
 	var bands := {}
 	var turning := []
 	for view: BuildingView in main.base_view.views.values():
@@ -55,13 +58,20 @@ func run(main: MainScript) -> void:
 		var foot := Rect2i(building.cell, Vector2i.ONE * view.footprint_size)
 		bands[band] = (bands.get(band, foot) as Rect2i).merge(foot)
 		turning.append_array(view.find_children("*", "Node3D", true, false).filter(
-			func(node: Node) -> bool: return node.has_meta(BuildingModels.SPIN_META)))
-	var angles := turning.map(func(spinner: Node3D) -> float: return spinner.rotation.y)
-	await main.get_tree().create_timer(1.0).timeout
-	var turned := range(turning.size()).filter(
-		func(i: int) -> bool: return not is_equal_approx((turning[i] as Node3D).rotation.y, angles[i])).size()
-	check(turned > 0 and turned == turning.size(), "%d of %d turning parts turned in a second"
-		% [turned, turning.size()])
+			func(node: Node) -> bool: return node.has_meta(BuildingModels.MOVE_META)))
+	# A part may hold still for a while (a hammer's hold) or come back to its first pose on a
+	# whole period, so each is sampled every few frames over a second and a half and passes once
+	# any sample differs from its first pose.
+	var poses := turning.map(func(mover: Node3D) -> Transform3D: return mover.transform)
+	var moved := {}
+	var sampling := main.get_tree().create_timer(MOVE_SAMPLE_SECONDS)
+	while sampling.time_left > 0.0:
+		await frames(MOVE_SAMPLE_FRAMES)
+		for i: int in turning.size():
+			if not (turning[i] as Node3D).transform.is_equal_approx(poses[i]):
+				moved[i] = true
+	check(moved.size() > 0 and moved.size() == turning.size(), "%d of %d moving parts moved within %.1f s"
+		% [moved.size(), turning.size(), MOVE_SAMPLE_SECONDS])
 
 	main.get_window().size = WIDE
 	await _shot(main, "whole", Vector3.ZERO, IsoCamera.MAX_ZOOM_SIZE)
@@ -74,8 +84,8 @@ func run(main: MainScript) -> void:
 			var name := "band-%s-%d" % [band, i + 1] if parts > 1 else "band-" + band
 			var at := main.base_view.cell_to_world(part.position, 0) + Vector3(part.size.x, 0, part.size.y) * 0.5
 			await _shot(main, name, at, BAND_ZOOM)
-			if turning.any(func(spinner: Node3D) -> bool:
-					return part.has_point(main.base_view.world_to_cell(spinner.global_position))):
+			if turning.any(func(mover: Node3D) -> bool:
+					return part.has_point(main.base_view.world_to_cell(mover.global_position))):
 				await main.get_tree().create_timer(1.0).timeout
 				await screenshot(name + "-later")
 

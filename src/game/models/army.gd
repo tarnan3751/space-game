@@ -299,9 +299,7 @@ static func build_research_lab(p: Parts, level: int) -> void:
 	m.prism(0.12, 0.11, 0.14, 16, mast, ARMOUR_ROUND)
 	var height := 1.25 + 0.08 * level
 	m.prism(0.08, 0.06, height, 16, mast + Vector3(0, 0.14, 0), Parts.GUNMETAL)
-	p.pivot = mast + Vector3(0, 0.14 + height, 0)
-	p.speed = 0.9
-	var radar := p.spin
+	var radar := p.moving(mast + Vector3(0, 0.14 + height, 0), Motion.spin(Vector3.UP, 0.9))
 	radar.box_chamfered(Vector3(0.12, 0.16, 0.12), 0.03, Vector3.ZERO, Parts.GUNMETAL)
 	var tilt := Vector3(60, 90, 0)
 	var hub := Vector3(0, 0.14, 0)

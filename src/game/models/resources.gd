@@ -50,9 +50,7 @@ static func build_drone_bay(p: Parts, _level: int) -> void:
 	m.box(Vector3(0.64, 0.14, 0.64), cab + Vector3(0, 0.12, 0), BAY_WINDOWS)
 	m.box_chamfered(Vector3(0.68, 0.06, 0.68), 0.03, cab + Vector3(0, 0.34, 0), Parts.GOLD_TRIM)
 	Parts.ladder(m, booth + Vector3(0.24, 0, 0.05), 0.7, 0.2, 90.0, Parts.ROD)
-	p.pivot = cab + Vector3(0, 0.4, 0)
-	p.speed = 2.4
-	_beacon(p.spin)
+	_beacon(p.moving(cab + Vector3(0, 0.4, 0), Motion.spin(Vector3.UP, 2.4)))
 
 	# A fuel tank on the left corner, crates on the right.
 	var tank := Vector3(-0.58, Parts.PAD_HEIGHT, 0.5)
@@ -192,9 +190,9 @@ static func build_metal_extractor(p: Parts, level: int) -> void:
 		var stack_height: float = stack[2]
 		_stack(m, Vector3(stack[0], house.y + 0.58, stack[1]), stack_height, gold)
 
-	p.pivot = DRILL + Vector3(0, ground + 0.1, 0)
-	p.speed = 3.0
-	_drill(p.spin, crown.y - p.pivot.y, ground + DRIVE_TOP * (height - ground) - p.pivot.y, gold)
+	var pivot := DRILL + Vector3(0, ground + 0.1, 0)
+	_drill(p.moving(pivot, Motion.spin(Vector3.UP, 3.0)), crown.y - pivot.y,
+		ground + DRIVE_TOP * (height - ground) - pivot.y, gold)
 
 
 ## A square hopper on four legs, a metal accent strip round its rim and glowing ore heaped in it.
@@ -323,9 +321,8 @@ static func build_crystal_harvester(p: Parts, level: int) -> void:
 	m.box(Vector3(0.18, 0.14, 0.03), Vector3(-0.55, ground + 0.1, 1.26), CRYSTAL_GLOW)
 
 	var tallest := ground + 0.12 + float(SHARDS[0][2]) * growth
-	p.pivot = beam + Vector3(0, -0.06, 0)
-	p.speed = 1.6
-	_emitter(p.spin, p.pivot.y - tallest, gold)
+	var pivot := beam + Vector3(0, -0.06, 0)
+	_emitter(p.moving(pivot, Motion.spin(Vector3.UP, 1.6)), pivot.y - tallest, gold)
 
 
 ## A crystal shard: a six-sided column with a pointed tip, tilted, its facets glowing within.
@@ -396,9 +393,7 @@ static func build_antimatter_siphon(p: Parts, level: int) -> void:
 		Parts.pipe_run(m, PackedVector3Array([Vector3(-0.84, ground + 0.26, 0.47), Vector3(-0.58, ground + 0.32, 0.32)]),
 			0.06, Parts.GUNMETAL, 8)
 
-	p.pivot = Vector3(0, SIPHON_CORE, 0)
-	p.speed = 1.4
-	var s := p.spin
+	var s := p.moving(Vector3(0, SIPHON_CORE, 0), Motion.spin(Vector3.UP, 1.4))
 	Parts.torus(s, 0.72, 0.12, 24, 10, Vector3(0, -0.12, 0), Parts.HULL_LIGHT_ROUND)
 	var coils: int = SIPHON_COILS[level - 1]
 	for k: int in coils:

@@ -6,11 +6,12 @@ extends HarnessScenario
 ## overview's line also says the render thread's CPU time for the frame, measured on the root
 ## viewport.
 ##
-## Checks every model: one or two body MeshInstance3D (the static body, the spinning part), each
-## with an outline instance beside it on the ink material casting no shadow; every vertex's kit
-## layer (UV2.x) within the kit; the body triangles within the art style's budget for its
+## Checks every model: one to four body MeshInstance3D (the static body, up to three moving
+## parts), each with an outline instance beside it on the ink material casting no shadow unless
+## all its parts are ones never outlined (Surf.NO_OUTLINE); every vertex's kit layer (UV2.x)
+## within the kit; the body triangles, both surfaces, within the art style's budget for its
 ## footprint (docs/reference/art-style.md, **Budgets**); and its reach in x and z (the body's
-## bounds, a spinning part's sweep around its pivot) within its footprint plus EXTENT_SLACK.
+## bounds, each moving part's over its whole motion) within its footprint plus EXTENT_SLACK.
 ## Nothing checks the height.
 ##
 ## Rows follow the catalog's categories: "core" (the Command Center), then catalog.categories
@@ -25,6 +26,8 @@ const WALL_CATEGORY := "walls"
 const WALL_BUDGET := 250
 ## How far past its footprint's edge (world units) a model may reach in x or z.
 const EXTENT_SLACK := 0.15
+## Degrees between the angles a swinging part's reach is sampled at.
+const SWING_STEP := 5.0
 ## Cells between models and between rows.
 const GAP := 1
 const OVERVIEW_SIZE := 44.0
@@ -131,42 +134,81 @@ func _check_budget(entry: Dictionary) -> void:
 		var bound := size * 0.5 + EXTENT_SLACK
 		var triangles := 0
 		var outlined := 0
+		var need_outline := 0
 		var top_layer := 0
 		for body: MeshInstance3D in bodies:
-			var arrays := body.mesh.surface_get_arrays(0)
-			var vertices: PackedVector3Array = arrays[Mesh.ARRAY_VERTEX]
-			triangles += vertices.size() / 3
-			var layers: PackedVector2Array = arrays[Mesh.ARRAY_TEX_UV2]
-			for layer: Vector2 in layers:
-				top_layer = maxi(top_layer, roundi(layer.x))
-			if _has_outline(body):
-				outlined += 1
+			var outlinable := false
+			for surface: int in body.mesh.get_surface_count():
+				var arrays := body.mesh.surface_get_arrays(surface)
+				var vertices: PackedVector3Array = arrays[Mesh.ARRAY_VERTEX]
+				triangles += vertices.size() / 3
+				var layers: PackedVector2Array = arrays[Mesh.ARRAY_TEX_UV2]
+				for layer: Vector2 in layers:
+					top_layer = maxi(top_layer, roundi(layer.x))
+					outlinable = outlinable or (roundi(layer.y) & Surf.NO_OUTLINE) == 0
+			if outlinable:
+				need_outline += 1
+				if _has_outline(body):
+					outlined += 1
 		model.free()
 		var over := "" if reach <= bound else ", over by %.2f" % (reach - bound)
-		check(bodies.size() >= 1 and bodies.size() <= 2 and outlined == bodies.size()
+		check(bodies.size() >= 1 and bodies.size() <= 1 + Parts.MAX_MOVING and outlined == need_outline
 			and top_layer < MaterialKit.LAYERS.size() and triangles <= limit and reach <= bound,
-			"%s %d: %d body instance(s), %d outlined, top kit layer %d, %d triangles (limit %d), reach %.2f (limit %.2f%s)"
-			% [type, level, bodies.size(), outlined, top_layer, triangles, limit, reach, bound, over])
+			"%s %d: %d body instance(s), %d of %d outlined, top kit layer %d, %d triangles (limit %d), reach %.2f (limit %.2f%s)"
+			% [type, level, bodies.size(), outlined, need_outline, top_layer, triangles, limit, reach, bound, over])
 
 
-## How far a model reaches from its centre in x or z, in world units: the static bodies' bounds,
-## and a spinning part's sweep (its vertices' largest distance from the pivot axis plus the
-## pivot's offset from the centre), both times the model's scale.
+## How far a model reaches from its centre in x or z, in world units, times the model's scale:
+## the static body's bounds, and each moving part's reach over its whole motion (_moving_reach).
 func _reach(model: Node3D, bodies: Array[MeshInstance3D]) -> float:
 	var reach := 0.0
 	for body: MeshInstance3D in bodies:
 		if body.get_parent() == model:
-			var box := body.mesh.get_aabb()
-			reach = maxf(reach, maxf(maxf(absf(box.position.x), absf(box.end.x)),
-				maxf(absf(box.position.z), absf(box.end.z))))
+			reach = maxf(reach, _box_reach(body.mesh.get_aabb(), Transform3D.IDENTITY))
 		else:
-			var pivot := (body.get_parent() as Node3D).position
-			var sweep := 0.0
-			var vertices: PackedVector3Array = body.mesh.surface_get_arrays(0)[Mesh.ARRAY_VERTEX]
-			for vertex: Vector3 in vertices:
-				sweep = maxf(sweep, Vector2(vertex.x, vertex.z).length())
-			reach = maxf(reach, Vector2(pivot.x, pivot.z).length() + sweep)
+			var node := body.get_parent() as Node3D
+			reach = maxf(reach, _moving_reach(body.mesh, node.get_meta(BuildingModels.MOVE_META) as Motion,
+				node.position))
 	return reach * model.scale.x
+
+
+## A moving part's reach from the model's centre in x or z over its whole motion. SPIN: each
+## vertex sweeps a circle about the axis through the pivot, which reaches no further across than
+## the circle's centre's offset plus its radius, plus the pivot's offset from the model's centre.
+## SWING: the part's bounds turned every SWING_STEP degrees from -amplitude to +amplitude, both
+## ends included. SLIDE: its
+## bounds at both ends of the slide.
+func _moving_reach(mesh: Mesh, motion: Motion, pivot: Vector3) -> float:
+	var box := mesh.get_aabb()
+	match motion.kind:
+		Motion.Kind.SPIN:
+			var sweep := 0.0
+			for surface: int in mesh.get_surface_count():
+				var vertices: PackedVector3Array = mesh.surface_get_arrays(surface)[Mesh.ARRAY_VERTEX]
+				for vertex: Vector3 in vertices:
+					var centre := motion.axis * vertex.dot(motion.axis)
+					sweep = maxf(sweep, Vector2(centre.x, centre.z).length() + (vertex - centre).length())
+			return Vector2(pivot.x, pivot.z).length() + sweep
+		Motion.Kind.SWING:
+			var reach := 0.0
+			var steps := maxi(1, ceili(2.0 * absf(motion.amplitude) / SWING_STEP))
+			for k: int in steps + 1:
+				var angle := deg_to_rad(motion.amplitude) * (2.0 * k / steps - 1.0)
+				reach = maxf(reach, _box_reach(box, Transform3D(Basis(motion.axis, angle), pivot)))
+			return reach
+		_:
+			var shift := motion.axis * motion.amplitude
+			return maxf(_box_reach(box, Transform3D(Basis.IDENTITY, pivot + shift)),
+				_box_reach(box, Transform3D(Basis.IDENTITY, pivot - shift)))
+
+
+## The largest |x| or |z| of a box's corners placed by `at`.
+func _box_reach(box: AABB, at: Transform3D) -> float:
+	var reach := 0.0
+	for corner: int in 8:
+		var point := at * box.get_endpoint(corner)
+		reach = maxf(reach, maxf(absf(point.x), absf(point.z)))
+	return reach
 
 
 ## Whether a body has an outline instance beside it on the ink material, casting no shadow.
@@ -179,7 +221,7 @@ func _has_outline(body: MeshInstance3D) -> bool:
 	return false
 
 
-## The model's body mesh instances (not the outlines), the spinning one included.
+## The model's body mesh instances (not the outlines), the moving parts' included.
 func _bodies(node: Node) -> Array[MeshInstance3D]:
 	var bodies: Array[MeshInstance3D] = []
 	for child: Node in node.get_children():

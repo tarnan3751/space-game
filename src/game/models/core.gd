@@ -111,9 +111,7 @@ static func build_command_center(p: Parts, level: int) -> void:
 	var pylon_height := DRUM_HEIGHT + 0.2
 	m.box_chamfered(Vector3(0.34, 0.16, 0.34), 0.05, pylon, Parts.HULL_DARK, Vector3(0, 45, 0))
 	m.prism(0.13, 0.09, pylon_height, 16, pylon + Vector3(0, 0.16, 0), Parts.HULL_MID_ROUND)
-	p.pivot = pylon + Vector3(0, 0.16 + pylon_height, 0)
-	p.speed = 0.8
-	_comms_dish(p.spin, gold)
+	_comms_dish(p.moving(pylon + Vector3(0, 0.16 + pylon_height, 0), Motion.spin(Vector3.UP, 0.8)), gold)
 
 
 ## The hangar door facing the camera: a block off the drum with a roll-up door framed in

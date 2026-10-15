@@ -11,8 +11,9 @@ render_mode cull_front, unshaded;
 // renderer flips the projection's Y when it draws into a render target).
 //
 // The push never takes a vertex below the ground (world y = 0) unless it already was, so a
-// building's bottom edge does not dip into the ground. Instances only ever turn about Y and
-// scale uniformly, so the ground's height in model space is -origin.y / scale.
+// building's bottom edge does not dip into the ground. Instances scale uniformly, and only
+// moving parts turn about any axis but Y, high enough above the ground that the clamp does not
+// reach them, so the ground's height in model space is -origin.y / scale.
 //
 // The outline carries its parts' flags (UV2.y) and phases (COLOR.a), and moves each vertex as
 // the body's shader does (effects.gdshaderinc: BOB and JITTER) before the push, so an outline
@@ -25,7 +26,7 @@ uniform vec4 ink_color : source_color = vec4(0.106, 0.102, 0.18, 1.0);
 
 void vertex() {
 	float width = ink_px * 2.0 / (720.0 * abs(PROJECTION_MATRIX[1][1]));
-	float scale = MODEL_MATRIX[1][1];
+	float scale = length(MODEL_MATRIX[0].xyz);
 	vec3 moved = effect_vertex(VERTEX, surf_flags(UV2), surf_phase(COLOR), MODEL_MATRIX);
 	vec3 pushed = moved + normalize(NORMAL) * width / scale;
 	pushed.y = max(pushed.y, min(moved.y, -MODEL_MATRIX[3][1] / scale));
