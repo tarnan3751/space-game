@@ -82,8 +82,17 @@ func _run(scenario_path: String) -> void:
 		return
 	_main.placement.clock = now
 	_main.state.advance_to(_clock)
-	var script: GDScript = load(scenario_path)
-	var scenario: HarnessScenario = script.new()
+	# A scenario that does not parse loads as null or cannot be instantiated; stop rather than
+	# wait for a run that never starts.
+	var script := load(scenario_path) as GDScript
+	var scenario: HarnessScenario = null
+	if script != null and script.can_instantiate():
+		scenario = script.new() as HarnessScenario
+	if scenario == null:
+		say("HARNESS FAIL: %s, script failed to load" % scenario_name)
+		_log.close()
+		quit(1)
+		return
 	scenario.harness = self
 	say("harness: run %s" % scenario_name)
 	await scenario.run(_main)

@@ -54,7 +54,9 @@ later screenshot repeating its last frame, so `run.sh` guards rendered runs thre
 
 A run exits 0 only when every `check()` passed, Godot logged no `SCRIPT ERROR`, and no rendered
 screenshot repeats an earlier one unless it may. The last lines of `log.txt` are `HARNESS PASS:
-<scenario>` or `HARNESS FAIL: <scenario>, N failed check(s)` followed by each failed check.
+<scenario>` or `HARNESS FAIL: <scenario>, N failed check(s)` followed by each failed check. A
+scenario that does not parse ends the run at once with `HARNESS FAIL: <scenario>, script failed
+to load` and exit code 1.
 
 ## How a run is isolated
 
