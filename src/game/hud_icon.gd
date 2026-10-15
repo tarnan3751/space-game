@@ -26,28 +26,28 @@ func _draw() -> void:
 	pen.draw(self)
 
 
-## Adds the icon of `kind`, fitted to `rect`, to `pen`: every part's shadow, then the parts.
-static func paint(pen: Pen, kind: String, rect: Rect2, color: Color) -> void:
+## Adds the `icon`, fitted to `rect`, to `pen`: every part's shadow, then the parts.
+static func paint(pen: Pen, icon: String, rect: Rect2, tint: Color) -> void:
 	pen.fit(rect)
 	for shadow: bool in [true, false]:
 		pen.shadow = shadow
-		match kind:
+		match icon:
 			"metal":
-				_ingot(pen, color)
+				_ingot(pen, tint)
 			"crystal":
-				_shards(pen, color)
+				_shards(pen, tint)
 			"antimatter":
-				_orb(pen, color)
+				_orb(pen, tint)
 			"drones":
-				_quad_rotor(pen, color)
+				_quad_rotor(pen, tint)
 			_:
-				_gem(pen, color)
+				_gem(pen, tint)
 	pen.shadow = false
 
 
 ## A bar seen from the front and a little above: a trapezoid front, a lighter top face and a
 ## darker end.
-static func _ingot(pen: Pen, color: Color) -> void:
+static func _ingot(pen: Pen, tint: Color) -> void:
 	var front_left := Vector2(4, 32)
 	var front_right := Vector2(27, 32)
 	var top_left := Vector2(8, 20)
@@ -55,65 +55,65 @@ static func _ingot(pen: Pen, color: Color) -> void:
 	var depth := Vector2(8, -8)
 	var outline := PackedVector2Array([front_left, front_right, front_right + depth,
 		top_right + depth, top_left + depth, top_left])
-	pen.shape(outline, color)
-	pen.facet(PackedVector2Array([top_left, top_right, top_right + depth, top_left + depth]), color.lightened(0.45))
-	pen.facet(PackedVector2Array([front_right, top_right, top_right + depth, front_right + depth]), color.darkened(0.25))
+	pen.shape(outline, tint)
+	pen.facet(PackedVector2Array([top_left, top_right, top_right + depth, top_left + depth]), tint.lightened(0.45))
+	pen.facet(PackedVector2Array([front_right, top_right, top_right + depth, front_right + depth]), tint.darkened(0.25))
 	pen.edge(PackedVector2Array([top_left, top_right, front_right]))
 	pen.edge(PackedVector2Array([top_right, top_right + depth]))
 	pen.outline(outline)
 
 
 ## A tall kite with a smaller one leaning on it, each with a lighter left face.
-static func _shards(pen: Pen, color: Color) -> void:
-	_kite(pen, color, Vector2(9, 11), Vector2(16, 20), Vector2(13, 36), Vector2(3, 24))
-	_kite(pen, color, Vector2(24, 3), Vector2(34, 16), Vector2(23, 37), Vector2(15, 17))
+static func _shards(pen: Pen, tint: Color) -> void:
+	_kite(pen, tint, Vector2(9, 11), Vector2(16, 20), Vector2(13, 36), Vector2(3, 24))
+	_kite(pen, tint, Vector2(24, 3), Vector2(34, 16), Vector2(23, 37), Vector2(15, 17))
 
 
-static func _kite(pen: Pen, color: Color, top: Vector2, right: Vector2, bottom: Vector2, left: Vector2) -> void:
+static func _kite(pen: Pen, tint: Color, top: Vector2, right: Vector2, bottom: Vector2, left: Vector2) -> void:
 	var outline := PackedVector2Array([top, right, bottom, left])
-	pen.shape(outline, color)
-	pen.facet(PackedVector2Array([top, bottom, left]), color.lightened(0.45))
+	pen.shape(outline, tint)
+	pen.facet(PackedVector2Array([top, bottom, left]), tint.lightened(0.45))
 	pen.edge(PackedVector2Array([top, bottom]))
 	pen.outline(outline)
 
 
 ## An orb with an orbit ring tilted across it: the ring's far half behind the orb, its near
 ## half in front.
-static func _orb(pen: Pen, color: Color) -> void:
+static func _orb(pen: Pen, tint: Color) -> void:
 	var centre := Vector2(20, 20)
 	var ring_radii := Vector2(18, 6.5)
 	var tilt := -0.38
-	var ring_color := color.lightened(0.35)
+	var ring_color := tint.lightened(0.35)
 	pen.band(_ellipse(centre, ring_radii, PI, TAU, 12, tilt), ring_color)
 	var orb := _ellipse(centre, Vector2(11, 11), 0.0, TAU, 24)
-	pen.shape(orb, color)
-	pen.facet(_ellipse(Vector2(16.5, 15.5), Vector2(4.5, 3.5), 0.0, TAU, 12, -0.6), color.lightened(0.55))
+	pen.shape(orb, tint)
+	pen.facet(_ellipse(Vector2(16.5, 15.5), Vector2(4.5, 3.5), 0.0, TAU, 12, -0.6), tint.lightened(0.55))
 	pen.outline(orb)
 	pen.band(_ellipse(centre, ring_radii, 0.0, PI, 12, tilt), ring_color)
 
 
 ## A quad-rotor from above: four rotor discs on crossed arms round a rounded body.
-static func _quad_rotor(pen: Pen, color: Color) -> void:
+static func _quad_rotor(pen: Pen, tint: Color) -> void:
 	pen.band(PackedVector2Array([Vector2(9, 9), Vector2(31, 31)]), Hud.INK)
 	pen.band(PackedVector2Array([Vector2(31, 9), Vector2(9, 31)]), Hud.INK)
 	for corner: Vector2 in [Vector2(9, 9), Vector2(31, 9), Vector2(31, 31), Vector2(9, 31)]:
 		var disc := _ellipse(corner, Vector2(7, 7), 0.0, TAU, 16)
-		pen.shape(disc, color.lightened(0.5))
+		pen.shape(disc, tint.lightened(0.5))
 		pen.facet(_ellipse(corner + Vector2(-1.5, -1.5), Vector2(3, 3), 0.0, TAU, 10), Color(1, 1, 1, 0.6))
 		pen.outline(disc)
 	var body := PackedVector2Array([Vector2(16, 12), Vector2(24, 12), Vector2(28, 16), Vector2(28, 24),
 		Vector2(24, 28), Vector2(16, 28), Vector2(12, 24), Vector2(12, 16)])
-	pen.shape(body, color)
-	pen.facet(PackedVector2Array([Vector2(16, 12), Vector2(24, 12), Vector2(12, 24), Vector2(12, 16)]), color.lightened(0.45))
+	pen.shape(body, tint)
+	pen.facet(PackedVector2Array([Vector2(16, 12), Vector2(24, 12), Vector2(12, 24), Vector2(12, 16)]), tint.lightened(0.45))
 	pen.outline(body)
 	pen.facet(_ellipse(Vector2(21.5, 21.5), Vector2(2.2, 2.2), 0.0, TAU, 10), Hud.INK)
 
 
 ## A cut gem, for a resource with no silhouette of its own.
-static func _gem(pen: Pen, color: Color) -> void:
+static func _gem(pen: Pen, tint: Color) -> void:
 	var outline := PackedVector2Array([Vector2(12, 8), Vector2(28, 8), Vector2(35, 17), Vector2(20, 35), Vector2(5, 17)])
-	pen.shape(outline, color)
-	pen.facet(PackedVector2Array([Vector2(12, 8), Vector2(20, 17), Vector2(5, 17)]), color.lightened(0.45))
+	pen.shape(outline, tint)
+	pen.facet(PackedVector2Array([Vector2(12, 8), Vector2(20, 17), Vector2(5, 17)]), tint.lightened(0.45))
 	pen.edge(PackedVector2Array([Vector2(5, 17), Vector2(35, 17)]))
 	pen.outline(outline)
 
