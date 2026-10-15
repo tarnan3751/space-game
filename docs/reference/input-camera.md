@@ -256,9 +256,9 @@ of the finished model, and it frees itself after its climb. `drone()` returns th
 (null when none), for the harness. `BaseView.clear()` frees the drones with the views.
 
 `BuildingModels.create(type, level, size)` returns a `Node3D` holding the static body and its
-ink outline, and up to three moving parts (today one each: the comms dish, the drone bay's
-beacon, the drill, the harvester's emitter, the siphon and gravity well rings, the research and
-flak radars, the laser head) with their outlines, each under a pivot node carrying `MOVE_META`:
+ink outline, and up to three moving parts (the model table in `art-style.md` names each
+type's: dishes, radars and gyro rings that spin, heads and launchers that scan, press arms,
+doors and cranes that slide) with their outlines, each under a pivot node carrying `MOVE_META`:
 at most eight `MeshInstance3D`, half of them at most outlines that cast no shadow
 (`art-style.md`, **Animation**).
 The models are built in code, one per type and level of the 32-type roster, each type's in its

@@ -854,10 +854,13 @@ base is 48 draw calls with the HUD's build panel closed (46 before the perimeter
 hologram fence and its shadow; earlier, 63 with the always-visible build bar it replaced, 57 of
 those before the environment's curb, terrain outline and outcrops). The panel
 costs only while it is open: a fresh base with it open is 100 draw calls on a full tab
-(resources, army, defence), 86 on traps and 68 on walls. The model gallery's overview is 362
-draw calls on page 1 and 158 on page 2 (381 and 177 with the build bar, 375 and 171 before the
-environment, 294 and 157 before the kit; the research lab's spinning dish adds 15 on page 1),
-and the render thread's CPU time is about 0.5 ms a frame either way. The kit's texture array,
+(resources, army, defence), 86 on traps and 68 on walls. The model gallery's overview is 565
+draw calls on page 1 and 217 on page 2 with every type animated (362 and 158 before the
+animation pass, when nine types had one spinner each; 381 and 177 with the build bar, 375 and
+171 before the environment, 294 and 157 before the kit): every moving part is two more draws
+and a shadow draw, and every mesh with holograms one more. The render thread's CPU time on
+the development Mac is about 1.5 ms a frame on page 1 (118 models at once) and 0.4 ms on
+page 2, measured with the gallery's own line. The kit's texture array,
 sixteen 256×256 RGBA8 layers, is about 5.3 MB with its mipmaps; the field texture, one 1024×1024
 RGBA8 image, is about 5.3 MB with its mipmaps too, and the ground and the terrain share it; the
 terrain's rock texture, one 512×512 RGBA8 image, is about 1.4 MB with its mipmaps. The terrain's
