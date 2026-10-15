@@ -361,10 +361,10 @@ triangles as the gallery counts them.
 | `nanite_foundry` | vats with bands of glowing nanite-green goo, piped with ball elbows; the big vat open over swirling goo | spin: the stirrer in the big vat. The goo FLOWs up every vat (and FLOW_U round the open top), bubbles BLINK on it, the pipes and the pump's screens FLOW | 2,982 |
 | `drydock` | half-built ship in a cradle under orange gantries, welders throwing sparks; the unbuilt stern a cyan hologram | slide: the first gantry along its rails. The welds BLINK, FLICKER and JITTER sparks fly off them, the reactor PULSEs (and the engines at L2), the HOLO hull completes the stern | 3,206 |
 | `alliance_beacon` | braced transmitter tower with rings of light, a big dish and an emitter orb | spin: the big dish on a collar, circling the tower. The rings BLINK in a chase up it, the orb PULSEs and BOBs with its spike, a HOLO halo BOBs over them | 2,384 |
-| `laser_turret` | domed head on the red-belted plinth, twin barrels ending in red emitters | spin: the head | 2,722 |
-| `missile_battery` | tilted box launcher of red-tipped tubes (4, 6 at L3, 9 at L4) with a hazard band | none | 2,174 |
-| `plasma_mortar` | fat short barrel rising from a caged violet plasma chamber on a heavy ring | none | 2,782 |
-| `shield_generator` | cyan energy orb held over an emitter dome by three coil arms | none | 2,914 |
+| `laser_turret` | domed head on the red-belted plinth, twin barrels ending in red emitters | swing: the head scans ±45° (6 s). The emitters pulse in turn, the pad's cells pulse, the belt's plates creep round it (FLOW_U), the head's mast lamp (L4) blinks | 2,722 |
+| `missile_battery` | tilted box launcher of red-tipped tubes (4, 6 at L3, 9 at L4) with a hazard band | swing: the launcher, arms and tubes, scans ±15° (7 s). The tips blink in a chase snaking along the rows, the mast lamp (L2) pulses | 2,174 |
+| `plasma_mortar` | fat short barrel rising from a caged violet plasma chamber on a heavy ring | spin: a cooling fan on the heavy ring's flank. The chamber pulses, bubbles swell on it between the cage's ribs, arcs crackle from the ribs, the bore's lining flows up out of the muzzle | 2,982 |
+| `shield_generator` | cyan energy orb held over an emitter dome by three coil arms, their upper runs glowing conduits | spin: a hologram band round the orb, tilted off its axis so it wobbles as it turns. The orb bobs and pulses, current flows up the arms, arcs jump from the arm tips to the orb | 2,980 |
 | `flak_cannon` | barrels angled at the sky on a tall bell mount | spin: the radar dish on its mast | 2,900 |
 | `arc_tower` | tesla coil of white insulator skirts under an arc-blue sphere; twin coils at L4 | none | 2,794 |
 | `cloaked_sentry` | low dark hexagonal pod with a lid gun and a dim cyan shimmer ring | none | 854 |
