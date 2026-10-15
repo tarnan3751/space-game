@@ -936,10 +936,13 @@ where the rays pass under the ring's raised outer edge.
 
 **The scenery**:
 
-- **Rocks**: 80 chamfered chunks, 0.8 to 5 units across and most of them small, of five to seven
+- **Rocks**: 80 chamfered chunks drawn, 0.8 to 5 units across and most of them small, of five to seven
   sides, a shoulder ring, a chamfer and a low peak, flat shaded, sides in `ROCK` and chamfers and
   tops in `ROCK_LIT`; about a quarter of those over 1.6 units across carry a smaller rock on top.
-  Each sits on the lowest ground under it. One mesh with its outline; the body casts shadows.
+  Each sits on the lowest ground under it. A rock whose footprint meets a mesa (within its
+  fillet's outer edge) is left out, built into a mesh that is thrown away so that the rest keep
+  their places: six today, which the `environment` scenario checks by every rock vertex lying
+  outside the mesas' reach. One mesh with its outline; the body casts shadows.
   Their rule keeps a rock only its radius plus 1.5 outside the field, which does not by itself
   keep it off the perimeter; that clearance is checked (the `environment` scenario), not enforced.
 - **Rubble**: 36 more rocks of the same make, 0.3 to 0.8 units across, strewn beside the curb
@@ -959,7 +962,7 @@ where the rays pass under the ring's raised outer edge.
 **Budgets**: the field 1 draw; the perimeter, the terrain, the rocks and the outcrops a body and an
 outline each, the perimeter's body two surfaces (its fence a hologram) and drawn into the shadow
 map. The terrain is 35,794 triangles on 19,561 points, its outline 36,274 with the mesas' fins
-(the `environment` scenario allows the body 38,000), the rocks about 3,900 (about 1,100 of them
+(the `environment` scenario allows the body 38,000), the rocks about 3,600 (about 1,100 of them
 the rubble) and the outcrops about 900. It is
 all built once, in about 110 ms on the development Mac (88 to 97 warm before the perimeter's
 pylons and fence added about 22, and 74 to 79 before a half-unit lattice round the mesas, since

@@ -231,7 +231,7 @@ same landscape. How each looks is in `art-style.md`, **Environment**:
   with the focus anywhere on the grid on every aspect up to about 2.98:1 (a 19.5:9 phone is
   2.17:1); beyond that the sky shows.
 - **The rocks**: `ROCK_COUNT` (80) chamfered rocks, some stacked, on the terrain clear of the
-  curb, and `RUBBLE_ROCKS` (36) small ones strewn round the field 2.4 to 7.4 units out, all in one
+  curb (those that would meet a mesa left out), and `RUBBLE_ROCKS` (36) small ones strewn round the field 2.4 to 7.4 units out, all in one
   mesh with its outline.
 - **The outcrops**: six to ten clusters of glowing crystal shards in one mesh with its outline,
   never within `OUTCROP_GAP` (4) of the field.

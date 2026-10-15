@@ -4,7 +4,8 @@ extends HarnessScenario
 ## no shadow (the terrain's body none either, the perimeter's one); that the perimeter's body is two
 ## surfaces, the toon's and the holograms' (its fence); that the background is a sky drawn by a
 ## shader; that no rock or rubble vertex comes within the perimeter's reach out of the field, beside
-## the sides or in the corners (its own vertices' farthest); the terrain's triangle budget; that
+## the sides or in the corners (its own vertices' farthest), or inside a mesa's reach (its fillet's
+## outer edge); the terrain's triangle budget; that
 ## each mesa's own geometry (BaseView.mesa_indices) is closed but along its fillet's outer edge, sunk
 ## MESA_SINK under the ground, has no degenerate triangle and lies on terrain_height everywhere
 ## else, and that its rim stays within MESA_RIM_RISE of its top all round; that no part of an
@@ -104,6 +105,17 @@ func run(main: MainScript) -> void:
 	check(closest.x > reach.x and closest.y > reach.y,
 		"the rocks keep off the perimeter: nearest %.2f out beside a side (it reaches %.2f), %.2f in a corner (%.2f)"
 		% [closest.x, reach.x, closest.y, reach.y])
+	# Nor inside a mesa's reach: its fillet's outer edge in the direction of each vertex.
+	var gap := INF
+	for surface: int in view.rocks.mesh.get_surface_count():
+		for at: Vector3 in view.rocks.mesh.surface_get_arrays(surface)[Mesh.ARRAY_VERTEX]:
+			for k: int in view.mesas.size():
+				var away := Vector2(at.x - view.mesas[k].x, at.z - view.mesas[k].y)
+				# The outline reaches at most 1.18 radii from the middle.
+				if away.length() < view.mesas[k].z * 1.18 + BaseView.MESA_FOOT + BaseView.MESA_APRON + 1.0:
+					var profile := view.mesa_profile(k, away.angle())
+					gap = minf(gap, away.length() - profile[profile.size() - 1].x)
+	check(gap > 0.0, "the rocks keep off the mesas: the nearest vertex %.2f outside a mesa's reach" % gap)
 	# Each side by the screen corner it faces, and its outward direction in world x and z.
 	var sides := {"top-left": Vector2(-1, 0), "top-right": Vector2(0, -1), "bottom-right": Vector2(1, 0),
 		"bottom-left": Vector2(0, 1)}

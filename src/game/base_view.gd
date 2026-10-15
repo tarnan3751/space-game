@@ -1065,9 +1065,21 @@ func _clear(at: Vector2, extent: float) -> bool:
 	return true
 
 
+## Whether something reaching `extent` from `at` meets a mesa: comes within its fillet's outer edge
+## in the direction of it.
+func _meets_mesa(at: Vector2, extent: float) -> bool:
+	for k: int in mesas.size():
+		var away := at - Vector2(mesas[k].x, mesas[k].y)
+		if away.length() < extent + _mesa_edge(k, away.x, away.y) + MESA_FOOT + MESA_APRON:
+			return true
+	return false
+
+
 ## Chamfered rocks scattered on the terrain clear of the curb, about a quarter of those over 0.8
 ## in radius with a smaller rock on top, into `mesh`. Each sits on the lowest ground under it, so
-## it does not float on a slope. Returns each rock's (x, z, reach).
+## it does not float on a slope. A rock whose footprint meets a mesa (_meets_mesa) is built into a
+## mesh that is thrown away, so it draws from `rng` as it would and every other rock keeps its
+## place. Returns each kept rock's (x, z, reach).
 func _build_rocks(mesh: LowPolyMesh, rng: SeededRng) -> Array[Vector3]:
 	var half := Vector2(grid_size) * 0.5
 	var spots: Array[Vector3] = []
@@ -1082,12 +1094,16 @@ func _build_rocks(mesh: LowPolyMesh, rng: SeededRng) -> Array[Vector3]:
 		if _out_of_field(x, z) < radius + 1.5:
 			continue
 		placed += 1
-		spots.append(Vector3(x, z, radius * 1.05))
-		var top := _rock(mesh, Vector3(x, _lowest_ground(x, z, radius) - 0.1 * radius, z), radius, rng)
+		var into := mesh
+		if _meets_mesa(Vector2(x, z), radius * 1.05):
+			into = LowPolyMesh.new()
+		else:
+			spots.append(Vector3(x, z, radius * 1.05))
+		var top := _rock(into, Vector3(x, _lowest_ground(x, z, radius) - 0.1 * radius, z), radius, rng)
 		if radius > 0.8 and rng.range_int(0, 99) < ROCK_STACKED:
 			var lean := Vector2(rng.range_int(-25, 25), rng.range_int(-25, 25)) * radius / 100.0
 			var smaller := radius * rng.range_int(40, 55) / 100.0
-			_rock(mesh, Vector3(x + lean.x, top - 0.1 * radius, z + lean.y), smaller, rng)
+			_rock(into, Vector3(x + lean.x, top - 0.1 * radius, z + lean.y), smaller, rng)
 	return spots
 
 
