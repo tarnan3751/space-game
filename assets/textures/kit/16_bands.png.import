@@ -1,0 +1,14 @@
+[remap]
+
+importer="image"
+type="Image"
+uid="uid://dc24cynsicfwu"
+path="res://.godot/imported/16_bands.png-2a3a517a1fec1e24adf36b4e2e4907d2.image"
+
+[deps]
+
+source_file="res://assets/textures/kit/16_bands.png"
+dest_files=["res://.godot/imported/16_bands.png-2a3a517a1fec1e24adf36b4e2e4907d2.image"]
+
+[params]
+

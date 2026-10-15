@@ -3,7 +3,7 @@ extends RefCounted
 ## The comic style's shared look (docs/reference/art-style.md): the material kit, the colour
 ## roles every model is tinted from, and the few shared materials every mesh is drawn with.
 ##
-## The kit is one Texture2DArray of the sixteen layers tools/gen_textures.gd draws into
+## The kit is one Texture2DArray of the seventeen layers tools/gen_textures.gd draws into
 ## assets/textures/kit/, imported as Images and given their mipmaps here (the Compatibility
 ## renderer generates none for a layered texture). A mesh picks a layer per vertex in UV2.x
 ## and its surface flags in UV2.y (LowPolyMesh does this from a Surf), and carries its tint in
@@ -14,11 +14,11 @@ extends RefCounted
 ## The kit's layers, in array order (the PNGs' index prefixes).
 enum Layer {
 	FLAT, HULL, HULL_DENSE, PLATE, VENT, PIPE, GRATING, CONCRETE,
-	HAZARD, SOLAR, GLASS, GLOW, SCREEN, CRYSTAL, ROCK, REGOLITH,
+	HAZARD, SOLAR, GLASS, GLOW, SCREEN, CRYSTAL, ROCK, REGOLITH, BANDS,
 }
 const LAYERS := [
 	"flat", "hull", "hull_dense", "plate", "vent", "pipe", "grating", "concrete",
-	"hazard", "solar", "glass", "glow", "screen", "crystal", "rock", "regolith",
+	"hazard", "solar", "glass", "glow", "screen", "crystal", "rock", "regolith", "bands",
 ]
 const TEXTURE_DIR := "res://assets/textures/kit"
 

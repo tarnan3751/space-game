@@ -75,7 +75,7 @@ write a scenario; `scenarios/place_and_build.gd` is the example.
 
 ## The texture generator: `tools/gen_textures.gd`
 
-A headless `SceneTree` script that draws the material kit's sixteen layers into
+A headless `SceneTree` script that draws the material kit's seventeen layers into
 `assets/textures/kit/` and the ground's field texture into `assets/textures/field.png` from one
 seed, byte-identical run to run:
 `$GODOT --headless --path . -s res://tools/gen_textures.gd`, after an import. The gate does not

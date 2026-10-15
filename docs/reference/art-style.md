@@ -21,7 +21,7 @@ camera and the views' wiring are in `input-camera.md`.
 | `src/game/base_view.gd` | builds the ground, the perimeter, the terrain ring, the rocks and the outcrops (**Environment**) |
 | `src/game/building_models.gd`, `src/game/models/` | the dispatcher and one model file per category, `Parts` in `models/parts.gd` |
 | `src/game/construction_drone.gd`, `src/game/models/drone.gd` | the builder drone over a busy site, its flight and its laser (**Construction drone**) |
-| `assets/textures/kit/` | the sixteen layers, committed PNGs |
+| `assets/textures/kit/` | the seventeen layers, committed PNGs |
 | `assets/textures/field.png` | the field texture, a committed PNG |
 | `assets/textures/terrain_rock.png` | the terrain's rock texture, a committed PNG |
 | `tools/gen_textures.gd` | the generator that draws them |
@@ -207,8 +207,8 @@ pylons `HULL_MID` with `ENERGY` lamps and `HAZARD` beacons, its fence `ENERGY`; 
 
 ## The material kit
 
-One `Texture2DArray` of sixteen 256×256 RGBA8 layers. RGB is the albedo: near-white greys (0.78
-to 1.0) with ink-coloured lines for the layers a tint multiplies, real colours for the fixed ones,
+One `Texture2DArray` of seventeen 256×256 RGBA8 layers. RGB is the albedo: near-white greys (0.78
+to 1.0; the bands layer's ground is 0.62) with ink-coloured lines for the layers a tint multiplies, real colours for the fixed ones,
 which are tinted white. A is the emission mask. Ink lines are about 3 px; rivets are 5 px discs
 with a 1 px highlight. Every layer tiles seamlessly.
 
@@ -230,6 +230,7 @@ with a 1 px highlight. Every layer tiles seamlessly.
 | 13 | `crystal` | faceted shards with a glow towards each facet's middle | yes |
 | 14 | `rock` | four big plates in three tones with faint seams, three bold ink cracks | yes |
 | 15 | `regolith` | dust: large soft blobs in two tones, two pebbles, no ink (unused since the terrain took its own shader) | yes |
+| 16 | `bands` | a broad band across V, a third of the repeat, at 1.0 on 0.62 (darker than the other layers' greys, so the band reads as a pulse), ink-edged on its leading side (towards smaller V, where a FLOW below 0.5 carries it); emission 1.0. For a beam or a conduit, where a flow reads as pulses travelling | yes |
 
 At the default UV scale a layer covers one world unit. Large surfaces take `hull` or `plate`:
 `hull_dense` is for parts under a unit, and on a large one it aliases into a checker at the widest
@@ -253,9 +254,10 @@ Commit the PNGs that changed. The gate does not run the generator.
 
 **Adding a layer.** Append it, never insert, so existing indices hold: a `_draw_<name>()` in the
 generator and the name at the end of its `LAYERS`, and the same name at the end of
-`MaterialKit.Layer` and `MaterialKit.LAYERS`. Run the generator, then the gate, which imports the
-new PNG and writes its `.import`; edit that file to `importer="image"` as the others are, run the
-gate again, and commit the PNG and its `.import`. The gallery checks that no vertex names a layer
+`MaterialKit.Layer` and `MaterialKit.LAYERS`; the field and the rock texture draw from seeds of
+their own (`FIELD_SEED`, `ROCK_SEED`), so they stay as they are. Run the generator, then the
+gate, which imports the new PNG and writes its `.import`; edit that file to `importer="image"` as
+the others are, run the gate again, and commit the PNG and its `.import`. The gallery checks that no vertex names a layer
 past the last.
 
 ## Surfaces: `Surf`
@@ -895,7 +897,7 @@ the development Mac is about 1.2 to 1.5 ms a frame on page 1 (118 models at once
 filter (0, 2 or 4 measure the same within that noise), since PCF costs on the GPU: 13 shadow
 taps a fragment near a shadow edge (fewer where the first taps agree), and the penumbra's dot
 screen a few more instructions in `light()`. The shadow map, 1024² at 16 bits, is 2 MB. The
-kit's texture array, sixteen 256×256 RGBA8 layers, is about 5.3 MB with its mipmaps; the field
+kit's texture array, seventeen 256×256 RGBA8 layers, is about 5.7 MB with its mipmaps; the field
 texture, one 1024×1024 RGBA8 image, is about 5.3 MB with its mipmaps too, and the ground and the
 terrain share it; the terrain's rock texture, one 512×512 RGBA8 image, is about 1.4 MB with its
 mipmaps. The terrain's shader has two samplers (the field texture and the rock texture) and takes

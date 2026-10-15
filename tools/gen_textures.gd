@@ -1,5 +1,5 @@
 extends SceneTree
-## Draws the material kit: the 16 layers of the Texture2DArray every building and the rocks are
+## Draws the material kit: the 17 layers of the Texture2DArray every building and the rocks are
 ## painted from (docs/reference/art-style.md, **The material kit**), saved as
 ## assets/textures/kit/<index>_<name>.png; the field texture the buildable ground and the terrain's
 ## marks are drawn from, assets/textures/field.png (**The field**); and the rock texture the
@@ -8,12 +8,12 @@ extends SceneTree
 ##
 ##   $GODOT --headless --path . -s res://tools/gen_textures.gd
 ##
-## Each layer is SIZE x SIZE RGBA8. RGB is the albedo: near-white greys (0.78 to 1.0, ink lines
-## at the ink colour) for the layers a tint multiplies, real colours for the fixed ones (hazard,
-## solar). A is the emission mask: 0 on plain surfaces, up to 1 where the surface glows. The
-## field texture is FIELD_SIZE square, an atlas of four tiles, and holds weights, not colours
-## (_draw_field); the rock texture is ROCK_SIZE square, a single tile in the same channels
-## (_draw_terrain_rock).
+## Each layer is SIZE x SIZE RGBA8. RGB is the albedo: near-white greys (0.78 to 1.0, the bands
+## layer's ground 0.62; ink lines at the ink colour) for the layers a tint multiplies, real
+## colours for the fixed ones (hazard, solar). A is the emission mask: 0 on plain surfaces, up to
+## 1 where the surface glows. The field texture is FIELD_SIZE square, an atlas of four tiles,
+## and holds weights, not colours (_draw_field); the rock texture is ROCK_SIZE square, a single
+## tile in the same channels (_draw_terrain_rock).
 ##
 ## Everything is drawn from SEED with SeededRng, so a run gives byte-identical PNGs. Every
 ## primitive wraps modulo the image's size, so every layer and the rock texture tile seamlessly;
@@ -69,8 +69,12 @@ const ROCK_PLATES := Vector2i(2, 3)
 ## The layers, in array order. MaterialKit.LAYERS must match.
 const LAYERS := [
 	"flat", "hull", "hull_dense", "plate", "vent", "pipe", "grating", "concrete",
-	"hazard", "solar", "glass", "glow", "screen", "crystal", "rock", "regolith",
+	"hazard", "solar", "glass", "glow", "screen", "crystal", "rock", "regolith", "bands",
 ]
+## The field's and the rock texture's seeds, fixed where the sixteen layers left them so a new
+## layer does not redraw them.
+const FIELD_SEED := SEED + 16
+const ROCK_SEED := SEED + 17
 const INK := Color("1b1a2e")
 const INK_WIDTH := 3.0
 const HAZARD_YELLOW := Color("ffd60a")
@@ -95,11 +99,11 @@ func _initialize() -> void:
 		call("_draw_" + layer_name)
 		if not _save(OUT_DIR.path_join("%02d_%s.png" % [index, layer_name])):
 			return
-	_begin(FIELD_SIZE, FIELD_SIZE, SEED + LAYERS.size())
+	_begin(FIELD_SIZE, FIELD_SIZE, FIELD_SEED)
 	_draw_field()
 	if not _save(FIELD_PATH):
 		return
-	_begin(ROCK_SIZE, ROCK_SIZE, SEED + LAYERS.size() + 1)
+	_begin(ROCK_SIZE, ROCK_SIZE, ROCK_SEED)
 	_draw_terrain_rock()
 	if not _save(ROCK_PATH):
 		return
@@ -409,6 +413,16 @@ func _draw_regolith() -> void:
 		_disc(spot - SUN * radius * 0.55, radius * 0.9, _grey(0.78))
 		_disc(spot, radius, _grey(0.88))
 		_disc(spot + SUN * radius * 0.3, radius * 0.5, _grey(1.0))
+
+
+## Broad bands across V for a flow to carry: each repeat a band a third of it at 1.0 on 0.62,
+## ink-edged on its leading side (its top: a FLOW at a phase below 0.5 carries the bands towards
+## smaller V), so a scrolling beam or conduit reads as pulses travelling. Fully emissive.
+func _draw_bands() -> void:
+	_fill(_grey(0.62))
+	_rect(0, 0, SIZE, SIZE / 3, _grey(1.0))
+	_rect(0, 0, SIZE, int(INK_WIDTH), INK)
+	_mask.fill(1.0)
 
 
 ## The ground's field texture: an atlas of four tiles (FIELD_TILES), TILE pixels square, which the
