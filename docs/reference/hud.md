@@ -4,6 +4,7 @@
 display and reports presses as signals; it never changes game state. `main.gd` wires the
 signals to `PlacementController` (`input-camera.md`). Two controls of its own draw in code:
 `HudIcon` (`hud_icon.gd`), the vector icons, and `DroneRing` (`drone_ring.gd`), the drones.
+`ModelPreview` (`model_preview.gd`), a node under it, renders the build cards' pictures.
 
 ## The touch rule
 
@@ -21,8 +22,8 @@ shows.
 The build cards are the one exception: they are `MOUSE_FILTER_PASS`, so a drag that starts on
 a card also reaches the `ScrollContainer` and scrolls the strip (with the default `STOP` it
 does not). The build panel's `PanelContainer` behind them is `STOP`, so a touch anywhere on the
-open panel never reaches the world. Each card's content (its stripe and a `VBoxContainer` of
-labels) is IGNORE, so the button itself is what a touch lands on.
+open panel never reaches the world. Each card's content (its stripe, its picture and a
+`VBoxContainer` of labels) is IGNORE, so the button itself is what a touch lands on.
 
 ## Theme
 
@@ -196,18 +197,19 @@ selected.
 
 **Cards.** Under the tabs, a horizontal `ScrollContainer` of cards, scrolled by a drag, with a
 thin scroll bar under it; to its right a column as wide as the Build button stays clear, since
-Build stays over the open panel at the safe area's corner. Every menu type gets a 200×120 card
+Build stays over the open panel at the safe area's corner. Every menu type gets a 200×176 card
 when the HUD is built; a tab only shows or hides them. A card is a card-filled button with the
 ink border and shadow, its category's stripe (6 px, `CATEGORY_STRIPE`) along its top inside the
-border, and three centred lines:
+border, the building's picture (84×84, `PREVIEW_SIZE`; **Pictures**), and three centred lines
+under it:
 
 1. the display name (Lilita One 20 px, white, a 2 px ink outline);
 2. the level 1 cost, each amount in its resource's colour (`resource_color`, the text colour
    when there is none), or "Free" (18 px);
 3. the status: `"built / max"` (16 px, dim), from `state.count_of(type)` and
    `catalog.max_count(type, state.cc_level())`, when `state.check_can_build(type)` passes; else
-   the reason (15 px, dim), and the card is disabled: the disabled fill, its name and cost at
-   55 %:
+   the reason (15 px, dim), and the card is disabled: the disabled fill, its picture, name and
+   cost at 55 %:
 
 | `check_can_build` | Status line |
 | --- | --- |
@@ -221,6 +223,22 @@ A type the Command Center has not unlocked (`max_count` 0 at the current level) 
 listed, disabled with its "Needs Command Center N" line. Pressing a card closes the panel and
 emits `build_pressed(type)`; a drag across the strip scrolls it and presses nothing. The walls
 tab's Barrier Wall is a card like any other, and placement paints it (`input-camera.md`).
+
+**Pictures.** `ModelPreview` renders each type's level 1 model (`BuildingModels.create`) into a
+160×160 texture once and keeps it for the session. It owns one `SubViewport` with a world of its
+own (`own_world_3d`), a transparent background and 4× MSAA: an orthographic camera at the world's
+angle (`IsoCamera.PITCH_DEG`, `YAW_DEG`) framing the model's bounds with 8 % to spare on each
+side, the key light from `main.gd`'s direction and colour with no shadow, and an environment with
+no ambient and linear tonemapping. The models keep the world's toon materials; their outlines take
+a copy of the ink material whose `ink_px` is scaled by 720 / 160, so the line is as many pixels on
+the texture as it is on a 720p screen. A moving part stands where `Motion.transform_at(0)` puts
+it. It renders one model a frame, and only while the panel is open: a frame puts the model in front
+of the camera and has the viewport draw once (`UPDATE_ONCE`), the next reads the image back into
+an `ImageTexture`, caches it by type and hands it to the card. Opening the panel, and selecting a
+tab while it is open, moves that tab's types to the front of the queue, so the visible cards fill
+first. A card shows no picture, only its stripe, until its own is ready. Once every type is
+cached the viewport is freed and the node stops processing, so the panel costs nothing more per
+frame. A headless run draws nothing: the queue is gone through but no picture is made.
 
 ## Info panel
 
@@ -291,9 +309,10 @@ Read-only, so a scenario never reads a private member (`tools/harness/README.md`
 `build_button()` is the Build button; `is_menu_open()` whether the build panel is open or opening;
 `build_panel()` the panel itself; `close_button()` the panel's close button;
 `tab_button(category)` and `entry_button(type)` return the tab's and the card's `Button`;
-`entry_status(type)` is a card's status line; `entry_strip()` the `ScrollContainer` the cards
-scroll in; `resource_panel(res)` is the top bar's meter for a
-resource and `resource_fill(res)` its fill, whose parent is the track it grows across;
+`entry_status(type)` is a card's status line; `entry_preview(type)` its picture (null until
+rendered); `previews_done()` whether every type's picture has been made (in a headless run,
+gone through); `entry_strip()` the `ScrollContainer` the cards scroll in; `resource_panel(res)`
+is the top bar's meter for a resource and `resource_fill(res)` its fill, whose parent is the track it grows across;
 `place_button()` is the place bar's `Place` (or `Done`); `drones_panel()` is the `DroneRing`,
 whose `free_count()` and `total_count()` are the counts it shows; `reset_button()` and
 `template_button()` are the debug row's Reset base and Template base (null in a release build).

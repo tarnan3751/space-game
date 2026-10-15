@@ -76,7 +76,9 @@ const BORDER := 3
 const BUTTON_MARGIN := 6.0
 const TAB_SIZE := Vector2(140, 48)
 const CLOSE_SIZE := Vector2(48, 48)
-const CARD_SIZE := Vector2(200, 120)
+const CARD_SIZE := Vector2(200, 176)
+## The building's picture at the top of a card (ModelPreview), shown at this size.
+const PREVIEW_SIZE := Vector2(84, 84)
 ## The category stripe along a card's top, inside its border.
 const STRIPE_HEIGHT := 6
 const BUILD_SIZE := Vector2(128, 64)
@@ -130,7 +132,10 @@ var _tab_buttons: Dictionary[String, Button] = {}
 var _entry_scroll: ScrollContainer
 var _strip_tween: Tween
 var _entries: Dictionary[String, Button] = {}
-## Each card's name and cost, dimmed while it cannot be built.
+## Each card's picture of its building, empty until ModelPreview has rendered it.
+var _entry_preview: Dictionary[String, TextureRect] = {}
+var _preview: ModelPreview
+## Each card's picture, name and cost, dimmed while it cannot be built.
 var _entry_heading: Dictionary[String, Control] = {}
 ## Each card's last line: built / max, or why it cannot be built.
 var _entry_status: Dictionary[String, Label] = {}
@@ -316,6 +321,16 @@ func entry_status(type: String) -> String:
 	return _entry_status[type].text
 
 
+## A card's picture of its building; null until it is rendered.
+func entry_preview(type: String) -> Texture2D:
+	return _entry_preview[type].texture
+
+
+## Whether every card's picture has been rendered (in a headless run, attempted: nothing draws).
+func previews_done() -> bool:
+	return _preview.is_done()
+
+
 ## The horizontal strip the cards scroll in.
 func entry_strip() -> ScrollContainer:
 	return _entry_scroll
@@ -382,6 +397,10 @@ func _slide_menu(open: bool) -> void:
 			_menu.show()
 		if _state != null:
 			_refresh_entries(_state)
+	# The cards' pictures render while the panel is open, the selected tab's first.
+	if open:
+		_preview.prioritize(_tab_types(_tab))
+	_preview.run(open)
 	_menu_tween = create_tween()
 	var target := bottom - _menu.size.y if open else bottom
 	_menu_tween.tween_property(_menu, "position:y", target, MENU_OPEN_SECONDS if open else MENU_CLOSE_SECONDS) \
@@ -438,6 +457,7 @@ func _select_tab(category: String) -> void:
 	_entry_scroll.scroll_horizontal = 0
 	if _state != null and _menu_open:
 		_refresh_entries(_state)
+		_preview.prioritize(_tab_types(category))
 
 
 ## A press on the selected tab scrolls its strip back to the start; on another, selects it.
@@ -450,6 +470,19 @@ func _on_tab_pressed(category: String) -> void:
 	_strip_tween = create_tween()
 	_strip_tween.tween_property(_entry_scroll, "scroll_horizontal", 0, STRIP_RETURN_SECONDS) \
 		.set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_OUT)
+
+
+## The menu's types in a category, in menu_order order.
+func _tab_types(category: String) -> PackedStringArray:
+	var types := PackedStringArray()
+	for type: String in _catalog.menu_order:
+		if _catalog.category_of(type) == category:
+			types.append(type)
+	return types
+
+
+func _on_preview_rendered(type: String, texture: Texture2D) -> void:
+	_entry_preview[type].texture = texture
 
 
 func _refresh_info(state: BaseState, building: BuildingState) -> void:
@@ -712,6 +745,10 @@ func _build_menu() -> void:
 	room.add_child(cards)
 	for type: String in _catalog.menu_order:
 		cards.add_child(_build_entry(type))
+	_preview = ModelPreview.new()
+	_preview.setup(_catalog, _catalog.menu_order)
+	_preview.rendered.connect(_on_preview_rendered)
+	add_child(_preview)
 	# The Build button stays over the open panel at the safe area's corner; nothing goes under it.
 	var clear := Control.new()
 	clear.mouse_filter = Control.MOUSE_FILTER_IGNORE
@@ -720,8 +757,9 @@ func _build_menu() -> void:
 	_select_tab(_catalog.categories[0])
 
 
-## A card: the category's stripe along its top, then three lines: the name, the level 1
-## cost (each amount in its resource's colour), and the status line `_refresh_entries` fills.
+## A card: the category's stripe along its top, then the building's picture (ModelPreview's,
+## empty until it is rendered), and three lines: the name, the level 1 cost (each amount in its
+## resource's colour), and the status line `_refresh_entries` fills.
 func _build_entry(type: String) -> Button:
 	var button := _button("", CARD_SIZE)
 	# PASS, so a drag that starts on a card reaches the ScrollContainer and scrolls the
@@ -753,6 +791,13 @@ func _build_entry(type: String) -> Button:
 	heading.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	heading.add_theme_constant_override("separation", 0)
 	content.add_child(heading)
+	var preview := TextureRect.new()
+	preview.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	preview.custom_minimum_size = PREVIEW_SIZE
+	preview.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	preview.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+	heading.add_child(preview)
+	_entry_preview[type] = preview
 	var name_label := _card_label(heading, _catalog.display_name(type), &"CardName")
 	name_label.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
 	var cost_row := HBoxContainer.new()

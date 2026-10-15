@@ -853,8 +853,12 @@ draw once and never cast. Measured with `Performance.RENDER_TOTAL_DRAW_CALLS_IN_
 base is 48 draw calls with the HUD's build panel closed (46 before the perimeter gained its
 hologram fence and its shadow; earlier, 63 with the always-visible build bar it replaced, 57 of
 those before the environment's curb, terrain outline and outcrops). The panel
-costs only while it is open: a fresh base with it open is 100 draw calls on a full tab
-(resources, army, defence), 86 on traps and 68 on walls. The model gallery's overview is 565
+costs only while it is open: a fresh base with it open is 110 draw calls on a full tab
+(resources, army, defence), 94 on traps and 73 on walls, the cards' pictures included (100, 86
+and 68 before them). The pictures cost one 160×160 render per type, one a frame, the first time
+the panel opens, each read back into a 100 KB texture (about 3 MB for today's menu), and
+nothing per frame once every type is cached and the preview's viewport is freed (`hud.md`,
+**Pictures**). The model gallery's overview is 565
 draw calls on page 1 and 217 on page 2 with every type animated (362 and 158 before the
 animation pass, when nine types had one spinner each; 381 and 177 with the build bar, 375 and
 171 before the environment, 294 and 157 before the kit): every moving part is two more draws

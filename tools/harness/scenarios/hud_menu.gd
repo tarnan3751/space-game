@@ -1,7 +1,7 @@
 extends HarnessScenario
 ## The HUD on a fresh base: the meters and drone ring, the Build button and the panel it slides
-## up (tabs, cards, the selected tab pressed again, close button), a card picked into the place
-## bar, a purchase, a wide window.
+## up (tabs, cards and their pictures, the selected tab pressed again, close button), a card
+## picked into the place bar, a purchase, a wide window.
 ## Touches are real input events (Input.parse_input_event), so they take a finger's path.
 
 var _world_taps: int = 0
@@ -35,6 +35,22 @@ func run(main: MainScript) -> void:
 				shown.append(type)
 		check(shown == expected, "the %s tab shows %s" % [category, ", ".join(shown)])
 		await screenshot("open-" + category)
+
+	# Every card's picture is rendered within a second of the panel opening. A headless run draws
+	# nothing, so it checks only that every type was gone through.
+	await _wait(main, 1.0)
+	check(hud.previews_done(), "the pictures are done a second after the panel opened")
+	if DisplayServer.get_name() != "headless":
+		var missing := PackedStringArray()
+		for type: String in catalog.menu_order:
+			if hud.entry_preview(type) == null:
+				missing.append(type)
+		check(missing.is_empty(), "every card has its picture (missing: %s)" % ", ".join(missing))
+	for category: String in catalog.categories:
+		await _tap(main, hud.tab_button(category).get_global_rect().get_center())
+		await frames(2)
+		say("panel open on %s: %d draw calls" % [category, Performance.get_monitor(Performance.RENDER_TOTAL_DRAW_CALLS_IN_FRAME)])
+		await screenshot("pictures-" + category)
 
 	# A press on the selected tab scrolls its strip back to the start, animated.
 	var first: String = catalog.categories[0]

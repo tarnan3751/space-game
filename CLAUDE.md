@@ -121,7 +121,7 @@ scenes/          main.tscn only
 src/core/        catalog, base_state, building_state, base_grid, seeded_rng
 src/game/        main, template_base, iso_camera, world_input, placement_controller, base_view,
                  building_view, construction_drone, building_models, wall_mesh, low_poly_mesh, surf,
-                 motion, material_kit, hud, hud_icon, drone_ring, format, toon.gdshader,
+                 motion, material_kit, hud, hud_icon, drone_ring, format, model_preview, toon.gdshader,
                  toon_common.gdshaderinc, effects.gdshaderinc, ink.gdshader, holo.gdshader,
                  ground.gdshader, terrain.gdshader, field_marks.gdshaderinc
 src/game/models/ parts (the model being built, shared helpers and surfaces), then one file of
