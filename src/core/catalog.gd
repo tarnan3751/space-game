@@ -6,6 +6,10 @@ extends RefCounted
 ##
 ## JSON numbers parse as floats in Godot, so every whole number is converted to
 ## int on load. Everything handed out by this class is int, never float.
+##
+## The one exception to read-only is apply_dev_cheats(), which a debug build of the game
+## calls once after loading (main.gd): every level becomes free and builds in one second at
+## most. BaseState never knows, so a save made under the cheats is an ordinary save.
 
 const RULES_PATH := "res://data/rules.json"
 const BUILDINGS_PATH := "res://data/buildings.json"
@@ -129,6 +133,18 @@ func max_count(type: String, cc_level: int) -> int:
 ## The Command Center's level count: the length of every max_count list.
 func max_cc_level() -> int:
 	return max_level(HQ_TYPE)
+
+
+## Debug builds only: every level of every type costs nothing, and one that takes time
+## builds in one second. An instant level stays instant, so walls still need no builder and
+## paint as fast as the finger moves. Nothing else changes, so the Command Center still
+## gates levels and counts. Call it once, on a catalog that loaded cleanly.
+func apply_dev_cheats() -> void:
+	for type: String in _buildings:
+		var levels: Array = _def(type)["levels"]
+		for stats: Dictionary in levels:
+			stats["cost"] = {}
+			stats["build_seconds"] = mini(int(stats["build_seconds"]), 1)
 
 
 func _def(type: String) -> Dictionary:

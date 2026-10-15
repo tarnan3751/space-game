@@ -96,6 +96,46 @@ func test_display_fields() -> void:
 	assert_eq(catalog.level_stats("hangar", 2)["capacity"], 30)
 
 
+func test_dev_cheats_make_every_level_free_and_one_second_at_most() -> void:
+	var catalog := Fixtures.catalog()
+	var before := Fixtures.catalog()
+	catalog.apply_dev_cheats()
+	for type: String in catalog.types():
+		for cc: int in range(1, catalog.max_cc_level() + 1):
+			assert_eq(catalog.max_count(type, cc), before.max_count(type, cc), "%s max_count at CC %d" % [type, cc])
+		for level: int in range(1, catalog.max_level(type) + 1):
+			var stats := catalog.level_stats(type, level)
+			var original := before.level_stats(type, level)
+			var where := "%s level %d" % [type, level]
+			for res: String in catalog.resources:
+				assert_eq(_amount(stats, "cost", res), 0, "%s costs %s" % [where, res])
+			# A level that takes time takes one second; an instant one stays instant.
+			assert_eq(stats["build_seconds"], mini(int(original["build_seconds"]), 1), where)
+			# Every other field (requires_cc, storage, produces, builders...) is untouched.
+			var rest := stats.duplicate()
+			var original_rest := original.duplicate()
+			for field: String in ["cost", "build_seconds"]:
+				rest.erase(field)
+				original_rest.erase(field)
+			assert_eq(rest, original_rest, "%s apart from cost and build_seconds" % where)
+
+
+func test_dev_cheats_let_a_base_build_what_it_cannot_afford() -> void:
+	var catalog := Fixtures.catalog()
+	var state := BaseState.create_new(catalog, 0)
+	state.resources["crystal"] = 50
+	assert_eq(state.check_place("extractor", Vector2i(5, 5)), BaseState.ERR_FUNDS)
+	catalog.apply_dev_cheats()
+	assert_eq(state.apply({"op": "place", "type": "extractor", "cell": [5, 5]}, 0), "")
+	assert_eq(state.resources["crystal"], 50, "nothing was paid")
+	var extractor: BuildingState = state.buildings[state.last_added_id]
+	assert_true(extractor.is_busy(), "under construction")
+	assert_eq(state.seconds_left(extractor.id), 1)
+	state.advance_to(1)
+	assert_false(extractor.is_busy(), "finished one second later")
+	assert_eq(extractor.level, 1)
+
+
 func test_validation_reports_unknown_resources() -> void:
 	var rules := FileAccess.get_file_as_string(Fixtures.RULES)
 	var buildings := '{"command_center": {"size": 2, "max_count": [1], "levels": [' \
