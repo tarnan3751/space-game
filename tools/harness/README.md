@@ -212,7 +212,11 @@ never shows: marched in half-unit steps over `BaseView.terrain_height`, it must 
 terrain's extent above the ground (not under its raised outer edge) and meet the ground before it
 leaves; and in a 1400x400 window (3.5:1), focused on the field's nearest corner, it does not, so
 that view shows the sky. Those checks are worked out from `BaseView` and the camera's transform, so they hold
-headless. It screenshots the start zoom, the closest zoom on the field (its marks and the grid),
+headless. One check runs rendered only (headless it logs that it skipped): on the widest shot in
+the 1560x720 window, the average colour of an 80x40 pixel box round the centre of each of the
+field's four quarters (clear of the buildings) and round two flat stretches of the ring agree
+within 0.01 in HSL lightness and 0.02 in saturation, so the field renders in the ring's shade
+(**Colour**); it prints both. It screenshots the start zoom, the closest zoom on the field (its marks and the grid),
 the closest zoom on a point where four of the field texture's tiles meet (`tile-corner`, where
 nothing should show the tiles' edges), a wider stretch of the field at camera size 12 (`tiles`),
 the perimeter at the middle of each side of the field at size 16 (`edge-top-left`, `edge-top-right`,

@@ -196,24 +196,28 @@ The field's and the terrain's roles are picked so that, under the warm key light
 textures, they render as the art direction asks: each is bluer and more saturated than it shows.
 The rendered column is the average over flat ground at the widest zoom (the `environment`
 scenario's widest shot, measured in HSL): the field as a whole, ground, marks and grid together,
-over each quarter of it clear of the HUD and the buildings; and the ring's flat dust. The field is
-the lighter, cooler plain; the ring the deeper, more saturated land round it; the buildings' hulls
-the lightest things on screen.
+over each quarter of it clear of the HUD and the buildings; and the ring's flat dust. The field
+renders in the ring's shade, within 0.01 in L and 0.02 in S (the `environment` scenario checks it,
+rendered): it reads as a plain of its own by its marks and its grid, and the kerb and the field's
+ink line are its border, not its tone. The buildings' hulls are the lightest things on screen.
 
 | Role | Constant | Value | Rendered | Where |
 | --- | --- | --- | --- | --- |
-| Field dust | `FIELD` | `543FCC` | the field: `5B509F` to `5F54A6` (L 0.47 to 0.49, S 0.33) | the field's dust, covering the ground at 60 %; the most saturated, as the plate tint greys it |
-| Field light | `FIELD_LIGHT` | `827FD7` | | the lit sides of the field's marks (crater walls, pebbles, shards), its light tones |
-| Field dark | `FIELD_DARK` | `4D479F` | | the shadow sides of the field's marks, its dark tones (crater and pit floors) |
-| Field plate | `FIELD_PLATE` | `8083C3` | | the levelled ground under the dust (a cooler grey-violet) |
+| Field dust | `FIELD` | `4A35D0` | the field: `5445A8` to `5848AF` (L 0.47 to 0.48, S 0.42) | the field's dust, covering the ground at 60 %; the most saturated, as the plate tint greys it |
+| Field light | `FIELD_LIGHT` | `746CDB` | | the lit sides of the field's marks (crater walls, pebbles, shards), its light tones |
+| Field dark | `FIELD_DARK` | `443BA2` | | the shadow sides of the field's marks, its dark tones (crater and pit floors) |
+| Field plate | `FIELD_PLATE` | `726FC7` | | the levelled ground under the dust (a cooler grey-violet) |
 | Terrain | `TERRAIN` | `564AC5` | the ring's flats, marks and grain included: `5346A2` to `5747AE` (L 0.46 to 0.48, S 0.40 to 0.42) | the ring's dust |
 | Terrain light | `TERRAIN_LIGHT` | `7A73E3` | | the lit side of slopes over 25 degrees; the light sides and tones of the ring's marks, the lit sides of its ripples |
 | Terrain dark | `TERRAIN_DARK` | `3E388C` | | crater floors and the shadow side of slopes over 18 degrees; the dark sides and tones of the ring's marks, the shaded sides of its ripples, the strata's undersides |
 | Rock | `ROCK` | `50619B` | | slopes over 35 degrees (crater walls, mesa sides), the scenery rocks' sides, the crystal harvester's rock bed |
 | Rock lit | `ROCK_LIT` | `768BC9` | | the scenery rocks' chamfers and tops; the strata's lit top edges, light bands and outcrop plates |
 
-The field's row is lighter than when ink seams ran between its tiles: away from where they ran
-the plain renders as it did (L 0.485 against 0.486). The ring's row was re-measured when its
+The field's roles were moved to the ring's shade from a lighter, paler plain that rendered
+`5F52A5` to `6355AC` (L 0.48 to 0.50, S 0.34): all four scaled per channel, in linear light, by
+the ring's flats over the field's average, so the marks keep their contrast against the plain.
+Measured over the same four quarters and two flat stretches of the ring (`5646AC`, `5747AD`), the
+field now averages L 0.477, S 0.417 against the ring's L 0.478, S 0.420. The ring's row was re-measured when its
 surface was drawn (marks, ripples, strata): over the same three stretches of flat ring the
 untextured ring rendered `5547A6` to `5A4CA8` (L 0.46 to 0.48, S 0.38 to 0.40), and the field's
 four quarters rendered pixel for pixel as before. The perimeter's kerb is `CONCRETE`, its
@@ -701,7 +705,7 @@ building; the paint brush is a ghost and keeps plain ink.
 ## Environment
 
 The ground and everything round it, drawn in the buildings' language: a levelled, lit landing
-plain inside a deeper, wilder landscape, so the base reads as a settlement. `BaseView.setup`
+plain inside a wilder landscape of the same ground, so the base reads as a settlement. `BaseView.setup`
 builds it all once; the terrain, the rocks and the outcrops come from `SeededRng` on
 `SCENERY_SEED` (7), so every base sits in the same landscape (`input-camera.md`, **BaseView**).
 

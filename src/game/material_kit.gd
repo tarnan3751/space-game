@@ -46,13 +46,13 @@ const ARC_BLUE := Color("5b8cff")
 ## the terrain's roles are picked so that, under the warm key light and over their textures, they
 ## render at the art style's colours (docs/reference/art-style.md, **Colour**): bluer and more
 ## saturated than they show. FIELD covers the ground at 60 percent, so it is the most saturated.
-const FIELD := Color("543fcc")
-const FIELD_LIGHT := Color("827fd7")
-const FIELD_DARK := Color("4d479f")
-const FIELD_PLATE := Color("8083c3")
-## The terrain around the field, a shade deeper: its dust, its lit slopes and the light sides of
-## its marks and ripples, and its crater floors, shadow sides and the dark sides of its marks,
-## ripples and strata; and rock, its faces, and its lit faces and strata.
+const FIELD := Color("4a35d0")
+const FIELD_LIGHT := Color("746cdb")
+const FIELD_DARK := Color("443ba2")
+const FIELD_PLATE := Color("726fc7")
+## The terrain around the field, rendering in the field's shade: its dust, its lit slopes and the
+## light sides of its marks and ripples, and its crater floors, shadow sides and the dark sides of
+## its marks, ripples and strata; and rock, its faces, and its lit faces and strata.
 const TERRAIN := Color("564ac5")
 const TERRAIN_LIGHT := Color("7a73e3")
 const TERRAIN_DARK := Color("3e388c")

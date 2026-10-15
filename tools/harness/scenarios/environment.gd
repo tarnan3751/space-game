@@ -10,12 +10,14 @@ extends HarnessScenario
 ## the relief is full (BaseView.blend_end) wanders by more than BLEND_WANDER; that at the widest
 ## zoom in a WIDE window, the focus at each corner of its bounds, the ray from every screen corner
 ## meets the terrain; and that in a WIDER window, focused on the field's nearest corner, it does
-## not, so the sky shows. Screenshots: the start zoom, the closest on the field, the closest on a
-## point where four of the field texture's tiles meet (nothing should show where they do), a wider
-## stretch of the field, the perimeter at the middle of each side, a side and a corner of it at the
-## closest zoom, the widest in the WIDE window and in the WIDER one on the nearest corner (stars
-## beyond the ring, no bare colour), the widest in the WIDEST one on the field's left corner (the
-## sky's haze band beyond the ring's lower left), a crater, an outcrop and the first mesa's wall centred
+## not, so the sky shows; and, rendered only, that in the widest shot the field's quarters and two
+## flat stretches of the ring average to the same shade (_check_field_shade). Screenshots: the
+## start zoom, the closest on the field, the closest on a point where four of the field texture's
+## tiles meet (nothing should show where they do), a wider stretch of the field, the perimeter at
+## the middle of each side, a side and a corner of it at the closest zoom, the widest in the WIDE
+## window and in the WIDER one on the nearest corner (stars beyond the ring, no bare colour), the
+## widest in the WIDEST one on the field's left corner (the sky's haze band beyond the ring's lower
+## left), a crater, an outcrop and the first mesa's wall centred
 ## (its foot and rim), then the mesa wider (for the perimeter, the crater, the outcrop and the mesa
 ## the camera's bounds are widened, as a player cannot centre the view off the field).
 
@@ -30,6 +32,15 @@ const WIDE := Vector2i(1560, 720)
 const WIDER := Vector2i(1400, 400)
 ## Wider still (4:1), for the sky's haze band beyond the ring's lower left.
 const WIDEST := Vector2i(1600, 400)
+## The field's shade against the ring's in the widest shot: the centres of the field's four
+## quarters (clear of the buildings), two flat stretches of the ring, the box averaged round each
+## in pixels, and how far the two averages may differ in HSL lightness and saturation.
+const FIELD_QUARTERS: Array[Vector3] = [Vector3(-10, 0, -10), Vector3(10, 0, -10), Vector3(10, 0, 10),
+	Vector3(-10, 0, 10)]
+const RING_FLATS: Array[Vector3] = [Vector3(9, 0, -26.5), Vector3(26, 0, -9.5)]
+const SHADE_BOX := Vector2i(80, 40)
+const SHADE_L := 0.01
+const SHADE_S := 0.02
 
 
 func run(main: MainScript) -> void:
@@ -122,6 +133,7 @@ func run(main: MainScript) -> void:
 		check(_ring_fills_view(view, main.camera, float(WIDE.x) / WIDE.y),
 			"the ring fills a %s view at the widest zoom focused on %s" % [WIDE, corner])
 	await _shot(main, "widest-wide", Vector3.ZERO, IsoCamera.MAX_ZOOM_SIZE)
+	_check_field_shade(main)
 	main.get_window().size = WIDER
 	main.camera.focus = Vector3(field.end.x, 0.0, field.end.y)
 	main.camera.nudge(Vector3.ZERO)
@@ -143,6 +155,34 @@ func run(main: MainScript) -> void:
 	await _shot(main, "mesa", facing, IsoCamera.MIN_ZOOM_SIZE)
 	await _shot(main, "mesas", Vector3(mesa.x, mesa.w * 0.5, mesa.y), 24.0)
 	main.camera.bounds = field
+
+
+## Whether the field renders in the ring's shade (docs/reference/art-style.md, **Colour**): the
+## average colour of SHADE_BOX round each of FIELD_QUARTERS and of RING_FLATS on the frame just
+## shown, each in sRGB, agree within SHADE_L in HSL lightness and SHADE_S in saturation. A
+## rendered run only: a headless one draws nothing.
+func _check_field_shade(main: MainScript) -> void:
+	if harness.headless:
+		say("the field's shade against the ring's skipped (headless)")
+		return
+	var image := main.get_viewport().get_texture().get_image()
+	var scale := Vector2(image.get_size()) / main.get_viewport().get_visible_rect().size
+	var hsl: Array[Vector2] = []
+	for spots: Array[Vector3] in [FIELD_QUARTERS, RING_FLATS]:
+		var sum := Color(0, 0, 0)
+		for at: Vector3 in spots:
+			var corner := Vector2i(main.camera.unproject_position(at) * scale) - SHADE_BOX / 2
+			for y: int in SHADE_BOX.y:
+				for x: int in SHADE_BOX.x:
+					sum += image.get_pixelv(corner + Vector2i(x, y))
+		var average := sum / float(spots.size() * SHADE_BOX.x * SHADE_BOX.y)
+		var high := maxf(average.r, maxf(average.g, average.b))
+		var low := minf(average.r, minf(average.g, average.b))
+		var lightness := (high + low) * 0.5
+		hsl.append(Vector2(lightness, (high - low) / (1.0 - absf(2.0 * lightness - 1.0))))
+	check(absf(hsl[0].x - hsl[1].x) <= SHADE_L and absf(hsl[0].y - hsl[1].y) <= SHADE_S,
+		"in the widest shot the field renders L %.3f S %.3f, the ring's flats L %.3f S %.3f"
+		% [hsl[0].x, hsl[0].y, hsl[1].x, hsl[1].y])
 
 
 ## How far a point lies outside the field along x and along z (0 within its span).
