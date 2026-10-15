@@ -67,11 +67,13 @@ const GHOST_MIX := 0.65
 
 const TOON_SHADER := preload("res://src/game/toon.gdshader")
 const INK_SHADER := preload("res://src/game/ink.gdshader")
+const HOLO_SHADER := preload("res://src/game/holo.gdshader")
 
 static var _texture: Texture2DArray
 static var _toon: ShaderMaterial
 static var _ink: ShaderMaterial
 static var _ink_selected: ShaderMaterial
+static var _holo: ShaderMaterial
 static var _ghost_valid: ShaderMaterial
 static var _ghost_invalid: ShaderMaterial
 
@@ -109,6 +111,15 @@ static func ink_selected() -> ShaderMaterial:
 	if _ink_selected == null:
 		_ink_selected = _ink_material(CORE_GOLD)
 	return _ink_selected
+
+
+## The hologram surface of a kit mesh: its HOLO parts, transparent and unlit.
+static func holo() -> ShaderMaterial:
+	if _holo == null:
+		_holo = ShaderMaterial.new()
+		_holo.shader = HOLO_SHADER
+		_holo.set_shader_parameter("kit", texture())
+	return _holo
 
 
 ## The body of a placement ghost on a free spot.

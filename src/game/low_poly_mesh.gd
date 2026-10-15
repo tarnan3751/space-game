@@ -1,8 +1,9 @@
 class_name LowPolyMesh
 extends RefCounted
 ## Builds a model out of simple parts painted from the material kit
-## (docs/reference/art-style.md): the body mesh, drawn with MaterialKit.toon(), and its ink
-## outline, a second mesh drawn with MaterialKit.ink(). Both are unindexed triangle lists.
+## (docs/reference/art-style.md): the body mesh, drawn with MaterialKit.toon() (its HOLO parts in
+## a second surface on MaterialKit.holo()), and its ink outline, a second mesh drawn with
+## MaterialKit.ink(). Both are unindexed triangle lists.
 ##
 ## A part is placed by `pos`, the centre of its base (an orb's centre), and `rot`, Euler
 ## degrees applied Z, then X, then Y (Godot's default order); its size arguments scale it.
@@ -41,22 +42,31 @@ var _outlined := PackedByteArray()
 var _hard := PackedByteArray()
 
 
-## Triangles in the body mesh.
+## Triangles in the body mesh, both surfaces.
 func triangle_count() -> int:
 	return _vertices.size() / 3
 
 
-## The body, with the toon material. Call once the parts are added.
+## The body: the opaque parts on the toon material, then, when there are any, the HOLO parts
+## on the hologram material, each a surface; with no opaque part the holograms are surface 0.
+## Call once the parts are added.
 func to_mesh() -> ArrayMesh:
 	var mesh := ArrayMesh.new()
-	mesh.add_surface_from_arrays(Mesh.PRIMITIVE_TRIANGLES, to_arrays())
-	mesh.surface_set_material(0, MaterialKit.toon())
+	var opaque := to_arrays()
+	if not (opaque[Mesh.ARRAY_VERTEX] as PackedVector3Array).is_empty():
+		mesh.add_surface_from_arrays(Mesh.PRIMITIVE_TRIANGLES, opaque)
+		mesh.surface_set_material(mesh.get_surface_count() - 1, MaterialKit.toon())
+	if _has_holo():
+		mesh.add_surface_from_arrays(Mesh.PRIMITIVE_TRIANGLES, _select(true))
+		mesh.surface_set_material(mesh.get_surface_count() - 1, MaterialKit.holo())
 	return mesh
 
 
-## The body's surface arrays (vertex, normal, UV, UV2, colour), for a caller that merges
-## meshes itself (WallMesh).
+## The opaque body's surface arrays (vertex, normal, UV, UV2, colour), for a caller that merges
+## meshes itself (WallMesh); HOLO parts are left out.
 func to_arrays() -> Array:
+	if _has_holo():
+		return _select(false)
 	var arrays := []
 	arrays.resize(Mesh.ARRAY_MAX)
 	arrays[Mesh.ARRAY_VERTEX] = _vertices
@@ -105,6 +115,38 @@ func to_outline_arrays() -> Array:
 	arrays.resize(Mesh.ARRAY_MAX)
 	arrays[Mesh.ARRAY_VERTEX] = vertices
 	arrays[Mesh.ARRAY_NORMAL] = normals
+	arrays[Mesh.ARRAY_TEX_UV2] = uv2s
+	arrays[Mesh.ARRAY_COLOR] = colors
+	return arrays
+
+
+## Whether any part is a hologram.
+func _has_holo() -> bool:
+	for uv2: Vector2 in _uv2s:
+		if (roundi(uv2.y) & Surf.HOLO) != 0:
+			return true
+	return false
+
+
+## The surface arrays of the HOLO triangles (`holo`) or of the others.
+func _select(holo: bool) -> Array:
+	var vertices := PackedVector3Array()
+	var normals := PackedVector3Array()
+	var uvs := PackedVector2Array()
+	var uv2s := PackedVector2Array()
+	var colors := PackedColorArray()
+	for i: int in _vertices.size():
+		if ((roundi(_uv2s[i].y) & Surf.HOLO) != 0) == holo:
+			vertices.append(_vertices[i])
+			normals.append(_normals[i])
+			uvs.append(_uvs[i])
+			uv2s.append(_uv2s[i])
+			colors.append(_colors[i])
+	var arrays := []
+	arrays.resize(Mesh.ARRAY_MAX)
+	arrays[Mesh.ARRAY_VERTEX] = vertices
+	arrays[Mesh.ARRAY_NORMAL] = normals
+	arrays[Mesh.ARRAY_TEX_UV] = uvs
 	arrays[Mesh.ARRAY_TEX_UV2] = uv2s
 	arrays[Mesh.ARRAY_COLOR] = colors
 	return arrays
