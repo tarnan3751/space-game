@@ -1,7 +1,8 @@
 class_name BuildingView
 extends Node3D
 ## Visual for one building: its model (or a scaffold while first being built), a
-## footprint tile for selection/placement feedback, and a floating timer label.
+## footprint tile for selection/placement feedback, and a floating timer label, raised above
+## the construction drone's flight while one works over the site.
 ## Holds no game state; BaseView and PlacementController push state into it.
 ##
 ## The meshes are shared, so a state shows by overriding an instance's material with another
@@ -26,6 +27,9 @@ const LIFT_HEIGHT := 0.35
 ## outline_size out): about 2 px of ink round the text at the starting zoom.
 const LABEL_FONT_SIZE := 48
 const LABEL_OUTLINE_SIZE := 20
+## While a drone works over the site, the label's centre sits this far above the highest point
+## the drone reaches, so the text never overlaps its flight.
+const LABEL_OVER_DRONE := 0.5
 
 var building_id: int = 0
 var building_type: String = ""
@@ -98,7 +102,7 @@ func setup(id: int, type: String, level: int, size: int) -> void:
 	_label.pixel_size = 0.016
 	_label.modulate = Hud.TEXT
 	_label.outline_modulate = Hud.INK
-	_label.position = Vector3(0, 1.4 + size * 0.4, 0)
+	_label.position = Vector3(0, _label_height(), 0)
 	add_child(_label)
 
 	set_footprint(Footprint.NONE)
@@ -121,6 +125,7 @@ func show_status(level: int, busy: bool, target_level: int, seconds_left: int) -
 		_drone = ConstructionDrone.new()
 		_drone.setup(building_id, footprint_size, _scaffold if level < 1 else _model)
 		add_child(_drone)
+		_place_label()
 		set_process(true)
 	elif not busy and _drone != null:
 		_drone.leave(site_height())
@@ -152,13 +157,17 @@ func is_model_visible() -> bool:
 
 
 ## Raised slightly while being dragged, so it reads as "picked up", with gold outlines (a
-## ghost's stay plain).
+## ghost's stay plain). A drone working over the site follows it up or down, and so does the
+## label over the drone.
 func set_lifted(lifted: bool) -> void:
 	var height := LIFT_HEIGHT if lifted else 0.0
 	_model.position = Vector3(0, height, 0)
 	_scaffold.position = Vector3(0, height, 0)
 	_lifted = lifted
 	_update_outlines()
+	if _drone != null and not _drone.is_leaving():
+		_drone.set_site_top(site_height())
+		_place_label()
 
 
 ## Marks the view as a placement ghost and tints its bodies for a spot it can (valid) or cannot
@@ -179,11 +188,12 @@ func drone() -> ConstructionDrone:
 	return _drone
 
 
-## The top of what the view shows now: the scaffold while the level show_status was last given
-## is 0, else the model. Not building_level: a view kept while it is dragged shows its finished
-## model before it is rebuilt.
+## The top of what the view shows now, lift included: the scaffold while the level show_status
+## was last given is 0, else the model. Not building_level: a view kept while it is dragged shows
+## its finished model before it is rebuilt.
 func site_height() -> float:
-	return ConstructionDrone.top_of(_scaffold if _scaffold.visible else _model)
+	var site := _scaffold if _scaffold.visible else _model
+	return ConstructionDrone.top_of(site) + site.position.y
 
 
 ## Hands a drone that is still over the site to `parent`, where it finishes its work or its
@@ -205,6 +215,16 @@ func _process(delta: float) -> void:
 	_time += delta
 	for i: int in _movers.size():
 		_movers[i].transform = _motions[i].transform_at(_time, _rests[i])
+
+
+## The timer label's height with no drone over the site.
+func _label_height() -> float:
+	return 1.4 + footprint_size * 0.4
+
+
+## Holds the label LABEL_OVER_DRONE above the highest point the working drone reaches.
+func _place_label() -> void:
+	_label.position.y = maxf(_label_height(), _drone.ceiling() + LABEL_OVER_DRONE)
 
 
 func _update_outlines() -> void:

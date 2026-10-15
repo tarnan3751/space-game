@@ -2,7 +2,8 @@ extends HarnessScenario
 ## The construction drone on the real build times: a Metal Silo placed on a fresh base gets a
 ## drone over its scaffold, which descends, moves, and fires its laser at a point on the site;
 ## when the silo is finished the view has no drone and stops processing while the old drone
-## climbs away and frees itself. Then, the Command Center taken to level 2 (the metal and the
+## climbs away and frees itself. The timer label sits above the drone's flight, over the scaffold
+## and over the model. Then, the Command Center taken to level 2 (the metal and the
 ## crystal topped up by the scenario: the start's amounts and caps do not cover both upgrades),
 ## an upgrade of the silo gets a drone again, firing at the finished model. Last, a Metal
 ## Extractor finishes while the player drags it: the dragged view is kept, now showing the
@@ -48,6 +49,7 @@ func run(main: MainScript) -> void:
 	check(positions[2].distance_to(positions[1]) > 0.3, "it moves on round the site")
 	check(await _until_firing(main, drone), "it fires within %d s" % FIRE_WAIT_SECONDS)
 	_check_beam(drone, view.footprint_size)
+	_check_label(view, drone)
 	await frames(2)
 	await screenshot("firing")
 	# A fifth of a second on, to compare: the sparks flicker, the rotors turn, the beam flows.
@@ -98,6 +100,7 @@ func run(main: MainScript) -> void:
 	_check_clear(drone, upgrading.site_height(), "on its orbit the drone clears the model")
 	check(await _until_firing(main, drone), "it fires within %d s" % FIRE_WAIT_SECONDS)
 	_check_beam(drone, upgrading.footprint_size)
+	_check_label(upgrading, drone)
 	await frames(2)
 	await screenshot("upgrading")
 
@@ -141,8 +144,8 @@ func run(main: MainScript) -> void:
 		and dragged.is_model_visible(), "finished while dragged, the kept view shows the finished model")
 	check(dragged.drone() == drone and drone.is_leaving(), "the drone leaves the dragged view")
 	_check_clear(drone, dragged.site_height(), "the leaving drone starts clear of the finished model")
-	# site_height() is the model's top unlifted; the dragged model stands LIFT_HEIGHT higher.
-	say("lifted, the finished model's top is %.2f" % (dragged.site_height() + BuildingView.LIFT_HEIGHT))
+	# site_height() includes the lift: the dragged model stands LIFT_HEIGHT higher.
+	say("lifted, the finished model's top is %.2f" % dragged.site_height())
 	await screenshot("finished-while-dragged")
 	main.world_input.drag_ended.emit(finger)
 	await _wait(main, 1.0)
@@ -195,6 +198,19 @@ func _check_grid(state: BaseState) -> void:
 		for x: int in grid.width:
 			wrong += 1 if state.grid.occupant_at(Vector2i(x, y)) != grid.occupant_at(Vector2i(x, y)) else 0
 	check(wrong == 0, "the grid's occupancy matches every footprint (%d cells differ)" % wrong)
+
+
+## The view's timer label is above the highest point the drone reaches while it works, and
+## above the drone now.
+func _check_label(view: BuildingView, drone: ConstructionDrone) -> void:
+	var label: Label3D = null
+	for child: Node in view.get_children():
+		if child is Label3D:
+			label = child as Label3D
+	check(label != null and label.visible and label.position.y >= drone.ceiling() + BuildingView.LABEL_OVER_DRONE - 0.001
+		and label.position.y >= drone.drone_position().y + BuildingView.LABEL_OVER_DRONE,
+		"the timer label is above the drone's flight (at %.2f; the drone reaches %.2f, is at %.2f)"
+		% [label.position.y if label != null else 0.0, drone.ceiling(), drone.drone_position().y])
 
 
 func _instances(node: Node) -> int:

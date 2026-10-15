@@ -234,9 +234,12 @@ A `BuildingView` is one building's visual: the model for its finished level, a s
 instead while `level` is 0, a footprint tile (`Footprint.NONE / SELECTED / VALID / INVALID`, the
 last three translucent cyan, green and red), and a billboard `Label3D` timer ("Building 10s",
 "Lv 2 1m 00s") shown while busy, in the HUD's Lilita One (`Hud.BODY_FONT`, the same resource) and
-text colour with an ink outline about 2 px wide at the starting zoom. A wall drawn by the merged
-wall mesh hides its model
-(`set_merged(true)`, **Walls**) and keeps the rest; `is_model_visible()` says whether the view
+text colour with an ink outline about 2 px wide at the starting zoom; while a drone works over the
+site it is raised, when the drone is spawned, to `LABEL_OVER_DRONE` (0.5) above the highest point
+the drone reaches (`ConstructionDrone.ceiling()`), so it never overlaps its flight, and
+`set_lifted` passes the lifted or lowered `site_height()` to a working drone (`set_site_top`) and
+places the label again. A wall drawn
+by the merged wall mesh hides its model (`set_merged(true)`, **Walls**) and keeps the rest; `is_model_visible()` says whether the view
 draws its own model. `setup(id, type, level, size)` builds it for one level (level 1's model
 while the level is 0); `building_level` records it, and `BaseView.sync` replaces the view when
 the finished level changes, so a building mid-upgrade shows its current level until the upgrade
@@ -260,7 +263,8 @@ not busy. The view turns processing on while it has a drone and drives it from `
 only if something moves. A finished level replaces the view, so `BaseView.sync` first calls
 `release_drone`, which re-parents the drone to the base view, where it keeps its place in the
 world and drives itself; once the new view exists, `sync` tells it to leave over that view's
-site (`site_height()`, the top of the scaffold or the model it shows), so its climb starts clear
+site (`site_height()`, the top of the scaffold or the model it shows, raised by its lift while it is
+dragged), so its climb starts clear
 of the finished model, and it frees itself after its climb. `drone()` returns the view's drone
 (null when none), for the harness. `BaseView.clear()` frees the drones with the views.
 

@@ -427,14 +427,19 @@ While a building is constructed or upgraded, a builder drone works over it
   12 degrees into the turn. After 2.2 s it picks a work point, flies to it easing in and out,
   tilts its nose down 15 degrees, fires for 1.3 s and flies back to the orbit. Leaving, it stops
   firing, rises 3.5 over 0.7 s and frees itself; the climb starts no lower than clear of what the
-  site shows by then, so a drone whose build just finished starts above the new model.
+  site shows by then, so a drone whose build just finished starts above the new model. When its
+  view is lifted or set down (dragged), the view tells it the site's new top (`set_site_top`): the
+  orbit and hover heights re-clamp, the work point moves with the site, and the drone eases there
+  as between any two points (a shot in progress is aimed again once it arrives).
 - **The work points.** At spawn it keeps the faces of the shown site's body mesh (the scaffold or
   the model) that face the camera (the normal's dot with the view direction above 0.3, so up-
   facing ones too) and reach between 0.3 and 0.8 of its height. Each shot picks one of them, a
   height in that band within the face and a point across the face there, from a hash of the
   building's id and the shot count, so a run repeats. It hovers 0.9 above the point, nudged 0.3
   outward along the face's horizontal normal, with its lowest point (tilted to fire, at the bottom
-  of its bob) held at least 0.3 above the site's top; the beam slants down to the point.
+  of its bob) held at least 0.3 above the site's top; the beam slants down to the point. The
+  highest it reaches at work, on the orbit or over the highest work point, at the top of its bob
+  and tilted or banked, is `ceiling()`, which the view's timer label is held above.
 - **The laser**: a thin unlit `ENERGY` square rod (0.05 across, not outlined), one unit long
   (`create_drone_effect("beam")`) under a node stretched from the emitter to the work point, so
   no mesh is rebuilt per shot; at the point a flare (`create_drone_effect("flare")`): an unlit

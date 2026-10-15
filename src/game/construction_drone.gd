@@ -18,7 +18,9 @@ extends Node3D
 ## (tilted to fire, at the bottom of its bob) held at least CLEARANCE above the site's top, and
 ## the beam slants down to the point. The orbit is held as high, so a tall site's corners stay
 ## clear, and so is the start of the climb when it leaves, over what the site shows by then (a
-## finished level's model may be taller than the scaffold it worked on).
+## finished level's model may be taller than the scaffold it worked on). While the site is lifted
+## (its view dragged), the view tells it the site's new top (set_site_top): the work points and the
+## heights follow, and the drone eases to them.
 ##
 ## It sits at its view's origin, the footprint's centre on the ground, and moves its children:
 ## the drone model (a body and its outline, built at the drone bay's size and shown SCALE times
@@ -63,12 +65,15 @@ const TURN_RATE := 6.0
 
 var _seed: int = 0
 var _radius: float = 1.0
+## The site's top at spawn, and how far the site has been lifted since (set_site_top).
 var _height: float = 1.0
+var _lift: float = 0.0
 ## The work faces: three corners each, and one normal each.
 var _faces: PackedVector3Array = PackedVector3Array()
 var _face_normals: PackedVector3Array = PackedVector3Array()
-## How far the model reaches below its centre, tilted to fire.
+## How far the model reaches below its centre, tilted to fire, and above it, tilted or banked.
 var _drop: float = 0.0
+var _rise: float = 0.0
 ## ORBIT_HEIGHT, or higher to clear a tall site.
 var _orbit_height: float = ORBIT_HEIGHT
 var _hover_normal: Vector3 = Vector3.ZERO
@@ -103,8 +108,11 @@ func setup(id: int, size: int, site: Node3D) -> void:
 	_body = BuildingModels.create_drone()
 	var bounds := (_body.get_child(0) as MeshInstance3D).mesh.get_aabb()
 	var tilted := Basis(Vector3.RIGHT, deg_to_rad(TILT_DEGREES)) * SCALE
+	var banked := Basis(Vector3.BACK, deg_to_rad(BANK_DEGREES)) * SCALE
 	for corner: int in 8:
-		_drop = maxf(_drop, -(tilted * bounds.get_endpoint(corner)).y)
+		var point := bounds.get_endpoint(corner)
+		_drop = maxf(_drop, -(tilted * point).y)
+		_rise = maxf(_rise, maxf((tilted * point).y, (banked * point).y))
 	_orbit_height = maxf(ORBIT_HEIGHT, _clear_of(_height))
 	add_child(_body)
 	_beam = Node3D.new()
@@ -145,11 +153,9 @@ func advance(delta: float) -> bool:
 			_angle += SPEED / _radius * delta
 			_path = _orbit_point(_angle)
 			if _time >= ORBIT_SECONDS:
-				_work = _work_point()
+				_work = _work_point() + Vector3(0, _lift, 0)
 				_shots += 1
-				var hover := _work + Vector3(0, HOVER, 0) + _hover_normal * HOVER_OUT
-				hover.y = maxf(hover.y, _clear_of(_height))
-				_move_to(hover, Phase.TO_WORK)
+				_move_to(_hover(), Phase.TO_WORK)
 		Phase.TO_WORK, Phase.FROM_WORK:
 			_path = _from.lerp(_to, _ease_in_out(_time / _duration))
 			if _time >= _duration:
@@ -191,6 +197,30 @@ func leave(site_top: float) -> void:
 	_begin(Phase.LEAVE)
 
 
+## The site's top is now `site_top` (its view was lifted or set down): the orbit and the hover
+## re-clamp to it and the work point moves with the site, and the drone eases there as it does
+## between any two points (a shot in progress is aimed again once it has arrived). Lifted, it is
+## first raised by the lift at once. Ignored while leaving, or when nothing changed.
+func set_site_top(site_top: float) -> void:
+	var shift := site_top - _height - _lift
+	if _phase == Phase.LEAVE or absf(shift) < 0.001:
+		return
+	_lift += shift
+	_orbit_height = maxf(ORBIT_HEIGHT, _clear_of(site_top))
+	# Lifted, it rises with the site at once, so it never dips into it while it eases on.
+	if shift > 0.0:
+		_path.y += shift
+		_place(0.0, _path)
+	match _phase:
+		Phase.TO_WORK, Phase.FIRE:
+			_beam.visible = false
+			_flare.visible = false
+			_work.y += shift
+			_move_to(_hover(), Phase.TO_WORK)
+		_:
+			_move_to(_orbit_point(_angle), Phase.FROM_WORK)
+
+
 ## Moves it under `parent`, where it stays put in the world and drives itself: its view is about
 ## to be freed. Whoever releases it then tells it to leave.
 func release(parent: Node) -> void:
@@ -217,14 +247,21 @@ func drone_position() -> Vector3:
 	return _body.position
 
 
-## The site's top, in this node's space.
+## The site's top, in this node's space, lift included.
 func site_height() -> float:
-	return _height
+	return _height + _lift
 
 
 ## How far the model reaches below its centre, tilted to fire.
 func reach_below() -> float:
 	return _drop
+
+
+## The highest any part of it reaches while it works, in this node's space: on the orbit or
+## hovering over the highest work point, at the top of its bob.
+func ceiling() -> float:
+	var top := _height + _lift
+	return maxf(_orbit_height, maxf(WORK_HIGH * _height + _lift + HOVER, _clear_of(top))) + BOB + _rise
 
 
 ## The beam's ends, in this node's space: the emitter and the work point.
@@ -242,6 +279,13 @@ func _move_to(target: Vector3, phase: Phase) -> void:
 	_to = target
 	_duration = maxf(_from.distance_to(_to) / SPEED, 0.5)
 	_begin(phase)
+
+
+## Where it hovers to fire at the work point: above it, out from its face, clear of the site.
+func _hover() -> Vector3:
+	var hover := _work + Vector3(0, HOVER, 0) + _hover_normal * HOVER_OUT
+	hover.y = maxf(hover.y, _clear_of(_height + _lift))
+	return hover
 
 
 func _orbit_point(angle: float) -> Vector3:
