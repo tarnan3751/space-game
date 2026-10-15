@@ -17,12 +17,11 @@ static var DUCT_BAND := Surf.make(MaterialKit.Layer.HAZARD, Color.WHITE, 3.0, Su
 ## the disc as a blur arc as U scrolls; ROTOR_SPEEDS gives each its phase, the pairs
 ## counter-rotating.
 static var ROTOR := Surf.make(MaterialKit.Layer.GLASS, Color.WHITE, 1.0, Surf.HOLO | Surf.FLOW_U)
-## The laser and its flare: unlit and too thin or small for the outline. The beam is on the pipe
-## layer, whose dark rib lines cross V, at 0.4 repeats a unit, so a line is about 2 px wide at the
-## closest zoom; its V falls from the emitter to the hit point (a face's V is minus its height),
-## so its flow phase is below 0.5 to carry the lines towards the hit point. The sparks take
-## phases k/5.
-static var BEAM := Surf.make(MaterialKit.Layer.PIPE, MaterialKit.ENERGY, 0.4,
+## The laser and its flare: unlit and too thin or small for the outline. The beam is on the bands
+## layer, a broad bright band ink-edged on its leading side, at 2 repeats a unit; its V falls from
+## the emitter to the hit point (a face's V is minus its height), so its flow phase is below 0.5
+## to carry the bands towards the hit point as pulses. The sparks take phases k/5.
+static var BEAM := Surf.make(MaterialKit.Layer.BANDS, MaterialKit.ENERGY, 2.0,
 	Surf.UNLIT | Surf.FLOW | Surf.PULSE, true, false, 0.15)
 static var FLARE := Surf.make(MaterialKit.Layer.GLOW, MaterialKit.ENERGY, 1.0, Surf.UNLIT | Surf.PULSE, true, false)
 static var SPARK := Surf.make(MaterialKit.Layer.GLOW, MaterialKit.HAZARD, 1.0,

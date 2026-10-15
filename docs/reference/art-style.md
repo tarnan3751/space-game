@@ -444,13 +444,13 @@ While a building is constructed or upgraded, a builder drone works over it
   face's normal (one basis, no allocation), so the burst fans along the surface instead of half
   of it entering a wall.
 - **Its animation** (**Animation**; each on a surface of its own on `DroneModels`): the beam is
-  UNLIT, FLOW and PULSE on the pipe layer at 0.4 repeats a unit and phase 0.15: its dark rib
-  lines, about 2 px wide at the closest zoom, travel fast from the emitter to the hit point (a
-  face's V is minus its height, so the phase is below 0.5) while it pulses. The rod is a box,
-  not a prism: a lathe takes a whole repeat round, which on so thin a rod mips the lines away,
-  where a box's planar UVs keep the texture as dense across it as along it. The glow layer's
-  stripes, and the pipe layer at higher scales, are too faint or too fine to show the flow. The
-  hit dome is UNLIT and PULSE; the sparks are UNLIT, FLICKER and JITTER on the glow layer in
+  UNLIT, FLOW and PULSE on the bands layer at 2 repeats a unit and phase 0.15: its bright bands,
+  a sixth of a unit long, each led by an ink edge, travel from the emitter to the hit point at
+  0.7 units a second (a face's V is minus its height, so the phase is below 0.5) while it pulses,
+  so the beam reads as pulses fired down it. The rod is a box, not a prism: a lathe takes a whole
+  repeat round, which on so thin a rod mips the bands away, where a box's planar UVs keep the
+  texture as dense across it as along it. The glow layer's stripes and the pipe layer's rib lines
+  are too faint or too fine on so thin a rod to show the flow. The hit dome is UNLIT and PULSE; the sparks are UNLIT, FLICKER and JITTER on the glow layer in
   hazard yellow, each shard at phase k/5, so the burst pops and crackles; the rotor discs are HOLO
   and FLOW_U on the glass layer untinted (its pale glass and diagonal streak as they are), at
   phases 0.92, 0.08, 0.96 and 0.04, so they read as pale translucent discs whose streak sweeps
@@ -494,7 +494,7 @@ of a mesh animates alike.
 | `PULSE` | 4 | the colour, emission included, swells between 0.55 and 1.0 on a sine of period 1.6 s: cores, lenses, beacons |
 | `BLINK` | 8 | lit 0.2 s of every 1.2 s, at 0.35 the rest; lamps with phases k/n chase round a ring |
 | `FLICKER` | 16 | on or off at random 24 times a second (a hash of the time step and the phase), on about 40 % of the time; while off the vertex shader collapses the part to a point, so it draws nothing (no `discard`, which would cost the shared toon material its early depth test): sparks, welding arcs |
-| `FLOW` | 32 | the texture scrolls along V at (phase - 0.5) × 4 repeats a second: 0.5 still, 0.75 one repeat a second forward, 0.25 back. Liquids in pipes (the pipe layer's bands), conveyors (grating), screens; the glow layer's stripes are too faint to show a scroll and run along U, so FLOW_U shows nothing on it: currents and bands use the screen, pipe or crystal layer |
+| `FLOW` | 32 | the texture scrolls along V at (phase - 0.5) × 4 repeats a second: 0.5 still, 0.75 one repeat a second forward, 0.25 back. Liquids in pipes (the pipe layer's bands), conveyors (grating), screens; the glow layer's stripes are too faint to show a scroll and run along U, so FLOW_U shows nothing on it: currents and bands use the bands, screen, pipe or crystal layer |
 | `FLOW_U` | 64 | the same along U: discs, rings. It shows only on a layer that varies along U: not the glow layer, whose stripes run along it |
 | `BOB` | 128 | the part rises and falls 0.08 along world Y on a sine of period 2.4 s: floating cores, holograms |
 | `JITTER` | 256 | each vertex jumps up to 0.04 in a pseudo-random direction (a hash of its position and the time step), 20 times a second; corners shared by faces move together. With UNLIT and FLICKER, a crackling arc: build it of short segments so there are corners to shake |
