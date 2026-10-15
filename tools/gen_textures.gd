@@ -1,22 +1,29 @@
 extends SceneTree
 ## Draws the material kit: the 16 layers of the Texture2DArray every building, the terrain and
 ## the rocks are painted from (docs/reference/art-style.md, **The material kit**), saved as
-## assets/textures/kit/<index>_<name>.png. Run it after an import (tools/gates.sh does one), from
-## the project root:
+## assets/textures/kit/<index>_<name>.png; and the field texture the buildable ground is drawn
+## from, assets/textures/field.png (**The field**). Run it after an import (tools/gates.sh does
+## one), from the project root:
 ##
 ##   $GODOT --headless --path . -s res://tools/gen_textures.gd
 ##
 ## Each layer is SIZE x SIZE RGBA8. RGB is the albedo: near-white greys (0.78 to 1.0, ink lines
 ## at the ink colour) for the layers a tint multiplies, real colours for the fixed ones (hazard,
-## solar). A is the emission mask: 0 on plain surfaces, up to 1 where the surface glows.
+## solar). A is the emission mask: 0 on plain surfaces, up to 1 where the surface glows. The
+## field texture is FIELD_SIZE square and holds weights, not colours (_draw_field).
 ##
 ## Everything is drawn from SEED with SeededRng, so a run gives byte-identical PNGs. Every
-## primitive wraps modulo SIZE, so every layer tiles seamlessly. One layer covers one world unit
-## at the default UV scale: an ink line of INK_WIDTH pixels is about 0.012 units wide.
+## primitive wraps modulo the image's size, so every texture tiles seamlessly. One layer covers
+## one world unit at the default UV scale: an ink line of INK_WIDTH pixels is about 0.012 units
+## wide.
 
 const SIZE := 256
 const SEED := 20261014
 const OUT_DIR := "res://assets/textures/kit"
+## The field texture: one landing plate of the ground (4x4 cells), drawn after the kit from its
+## own seed.
+const FIELD_PATH := "res://assets/textures/field.png"
+const FIELD_SIZE := 1024
 ## The layers, in array order. MaterialKit.LAYERS must match.
 const LAYERS := [
 	"flat", "hull", "hull_dense", "plate", "vent", "pipe", "grating", "concrete",
@@ -25,29 +32,50 @@ const LAYERS := [
 const INK := Color("1b1a2e")
 const INK_WIDTH := 3.0
 const HAZARD_YELLOW := Color("ffd60a")
+## Towards the key light across the ground, in the ground's texture space (u along world x, v
+## along world z, so image y is world z): craters and pebbles are shaded from it.
+const SUN := Vector2(-0.5, 0.866)
 
 var _rgb := PackedColorArray()
 var _mask := PackedFloat32Array()
 var _rng: SeededRng
+## The size of the image being drawn.
+var _width: int = SIZE
+var _height: int = SIZE
 
 
 func _initialize() -> void:
 	DirAccess.make_dir_recursive_absolute(ProjectSettings.globalize_path(OUT_DIR))
 	for index: int in LAYERS.size():
 		var layer_name: String = LAYERS[index]
-		_rgb.resize(SIZE * SIZE)
-		_mask.resize(SIZE * SIZE)
-		_mask.fill(0.0)
-		_rng = SeededRng.new(SEED + index)
+		_begin(SIZE, SIZE, SEED + index)
 		call("_draw_" + layer_name)
-		var path := OUT_DIR.path_join("%02d_%s.png" % [index, layer_name])
-		var error := _image().save_png(path)
-		if error != OK:
-			printerr("gen_textures: could not save %s: %s" % [path, error_string(error)])
-			quit(1)
+		if not _save(OUT_DIR.path_join("%02d_%s.png" % [index, layer_name])):
 			return
-		print("gen_textures: %s" % path)
+	_begin(FIELD_SIZE, FIELD_SIZE, SEED + LAYERS.size())
+	_draw_field()
+	if not _save(FIELD_PATH):
+		return
 	quit(0)
+
+
+func _begin(width: int, height: int, image_seed: int) -> void:
+	_width = width
+	_height = height
+	_rgb.resize(width * height)
+	_mask.resize(width * height)
+	_mask.fill(0.0)
+	_rng = SeededRng.new(image_seed)
+
+
+func _save(path: String) -> bool:
+	var error := _image().save_png(path)
+	if error != OK:
+		printerr("gen_textures: could not save %s: %s" % [path, error_string(error)])
+		quit(1)
+		return false
+	print("gen_textures: %s" % path)
+	return true
 
 
 # --- Layers ------------------------------------------------------------------------
@@ -280,37 +308,145 @@ func _draw_crystal() -> void:
 			_mask[i] = 0.8 * smoothstep(5.0, 18.0, edge)
 
 
-## Rock grain in three posterised tones, ink cracks and dark speckles.
+## Rock at the scale of the terrain's slopes and the scenery rocks: four big plates (a wrapped
+## Voronoi diagram) in three tones, each lighter towards the light, parted by faint seams, with
+## three bold ink cracks across them and a little dark grit.
 func _draw_rock() -> void:
-	var noise := _noise_field([64, 32, 16, 8], [0.5, 0.25, 0.15, 0.1])
-	for i: int in noise.size():
-		var n := noise[i]
-		var tone := 0.97 if n > 0.6 else (0.9 if n > 0.42 else 0.83)
-		_rgb[i] = _grey(tone)
+	var seeds := PackedVector2Array()
+	var tones := PackedFloat32Array()
+	for gy: int in 2:
+		for gx: int in 2:
+			seeds.append(Vector2(gx * 128 + _rng.range_int(20, 108), gy * 128 + _rng.range_int(20, 108)))
+			tones.append([0.84, 0.9, 0.96][_rng.range_int(0, 2)])
+	for y: int in SIZE:
+		for x: int in SIZE:
+			var p := Vector2(x + 0.5, y + 0.5)
+			var nearest := 0
+			var second := 0
+			var best := INF
+			var next := INF
+			for s: int in seeds.size():
+				var distance := _wrapped(seeds[s] - p).length_squared()
+				if distance < best:
+					next = best
+					second = nearest
+					best = distance
+					nearest = s
+				elif distance < next:
+					next = distance
+					second = s
+			var to_near := _wrapped(seeds[nearest] - p)
+			var to_second := _wrapped(seeds[second] - p)
+			# Distance from p to the bisector between the two nearest seeds.
+			var edge := (to_second.length_squared() - to_near.length_squared()) / (2.0 * (to_second - to_near).length())
+			var tone := clampf(tones[nearest] - 0.06 * to_near.dot(SUN) / 128.0, 0.8, 1.0)
+			_rgb[y * SIZE + x] = _grey(tone).lerp(_grey(0.76), clampf(1.25 - edge, 0.0, 1.0))
+	_grain(0.02, 16)
 	_grain(0.012, 1)
-	for i: int in 7:
-		_crack(Vector2(_rng.range_int(0, SIZE - 1), _rng.range_int(0, SIZE - 1)), _rng.range_int(4, 8), 2.5, INK)
-	for i: int in 160:
-		_disc(Vector2(_rng.range_int(0, SIZE - 1), _rng.range_int(0, SIZE - 1)), 0.7, _grey(0.78))
-
-
-## Fine dust, faint craterlets with a lit rim, and pebbles with a highlight.
-func _draw_regolith() -> void:
-	var noise := _noise_field([32, 16, 8], [0.5, 0.3, 0.2])
-	for i: int in noise.size():
-		_rgb[i] = _grey(0.9 + 0.08 * noise[i])
-	_grain(0.012, 1)
-	for i: int in 6:
-		var centre := Vector2(_rng.range_int(0, SIZE - 1), _rng.range_int(0, SIZE - 1))
-		var radius := _rng.range_int(8, 20)
-		_disc(centre, radius, _grey(0.86))
-		_disc(centre + Vector2(radius * 0.25, radius * 0.25), radius * 0.8, _grey(0.89))
-		_ring(centre, radius, 2.0, _grey(1.0))
+	for i: int in 3:
+		_crack(Vector2(_rng.range_int(0, SIZE - 1), _rng.range_int(0, SIZE - 1)), _rng.range_int(5, 8), 3.5, INK)
 	for i: int in 40:
+		_disc(Vector2(_rng.range_int(0, SIZE - 1), _rng.range_int(0, SIZE - 1)), 0.9, _grey(0.76))
+
+
+## The terrain's dust, at the ring's scale (the terrain takes it at 0.18 repeats a unit): large
+## soft blobs in two tones and two pebbles, shaded from SUN. No ink: the ring's craters and ridges
+## are its shapes.
+func _draw_regolith() -> void:
+	var noise := _noise_field([128, 64], [0.7, 0.3])
+	for i: int in noise.size():
+		_rgb[i] = _grey(lerpf(0.93, 1.0, smoothstep(0.45, 0.6, noise[i])))
+	_grain(0.012, 1)
+	for i: int in 2:
 		var spot := Vector2(_rng.range_int(0, SIZE - 1), _rng.range_int(0, SIZE - 1))
-		var radius := _rng.range_int(15, 35) / 10.0
-		_disc(spot, radius, _grey(0.8 + _rng.range_int(0, 6) / 100.0))
-		_disc(spot - Vector2(radius * 0.35, radius * 0.35), 0.8, _grey(1.0))
+		var radius := _rng.range_int(50, 80) / 10.0
+		_disc(spot - SUN * radius * 0.55, radius * 0.9, _grey(0.78))
+		_disc(spot, radius, _grey(0.88))
+		_disc(spot + SUN * radius * 0.3, radius * 0.5, _grey(1.0))
+
+
+## The ground's field texture: one landing plate of the buildable plain, which the ground shader
+## turns into the field's tints (ground.gdshader). Not colours but four weights, so the tints stay
+## MaterialKit roles:
+## - R, dust: raw value noise the shader steps into two-tone blobs (field base and light).
+## - G, shade: the field's dark tint. Crater floors, the shadow side of crater walls (the inner
+##   wall towards the light, the outer slope away from it), pebbles' shadow sides and shadows.
+## - B, ink: crater rims, pebble outlines, hairline cracks.
+## - A, light: 0.5 for the field's light tint (the lit crater walls, pebble tops), 1 for a bright
+##   shard fleck.
+## Per two cells, one large crater and two small ones (a cell is 256 pixels: radii of 0.35 to
+## 0.45 of a cell and 0.15 to 0.22), ten pebbles, two long cracks and a few flecks, so four of
+## each placed freely over the plate, all shaded from SUN, leaving big flat areas of dust. Each
+## channel is drawn in greys in its own pass and read off the red.
+func _draw_field() -> void:
+	var dust := _noise_field([512, 256, 128], [0.6, 0.3, 0.1])
+	var craters: Array[Vector3] = []
+	for i: int in 4:
+		craters.append(_free_spot(craters, _rng.range_int(90, 115), 1.3))
+	for i: int in 8:
+		craters.append(_free_spot(craters, _rng.range_int(38, 56), 1.4))
+	# Pebbles: jittered hexagons, each with its centre and radius.
+	var pebbles: Array[PackedVector2Array] = []
+	var spots: Array[Vector3] = []
+	var taken := craters.duplicate()
+	for i: int in 40:
+		var spot := _free_spot(taken, _rng.range_int(100, 180) / 10.0, 1.3)
+		taken.append(spot)
+		spots.append(spot)
+		var corners := PackedVector2Array()
+		var turn := TAU * _rng.range_int(0, 59) / 360.0
+		for k: int in 6:
+			var angle := turn + TAU * k / 6.0
+			var reach := spot.z * _rng.range_int(72, 100) / 100.0
+			corners.append(Vector2(spot.x, spot.y) + Vector2(cos(angle), sin(angle)) * reach)
+		pebbles.append(corners)
+
+	_fill(_grey(0.0))
+	for crater: Vector3 in craters:
+		var centre := Vector2(crater.x, crater.y)
+		var r := crater.z
+		_disc(centre, r, _grey(0.15))
+		_crescent(centre, r, centre - SUN * r * 0.5, r * 0.95, _grey(1.0))
+		_crescent(centre - SUN * r * 0.22, r * 1.18, centre, r, _grey(0.6))
+		_crescent(centre, r * 0.97, centre + SUN * r * 0.35, r * 0.97, _grey(0.0))
+	for i: int in pebbles.size():
+		var r := spots[i].z
+		_polygon(_moved(pebbles[i], -SUN * r * 0.55, 1.0), _grey(0.4))
+		_polygon(pebbles[i], _grey(0.75))
+		_polygon(_moved(pebbles[i], SUN * r * 0.2, 0.7), _grey(0.0))
+	var shade := _channel()
+
+	_fill(_grey(0.0))
+	for crater: Vector3 in craters:
+		var centre := Vector2(crater.x, crater.y)
+		var r := crater.z
+		_crescent(centre + SUN * r * 0.22, r * 1.18, centre, r, _grey(0.5))
+		_crescent(centre, r * 0.97, centre + SUN * r * 0.35, r * 0.97, _grey(0.5))
+	for i: int in pebbles.size():
+		_polygon(_moved(pebbles[i], SUN * spots[i].z * 0.3, 0.4), _grey(0.5))
+	for i: int in 48:
+		var at := Vector2(_rng.range_int(0, _width - 1), _rng.range_int(0, _height - 1))
+		var angle := TAU * _rng.range_int(0, 359) / 360.0
+		var along := Vector2(cos(angle), sin(angle)) * _rng.range_int(50, 80) / 10.0
+		var across := Vector2(-along.y, along.x) * 0.35
+		_polygon(PackedVector2Array([at - along, at + across, at + along, at - across]), _grey(1.0))
+	var light := _channel()
+
+	_fill(_grey(0.0))
+	for crater: Vector3 in craters:
+		var thin := clampf(crater.z * 0.055, 5.0, 7.0)
+		_rim(Vector2(crater.x, crater.y), crater.z, thin, thin * 2.2, _grey(1.0))
+	for corners: PackedVector2Array in pebbles:
+		for k: int in corners.size():
+			_line(corners[k], corners[(k + 1) % corners.size()], 1.5, _grey(1.0))
+	for i: int in 8:
+		_crack(Vector2(_rng.range_int(0, _width - 1), _rng.range_int(0, _height - 1)), _rng.range_int(20, 26), 2.0,
+			_grey(1.0))
+	var ink := _channel()
+
+	for i: int in _rgb.size():
+		_rgb[i] = Color(dust[i], shade[i], ink[i], 1.0)
+		_mask[i] = light[i]
 
 
 # --- Shared motifs ------------------------------------------------------------------
@@ -347,6 +483,42 @@ func _rivet(centre: Vector2) -> void:
 	_disc(centre - Vector2(0.8, 0.8), 0.6, _grey(1.0))
 
 
+## A spot for a round feature of `radius` (x, y, radius) at least `spacing` times the sum of
+## the radii from every one in `taken`, on the wrapping image; the last try if none is free.
+func _free_spot(taken: Array[Vector3], radius: float, spacing: float) -> Vector3:
+	var spot := Vector3.ZERO
+	for attempt: int in 60:
+		spot = Vector3(_rng.range_int(0, _width - 1), _rng.range_int(0, _height - 1), radius)
+		var free := true
+		for other: Vector3 in taken:
+			if _wrapped(Vector2(other.x - spot.x, other.y - spot.y)).length() < (other.z + radius) * spacing:
+				free = false
+				break
+		if free:
+			break
+	return spot
+
+
+## `corners` scaled by `scale` about their centre, then moved by `offset`.
+func _moved(corners: PackedVector2Array, offset: Vector2, scale: float) -> PackedVector2Array:
+	var centre := Vector2.ZERO
+	for corner: Vector2 in corners:
+		centre += corner / corners.size()
+	var moved := PackedVector2Array()
+	for corner: Vector2 in corners:
+		moved.append(centre + (corner - centre) * scale + offset)
+	return moved
+
+
+## The buffer's red channel: a channel of the field texture, drawn in greys.
+func _channel() -> PackedFloat32Array:
+	var channel := PackedFloat32Array()
+	channel.resize(_rgb.size())
+	for i: int in _rgb.size():
+		channel[i] = _rgb[i].r
+	return channel
+
+
 ## A crack: a jagged polyline of `segments` steps from `start`, drifting in direction.
 func _crack(start: Vector2, segments: int, width: float, color: Color) -> void:
 	var angle := TAU * _rng.range_int(0, 359) / 360.0
@@ -358,7 +530,7 @@ func _crack(start: Vector2, segments: int, width: float, color: Color) -> void:
 		at += step
 
 
-# --- Primitives (all wrap modulo SIZE) ---------------------------------------------
+# --- Primitives (all wrap modulo the image's size) ---------------------------------
 
 func _grey(value: float) -> Color:
 	return Color(value, value, value, 1.0)
@@ -373,7 +545,7 @@ func _fill(color: Color) -> void:
 func _paint(x: int, y: int, color: Color, coverage: float, mask: float = -1.0) -> void:
 	if coverage <= 0.0:
 		return
-	var i := posmod(y, SIZE) * SIZE + posmod(x, SIZE)
+	var i := posmod(y, _height) * _width + posmod(x, _width)
 	_rgb[i] = _rgb[i].lerp(color, minf(coverage, 1.0))
 	if mask >= 0.0:
 		_mask[i] = lerpf(_mask[i], mask, minf(coverage, 1.0))
@@ -391,6 +563,30 @@ func _disc(centre: Vector2, radius: float, color: Color, mask: float = -1.0) -> 
 		for px: int in range(floori(centre.x - radius - 1), ceili(centre.x + radius + 1)):
 			var d := Vector2(px + 0.5, py + 0.5).distance_to(centre)
 			_paint(px, py, color, radius + 0.5 - d, mask)
+
+
+## An antialiased crescent: the disc of `radius` at `centre` less the disc of `cut_radius` at
+## `cut_centre`.
+func _crescent(centre: Vector2, radius: float, cut_centre: Vector2, cut_radius: float, color: Color) -> void:
+	for py: int in range(floori(centre.y - radius - 1), ceili(centre.y + radius + 1)):
+		for px: int in range(floori(centre.x - radius - 1), ceili(centre.x + radius + 1)):
+			var p := Vector2(px + 0.5, py + 0.5)
+			var inside := clampf(radius + 0.5 - p.distance_to(centre), 0.0, 1.0)
+			_paint(px, py, color, inside * clampf(p.distance_to(cut_centre) - cut_radius + 0.5, 0.0, 1.0))
+
+
+## An ink rim round a crater: a circle outline `thin` pixels wide on the side away from SUN,
+## swelling inwards to `thick` on the side towards it, where the crater's inner wall is in shadow
+## (a comic line, heavier on the shadow side).
+func _rim(centre: Vector2, radius: float, thin: float, thick: float, color: Color) -> void:
+	var reach := radius + thick
+	for py: int in range(floori(centre.y - reach - 1), ceili(centre.y + reach + 1)):
+		for px: int in range(floori(centre.x - reach - 1), ceili(centre.x + reach + 1)):
+			var offset := Vector2(px + 0.5, py + 0.5) - centre
+			var d := offset.length()
+			var towards := 0.5 + 0.5 * offset.dot(SUN) / maxf(d, 0.001)
+			var inner := radius + thin * 0.5 - lerpf(thin, thick, towards * towards)
+			_paint(px, py, color, clampf(minf(d - inner, radius + thin * 0.5 - d) + 0.5, 0.0, 1.0))
 
 
 ## An antialiased circle outline `width` pixels thick.
@@ -441,31 +637,33 @@ func _grain(amount: float, cell: int) -> void:
 		_rgb[i] = Color(c.r * k, c.g * k, c.b * k, 1.0)
 
 
-## Tileable value noise in [0, 1]: one octave per lattice cell size (each dividing SIZE),
-## weighted and summed.
+## Tileable value noise in [0, 1]: one octave per lattice cell size (each dividing the image's
+## size), weighted and summed.
 func _noise_field(cells: Array, weights: Array) -> PackedFloat32Array:
 	var field := PackedFloat32Array()
-	field.resize(SIZE * SIZE)
+	field.resize(_width * _height)
 	field.fill(0.0)
 	for octave: int in cells.size():
 		var cell: int = cells[octave]
 		var weight: float = weights[octave]
-		var count := SIZE / cell
+		var across := _width / cell
+		var down := _height / cell
 		var lattice := PackedFloat32Array()
-		for i: int in count * count:
+		for i: int in across * down:
 			lattice.append(_rng.range_int(0, 1000) / 1000.0)
-		for y: int in SIZE:
-			for x: int in SIZE:
+		for y: int in _height:
+			for x: int in _width:
 				var gx := float(x) / cell
 				var gy := float(y) / cell
 				var ix := floori(gx)
 				var iy := floori(gy)
 				var fx := smoothstep(0.0, 1.0, gx - ix)
 				var fy := smoothstep(0.0, 1.0, gy - iy)
-				var top := lerpf(lattice[(iy % count) * count + ix % count], lattice[(iy % count) * count + (ix + 1) % count], fx)
-				var bottom := lerpf(lattice[((iy + 1) % count) * count + ix % count],
-					lattice[((iy + 1) % count) * count + (ix + 1) % count], fx)
-				field[y * SIZE + x] += weight * lerpf(top, bottom, fy)
+				var top := lerpf(lattice[(iy % down) * across + ix % across],
+					lattice[(iy % down) * across + (ix + 1) % across], fx)
+				var bottom := lerpf(lattice[((iy + 1) % down) * across + ix % across],
+					lattice[((iy + 1) % down) * across + (ix + 1) % across], fx)
+				field[y * _width + x] += weight * lerpf(top, bottom, fy)
 	return field
 
 
@@ -476,16 +674,16 @@ func _band(at: float, low: float, high: float) -> float:
 
 ## The shortest offset equivalent to `d` on the wrapping texture.
 func _wrapped(d: Vector2) -> Vector2:
-	return Vector2(wrapf(d.x, -SIZE * 0.5, SIZE * 0.5), wrapf(d.y, -SIZE * 0.5, SIZE * 0.5))
+	return Vector2(wrapf(d.x, -_width * 0.5, _width * 0.5), wrapf(d.y, -_height * 0.5, _height * 0.5))
 
 
 func _image() -> Image:
 	var data := PackedByteArray()
-	data.resize(SIZE * SIZE * 4)
-	for i: int in SIZE * SIZE:
+	data.resize(_width * _height * 4)
+	for i: int in _width * _height:
 		var c := _rgb[i]
 		data[i * 4] = roundi(clampf(c.r, 0.0, 1.0) * 255.0)
 		data[i * 4 + 1] = roundi(clampf(c.g, 0.0, 1.0) * 255.0)
 		data[i * 4 + 2] = roundi(clampf(c.b, 0.0, 1.0) * 255.0)
 		data[i * 4 + 3] = roundi(clampf(_mask[i], 0.0, 1.0) * 255.0)
-	return Image.create_from_data(SIZE, SIZE, false, Image.FORMAT_RGBA8, data)
+	return Image.create_from_data(_width, _height, false, Image.FORMAT_RGBA8, data)
