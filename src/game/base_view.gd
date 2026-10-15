@@ -61,7 +61,8 @@ const LIT_SLOPE_Y := 0.906
 const CRATER_FLOOR := 0.75
 const DRIFT := 0.76
 const PAINT_SOFTNESS := 0.08
-## Towards the key light across the ground (main.gd's sun), in world x and z.
+## Towards the key light across the ground (main.gd's sun), in world x and z: the terrain's
+## painting and the ground shader's light on the field's marks.
 const SUN_ACROSS := Vector2(-0.5, 0.866)
 ## The rocks: how many, their radii (world units, most of them small), and how many in a hundred
 ## of those over 0.8 in radius carry a smaller rock on top.
@@ -255,8 +256,8 @@ func _build_ground() -> void:
 	_ground_material.set_shader_parameter("field_light", MaterialKit.FIELD_LIGHT)
 	_ground_material.set_shader_parameter("field_dark", MaterialKit.FIELD_DARK)
 	_ground_material.set_shader_parameter("plate_color", MaterialKit.FIELD_PLATE)
-	_ground_material.set_shader_parameter("fleck_color", MaterialKit.CRYSTAL)
 	_ground_material.set_shader_parameter("ink_color", MaterialKit.INK)
+	_ground_material.set_shader_parameter("sun_across", SUN_ACROSS)
 	_ground_material.set_shader_parameter("line_strength", GRID_LINES)
 	var plane := PlaneMesh.new()
 	plane.size = Vector2(grid_size)

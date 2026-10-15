@@ -2,24 +2,24 @@ shader_type spatial;
 render_mode ambient_light_disabled;
 
 // The buildable field (docs/reference/art-style.md, **The field**): a plain of levelled landing
-// plates, PLATE cells square, dusted with the field texture, with ink seams between the plates,
-// an ink line along the field's edge, and the cell grid in holographic cyan, faint by default and
-// brighter while placing (BaseView.set_grid_highlight sets line_strength); all under the comic
-// style's light (toon_common): the three bands, the halftone in the shadow band. Cells are 1
-// world unit; the plane is centred on 0.
+// plates, PLATE cells square, each drawn from the field texture, with ink seams between the
+// plates, an ink line along the field's edge, and the cell grid in holographic cyan, faint by
+// default and brighter while placing (BaseView.set_grid_highlight sets line_strength); all under
+// the comic style's light (toon_common): the three bands, the halftone in the shadow band. Cells
+// are 1 world unit; the plane is centred on 0.
 //
-// The field texture (assets/textures/field.png, one repeat per plate) holds weights, not
-// colours (tools/gen_textures.gd, _draw_field): R dust noise, stepped here into two tones; G
-// shade; B ink; A light (0.5) and a shard fleck (1). The tints are MaterialKit roles, set by
-// BaseView. It is sampled twice: once shifted by an offset of each plate's own, so neighbouring
-// plates do not repeat, for the craters, pebbles and cracks; and once turned and at a larger
-// scale, for the dust's mottling, blobs one to two cells across that do not repeat with the
-// plates. A plate is the plate tint dusted at DUST_SHOWS with the field's base tint; the light
-// drifts lie over it in the field's light tint and half bury the craters under them, so the
-// copies of the texture on a plate show different craters; elsewhere the craters' shading and
-// ink are at full strength. A large value noise and a darkening towards the edge vary the plain
-// further. The seams and the edge line
-// are a fixed width in pixels at a 720 px viewport height, scaled with it, like the ink outline.
+// The field texture (assets/textures/field.png, tools/gen_textures.gd, _draw_field) is an atlas
+// of four plate tiles, quadrant column + 2 row, and holds weights, not colours: R and G the
+// surface's lean across the tile (0.5 flat, 0 and 1 a full lean either way), B ink, A tone (0.5
+// neutral). The tints are MaterialKit roles, set by BaseView. Each plate takes one tile (its
+// variant) in one of eight orientations (a quarter turn count, mirrored from 4 on), both from its
+// cell hash, so neighbouring plates differ. The lean is turned back into the field's axes and
+// lit from sun_across, so however a tile lies its marks are lit from the sun: the side leaning
+// towards it takes the light tint, the side leaning away the dark. The tone mixes towards the
+// dark tint below 0.5 and towards the light above it. A plate is the plate tint, nudged in value
+// and in warmth by the plate, dusted at DUST_SHOWS with the field's base tint. A large value
+// noise and a darkening towards the edge vary the plain further. The seams and the edge line are
+// a fixed width in pixels at a 720 px viewport height, scaled with it, like the ink outline.
 
 #include "res://src/game/toon_common.gdshaderinc"
 
@@ -28,28 +28,28 @@ uniform vec4 field_color : source_color = vec4(0.416, 0.373, 0.659, 1.0);
 uniform vec4 field_light : source_color = vec4(0.549, 0.51, 0.769, 1.0);
 uniform vec4 field_dark : source_color = vec4(0.306, 0.267, 0.525, 1.0);
 uniform vec4 plate_color : source_color = vec4(0.498, 0.478, 0.651, 1.0);
-uniform vec4 fleck_color : source_color = vec4(0.886, 0.643, 1.0, 1.0);
 uniform vec4 ink_color : source_color = vec4(0.106, 0.102, 0.18, 1.0);
 uniform vec4 line_color : source_color = vec4(0.31, 0.84, 0.9, 1.0);
 uniform vec2 grid_size = vec2(40.0, 40.0);
 uniform float line_width = 0.04;
 uniform float line_strength = 0.1;
+// Towards the key light across the ground, in cell x and y (world x and z): BaseView's SUN_ACROSS.
+uniform vec2 sun_across = vec2(-0.5, 0.866);
 
-// Cells a plate spans, and the field texture's repeats a cell.
+// Cells a plate spans.
 const float PLATE = 4.0;
-const float FIELD_REPEAT = 0.25;
-// The dust's sample: its repeats a cell, turned about 37 degrees, and how much of the detail
-// sample's dust is mixed in.
-const float DUST_REPEAT = 0.31;
-const float DUST_DETAIL = 0.3;
-// The dust's two tones: where its noise steps from base to light.
-const float DUST_STEP = 0.5;
-const float DUST_SOFTNESS = 0.06;
-// How much of the base dust covers a plate, how much of the craters a light drift buries, and how
-// far a plate's tint varies either way.
+// The offsets of the cell hash that picks a plate's tile, its orientation and its warmth.
+const float VARIANT_HASH = 30.0;
+const float ORIENTATION_HASH = 27.0;
+const float WARMTH_HASH = 53.0;
+// How much of the base dust covers a plate, and how far a plate's tint varies either way in
+// value, and in warmth on red and blue.
 const float DUST_SHOWS = 0.6;
-const float DRIFT_BURIES = 0.95;
 const float PLATE_TINT = 0.04;
+const float PLATE_WARMTH = 0.03;
+// The lean's light across the sun at which a mark's light or dark side starts and is full.
+const float LEAN_FROM = 0.25;
+const float LEAN_FULL = 0.4;
 // The macro value noise: its period in cells and its strength either way. The darkening towards
 // the edge, from half way out.
 const float MACRO_CELLS = 12.0;
@@ -65,7 +65,9 @@ void vertex() {
 	world_pos = (MODEL_MATRIX * vec4(VERTEX, 1.0)).xyz;
 }
 
-// A hash of a cell in [0, 1). Small intermediate values, so it holds at medium precision.
+// A hash of a cell in [0, 1). The product inside its last fract reaches about 10,000, beyond
+// medium precision, so it relies on highp floats, which the Compatibility renderer's fragment
+// shaders have.
 float cell_tone(vec2 cell) {
 	vec2 p = fract(cell * vec2(0.1031, 0.1030));
 	p += dot(p, p.yx + 33.33);
@@ -92,22 +94,31 @@ void fragment() {
 	vec2 cell = world_pos.xz + grid_size * 0.5;
 	vec2 plate = floor(cell / PLATE);
 
-	// The plate's detail, from the texture moved by the plate's offset. The gradients are the
-	// unmoved coordinates', so the mip does not jump at a seam.
-	vec2 uv = cell * FIELD_REPEAT;
-	vec2 shift = vec2(cell_tone(plate), cell_tone(plate + 17.0));
-	vec4 detail = textureGrad(field, uv + shift, dFdx(uv), dFdy(uv));
-	vec2 turned = mat2(vec2(0.8, 0.6), vec2(-0.6, 0.8)) * cell;
-	float dust = mix(texture(field, turned * DUST_REPEAT).r, detail.r, DUST_DETAIL);
+	// The plate's tile, and `turn`, which takes the plate's own axes to the tile's about its
+	// middle: a quarter turn count, then mirrored from 4 on.
+	float variant = floor(cell_tone(plate + VARIANT_HASH) * 4.0);
+	float orientation = floor(cell_tone(plate + ORIENTATION_HASH) * 8.0);
+	float angle = mod(orientation, 4.0) * PI * 0.5;
+	float c = round(cos(angle));
+	float s = round(sin(angle));
+	float flip = orientation < 4.0 ? 1.0 : -1.0;
+	mat2 turn = mat2(vec2(flip * c, s), vec2(-flip * s, c));
+	vec2 tile = turn * (fract(cell / PLATE) - 0.5) + 0.5;
+	vec2 uv = (vec2(mod(variant, 2.0), floor(variant * 0.5)) + tile) * 0.5;
+	// The gradients are the unturned, unbroken coordinates', so the mip does not jump at a seam.
+	vec2 across = cell / PLATE * 0.5;
+	vec4 marks = textureGrad(field, uv, dFdx(across), dFdy(across));
 
-	float drift = smoothstep(DUST_STEP - DUST_SOFTNESS * 0.5, DUST_STEP + DUST_SOFTNESS * 0.5, dust);
-	vec3 plate_tint = plate_color.rgb * (1.0 + PLATE_TINT * (2.0 * cell_tone(plate) - 1.0));
-	vec3 albedo = mix(mix(plate_tint, field_color.rgb, DUST_SHOWS), field_light.rgb, drift);
-	float shown = 1.0 - DRIFT_BURIES * drift;
-	albedo = mix(albedo, field_light.rgb, clamp(detail.a * 2.0, 0.0, 1.0) * shown);
-	albedo = mix(albedo, fleck_color.rgb, clamp(detail.a * 2.0 - 1.0, 0.0, 1.0) * shown);
-	albedo = mix(albedo, field_dark.rgb, detail.g * shown);
-	albedo = mix(albedo, ink_color.rgb, detail.b * shown);
+	vec3 warmth = vec3(1.0, 0.0, -1.0) * PLATE_WARMTH * (2.0 * cell_tone(plate + WARMTH_HASH) - 1.0);
+	vec3 plate_tint = plate_color.rgb * (1.0 + PLATE_TINT * (2.0 * cell_tone(plate) - 1.0)) * (1.0 + warmth);
+	vec3 albedo = mix(plate_tint, field_color.rgb, DUST_SHOWS);
+	albedo = mix(albedo, field_dark.rgb, clamp(1.0 - 2.0 * marks.a, 0.0, 1.0));
+	albedo = mix(albedo, field_light.rgb, clamp(2.0 * marks.a - 1.0, 0.0, 1.0));
+	// The lean, back in the field's axes: `turn` is orthogonal, so its inverse is its transpose.
+	float lit = dot(transpose(turn) * (marks.rg * 2.0 - 1.0), sun_across);
+	albedo = mix(albedo, field_light.rgb, smoothstep(LEAN_FROM, LEAN_FULL, lit));
+	albedo = mix(albedo, field_dark.rgb, smoothstep(LEAN_FROM, LEAN_FULL, -lit));
+	albedo = mix(albedo, ink_color.rgb, marks.b);
 
 	albedo *= 1.0 + MACRO * (2.0 * value_noise(cell / MACRO_CELLS) - 1.0);
 	vec2 out_from_centre = abs(cell / grid_size - 0.5) * 2.0;

@@ -41,11 +41,11 @@ const WALL := Color("6b7fa3")
 const ENERGY := Color("58e8ff")
 const NANITE_GREEN := Color("8cff5a")
 const ARC_BLUE := Color("5b8cff")
-## The buildable field: its dust, the dust's light drifts and lit crater walls, the craters'
-## shadows, and the landing plates under the grid. The ground's and the terrain's roles are picked
-## so that, under the warm key light and over their textures, they render at the art style's
-## colours (docs/reference/art-style.md, **Colour**): bluer and more saturated than they show.
-## FIELD covers a plate at 60 percent, so it is the most saturated.
+## The buildable field: its dust, the light and dark sides of its marks (crater walls, pebbles,
+## bolts) and its light and dark tones, and the landing plates under the grid. The ground's and the
+## terrain's roles are picked so that, under the warm key light and over their textures, they
+## render at the art style's colours (docs/reference/art-style.md, **Colour**): bluer and more
+## saturated than they show. FIELD covers a plate at 60 percent, so it is the most saturated.
 const FIELD := Color("543fcc")
 const FIELD_LIGHT := Color("827fd7")
 const FIELD_DARK := Color("4d479f")
