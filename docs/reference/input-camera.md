@@ -165,23 +165,33 @@ the origin, cell (x, y) on world (x, z).
 | `walls` | The `WallMesh` that draws every finished wall but the dragged one. |
 | `set_grid_highlight(on)` | Brightens the ground's cell lines (`GRID_LINES_PLACING`) or dims them back (`GRID_LINES`); `PlacementController` calls it as placement begins and ends. |
 | `clear()` | Frees every view (used when the state is replaced). |
+| `terrain`, `boundary`, `rocks`, `outcrops` | The scenery's body instances, each with its ink outline beside it (`terrain_outline`, `boundary_outline`, `rocks_outline`, `outcrops_outline`), which casts no shadow. |
+| `craters`, `mesas`, `outcrop_spots` | The terrain's craters as (x, z, radius) and mesas as (x, z, radius, top height), and each crystal outcrop's centre on the ground. |
 
-`setup(size)` builds the scenery, the terrain and rocks drawn from `SeededRng.new(SCENERY_SEED)`
-(7) so every player's base sits in the same landscape; how each is shaded is in `art-style.md`,
-**Ground and scenery**:
+`setup(size)` builds the ground and the scenery once; the terrain, the rocks and the outcrops are
+drawn from `SeededRng.new(SCENERY_SEED)` (7) in that order, so every player's base sits in the
+same landscape. How each looks is in `art-style.md`, **Environment**:
 
-- **The ground**: a `PlaneMesh` of the grid's size with `ground.gdshader`: the kit's regolith in
-  the ground tint (`base_color`, `MaterialKit.GROUND`) with a slight tone variation per cell and a
-  cell grid whose `line_strength` is faint by default and brighter while placing; `grid_size` is a
-  uniform.
-- **The terrain**: one flat-shaded `ArrayMesh` annulus from the grid's edge out to
-  ±`TERRAIN_EXTENT` (90) on a `TERRAIN_STEP` (2) lattice that includes both grid edges. Heights
-  come from value noise, rise gently with distance and dip into three to five craters; along the
-  grid's edge they are pinned to y = 0, so the terrain meets the ground with no seam. Faces are
-  painted by height band (dust, darker dust, rock, dark rock, crater floors). It covers the view
-  at the widest zoom with the focus anywhere on the grid, and casts no shadows.
-- **The rocks**: `ROCK_COUNT` (40) irregular rocks merged into one mesh with its outline, sitting
-  on the terrain, never inside the grid.
+- **The ground**: a `PlaneMesh` of the grid's size, flat at y = 0 (the camera picks against that
+  plane), with `ground.gdshader` on the field texture (`assets/textures/field.png`, loaded as an
+  `Image` and mipmapped here) and the field's colour roles: landing plates, dust, comic craters, a
+  cell grid whose `line_strength` is faint by default and brighter while placing; `grid_size` is
+  a uniform.
+- **The curb** (`boundary`): a low concrete band round the field, `CURB_GAP` (0.3) outside its
+  edge, with a glowing stud at every plate seam and on each cut corner; casts no shadow.
+- **The terrain**: one smooth-shaded, indexed `ArrayMesh` from the field's edge out to
+  ±`TERRAIN_EXTENT` (100), on a lattice of 1 unit within `TERRAIN_FINE_REACH` (50) of the centre
+  and of `TERRAIN_COARSE` (2) beyond, whose inner edge lies on the field's at y = 0, so the two
+  meet with no seam; it is within 0.03 of flat under the curb and reaches its relief 3 units out.
+  Its craters, mesas, channel and dunes are placed from the seed; it has its ink outline, receives
+  shadows and casts none. `terrain_height(x, z)` is its height function, which the harness
+  marches the view's rays over. At the widest zoom it fills the view with the focus anywhere on
+  the grid on every aspect up to about 2.98:1 (a 19.5:9 phone is 2.17:1); beyond that the clear
+  colour shows.
+- **The rocks**: `ROCK_COUNT` (80) chamfered rocks, some stacked, in one mesh with its outline,
+  on the terrain clear of the curb.
+- **The outcrops**: six to ten clusters of glowing crystal shards in one mesh with its outline,
+  never within `OUTCROP_GAP` (4) of the field.
 
 ## BuildingView (`building_view.gd`) and BuildingModels (`building_models.gd`)
 

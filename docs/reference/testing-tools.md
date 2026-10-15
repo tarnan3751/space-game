@@ -71,10 +71,11 @@ the example.
 ## The texture generator: `tools/gen_textures.gd`
 
 A headless `SceneTree` script that draws the material kit's sixteen layers into
-`assets/textures/kit/` from one seed, byte-identical run to run:
+`assets/textures/kit/` and the ground's field texture into `assets/textures/field.png` from one
+seed, byte-identical run to run:
 `$GODOT --headless --path . -s res://tools/gen_textures.gd`, after an import. The gate does not
 run it; the PNGs are committed. `art-style.md`, **The material kit**, says what each layer holds
-and how to add one.
+and how to add one, and **Environment** what the field texture holds.
 
 ## Landing: `tools/land_series.sh`
 

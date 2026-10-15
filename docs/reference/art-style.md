@@ -12,9 +12,11 @@ camera and the views' wiring are in `input-camera.md`.
 | `src/game/low_poly_mesh.gd` | `LowPolyMesh`: parts, UVs, smoothing, the body and outline meshes |
 | `src/game/toon.gdshader`, `toon_common.gdshaderinc` | the body shader and the light it shares with the ground |
 | `src/game/ink.gdshader` | the outline shader |
-| `src/game/ground.gdshader` | the buildable ground |
+| `src/game/ground.gdshader` | the buildable field: plates, dust, craters, grid |
+| `src/game/base_view.gd` | builds the ground, the curb, the terrain ring, the rocks and the outcrops (**Environment**) |
 | `src/game/building_models.gd`, `src/game/models/` | the dispatcher and one model file per category, `Parts` in `models/parts.gd` |
 | `assets/textures/kit/` | the sixteen layers, committed PNGs |
+| `assets/textures/field.png` | the field texture, a committed PNG |
 | `tools/gen_textures.gd` | the generator that draws them |
 
 ## The look
@@ -31,7 +33,8 @@ a faceted primitive.
 
 ## Light and shading
 
-`main.gd` builds the environment: deep space behind (`SPACE`, `0D0B1A`), a cool ambient
+`main.gd` builds the environment: deep space behind (`SPACE`, `0D0B1A`, the clear colour, which
+the terrain ring hides at every zoom on screens up to about 2.98:1; there is no sky), a cool ambient
 (`AMBIENT`, `8C8CFF` at 0.35), linear tonemapping (filmic desaturates the accents), and one
 `DirectionalLight3D`, the key light: warm white (`SUN`, `FFF4E0`) at energy 1.0, from the upper
 left of the view (rotation −55°, −30°), casting one hard `SHADOW_ORTHOGONAL` split out to 80
@@ -124,14 +127,35 @@ Every value is sRGB; a tint multiplies a near-white layer. The constants are on 
 | Energy cyan | `58E8FF` | `ENERGY` | shields, energy fields, wall tops at high level, the valid ghost |
 | Nanite green | `8CFF5A` | `NANITE_GREEN` | nanite foundry goo and nanite-themed glows |
 | Arc blue | `5B8CFF` | `ARC_BLUE` | arc tower coils and electric effects |
-| Ground | `6E6684` | `GROUND` | the regolith ground and dust; craters `5A5370` (`CRATER`) |
-| Rock | `585466` | `ROCK` | scenery rocks and ridges; lit face `7A7588` (`ROCK_LIT`) |
+
+The field's and the terrain's roles, and rock, are in their own table below.
 
 A building uses hull light or hull mid for its main mass, gunmetal or hull dark for mechanical
 parts, its category accent on one or two surfaces, and one emissive element in its accent colour.
 The top level of every type adds core gold trim (edges, rings, caps), so a maxed building reads as
-maxed from across the base. Under the warm key light every lit colour leans warm: the ground reads
-grey-mauve rather than violet.
+maxed from across the base. Under the warm key light every lit colour leans warm.
+
+The field's and the terrain's roles are picked so that, under the warm key light and over their
+textures, they render as the art direction asks: each is bluer and more saturated than it shows.
+The rendered column is the average over flat ground at the widest zoom (the `environment`
+scenario's widest shot, measured in HSL): the field as a whole, plates, dust, drifts and craters
+together, and the ring's flat dust. The field is the lighter, cooler plain; the ring the deeper,
+more saturated land round it; the buildings' hulls the lightest things on screen.
+
+| Role | Constant | Value | Rendered | Where |
+| --- | --- | --- | --- | --- |
+| Field dust | `FIELD` | `543FCC` | the field: `5B5197` to `5F549D` (L 0.46 to 0.48, S 0.30) | the field's dust, covering a plate at 60 %; the most saturated, as the plate greys it |
+| Field light | `FIELD_LIGHT` | `827FD7` | | the dust's light drifts, lit crater walls |
+| Field dark | `FIELD_DARK` | `4D479F` | | crater shadows, pebbles' shadow sides |
+| Field plate | `FIELD_PLATE` | `8083C3` | | the landing plates under the dust (a cooler grey-violet) |
+| Terrain | `TERRAIN` | `564AC5` | the ring's flats: `4F4398` to `5143A0` (L 0.43 to 0.45, S 0.39 to 0.40) | the ring's dust |
+| Terrain light | `TERRAIN_LIGHT` | `7A73E3` | | dust drifts and the lit side of slopes over 25 degrees |
+| Terrain dark | `TERRAIN_DARK` | `3E388C` | | crater floors and the shadow side of slopes over 18 degrees |
+| Rock | `ROCK` | `50619B` | | slopes over 35 degrees (crater walls, mesa sides), the scenery rocks' sides, the crystal harvester's rock bed |
+| Rock lit | `ROCK_LIT` | `768BC9` | | the scenery rocks' chamfers and tops |
+
+The shard flecks on the field take `CRYSTAL`; the curb is `CONCRETE` with `ENERGY` studs; the
+outcrops are `CRYSTAL`, `METAL` and `ANTIMATTER`.
 
 ## The material kit
 
@@ -156,21 +180,22 @@ with a 1 px highlight. Every layer tiles seamlessly.
 | 11 | `glow` | emission 1.0 with faint stripes | yes |
 | 12 | `screen` | a display: ink with rows of lit segments, emission on the rows | yes |
 | 13 | `crystal` | faceted shards with a glow towards each facet's middle | yes |
-| 14 | `rock` | rock grain with ink cracks | yes |
-| 15 | `regolith` | fine dust, pebbles, faint craterlets | yes |
+| 14 | `rock` | four big plates in three tones with faint seams, three bold ink cracks | yes |
+| 15 | `regolith` | the terrain's dust: large soft blobs in two tones, two pebbles, no ink | yes |
 
 At the default UV scale a layer covers one world unit. Large surfaces take `hull` or `plate`:
 `hull_dense` is for parts under a unit, and on a large one it aliases into a checker at the widest
-zoom. A large, plain area can ask for a smaller `uv_scale` (the terrain uses 0.3 and 0.5).
+zoom. A large, plain area can ask for a smaller `uv_scale` (the terrain takes the kit at 0.18).
 
 `MaterialKit.texture()` builds the array on first use: it loads each layer as an `Image` (the PNGs'
 `.import` files use the image importer, so `load()` returns an `Image` in exports), generates its
 mipmaps (the Compatibility renderer makes none for a layered texture) and calls
 `create_from_images`. That takes about 12 ms on the development Mac, once.
 
-**Regenerating.** `tools/gen_textures.gd` draws every layer with its own wrapped line, disc, ring,
-polygon and value-noise helpers, from one seed through `SeededRng`, so two runs write
-byte-identical PNGs. After an import (the gate does one):
+**Regenerating.** `tools/gen_textures.gd` draws every layer, and then the field texture
+(**Environment**), with its own wrapped line, disc, ring, crescent, polygon and value-noise
+helpers, each image from its own seed through `SeededRng`, so two runs write byte-identical PNGs.
+After an import (the gate does one):
 
 ```
 $GODOT --headless --path . -s res://tools/gen_textures.gd
@@ -407,26 +432,108 @@ selected merged wall shows its footprint tile and no gold, and the merged outlin
 A dragged wall leaves the mesh and shows its own post, lifted with gold outlines like any dragged
 building; the paint brush is a ghost and keeps plain ink.
 
-## Ground and scenery
+## Environment
 
-- **The ground** (`ground.gdshader`): the regolith layer in the ground tint, sampled twice at
-  different scales and angles (a repeat per 4 cells and about one per 7, turned 37°) so no cell
-  repeats its neighbour, a slight tone per cell, and the cell grid in holographic cyan, not ink
-  (`line_strength` 0.1 by default, 0.45 while placing), all under the same `light()`. `BaseView` sets `kit` and `layer` from
-  `MaterialKit`.
-- **The terrain** ring: flat, not outlined, casting no shadow. Its lower bands are dust (the
-  regolith layer at 0.3, a craterlet about every two cells, in the ground tints); only the two
-  highest bands and the crater floors take the rock layer (at 0.5, in the rock and crater tints),
-  so its ink cracks show only where it is steep.
-- **The rocks**: one merged mesh on the rock layer, sides in `ROCK` and tops in `ROCK_LIT`,
-  outlined.
+The ground and everything round it, drawn in the buildings' language: a levelled, lit landing
+plain inside a deeper, wilder landscape, so the base reads as a settlement. `BaseView.setup`
+builds it all once; the terrain, the rocks and the outcrops come from `SeededRng` on
+`SCENERY_SEED` (7), so every base sits in the same landscape (`input-camera.md`, **BaseView**).
+
+**The field** (`ground.gdshader`, on the 40×40 `PlaneMesh` at y = 0): landing plates four cells
+square, each the plate tint varied 4 % either way by a cell hash, covered at 60 % by the dust.
+Ink seams 2 px wide run along every fourth grid line and an ink line 3 px wide along the field's
+edge, both at a 720 px viewport height and scaled with it, like the ink outline; the 1-cell grid
+stays in holographic cyan (`line_strength` 0.1, 0.45 while placing). A value noise twelve cells
+across varies the plain 6 % either way, and it darkens by 10 % from half way out to its edge. The
+lighting is `light()` from `toon_common`, as on the buildings.
+
+The field texture, `assets/textures/field.png` (1024×1024, one repeat per plate, 256 pixels a
+cell, the image importer like the kit), holds weights, not colours, so the tints stay
+`MaterialKit` roles: R dust noise, G shade, B ink, A light (0.5) and a shard fleck (1). Per two
+cells it has one large crater and two small ones, ten pebbles and two cracks, placed freely over
+the plate (four large and eight small craters, forty pebbles and eight cracks in all), so the
+craters form no lattice. The craters are drawn comic style: an ink rim heavier on the side towards
+the light, the inner wall there in full shade, the far wall lit, and a light and a dark crescent
+outside. The pebbles are polygons with 1.5 px ink edges, a cast shadow, a dark side and a lit top;
+the cracks long hairlines; and a few shard flecks glint. All of it is shaded from the key light's
+direction across the ground (`SUN` in the generator), so the texture is never turned. The shader
+samples it twice: shifted by an offset of each plate's own, for the detail, so neighbouring plates
+do not repeat; and turned 37 degrees at 0.31 repeats a cell, for the dust's mottling, so its blobs
+are one to two cells across and do not repeat with the plates. Where the dust passes its step, a
+light drift lies over the plate in `FIELD_LIGHT` and buries 95 % of the detail under it, so the
+plain reads as big flat areas of colour.
+
+**The curb** (`boundary`): a concrete band 0.2 high and 0.3 wide, 0.3 outside the field's edge,
+its corners cut at 45 degrees and its top edges bevelled, with a glowing energy cyan stud (unlit,
+not outlined) on it at every plate seam and on each corner cut. One mesh with its outline; neither
+casts a shadow.
+
+**The terrain ring**: one indexed mesh from the field's edge to ±100, on a lattice of points 1
+unit apart within 50 of the centre and 2 apart beyond; a coarse cell beside the fine lattice fans
+out from the fine point in the middle of its edge, so no point lies on another cell's edge. Its
+height function is flat out to 0.8 and the mesh is within 0.03 of flat under the curb (it has no
+point between the field's edge and a unit out); it reaches its full relief 3 units out. Its
+shapes:
+
+- ridged dunes, low beside the field and 5 units high from 18 out, whose flanks fall into the mid
+  band on their shadow side;
+- three to five craters, radius 6 to 12, each a flat floor 0.18 radii deep, a wall steepening to
+  a rim 0.15 radii high and a gentler outer slope, in ground flattened round it;
+- two irregular flat-topped mesas towards the far edge of the view, 4 to 6 above the dunes' crests,
+  with steep walls;
+- a meandering dry channel running out from near the field, away from the mesas.
+
+Each point's normal comes once from its lattice neighbours' heights, so the ring is smooth shaded
+and the cel bands sweep across the dunes. Each point is tinted by slope and place: `TERRAIN`,
+blended towards `TERRAIN_DARK` on crater floors and the shadow side of slopes over 18 degrees,
+towards `TERRAIN_LIGHT` on the lit side of slopes over 25 degrees and on noise-chosen dust drifts,
+and towards `ROCK` on slopes over 35 degrees (crater walls, mesa sides). The blends are soft over a
+few points, so the patches are rounded, not triangles. The texture is the regolith layer
+everywhere but on the mesas' walls, which take the rock layer: the shader cannot blend two layers,
+so the layer switches only at a mesa's rim, where the slope breaks, and on level ground a unit past
+its foot. Both are projected from above at 0.18 repeats a unit. Its ink outline is a second mesh on
+the same points and normals, so it inks the crater rims and the ridges the camera looks over. The
+body receives shadows and casts none.
+
+At the widest zoom the ring fills the view with the focus anywhere on the grid on every aspect up
+to about 2.98:1, measured by marching the rays from the screen's corners over the terrain with the
+focus at each corner of its bounds (a 19.5:9 phone is 2.17:1, and the `environment` scenario checks
+1560x720). Beyond that the clear colour shows first along the bottom of the screen, where the rays
+pass under the ring's raised outer edge. There is no sky.
+
+A known limitation: at a mesa's foot the steep wall meets level ground within one lattice step,
+so the lattice normal jumps from wall to flat in one point, and the edge of the cel bands there
+forms small triangular teeth. Neither the tint nor the layer draws them (both were turned off to
+check), and the crater walls, which span several points, are free of them. The fix is a lattice
+of 0.5 within the mesas' reach, a later item.
+
+**The scenery**:
+
+- **Rocks**: 80 chamfered chunks, 0.8 to 5 units across and most of them small, of five to seven
+  sides, a shoulder ring, a chamfer and a low peak, flat shaded, sides in `ROCK` and chamfers and
+  tops in `ROCK_LIT`; about a quarter of those over 1.6 units across carry a smaller rock on top.
+  Each sits on the lowest ground under it. One mesh with its outline; the body casts shadows.
+- **Crystal outcrops**: six to ten clusters of three to seven shards, each a six-sided crystal 0.6
+  to 2 units long leaning out from the cluster's middle, on the crystal layer, unlit, in
+  `CRYSTAL`, `METAL` and `ANTIMATTER` in turn from a seeded start, outlined. No part of one comes
+  within 4 units of the field; they keep off the mesas and out of the craters' bowls. One mesh with
+  its outline; the body casts shadows.
+
+**Budgets**: the field 1 draw; the curb, the terrain, the rocks and the outcrops a body and an
+outline each. The terrain is 32,000 triangles on 16,280 points (the `environment` scenario allows
+35,000), the rocks about 2,800 and the outcrops about 900. It is all built once, in about 80 ms on
+the development Mac under load (the kit's build and the field texture's load and mipmaps included),
+the terrain about 50 ms of it; phones are unmeasured. Nothing runs per frame.
 
 ## Cost
 
 A building's body instances draw for the light and into the shadow map; its outline instances
 draw once and never cast. Measured with `Performance.RENDER_TOTAL_DRAW_CALLS_IN_FRAME`: a fresh
-base is 57 draw calls, as it was before the kit; the model gallery's overview is 375 draw calls on
-page 1 and 171 on page 2 (294 and 157 before the kit; the research lab's spinning dish adds 15 on
-page 1), and the render thread's CPU time is about 0.5 ms a frame either way. Keep `_process` free
+base is 63 draw calls (57 before the environment's curb, terrain outline and outcrops); the model
+gallery's overview is 381 draw calls on page 1 and 177 on page 2 (375 and 171 before them, 294 and
+157 before the kit; the research lab's spinning dish adds 15 on page 1), and the render thread's
+CPU time is about 0.5 ms a frame either way. The kit's texture array, sixteen 256×256 RGBA8 layers,
+is about 5.3 MB with its mipmaps; the field texture, one 1024×1024 RGBA8 image, is about 5.3 MB
+with its mipmaps too. Keep `_process` free
 of allocation, and keep every building to its four instances. The finished walls are one merged
 mesh, a fixed handful of draws however many there are (`input-camera.md`, **Walls**).

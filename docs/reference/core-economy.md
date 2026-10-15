@@ -196,4 +196,5 @@ denominator)` is true with that probability using integers only.
 The same seed gives the same sequence on every device and on the server, and
 `test_seeded_rng.gd` freezes the first values of seeds 1 and 12345: those expectations never
 change. Today the generator draws the scenery (`BaseView`, seed 7): the terrain's noise, its
-craters and the rocks; expeditions and the battle sim will draw from it.
+mesas, craters and channel, the rocks and the crystal outcrops; expeditions and the battle sim
+will draw from it.
