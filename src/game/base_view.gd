@@ -10,6 +10,8 @@ extends Node3D
 ## regolith, the rocks its rock layer); the rocks also have their ink outline.
 
 const GROUND_SHADER := preload("res://src/game/ground.gdshader")
+## The field texture the ground is drawn from, imported as an Image (tools/gen_textures.gd).
+const FIELD_TEXTURE := "res://assets/textures/field.png"
 const SCENERY_SEED := 7
 ## Strength of the ground's cell lines, normally and while placing.
 const GRID_LINES := 0.1
@@ -29,11 +31,11 @@ const TERRAIN_ROCK_UV := 0.5
 ## The terrain's faces by height band, from the crater floors up: flat and not outlined (its
 ## relief shows in the bands). The ring reads as quiet dust on the regolith layer, with the rock
 ## layer's grain and cracks only on the two highest bands and in the craters.
-static var TERRAIN_CRATER := Surf.make(MaterialKit.Layer.ROCK, MaterialKit.CRATER, TERRAIN_ROCK_UV, Surf.LIT,
+static var TERRAIN_CRATER := Surf.make(MaterialKit.Layer.ROCK, MaterialKit.TERRAIN_DARK, TERRAIN_ROCK_UV,
+	Surf.LIT, false, false)
+static var TERRAIN_LOW := Surf.make(MaterialKit.Layer.REGOLITH, MaterialKit.TERRAIN, TERRAIN_DUST_UV, Surf.LIT,
 	false, false)
-static var TERRAIN_LOW := Surf.make(MaterialKit.Layer.REGOLITH, MaterialKit.GROUND, TERRAIN_DUST_UV, Surf.LIT,
-	false, false)
-static var TERRAIN_MID := Surf.make(MaterialKit.Layer.REGOLITH, MaterialKit.GROUND.lerp(MaterialKit.ROCK, 0.5),
+static var TERRAIN_MID := Surf.make(MaterialKit.Layer.REGOLITH, MaterialKit.TERRAIN.lerp(MaterialKit.ROCK, 0.5),
 	TERRAIN_DUST_UV, Surf.LIT, false, false)
 static var TERRAIN_HIGH := Surf.make(MaterialKit.Layer.ROCK, MaterialKit.ROCK, TERRAIN_ROCK_UV, Surf.LIT,
 	false, false)
@@ -169,12 +171,19 @@ func clear() -> void:
 
 
 func _build_ground() -> void:
+	var field: Image = load(FIELD_TEXTURE)
+	# Mipmapped here: the image importer keeps the PNG as it is.
+	field.generate_mipmaps()
 	_ground_material = ShaderMaterial.new()
 	_ground_material.shader = GROUND_SHADER
 	_ground_material.set_shader_parameter("grid_size", Vector2(grid_size))
-	_ground_material.set_shader_parameter("base_color", MaterialKit.GROUND)
-	_ground_material.set_shader_parameter("kit", MaterialKit.texture())
-	_ground_material.set_shader_parameter("layer", float(MaterialKit.Layer.REGOLITH))
+	_ground_material.set_shader_parameter("field", ImageTexture.create_from_image(field))
+	_ground_material.set_shader_parameter("field_color", MaterialKit.FIELD)
+	_ground_material.set_shader_parameter("field_light", MaterialKit.FIELD_LIGHT)
+	_ground_material.set_shader_parameter("field_dark", MaterialKit.FIELD_DARK)
+	_ground_material.set_shader_parameter("plate_color", MaterialKit.FIELD_PLATE)
+	_ground_material.set_shader_parameter("fleck_color", MaterialKit.CRYSTAL)
+	_ground_material.set_shader_parameter("ink_color", MaterialKit.INK)
 	_ground_material.set_shader_parameter("line_strength", GRID_LINES)
 	var plane := PlaneMesh.new()
 	plane.size = Vector2(grid_size)

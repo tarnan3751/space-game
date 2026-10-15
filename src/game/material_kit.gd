@@ -41,10 +41,22 @@ const WALL := Color("6b7fa3")
 const ENERGY := Color("58e8ff")
 const NANITE_GREEN := Color("8cff5a")
 const ARC_BLUE := Color("5b8cff")
-const GROUND := Color("6e6684")
-const CRATER := Color("5a5370")
-const ROCK := Color("585466")
-const ROCK_LIT := Color("7a7588")
+## The buildable field: its dust, the dust's light drifts and lit crater walls, the craters'
+## shadows, and the landing plates under the grid. The ground's and the terrain's roles are picked
+## so that, under the warm key light and over their textures, they render at the art style's
+## colours (docs/reference/art-style.md, **Colour**): bluer and more saturated than they show.
+## FIELD covers a plate at 60 percent, so it is the most saturated.
+const FIELD := Color("543fcc")
+const FIELD_LIGHT := Color("827fd7")
+const FIELD_DARK := Color("4d479f")
+const FIELD_PLATE := Color("8083c3")
+## The terrain around the field, a shade deeper: its dust, lit slopes and drifts, and crater
+## floors and shadow sides; and rock, its faces and lit faces.
+const TERRAIN := Color("564ac5")
+const TERRAIN_LIGHT := Color("7a73e3")
+const TERRAIN_DARK := Color("3e388c")
+const ROCK := Color("50619b")
+const ROCK_LIT := Color("768bc9")
 ## The scene: the clear colour, the environment's ambient light and the key light.
 const SPACE := Color("0d0b1a")
 const AMBIENT := Color("8c8cff")
