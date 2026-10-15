@@ -288,14 +288,15 @@ func strut(from: Vector3, to: Vector3, width: float, surf: Surf) -> void:
 	box(Vector3(width, length, width), from, surf, Vector3(pitch, yaw, 0))
 
 
-## A cylinder with `sides` faces, tapering from `bottom_radius` to `top_radius`.
+## A cylinder with `sides` faces, tapering from `bottom_radius` to `top_radius`; swept from
+## `from_deg` to `to_deg` only, as lathe() says, for a half-vault.
 func prism(bottom_radius: float, top_radius: float, height: float, sides: int, pos: Vector3,
-		surf: Surf, rot: Vector3 = Vector3.ZERO) -> void:
+		surf: Surf, rot: Vector3 = Vector3.ZERO, from_deg: float = 0.0, to_deg: float = 360.0) -> void:
 	var profile := PackedVector2Array([Vector2(bottom_radius, 0)])
 	if top_radius > 0.0:
 		profile.append(Vector2(top_radius, height))
 	profile.append(Vector2(0, height))
-	lathe(profile, sides, pos, surf, rot)
+	lathe(profile, sides, pos, surf, rot, from_deg, to_deg)
 
 
 func cone(radius: float, height: float, sides: int, pos: Vector3, surf: Surf,
@@ -309,15 +310,16 @@ func pyramid(width: float, height: float, pos: Vector3, surf: Surf,
 	prism(width * 0.5 * sqrt(2.0), 0.0, height, 4, pos, surf, rot + Vector3(0, 45, 0))
 
 
-## A hemisphere squashed to `height`, in `rings` bands.
+## A hemisphere squashed to `height`, in `rings` bands; swept from `from_deg` to `to_deg` only,
+## as lathe() says.
 func dome(radius: float, height: float, sides: int, rings: int, pos: Vector3, surf: Surf,
-		rot: Vector3 = Vector3.ZERO) -> void:
+		rot: Vector3 = Vector3.ZERO, from_deg: float = 0.0, to_deg: float = 360.0) -> void:
 	var profile := PackedVector2Array()
 	for k: int in rings:
 		var angle := PI * 0.5 * k / rings
 		profile.append(Vector2(radius * cos(angle), height * sin(angle)))
 	profile.append(Vector2(0, height))
-	lathe(profile, sides, pos, surf, rot)
+	lathe(profile, sides, pos, surf, rot, from_deg, to_deg)
 
 
 ## A sphere centred on `pos`, in `rings` bands from pole to pole.
@@ -331,23 +333,25 @@ func orb(radius: float, sides: int, rings: int, pos: Vector3, surf: Surf,
 	lathe(profile, sides, pos, surf, rot)
 
 
-## A flat annulus with walls: a band, a collar, a hoop. Open underneath.
+## A flat annulus with walls: a band, a collar, a hoop. Open underneath. Swept from `from_deg`
+## to `to_deg` only, as lathe() says.
 func ring(inner_radius: float, outer_radius: float, height: float, sides: int, pos: Vector3,
-		surf: Surf, rot: Vector3 = Vector3.ZERO) -> void:
+		surf: Surf, rot: Vector3 = Vector3.ZERO, from_deg: float = 0.0, to_deg: float = 360.0) -> void:
 	lathe(PackedVector2Array([
 		Vector2(outer_radius, 0), Vector2(outer_radius, height),
 		Vector2(inner_radius, height), Vector2(inner_radius, 0),
-	]), sides, pos, surf, rot)
+	]), sides, pos, surf, rot, from_deg, to_deg)
 
 
 ## A hollow cylinder closed at both ends: a pipe, a barrel with a bore. Unlike a ring it has
-## its bottom face, so it reads from any angle when turned on its side.
+## its bottom face, so it reads from any angle when turned on its side. Swept from `from_deg`
+## to `to_deg` only, as lathe() says.
 func tube(inner_radius: float, outer_radius: float, height: float, sides: int, pos: Vector3,
-		surf: Surf, rot: Vector3 = Vector3.ZERO) -> void:
+		surf: Surf, rot: Vector3 = Vector3.ZERO, from_deg: float = 0.0, to_deg: float = 360.0) -> void:
 	lathe(PackedVector2Array([
 		Vector2(outer_radius, 0), Vector2(outer_radius, height),
 		Vector2(inner_radius, height), Vector2(inner_radius, 0), Vector2(outer_radius, 0),
-	]), sides, pos, surf, rot)
+	]), sides, pos, surf, rot, from_deg, to_deg)
 
 
 ## A flat regular polygon facing up: a pad marking, a glow plate.
@@ -360,8 +364,12 @@ func disc(radius: float, sides: int, pos: Vector3, surf: Surf,
 
 ## Spins `profile` (x = radius, y = height, from the bottom outside up) around +Y. A point at
 ## radius 0 closes the shape: a flat cap when it is level with its neighbour, else an apex.
+## Given `from_deg` and `to_deg` less than a turn apart (degrees from +X towards +Z, as
+## Parts.around), it sweeps only that arc, in as many of the `sides` steps as the arc spans, and
+## closes each end with a flat face: the profile, closed through the axis when one of its ends
+## is on it (keep that section convex). U still comes from the angle.
 func lathe(profile: PackedVector2Array, sides: int, pos: Vector3, surf: Surf,
-		rot: Vector3 = Vector3.ZERO) -> void:
+		rot: Vector3 = Vector3.ZERO, from_deg: float = 0.0, to_deg: float = 360.0) -> void:
 	var start := _vertices.size()
 	var xf := Transform3D(_basis(rot), pos)
 	var last := profile.size() - 1
@@ -373,11 +381,22 @@ func lathe(profile: PackedVector2Array, sides: int, pos: Vector3, surf: Surf,
 	for point: Vector2 in profile:
 		widest = maxf(widest, point.x)
 	var repeats := _repeats(widest, surf)
-	for j: int in sides:
-		var a0 := TAU * j / sides
-		var a1 := TAU * (j + 1) / sides
-		var u0 := repeats * float(j) / sides
-		var u1 := repeats * float(j + 1) / sides
+	var from := 0.0
+	var span := TAU
+	var steps := sides
+	var partial := to_deg - from_deg < 360.0
+	if partial:
+		from = deg_to_rad(from_deg)
+		span = deg_to_rad(to_deg - from_deg)
+		steps = maxi(1, roundi(sides * (to_deg - from_deg) / 360.0))
+	# U from the angle; on a whole turn these are exactly repeats * j / sides.
+	var u_from := repeats * (from / TAU)
+	var u_span := repeats * (span / TAU)
+	for j: int in steps:
+		var a0 := from + span * j / steps
+		var a1 := from + span * (j + 1) / steps
+		var u0 := u_from + u_span * j / steps
+		var u1 := u_from + u_span * (j + 1) / steps
 		var um := (u0 + u1) * 0.5
 		for i: int in last:
 			var p := profile[i]
@@ -404,8 +423,46 @@ func lathe(profile: PackedVector2Array, sides: int, pos: Vector3, surf: Surf,
 				_tri(xf * lower_a, xf * upper_b, xf * lower_b,
 					Vector2(u0, vp), Vector2(u1, vq), Vector2(u1, vp), surf, false)
 	if flat_top:
-		_fan(profile[last - 1].x, profile[last].y, sides, xf, surf, repeats)
+		_fan(profile[last - 1].x, profile[last].y, steps, xf, surf, repeats, from, span)
+	if partial:
+		var section := _section(profile)
+		_end_face(section, from, -1.0, xf, surf)
+		_end_face(section, from + span, 1.0, xf, surf)
 	_finish(start, surf)
+
+
+## The cross-section a partial lathe's end faces close: `profile` closed through the axis when
+## just one of its ends is on it, with repeated points dropped.
+static func _section(profile: PackedVector2Array) -> PackedVector2Array:
+	var first := profile[0]
+	var end := profile[profile.size() - 1]
+	var section := PackedVector2Array()
+	if end.x == 0.0 and first.x != 0.0:
+		section.append(Vector2(0.0, first.y))
+	for point: Vector2 in profile:
+		if section.is_empty() or point != section[section.size() - 1]:
+			section.append(point)
+	if first.x == 0.0 and end.x != 0.0:
+		section.append(Vector2(0.0, end.y))
+	if section.size() > 2 and section[0] == section[section.size() - 1]:
+		section.remove_at(section.size() - 1)
+	return section
+
+
+## A partial lathe's end: `section` stood at `angle` round +Y, facing along the sweep's
+## direction there times `onward` (-1 at its start, +1 at its end). Nothing for a section with no
+## area (an open profile).
+func _end_face(section: PackedVector2Array, angle: float, onward: float, xf: Transform3D, surf: Surf) -> void:
+	var corners := PackedVector3Array()
+	for point: Vector2 in section:
+		corners.append(Vector3(point.x * cos(angle), point.y, point.x * sin(angle)))
+	var out := Vector3(-sin(angle), 0.0, cos(angle)) * onward
+	var facing := _newell(corners).dot(out)
+	if absf(facing) < 1e-6:
+		return
+	if facing < 0.0:
+		corners.reverse()
+	_face(corners, xf, surf)
 
 
 static func _basis(rot: Vector3) -> Basis:
@@ -445,15 +502,19 @@ func _face_out(corners: PackedVector3Array, centre: Vector3, xf: Transform3D, su
 
 
 ## A flat polygon of `sides` facing up at `height`, as a fan from its centre with polar UVs
-## (U around, V the radius): a lathe's cap or a disc. Its faces stay hard in a smooth part.
-func _fan(radius: float, height: float, sides: int, xf: Transform3D, surf: Surf, repeats: int) -> void:
+## (U around, V the radius): a lathe's cap or a disc. Its faces stay hard in a smooth part. A
+## partial lathe's cap spans only its arc, `span` radians from `from`, in `sides` steps.
+func _fan(radius: float, height: float, sides: int, xf: Transform3D, surf: Surf, repeats: int,
+		from: float = 0.0, span: float = TAU) -> void:
 	var centre := Vector3(0, height, 0)
 	var v := radius * surf.uv_scale
+	var u_from := repeats * (from / TAU)
+	var u_span := repeats * (span / TAU)
 	for j: int in sides:
-		var a0 := TAU * j / sides
-		var a1 := TAU * (j + 1) / sides
-		var u0 := repeats * float(j) / sides
-		var u1 := repeats * float(j + 1) / sides
+		var a0 := from + span * j / sides
+		var a1 := from + span * (j + 1) / sides
+		var u0 := u_from + u_span * j / sides
+		var u1 := u_from + u_span * (j + 1) / sides
 		_tri(xf * centre, xf * Vector3(radius * cos(a1), height, radius * sin(a1)),
 			xf * Vector3(radius * cos(a0), height, radius * sin(a0)),
 			Vector2((u0 + u1) * 0.5, 0.0), Vector2(u1, v), Vector2(u0, v), surf, true)

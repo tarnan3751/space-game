@@ -293,14 +293,14 @@ faces are left out of boxes and lathes, since the camera always looks down.
 | `box_chamfered(size, chamfer, pos, surf, rot)` | a box with its top and vertical edges bevelled; the bottom edges stay square, since a part stands on something (30 triangles) |
 | `wedge(size, pos, surf, rot)` | a ramp, full height along −Z |
 | `strut(from, to, width, surf)` | a box from one point to another |
-| `prism(bottom_radius, top_radius, height, sides, pos, surf, rot)` | a cylinder or a tapered one, capped |
+| `prism(bottom_radius, top_radius, height, sides, pos, surf, rot, from_deg, to_deg)` | a cylinder or a tapered one, capped; the angles sweep part of it, as `lathe` does |
 | `cone`, `pyramid` | a cone, a four-sided cone |
-| `dome(radius, height, sides, rings, pos, surf, rot)` | a hemisphere squashed to `height` |
+| `dome(radius, height, sides, rings, pos, surf, rot, from_deg, to_deg)` | a hemisphere squashed to `height`; the angles sweep part of it, as `lathe` does |
 | `orb(radius, sides, rings, pos, surf, rot)` | a sphere centred on `pos` |
-| `ring(inner_radius, outer_radius, height, sides, pos, surf, rot)` | an annulus with walls, open underneath |
-| `tube(inner_radius, outer_radius, height, sides, pos, surf, rot)` | a hollow cylinder closed at both ends, for pipes and bores turned on their side |
+| `ring(inner_radius, outer_radius, height, sides, pos, surf, rot, from_deg, to_deg)` | an annulus with walls, open underneath; the angles sweep part of it, as `lathe` does |
+| `tube(inner_radius, outer_radius, height, sides, pos, surf, rot, from_deg, to_deg)` | a hollow cylinder closed at both ends, for pipes and bores turned on their side; the angles sweep part of it, as `lathe` does |
 | `disc(radius, sides, pos, surf, rot)` | a flat polygon facing up |
-| `lathe(profile, sides, pos, surf, rot)` | the general round part |
+| `lathe(profile, sides, pos, surf, rot, from_deg = 0.0, to_deg = 360.0)` | the general round part; given angles less than a turn apart (degrees from +X towards +Z, as `Parts.around`), it sweeps only that arc, in the share of `sides` steps the arc spans, and closes each end with a flat face, outlined like the rest: the profile, closed through the axis when one of its ends is on it (keep that section convex). U still comes from the angle. A half-vault: a `prism` turned onto its side and swept over its upper half |
 | `turn(offset, rot)` | an offset turned like a part, to place a part on a turned one |
 
 `sides` goes up to 24 and `rings` to 8 anywhere. `to_mesh()` is the body (VERTEX, NORMAL, UV,
