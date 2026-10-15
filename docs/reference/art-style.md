@@ -198,15 +198,20 @@ The rendered column is the average over flat ground at the widest zoom (the `env
 scenario's widest shot, measured in HSL): the field as a whole, ground and marks together (the
 grid is hidden outside building), over each quarter of it clear of the HUD and the buildings; and
 the ring's flat dust. The field renders in the ring's shade, within 0.01 in L and 0.02 in S (the
-`environment` scenario checks it, rendered): it reads as a plain of its own by its marks, and the
-kerb is its border, not its tone. The buildings' hulls are the lightest things on screen.
+`environment` scenario checks it, rendered, each spot's average divided by the large value noise's
+factor there, which the field and the ring share but which lies darker at the field's four spots
+than at the ring's two): it reads as a plain of its own by its marks, and the kerb is its border,
+not its tone. Where they meet there is no step: at the start zoom, half a cell inside the field's
+edge and half a unit outside it, along each of the two sides far from the camera, the ground's
+median colour (marks excluded) differs by under 3/255 in every channel (checked there too). The
+buildings' hulls are the lightest things on screen.
 
 | Role | Constant | Value | Rendered | Where |
 | --- | --- | --- | --- | --- |
-| Field dust | `FIELD` | `4A35D0` | the field: `5445A8` to `5848AF` (L 0.47 to 0.48, S 0.42) | the field's dust, covering the ground at 60 %; the most saturated, as the plate tint greys it |
+| Field dust | `FIELD` | `4733C9` | the field: `5646AD` (L 0.47 to 0.48, S 0.42) with the value noise divided out; `5142A3` to `5545AB` at the four spots as drawn | the field's dust, covering the ground at 60 %; the most saturated, as the plate tint greys it |
 | Field light | `FIELD_LIGHT` | `746CDB` | | the lit sides of the field's marks (crater walls, pebbles, shards), its light tones |
 | Field dark | `FIELD_DARK` | `443BA2` | | the shadow sides of the field's marks, its dark tones (crater and pit floors) |
-| Field plate | `FIELD_PLATE` | `726FC7` | | the levelled ground under the dust (a cooler grey-violet) |
+| Field plate | `FIELD_PLATE` | `6D6CC0` | | the levelled ground under the dust (a cooler grey-violet) |
 | Terrain | `TERRAIN` | `564AC5` | the ring's flats, marks and grain included: `5346A2` to `5747AE` (L 0.46 to 0.48, S 0.40 to 0.42) | the ring's dust |
 | Terrain light | `TERRAIN_LIGHT` | `7A73E3` | | the lit side of slopes over 25 degrees; the light sides and tones of the ring's marks, the lit sides of its ripples |
 | Terrain dark | `TERRAIN_DARK` | `3E388C` | | crater floors and the shadow side of slopes over 18 degrees; the dark sides and tones of the ring's marks, the shaded sides of its ripples, the strata's undersides |
@@ -220,7 +225,12 @@ Measured over the same four quarters and two flat stretches of the ring (`5646AC
 field now averages L 0.477, S 0.417 against the ring's L 0.478, S 0.420. The ring's row was re-measured when its
 surface was drawn (marks, ripples, strata): over the same three stretches of flat ring the
 untextured ring rendered `5547A6` to `5A4CA8` (L 0.46 to 0.48, S 0.38 to 0.40), and the field's
-four quarters rendered pixel for pixel as before. The perimeter's kerb is `CONCRETE`, its
+four quarters rendered pixel for pixel as before. The field's darkening towards its edge (10 %
+from half way out) then left it darker than the ring's first unit, a step of 13/255 along the
+whole edge; with the darkening gone it was 6 to 7/255 lighter, as its roles had been matched to the
+ring's at spots where the value noise lies 3 % darker on the field. `FIELD` and `FIELD_PLATE` were
+scaled down to the ring's tone at the edge (within 1/255), which with the noise divided out is the
+ring's flats' shade as well (L 0.473 against 0.476). The perimeter's kerb is `CONCRETE`, its
 pylons `HULL_MID` with `ENERGY` lamps and `HAZARD` beacons, its fence `ENERGY`; the outcrops are
 `CRYSTAL`, `METAL` and `ANTIMATTER`.
 
@@ -714,11 +724,11 @@ of regolith with natural marks scattered over it. Everywhere the ground is the p
 at 60 % by the dust, with a fine grain drawn by the shader in world space, so it runs on unbroken
 across the field: two octaves of value noise at 6 and 12 repeats a cell, each 3.5 % either way, each
 fading out as its lattice falls under a pixel so it does not shimmer at the widest zooms. A value
-noise twelve cells across varies the plain 6 % either way, and it darkens by 10 % from half way out
-to its edge. The 1-cell grid is drawn in holographic cyan only while building (`line_strength`
-0.45 while placing, painting walls or moving a building, 0 otherwise), and its outermost line,
-along the field's edge, is drawn like the inner ones, at the same width (the plane ends there, so
-it lies just inside). There is no other line, seam or square on it. The lighting is `light()`
+noise twelve cells across varies the plain 6 % either way, the ring's own on the same cells, so the
+field's tone runs on unbroken into the ring's at its edge. The 1-cell grid is drawn in holographic
+cyan only while building (`line_strength` 0.45 while placing, painting walls or moving a
+building, 0 otherwise), and its outermost line, along the field's edge, is drawn like the inner
+ones, at the same width (the plane ends there, so it lies just inside). There is no other line, seam or square on it. The lighting is `light()`
 from `toon_common`, as on the buildings. The hash, the noise, the grain and the tiles' sampling and
 lighting live in `field_marks.gdshaderinc`, which the terrain shader shares.
 

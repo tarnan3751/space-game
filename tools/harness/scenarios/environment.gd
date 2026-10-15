@@ -14,8 +14,10 @@ extends HarnessScenario
 ## the relief is full (BaseView.blend_end) wanders by more than BLEND_WANDER; that at the widest
 ## zoom in a WIDE window, the focus at each corner of its bounds, the ray from every screen corner
 ## meets the terrain; and that in a WIDER window, focused on the field's nearest corner, it does
-## not, so the sky shows; and, rendered only, that in the widest shot the field's quarters and two
-## flat stretches of the ring average to the same shade (_check_field_shade). Screenshots: the
+## not, so the sky shows; and, rendered only, that at the start zoom the ground just inside the
+## field's two far sides and just outside them differs by under EDGE_STEP (_check_edge_step), and
+## that in the widest shot the field's quarters and two flat stretches of the ring average to the
+## same shade, the value noise they share divided out (_check_field_shade). Screenshots: the
 ## start zoom, the closest on the field, the closest on a point where four of the field texture's
 ## tiles meet (nothing should show where they do), a wider stretch of the field, the perimeter at
 ## the middle of each side, a side and a corner of it at the closest zoom, the widest in the WIDE
@@ -51,6 +53,20 @@ const RING_FLATS: Array[Vector3] = [Vector3(9, 0, -26.5), Vector3(26, 0, -9.5)]
 const SHADE_BOX := Vector2i(80, 40)
 const SHADE_L := 0.01
 const SHADE_S := 0.02
+## The ground shaders' macro value noise (ground.gdshader, terrain.gdshader): its period in cells and
+## its strength either way.
+const MACRO_CELLS := 12.0
+const MACRO := 0.06
+## The step at the field's edge in the start shot: on each side whose strip outside the edge lies
+## clear of the perimeter (the two far from the camera, by the screen corner each faces, with its
+## outward direction), the ground EDGE_IN inside the edge and EDGE_IN outside it, sampled every
+## EDGE_EVERY cells along the side in a box of EDGE_BOX pixels, and the most the medians of the two
+## may differ in any channel, in 255ths.
+const EDGE_SIDES := {"top-left": Vector2(-1, 0), "top-right": Vector2(0, -1)}
+const EDGE_IN := 0.5
+const EDGE_EVERY := 1
+const EDGE_BOX := Vector2i(8, 4)
+const EDGE_STEP := 3
 
 
 func run(main: MainScript) -> void:
@@ -135,6 +151,7 @@ func run(main: MainScript) -> void:
 			"%.1f out from the %s side the ground is %.2f to %.2f high, its relief full %.1f to %.1f out"
 			% [EDGE_OUT, side, heights.x, heights.y, full.x, full.y])
 	await _shot(main, "start", Vector3.ZERO, main.camera.size)
+	_check_edge_step(main)
 	await _shot(main, "closest-field", view.cell_to_world(Vector2i(9, 9), 1), IsoCamera.MIN_ZOOM_SIZE)
 	# Cells (12, 28) are a corner of the field texture's tiles, which are 4 cells square.
 	var tile_corner := field.position + Vector2(12, 28)
@@ -194,8 +211,12 @@ func run(main: MainScript) -> void:
 
 ## Whether the field renders in the ring's shade (docs/reference/art-style.md, **Colour**): the
 ## average colour of SHADE_BOX round each of FIELD_QUARTERS and of RING_FLATS on the frame just
-## shown, each in sRGB, agree within SHADE_L in HSL lightness and SHADE_S in saturation. A
-## rendered run only: a headless one draws nothing.
+## shown, each in sRGB, agree within SHADE_L in HSL lightness and SHADE_S in saturation. Each box's
+## average is first divided by the macro value noise's factor at its middle (_macro), which the
+## field and the ring share but which lies differently at the two sets of spots, so the check
+## compares their tints (the factor shows one for one in the rendered sRGB values: measured with
+## the noise off, each box renders its average over the factor, within 1/255). A rendered run
+## only: a headless one draws nothing.
 func _check_field_shade(main: MainScript) -> void:
 	if harness.headless:
 		say("the field's shade against the ring's skipped (headless)")
@@ -207,10 +228,12 @@ func _check_field_shade(main: MainScript) -> void:
 		var sum := Color(0, 0, 0)
 		for at: Vector3 in spots:
 			var corner := Vector2i(main.camera.unproject_position(at) * scale) - SHADE_BOX / 2
+			var box := Color(0, 0, 0)
 			for y: int in SHADE_BOX.y:
 				for x: int in SHADE_BOX.x:
-					sum += image.get_pixelv(corner + Vector2i(x, y))
-		var average := sum / float(spots.size() * SHADE_BOX.x * SHADE_BOX.y)
+					box += image.get_pixelv(corner + Vector2i(x, y))
+			sum += box / float(SHADE_BOX.x * SHADE_BOX.y) / _macro(main.base_view, at)
+		var average := sum / float(spots.size())
 		var high := maxf(average.r, maxf(average.g, average.b))
 		var low := minf(average.r, minf(average.g, average.b))
 		var lightness := (high + low) * 0.5
@@ -218,6 +241,99 @@ func _check_field_shade(main: MainScript) -> void:
 	check(absf(hsl[0].x - hsl[1].x) <= SHADE_L and absf(hsl[0].y - hsl[1].y) <= SHADE_S,
 		"in the widest shot the field renders L %.3f S %.3f, the ring's flats L %.3f S %.3f"
 		% [hsl[0].x, hsl[0].y, hsl[1].x, hsl[1].y])
+
+
+## The macro value noise's factor on the ground's tint at `at`, as ground.gdshader and
+## terrain.gdshader take it (MACRO either way on a lattice MACRO_CELLS cells across, field_marks'
+## value_noise on the field's cells).
+func _macro(view: BaseView, at: Vector3) -> float:
+	var p := (Vector2(at.x, at.z) - view.area().position) / MACRO_CELLS
+	var i := p.floor() + Vector2(50.0, 50.0)
+	var f := p - p.floor()
+	f = f * f * (Vector2(3.0, 3.0) - 2.0 * f)
+	var noise := lerpf(lerpf(_cell_tone(i), _cell_tone(i + Vector2(1, 0)), f.x),
+		lerpf(_cell_tone(i + Vector2(0, 1)), _cell_tone(i + Vector2(1, 1)), f.x), f.y)
+	return 1.0 + MACRO * (2.0 * noise - 1.0)
+
+
+## field_marks' cell_tone: a hash of a cell in [0, 1).
+func _cell_tone(cell: Vector2) -> float:
+	var p := Vector2(fposmod(cell.x * 0.1031, 1.0), fposmod(cell.y * 0.1030, 1.0))
+	p += Vector2.ONE * p.dot(Vector2(p.y, p.x) + Vector2(33.33, 33.33))
+	return fposmod((p.x + p.y) * p.x, 1.0)
+
+
+## Whether the field meets the ring without a step in tone (docs/reference/art-style.md, **Colour**):
+## on each of EDGE_SIDES, on the frame just shown, the per-channel median of the boxes EDGE_IN inside
+## the field's edge and of those EDGE_IN outside it, every EDGE_EVERY cells along the side where
+## both lie on screen clear of the HUD's controls (_hud_rects), so the marks fall out, differ by
+## under EDGE_STEP in every channel. A rendered run only: a headless one draws nothing.
+func _check_edge_step(main: MainScript) -> void:
+	if harness.headless:
+		say("the step at the field's edge skipped (headless)")
+		return
+	var image := main.get_viewport().get_texture().get_image()
+	var scale := Vector2(image.get_size()) / main.get_viewport().get_visible_rect().size
+	var screen := Rect2i(Vector2i.ZERO, image.get_size())
+	var hud := _hud_rects(main, scale)
+	var field := main.base_view.area()
+	for side: String in EDGE_SIDES:
+		var out: Vector2 = EDGE_SIDES[side]
+		var along := Vector2(absf(out.y), absf(out.x))
+		var edge := absf(out.dot(field.end))
+		var span := int(along.dot(field.end))
+		# Each channel's pixels inside the edge, then outside it.
+		var pixels: Array[Array] = [[], [], [], [], [], []]
+		var points := 0
+		for k: int in range(-span + EDGE_EVERY, span, EDGE_EVERY):
+			var boxes: Array[Rect2i] = []
+			for depth: float in [-EDGE_IN, EDGE_IN]:
+				var at := out * (edge + depth) + along * k
+				var middle := Vector2i(main.camera.unproject_position(Vector3(at.x, 0.0, at.y)) * scale)
+				boxes.append(Rect2i(middle - EDGE_BOX / 2, EDGE_BOX))
+			var covered := false
+			for box: Rect2i in boxes:
+				covered = covered or not screen.encloses(box)
+				for control: Rect2i in hud:
+					covered = covered or control.intersects(box)
+			if covered:
+				continue
+			points += 1
+			for b: int in 2:
+				for y: int in EDGE_BOX.y:
+					for x: int in EDGE_BOX.x:
+						var pixel := image.get_pixelv(boxes[b].position + Vector2i(x, y))
+						for c: int in 3:
+							pixels[b * 3 + c].append(pixel[c])
+		var medians: Array[Color] = []
+		var step := 0
+		for b: int in 2:
+			var median := Color()
+			for c: int in 3:
+				var channel := pixels[b * 3 + c]
+				channel.sort()
+				median[c] = channel[channel.size() / 2] if points > 0 else 0.0
+			medians.append(median)
+		for c: int in 3:
+			step = maxi(step, absi(roundi(medians[0][c] * 255.0) - roundi(medians[1][c] * 255.0)))
+		check(points > 0 and step < EDGE_STEP,
+			"at the start zoom the %s side's ground is %s inside the edge, %s outside, at %d points: a step of %d/255"
+			% [side, medians[0].to_html(false), medians[1].to_html(false), points, step])
+
+
+## The HUD's controls over the world on a fresh base, in image pixels: the top bar's meters and
+## drone ring, the Build button, and in a debug build the Template base and Reset base buttons.
+func _hud_rects(main: MainScript, scale: Vector2) -> Array[Rect2i]:
+	var hud := main.hud
+	var controls: Array[Control] = [hud.drones_panel(), hud.build_button(), hud.template_button(), hud.reset_button()]
+	for res: String in main.catalog.resources:
+		controls.append(hud.resource_panel(res))
+	var rects: Array[Rect2i] = []
+	for control: Control in controls:
+		if control != null and control.is_visible_in_tree():
+			var rect := control.get_global_rect()
+			rects.append(Rect2i(Rect2(rect.position * scale, rect.size * scale)))
+	return rects
 
 
 ## Mesa `k`'s own triangles in the terrain's body (BaseView.mesa_indices), its points merged by

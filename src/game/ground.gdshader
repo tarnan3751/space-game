@@ -19,8 +19,9 @@ render_mode ambient_light_disabled;
 // the dark. The tone mixes towards the dark tint below 0.5 and towards the light above it.
 // Everywhere the ground is the plate tint dusted at DUST_SHOWS with the field's base tint, with a
 // fine grain in world space, so it runs on across the tiles, under the marks; a large value noise
-// and a darkening towards the edge vary the plain further. The plane ends at the field's edge, so
-// the edge line is drawn inside it at the full width of an inner line.
+// varies the plain further, the terrain ring's own on the same cells, so the field meets the ring
+// in one tone. The plane ends at the field's edge, so the edge line is drawn inside it at the full
+// width of an inner line.
 
 #include "res://src/game/toon_common.gdshaderinc"
 #include "res://src/game/field_marks.gdshaderinc"
@@ -45,11 +46,9 @@ const float VARIANT_HASH = 30.0;
 const float ORIENTATION_HASH = 27.0;
 // How much of the field's base tint dusts the plate tint.
 const float DUST_SHOWS = 0.6;
-// The macro value noise: its period in cells and its strength either way. The darkening towards
-// the edge, from half way out.
+// The macro value noise: its period in cells and its strength either way.
 const float MACRO_CELLS = 12.0;
 const float MACRO = 0.06;
-const float EDGE_DARKEN = 0.1;
 
 varying vec3 world_pos;
 
@@ -68,8 +67,6 @@ void fragment() {
 	albedo = shade_marks(albedo, marks, turn, sun_across, field_light.rgb, field_dark.rgb, ink_color.rgb);
 
 	albedo *= 1.0 + MACRO * (2.0 * value_noise(cell / MACRO_CELLS) - 1.0);
-	vec2 out_from_centre = abs(cell / grid_size - 0.5) * 2.0;
-	albedo *= 1.0 - EDGE_DARKEN * smoothstep(0.5, 1.0, max(out_from_centre.x, out_from_centre.y));
 
 	vec2 to_line = abs(fract(cell - 0.5) - 0.5);
 	vec2 to_edge = min(cell, grid_size - cell);
