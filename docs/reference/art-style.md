@@ -376,7 +376,7 @@ triangles as the gallery counts them.
 | Type | Signature element | Animation | Top level, body triangles |
 | --- | --- | --- | --- |
 | `command_center` | glass dome ringed in gold on a tall drum over a stepped foundation, a hazard-striped hangar door; wings, a ring of rooms, a hologram of the base's planet over the dome, a violet containment ring and a gold beacon spire as it grows | spin: the comms dish on its pylon; from L3 spin: the hologram's tilted HOLO ring round its violet HOLO + BOB globe (no outline). BLINK: the door's four lamps (a chase), the masts' bulbs; FLOW: the wing and room screens; PULSE: the hologram's projector lens; L4 FLOW_U on the containment ring (crystal layer), PULSE on its clamp nodes; L5 PULSE on the beacon | 4,966 |
-| `drone_bay` | landing deck in a hazard ring of cyan lights, a parked drone, a control booth with a gold roof; the drone's body, 0.42 across at 12 sides, is the one exception to the small-part side counts | spin: the beacon on the booth. BLINK: the six deck lights (a chase); BOB: the whole drone, idling over its cradle; FLOW_U: its rotor blurs (screen layer); FLOW: the booth's screen | 1,978 |
+| `drone_bay` | landing deck in a hazard ring of cyan lights, the builder drone (**Construction drone**) parked over its cradle, a control booth with a gold roof; the drone's body, 0.42 across at 12 sides, is the one exception to the small-part side counts, and the deck lights take them (10 and 8) to keep the bay in its budget | spin: the beacon on the booth. BLINK: the six deck lights (a chase); BOB: the whole drone, idling over its cradle; FLOW_U: its rotor blurs (screen layer, unlit, not holograms); FLOW: the booth's screen | 1,990 |
 | `metal_extractor` | tripod derrick over a drill with a walking beam on its crown, conveyors carrying glowing ore into hoppers, exhaust stacks | spin: the drill string and its top drive; swing: the walking beam, ±12° about its pin, 2 s. FLOW: the belts (grating); PULSE: the ore nuggets and the hoppers' ore; HOLO + BOB: two smoke puffs over each stack | 2,972 |
 | `crystal_harvester` | laser gantry over a cluster of glowing crystal shards | swing: the focusing emitter and its beam, ±25° along the gantry, 5 s. FLOW + PULSE: the beam (pipe layer); FLICKER: the sparks at its end; PULSE: every shard, each on its own phase; L4 BLINK: the pylon lamps (a chase) | 1,992 |
 | `antimatter_siphon` | coiled torus round a glowing violet core, field pylons leaning in | spin: the torus and its coils. FLOW: the coils' current (screen layer); PULSE + BOB: the core; UNLIT + FLICKER + JITTER: an arc from each pylon's tip to the core | 2,980 |
@@ -412,8 +412,10 @@ triangles as the gallery counts them.
 While a building is constructed or upgraded, a builder drone works over it
 (`ConstructionDrone`; `input-camera.md`, **BuildingView**, for when it is spawned and freed).
 
-- **The model** (`models/drone.gd`, `DroneModels.build_drone`): the drone bay's parked drone with
-  a builder's marks. A 12-sided saucer on `HULL_LIGHT_ROUND`, a `GLASS` canopy, an `ENERGY` eye
+- **The model** (`models/drone.gd`, `DroneModels.build_drone`), the drone the drone bay parks
+  too (`add_drone(m, pos, parked)`: turned 45 degrees so its rotors stand on the axes, every part
+  bobbing together on phase 0.9, its rotor blurs unlit screen-layer discs turning at that phase,
+  so the bay has no hologram surface). A 12-sided saucer on `HULL_LIGHT_ROUND`, a `GLASS` canopy, an `ENERGY` eye
   at its front (+Z), four `ROD` arms on the diagonals to `HULL_MID_ROUND` ducts, each banded in
   hazard stripes round a rotor blur disc (`ROTOR`, a hologram: below), and a gunmetal tool arm
   under the nose ending in an `ENERGY` emitter lens (`EMITTER`). It is built round its own centre

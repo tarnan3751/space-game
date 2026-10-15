@@ -1,8 +1,10 @@
 extends RefCounted
-## The builder drone that works on a building site (ConstructionDrone), and its laser: the drone
-## bay's parked drone (resources.gd, _drone) with a builder's marks, a hazard band round each
-## duct and a tool arm under its nose ending in a glowing emitter lens. It is built round its
-## own centre with its front along +Z, so the drone can turn and tilt about that point.
+## The builder drone that works on a building site (ConstructionDrone), and its laser. The drone
+## is a saucer with a hazard band round each rotor's duct and a tool arm under its nose ending in
+## a glowing emitter lens. It is built round its own centre with its front along +Z, so the drone
+## can turn and tilt about that point. The drone bay parks the same drone on its deck (add_drone,
+## parked): turned so its rotors stand on the axes, every part bobbing together, its rotors the
+## bay's unlit blurs.
 ##
 ## BuildingModels builds and caches each of the three (create_drone, create_drone_effect). The
 ## beam, the flare's dome, its sparks and the rotor blur each have a surface of their own, and
@@ -27,6 +29,22 @@ static var FLARE := Surf.make(MaterialKit.Layer.GLOW, MaterialKit.ENERGY, 1.0, S
 static var SPARK := Surf.make(MaterialKit.Layer.GLOW, MaterialKit.HAZARD, 1.0,
 	Surf.UNLIT | Surf.FLICKER | Surf.JITTER, false, false)
 
+## The parked drone idles: every part of it bobs together, on PARKED_PHASE, which is also the
+## speed its rotor blurs turn at (FLOW_U). The blurs are on the screen layer, whose lit segments
+## run round a disc, and unlit, not holograms, so the bay has no transparent surface.
+const PARKED_PHASE := 0.9
+const PARKED_YAW := 45.0
+static var PARKED_HULL := Surf.make(MaterialKit.Layer.HULL, MaterialKit.HULL_LIGHT, 1.0, Surf.BOB, true, true, PARKED_PHASE)
+static var PARKED_GLASS := Surf.make(MaterialKit.Layer.GLASS, MaterialKit.CORE_GLASS, 1.0, Surf.GLOSSY | Surf.BOB, true, true,
+	PARKED_PHASE)
+static var PARKED_GLOW := Surf.make(MaterialKit.Layer.GLOW, MaterialKit.ENERGY, 1.0, Surf.UNLIT | Surf.BOB, true, true, PARKED_PHASE)
+static var PARKED_ROD := Surf.make(MaterialKit.Layer.FLAT, MaterialKit.GUNMETAL, 1.0, Surf.BOB, true, false, PARKED_PHASE)
+static var PARKED_DUCT := Surf.make(MaterialKit.Layer.HULL, MaterialKit.HULL_MID, 1.0, Surf.BOB, true, true, PARKED_PHASE)
+static var PARKED_BAND := Surf.make(MaterialKit.Layer.HAZARD, Color.WHITE, 3.0, Surf.BOB, true, true, PARKED_PHASE)
+static var PARKED_GUNMETAL := Surf.make(MaterialKit.Layer.PLATE, MaterialKit.GUNMETAL, 1.0, Surf.BOB, true, true, PARKED_PHASE)
+static var PARKED_ROTOR := Surf.make(MaterialKit.Layer.SCREEN, MaterialKit.ENERGY, 4.0, Surf.UNLIT | Surf.FLOW_U | Surf.BOB, false,
+	true, PARKED_PHASE)
+
 ## The bottom of the saucer, below the drone's centre.
 const BASE := Vector3(0, -0.07, 0)
 ## The tool arm: its knuckle under the body's front, its end, and the emitter lens's centre,
@@ -43,28 +61,41 @@ const SPARK_WIDTH := 0.04
 const ROTOR_SPEEDS := [0.92, 0.08, 0.96, 0.04]
 
 
-## A saucer body with a glass canopy and a glowing eye at its front, four ducted rotors on arms
-## at the diagonals, each duct banded in hazard stripes round a blur disc, and the tool arm.
+## The construction drone, round its own centre.
 static func build_drone(p: Parts) -> void:
-	var m := p.body
+	add_drone(p.body, Vector3.ZERO, false)
+
+
+## A saucer body with a glass canopy and a glowing eye at its front, four ducted rotors on arms
+## at the diagonals, each duct banded in hazard stripes round a blur disc, and the tool arm, with
+## its centre at `pos`. `parked`: the drone bay's, turned PARKED_YAW and idling (above).
+static func add_drone(m: LowPolyMesh, pos: Vector3, parked: bool) -> void:
+	var turn := Vector3(0, PARKED_YAW if parked else 0.0, 0)
+	var hull := PARKED_HULL if parked else Parts.HULL_LIGHT_ROUND
+	var glow := PARKED_GLOW if parked else GLOW
+	var gunmetal := PARKED_GUNMETAL if parked else Parts.GUNMETAL
+	var base := pos + BASE
 	m.lathe(PackedVector2Array([
 		Vector2(0, 0), Vector2(0.1, 0), Vector2(0.2, 0.05), Vector2(0.21, 0.09), Vector2(0.15, 0.14),
 		Vector2(0, 0.15),
-	]), 12, BASE, Parts.HULL_LIGHT_ROUND)
-	m.dome(0.09, 0.08, 10, 3, BASE + Vector3(0, 0.13, 0), Parts.GLASS)
-	m.box_chamfered(Vector3(0.12, 0.05, 0.05), 0.015, BASE + Vector3(0, 0.05, 0.19), GLOW)
+	]), 12, base, hull)
+	m.dome(0.09, 0.08, 10, 3, base + Vector3(0, 0.13, 0), PARKED_GLASS if parked else Parts.GLASS)
+	m.box_chamfered(Vector3(0.12, 0.05, 0.05), 0.015, base + LowPolyMesh.turn(Vector3(0, 0.05, 0.19), turn), glow, turn)
 	for k: int in 4:
-		var degrees := 45.0 + 90.0 * k
-		var hub := BASE + Parts.around(0.3, degrees, 0.06)
-		m.strut(BASE + Parts.around(0.15, degrees, 0.07), hub, 0.05, Parts.ROD)
+		var degrees := 45.0 + 90.0 * k - turn.y
+		var hub := base + Parts.around(0.3, degrees, 0.06)
+		m.strut(base + Parts.around(0.15, degrees, 0.07), hub, 0.05, PARKED_ROD if parked else Parts.ROD)
 		m.lathe(PackedVector2Array([Vector2(0.115, 0), Vector2(0.115, 0.06), Vector2(0.08, 0.06)]), 10,
-			hub - Vector3(0, 0.02, 0), Parts.HULL_MID_ROUND)
-		m.ring(0.112, 0.127, 0.032, 12, hub - Vector3(0, 0.006, 0), DUCT_BAND)
-		m.disc(0.085, 10, hub + Vector3(0, 0.02, 0), ROTOR.phased(ROTOR_SPEEDS[k]))
-	m.orb(0.035, 8, 4, KNUCKLE, Parts.GUNMETAL)
-	Parts.pipe(m, KNUCKLE, ARM_END, 0.025, Parts.GUNMETAL, 8, false)
-	Parts.pipe(m, ARM_END, EMITTER, 0.04, Parts.GUNMETAL, 10, false)
-	m.orb(0.03, 8, 4, EMITTER, GLOW)
+			hub - Vector3(0, 0.02, 0), PARKED_DUCT if parked else Parts.HULL_MID_ROUND)
+		m.ring(0.112, 0.127, 0.032, 12, hub - Vector3(0, 0.006, 0), PARKED_BAND if parked else DUCT_BAND)
+		m.disc(0.085, 10, hub + Vector3(0, 0.02, 0), PARKED_ROTOR if parked else ROTOR.phased(ROTOR_SPEEDS[k]))
+	var knuckle := pos + LowPolyMesh.turn(KNUCKLE, turn)
+	var arm_end := pos + LowPolyMesh.turn(ARM_END, turn)
+	var emitter := pos + LowPolyMesh.turn(EMITTER, turn)
+	m.orb(0.035, 8, 4, knuckle, gunmetal)
+	Parts.pipe(m, knuckle, arm_end, 0.025, gunmetal, 8, false)
+	Parts.pipe(m, arm_end, emitter, 0.04, gunmetal, 10, false)
+	m.orb(0.03, 8, 4, emitter, glow)
 
 
 ## The laser: a thin square rod one unit long up +Y from the origin, stretched to its length by

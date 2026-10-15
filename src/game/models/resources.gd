@@ -15,47 +15,44 @@ static var HAZARD_RING := Surf.make(MaterialKit.Layer.HAZARD, Color.WHITE, 1.0, 
 ## The deck's landing lights, which blink in a chase round it, and the booth's scrolling screen.
 static var BAY_LAMP := Surf.make(MaterialKit.Layer.GLOW, MaterialKit.ENERGY, 1.0, Surf.UNLIT | Surf.BLINK, true)
 static var BAY_SCREEN := Surf.make(MaterialKit.Layer.SCREEN, MaterialKit.ENERGY, 3.0, Surf.FLOW, false, true, 0.6)
-## The parked drone idles: every part of it bobs together, on DRONE_PHASE, which is also the
-## speed its rotor blurs turn at (FLOW_U), so they bob with it. The blurs are on the screen
-## layer, whose lit segments run round a disc; the glow layer's stripes do not vary along U.
-const DRONE_PHASE := 0.9
-static var DRONE_HULL := Surf.make(MaterialKit.Layer.HULL, MaterialKit.HULL_LIGHT, 1.0, Surf.BOB, true, true, DRONE_PHASE)
-static var DRONE_GLASS := Surf.make(MaterialKit.Layer.GLASS, MaterialKit.CORE_GLASS, 1.0, Surf.GLOSSY | Surf.BOB, true, true, DRONE_PHASE)
-static var DRONE_EYE := Surf.make(MaterialKit.Layer.GLOW, MaterialKit.ENERGY, 1.0, Surf.UNLIT | Surf.BOB, true, true, DRONE_PHASE)
-static var DRONE_ARM := Surf.make(MaterialKit.Layer.FLAT, MaterialKit.GUNMETAL, 1.0, Surf.BOB, true, false, DRONE_PHASE)
-static var DRONE_DUCT := Surf.make(MaterialKit.Layer.HULL, MaterialKit.HULL_MID, 1.0, Surf.BOB, true, true, DRONE_PHASE)
-static var DRONE_ROTOR := Surf.make(MaterialKit.Layer.SCREEN, MaterialKit.ENERGY, 4.0, Surf.UNLIT | Surf.FLOW_U | Surf.BOB, false, true,
-	DRONE_PHASE)
+## The parked drone is the construction drone (DroneModels.add_drone), idling.
+const DroneModels := preload("res://src/game/models/drone.gd")
 
 ## The drone bay's landing deck: its middle and the height of its top.
 const BAY_DECK := Vector3(0.2, 0.0, 0.2)
 const BAY_DECK_TOP := 0.26
 
 
-## An open landing deck with a hazard ring and a chase of landing lights, a drone idling over
-## its docking cradle, its rotors a spinning blur, a raised control booth on the far corner
+## An open landing deck with a hazard ring and a chase of landing lights, the builder drone
+## idling over its docking cradle, its rotors a spinning blur, a raised control booth on the far corner
 ## with a scrolling screen and a rotating beacon on its roof, a fuel tank and a stack of
 ## crates. One level, so it is complete at once, gold on the booth's roof.
 static func build_drone_bay(p: Parts, _level: int) -> void:
 	var m := p.body
 	Parts.foundation(m, 2)
+	# The deck at 16 sides, its hazard ring a flat band, and the landing lights at the small-part
+	# side counts, a housing 10 round and a lens 8 round (Parts.landing_light's 16 are over the
+	# bay's budget with the drone).
 	m.lathe(PackedVector2Array([
 		Vector2(0.66, 0), Vector2(0.66, 0.1), Vector2(0.62, BAY_DECK_TOP - Parts.PAD_HEIGHT),
 		Vector2(0, BAY_DECK_TOP - Parts.PAD_HEIGHT),
-	]), 20, BAY_DECK + Vector3(0, Parts.PAD_HEIGHT, 0), Parts.HULL_MID_ROUND)
+	]), 16, BAY_DECK + Vector3(0, Parts.PAD_HEIGHT, 0), Parts.HULL_MID_ROUND)
 	var top := BAY_DECK + Vector3(0, BAY_DECK_TOP, 0)
-	m.disc(0.5, 20, top + Vector3(0, 0.005, 0), DECK_PLATE)
-	m.lathe(PackedVector2Array([Vector2(0.56, 0), Vector2(0.56, 0.02), Vector2(0.44, 0.02)]), 20, top, HAZARD_RING)
+	m.disc(0.5, 16, top + Vector3(0, 0.005, 0), DECK_PLATE)
+	m.lathe(PackedVector2Array([Vector2(0.56, 0.02), Vector2(0.44, 0.02)]), 16, top, HAZARD_RING)
 	for k: int in 6:
-		Parts.landing_light(m, top + Parts.around(0.6, 30 + 60 * k, 0), 0.09, BAY_LAMP.phased(k / 6.0))
-	# The docking cradle: two rails under the drone and a clamp at each end.
+		var light := top + Parts.around(0.6, 30 + 60 * k, 0)
+		m.prism(0.09, 0.0765, 0.045, 10, light, Parts.GUNMETAL)
+		m.dome(0.063, 0.063, 8, 3, light + Vector3(0, 0.045, 0), BAY_LAMP.phased(k / 6.0))
+	# The docking cradle: two rails under the drone, either side of its tool arm, and a clamp past
+	# each end, clear of the arm's lens.
 	for side: float in [-1.0, 1.0]:
 		var rail := top + LowPolyMesh.turn(Vector3(side * 0.13, 0, 0), Vector3(0, 45, 0))
 		m.box_chamfered(Vector3(0.07, 0.06, 0.5), 0.02, rail, Parts.GUNMETAL, Vector3(0, 45, 0))
-		var clamp_pos := top + LowPolyMesh.turn(Vector3(0, 0, side * 0.27), Vector3(0, 45, 0))
+		var clamp_pos := top + LowPolyMesh.turn(Vector3(0, 0, side * 0.33), Vector3(0, 45, 0))
 		m.box_chamfered(Vector3(0.16, 0.16, 0.06), 0.02, clamp_pos, Parts.HAZARD, Vector3(0, 45, 0))
-	# Raised by the bob's height, so at the bottom of its bob it rests where it was parked.
-	_drone(m, top + Vector3(0, 0.14, 0))
+	# High enough that at the bottom of its bob its tool arm's lens just clears the deck.
+	DroneModels.add_drone(m, top + Vector3(0, 0.28, 0), true)
 
 	# The control booth on the far corner: a column, a glazed cab, a gold-rimmed roof (its one
 	# level is its top level) and a ladder.
@@ -76,24 +73,6 @@ static func build_drone_bay(p: Parts, _level: int) -> void:
 	m.tube(0, 0.13, 0.5, 12, tank + Vector3(0, 0.2, -0.25), Parts.HULL_LIGHT_ROUND, Vector3(90, 0, 0))
 	m.box_chamfered(Vector3(0.3, 0.26, 0.3), 0.04, Vector3(0.55, Parts.PAD_HEIGHT, -0.55), CRATE, Vector3(0, 20, 0))
 	m.box_chamfered(Vector3(0.22, 0.2, 0.22), 0.04, Vector3(0.6, Parts.PAD_HEIGHT + 0.26, -0.52), CRATE, Vector3(0, -10, 0))
-
-
-## A collector drone idling over the deck: a saucer body with a glowing eye and a glass
-## canopy, and four ducted rotors on short arms (a duct and the blur of its rotor), all bobbing.
-static func _drone(m: LowPolyMesh, pos: Vector3) -> void:
-	m.lathe(PackedVector2Array([
-		Vector2(0.1, 0), Vector2(0.2, 0.05), Vector2(0.21, 0.09), Vector2(0.15, 0.14), Vector2(0, 0.15),
-	]), 12, pos, DRONE_HULL)
-	m.dome(0.09, 0.08, 10, 3, pos + Vector3(0, 0.13, 0), DRONE_GLASS)
-	m.box_chamfered(Vector3(0.12, 0.05, 0.05), 0.015, pos + LowPolyMesh.turn(Vector3(0, 0.05, 0.19), Vector3(0, 45, 0)),
-		DRONE_EYE, Vector3(0, 45, 0))
-	for k: int in 4:
-		var degrees := 90.0 * k
-		var hub := pos + Parts.around(0.3, degrees, 0.06)
-		m.strut(pos + Parts.around(0.15, degrees, 0.07), hub, 0.05, DRONE_ARM)
-		m.lathe(PackedVector2Array([Vector2(0.115, 0), Vector2(0.115, 0.06), Vector2(0.08, 0.06)]), 10,
-			hub - Vector3(0, 0.02, 0), DRONE_DUCT)
-		m.disc(0.08, 10, hub + Vector3(0, 0.02, 0), DRONE_ROTOR)
 
 
 ## The booth's rotating beacon: a dark housing with two glowing lenses back to back under a cap.
