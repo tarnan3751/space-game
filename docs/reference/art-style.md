@@ -768,15 +768,17 @@ language, with no gate.
   corner pylons stand 1.2 tall, turned across the cut, and carry a hazard yellow beacon (unlit,
   BLINK) in place of the lamp; at phases a quarter apart they flash in turn.
 - **The fence**: between each pylon and the next, following the kerb round its corners, a
-  gunmetal rail (`ROD`, radius 0.03, not outlined) 0.55 up, with a ball joint of its radius at
-  each of the kerb's eight bends, and under it, from the kerb's top to the rail, an energy panel:
-  a HOLO quad in `ENERGY` on the glow layer, built as a face each way since the hologram culls
-  back faces, its scan bands drifting up and its dip phased a quarter apart from one side to the
-  next. It is low and see-through, so the field's edge cells show
-  through and over it. On the two sides nearest the camera the panel is seen nearly edge-on and
-  reads faint, left so for the owner to judge.
+  gunmetal rail (`ROD`, radius 0.03, not outlined) 0.75 up, below the pylons' caps, with a ball
+  joint of its radius at each of the kerb's eight bends, and under it, from the kerb's top to the
+  rail, an energy panel 0.5 tall: HOLO quads in `ENERGY` on the glow layer, built as a face each
+  way since the hologram culls back faces, its scan bands drifting up and its dip phased a quarter apart from
+  one side to the next. It is folded half way up into a shallow V in section (`FENCE_LEAN`): its
+  lower half leans 20 degrees in towards the field and its upper half 20 degrees out, the fold
+  mitred round the bends, so on every side one half faces the camera and the panel reads, where
+  a flat one would be seen nearly edge-on on the two sides nearest it. It is low and see-through,
+  so the field's edge cells show through and over it.
 
-One `LowPolyMesh`, about 6,500 triangles on its toon surface and 190 on its hologram surface,
+One `LowPolyMesh`, about 6,500 triangles on its toon surface and 380 on its hologram surface,
 and its outline. The body casts a shadow (the pylons are real masses; the transparent fence casts
 none); the outline does not.
 

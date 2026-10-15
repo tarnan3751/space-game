@@ -96,7 +96,8 @@ const OUTCROP_GAP := 4.0
 ## stands on its middle line every PLATE_CELLS cells (the field texture's tiles are as wide) and on
 ## each corner cut: PYLON_WIDTH square, PYLON_HEIGHT tall, CORNER_PYLON_HEIGHT on the corners. The
 ## fence between them: a rail RAIL_RADIUS thick RAIL_HEIGHT up, over an energy panel from the
-## kerb's top to the rail.
+## kerb's top to the rail, folded half way up: its lower half leaning in by FENCE_LEAN degrees and
+## its upper half out by as much.
 const CURB_HEIGHT := 0.25
 const CURB_WIDTH := 0.35
 const CURB_GAP := 0.3
@@ -106,8 +107,9 @@ const PLATE_CELLS := 4
 const PYLON_WIDTH := 0.4
 const PYLON_HEIGHT := 0.9
 const CORNER_PYLON_HEIGHT := 1.2
-const RAIL_HEIGHT := 0.55
+const RAIL_HEIGHT := 0.75
 const RAIL_RADIUS := 0.03
+const FENCE_LEAN := 20.0
 ## The pylons' plated posts; their lamps, energy cyan, pulsing (each phased by its place round the
 ## loop, so the pulse travels round it); and the corner pylons' beacons, hazard yellow, blinking.
 static var PYLON := Surf.make(MaterialKit.Layer.PLATE, MaterialKit.HULL_MID)
@@ -314,7 +316,7 @@ func _build_ground() -> void:
 ## kerb, an octagonal band of concrete with chamfered top edges; a pylon on its middle line every
 ## PLATE_CELLS cells along each side and a taller one on each corner cut, each a plated post with a
 ## hazard band, a gunmetal cap and a lamp (a beacon on the corners); and between the pylons a fence,
-## a gunmetal rail, with a ball joint where it bends, over a hologram panel. The body casts a shadow (the pylons are real masses); the
+## a gunmetal rail, with a ball joint where it bends, over a hologram panel folded half way up. The body casts a shadow (the pylons are real masses); the
 ## outline none.
 func _build_boundary() -> void:
 	var mesh := LowPolyMesh.new()
@@ -355,6 +357,16 @@ func _build_boundary() -> void:
 			sides.append(k)
 	for kind: int in kinds:
 		pylons += 1 if kind != 0 else 0
+	# The panel's fold, half way up: FENCE_LEAN in from the course, along each point's mitre (the
+	# sum of the inward normals of the stretches either side, scaled so each stretch's fold lies
+	# parallel to it).
+	var fold := (RAIL_HEIGHT - CURB_HEIGHT) * 0.5 * tan(deg_to_rad(FENCE_LEAN))
+	var folds := PackedVector3Array()
+	for i: int in course.size():
+		var before := _inward(course[i - 1], course[i])
+		var after := _inward(course[i], course[(i + 1) % course.size()])
+		folds.append(course[i] + (before + after) / (1.0 + before.dot(after)) * fold
+			+ Vector3(0, (RAIL_HEIGHT + CURB_HEIGHT) * 0.5, 0))
 
 	var index := 0
 	for i: int in course.size():
@@ -367,16 +379,27 @@ func _build_boundary() -> void:
 		if kinds[i] == 0:
 			# A ball joint where the rail bends round a corner cut, as Parts.pipe_run makes.
 			mesh.orb(RAIL_RADIUS, 8, 4, course[i] + rail, Parts.ROD)
-		# The panel is see-through and drawn with back faces culled: one face each way.
-		var panel := PackedVector3Array([course[i] + Vector3(0, CURB_HEIGHT, 0), next + Vector3(0, CURB_HEIGHT, 0),
-			next + rail, course[i] + rail])
+		# The panel, folded: its lower half leaning in to the fold and its upper half out from it,
+		# so one half faces the camera on every side. It is see-through and drawn with back faces
+		# culled: one face each way.
+		var j := (i + 1) % course.size()
 		var field := FENCE_FIELD.phased(sides[i] * 0.25)
-		mesh.polygon(panel, field)
-		panel.reverse()
-		mesh.polygon(panel, field)
+		for panel: PackedVector3Array in [
+				PackedVector3Array([course[i] + Vector3(0, CURB_HEIGHT, 0), next + Vector3(0, CURB_HEIGHT, 0), folds[j], folds[i]]),
+				PackedVector3Array([folds[i], folds[j], next + rail, course[i] + rail])]:
+			mesh.polygon(panel, field)
+			panel.reverse()
+			mesh.polygon(panel, field)
 
 	boundary = _add_mesh(mesh.to_mesh(), true)
 	boundary_outline = _add_mesh(mesh.to_outline_mesh(), false)
+
+
+## The horizontal unit normal of the perimeter's stretch from `from` to `to` that points in, towards
+## the field.
+static func _inward(from: Vector3, to: Vector3) -> Vector3:
+	var normal := Vector3(to.z - from.z, 0.0, from.x - to.x).normalized()
+	return normal if normal.dot(-(from + to)) > 0.0 else -normal
 
 
 ## Where the pylons stand along one side of the perimeter, from `from` to `to`: at every
