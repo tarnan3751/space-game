@@ -138,8 +138,12 @@ does not fit on the grid at once, so rows that do not fit start a new page. Each
 overview screenshot (at the widest zoom, held for 2.1 seconds so that the frame rate, which
 counts the last whole second, covers one with the page already set up, after which it says the
 draw calls, the frame rate and the render thread's CPU time for the frame there), each row a
-close-up, and each row's first building a detail shot at the closest zoom (camera size 10), where outlines, bands and textures can be read; all
-are framed through `camera.zoom_at` and `camera.pan`. The frame rate is only meaningful when
+close-up at camera size 20, in even parts no wider than 20 cells (`ROW_PART_CELLS`; a part holds
+the models whose centres fall in it), and each row's first building a detail shot at the closest
+zoom (camera size 10), where outlines, bands and textures can be read; all are framed through
+`camera.zoom_at` and `camera.pan`. Each close-up and detail shot checks, in both modes, that
+every model in it has its footprint's corners and its top on the screen and outside the Build
+button. The frame rate is only meaningful when
 nothing else is loading the machine.
 In both modes it checks every model: one to four body `MeshInstance3D` (the static body and up
 to three moving parts), each with an outline instance beside it on `MaterialKit.ink()` that casts

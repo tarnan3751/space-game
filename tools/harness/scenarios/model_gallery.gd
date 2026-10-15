@@ -1,10 +1,12 @@
 extends HarnessScenario
 ## The model gallery: one BuildingView per building type and level in the catalog, laid out on
 ## the grid in category rows, with an overview screenshot of each page of rows (saying the draw
-## calls and the frame rate there), a close-up of each row, and a detail shot of each row's
-## first building at the closest zoom, where outlines, bands and textures can be read. The
-## overview's line also says the render thread's CPU time for the frame, measured on the root
-## viewport.
+## calls and the frame rate there), a close-up of each row (in even parts ROW_PART_CELLS wide at
+## most, so none runs under the HUD), and a detail shot of each row's first building at the
+## closest zoom, where outlines, bands and textures can be read. Each close-up and detail shot
+## checks that its models' footprints and tops are on the screen and clear of the Build button.
+## The overview's line also says the render thread's CPU time for the frame, measured on the
+## root viewport.
 ##
 ## Checks every model: one to four body MeshInstance3D (the static body, up to three moving
 ## parts), each with an outline instance beside it on the ink material casting no shadow unless
@@ -33,6 +35,8 @@ const GAP := 1
 const OVERVIEW_SIZE := 44.0
 const CLOSE_UP_SIZE := 20.0
 const DETAIL_SIZE := 10.0
+## The widest stretch of a row (cells) one close-up shows: a row is shot in even parts no wider.
+const ROW_PART_CELLS := 20
 ## Seconds the overview is held before the frame rate is read. Performance.TIME_FPS counts the
 ## last whole second, so only after two does it cover a second with the page already settled.
 const SETTLE_SECONDS := 2.1
@@ -66,6 +70,7 @@ func run(main: MainScript) -> void:
 		var page: Array = pages[page_index]
 		for row: Dictionary in page:
 			var names := PackedStringArray()
+			var views: Array[BuildingView] = []
 			for model: Array in row["models"]:
 				var type: String = model[0]
 				var level: int = model[1]
@@ -75,7 +80,9 @@ func run(main: MainScript) -> void:
 				view.setup(0, type, level, size)
 				view.position = main.base_view.cell_to_world(cell, size)
 				gallery.add_child(view)
+				views.append(view)
 				names.append("%s %d" % [type, level])
+			row["views"] = views
 			say("page %d, %s row at y %d: %s" % [page_index + 1, row["category"], row["y"], ", ".join(names)])
 		_frame(main, main.base_view.cell_to_world(Vector2i(grid.x / 2, grid.y / 2), 0), OVERVIEW_SIZE)
 		await main.get_tree().create_timer(SETTLE_SECONDS).timeout
@@ -86,18 +93,40 @@ func run(main: MainScript) -> void:
 		await screenshot("page%d-overview" % (page_index + 1))
 		for row_index: int in page.size():
 			var row: Dictionary = page[row_index]
-			var middle := Vector2i(int(row["width"]) / 2, int(row["y"]) + int(row["depth"]) / 2)
-			_frame(main, main.base_view.cell_to_world(middle, 0), CLOSE_UP_SIZE)
-			await frames(2)
-			await screenshot("page%d-row%d-%s" % [page_index + 1, row_index + 1, row["category"]])
+			var row_models: Array = row["models"]
+			var width: int = row["width"]
+			var parts := ceili(width / float(ROW_PART_CELLS))
+			for part: int in parts:
+				# The models whose centres fall in this part's even share of the row's width.
+				var shown: Array[BuildingView] = []
+				var low := width
+				var high := 0
+				for i: int in row_models.size():
+					var x: int = row_models[i][3]
+					var size: int = row_models[i][2]
+					if mini((2 * x + size) * parts / (2 * width), parts - 1) == part:
+						shown.append(row["views"][i])
+						low = mini(low, x)
+						high = maxi(high, x + size)
+				var name := "page%d-row%d-%s" % [page_index + 1, row_index + 1, row["category"]]
+				name += "-%d" % (part + 1) if parts > 1 else ""
+				var at := main.base_view.cell_to_world(Vector2i(low, row["y"]), 0) \
+					+ Vector3((high - low) * 0.5, 0, int(row["depth"]) * 0.5)
+				_frame(main, at, CLOSE_UP_SIZE)
+				_check_clear_of_hud(main, shown, name)
+				await frames(2)
+				await screenshot(name)
 		for row_index: int in page.size():
 			var row: Dictionary = page[row_index]
 			var first: Array = (row["models"] as Array)[0]
 			var size: int = first[2]
 			var cell := Vector2i(first[3], int(row["y"]) + (int(row["depth"]) - size) / 2)
+			var name := "page%d-row%d-%s-detail" % [page_index + 1, row_index + 1, row["category"]]
 			_frame(main, main.base_view.cell_to_world(cell, size), DETAIL_SIZE)
+			var row_views: Array[BuildingView] = row["views"]
+			_check_clear_of_hud(main, row_views.slice(0, 1), name)
 			await frames(2)
-			await screenshot("page%d-row%d-%s-detail" % [page_index + 1, row_index + 1, row["category"]])
+			await screenshot(name)
 		gallery.queue_free()
 		await frames(1)
 
@@ -265,6 +294,26 @@ func _paginate(rows: Array[Dictionary], height: int) -> Array[Array]:
 		pages.back().append(row)
 		y += int(row["depth"]) + GAP
 	return pages
+
+
+## Checks that every view's footprint corners and the top of its model project onto the screen
+## and outside the Build button, as the camera is framed now.
+func _check_clear_of_hud(main: MainScript, views: Array[BuildingView], shot: String) -> void:
+	var screen := main.get_viewport().get_visible_rect()
+	var button := main.hud.build_button().get_global_rect()
+	var hidden := PackedStringArray()
+	for view: BuildingView in views:
+		var half := view.footprint_size * 0.5
+		var points: Array[Vector3] = [view.position + Vector3(0, view.site_height(), 0)]
+		for corner: Vector2 in [Vector2(-1, -1), Vector2(1, -1), Vector2(-1, 1), Vector2(1, 1)]:
+			points.append(view.position + Vector3(corner.x * half, 0, corner.y * half))
+		for point: Vector3 in points:
+			var at := main.camera.unproject_position(point)
+			if not screen.has_point(at) or button.has_point(at):
+				hidden.append("%s %d" % [view.building_type, view.building_level])
+				break
+	check(hidden.is_empty(), "%s: every model on the screen, clear of the Build button%s" % [shot,
+		"" if hidden.is_empty() else " (not: %s)" % ", ".join(hidden)])
 
 
 ## Zooms the camera to an orthographic size and pans it onto a ground point, through the
