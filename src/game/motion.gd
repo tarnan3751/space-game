@@ -3,7 +3,12 @@ extends RefCounted
 ## How a moving part of a model moves about its pivot (Parts.moving,
 ## docs/reference/art-style.md, **Animation**): it spins, swings or slides, eased. A Motion is
 ## built with spin(), swing() or slide(), shared by every view of the model, and never changed;
-## BuildingView asks it for the part's transform at the view's animation time each frame.
+## BuildingView asks it for the part's transform at clock() each frame.
+##
+## clock() is the game's one animation clock: seconds from a monotonic clock, wrapping every
+## WRAP_SECONDS as the shaders' time did, so a period that divides it never jumps. main.gd sets it
+## once a frame (tick) and hands the same value to the shaders as the anim_time global, so a
+## moving part and its surface effects keep step.
 ##
 ## SWING and SLIDE move between -amplitude and +amplitude on a wave s(u) of the cycle's share u,
 ## from -1 to 1. At s = -1 the part is at its rest turned or moved by -amplitude: a HAMMER rests
@@ -28,6 +33,21 @@ var amplitude := 0.0
 var period := 1.0
 ## SWING and SLIDE: 0 to 1, where in its cycle the part is at time 0.
 var phase := 0.0
+
+const WRAP_SECONDS := 3600
+static var _clock: float = 0.0
+
+
+## The animation clock now, in seconds, as of this frame's tick().
+static func clock() -> float:
+	return _clock
+
+
+## Reads the monotonic clock into clock() and returns it; main.gd calls it once a frame, before
+## the views animate.
+static func tick() -> float:
+	_clock = (Time.get_ticks_usec() % (WRAP_SECONDS * 1000000)) / 1000000.0
+	return _clock
 
 
 ## Continuous rotation about `axis` through the pivot at `rate` radians a second.

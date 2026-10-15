@@ -8,7 +8,7 @@ render_mode ambient_light_disabled;
 // ghost_tint in by its alpha (MaterialKit.ghost_valid and ghost_invalid); the shared body
 // material leaves it at 0.
 //
-// The surface flags in UV2.y animate a part from TIME, offset by its phase in COLOR.a
+// The surface flags in UV2.y animate a part from anim_time, offset by its phase in COLOR.a
 // (effects.gdshaderinc): the vertex moves (BOB, JITTER, FLICKER), the texture scrolls (FLOW,
 // FLOW_U) and the colour, emission included, brightens and dims (PULSE, BLINK).
 

@@ -89,6 +89,12 @@ func _ready() -> void:
 	add_child(tick)
 
 
+## The one animation clock, set before any view animates (main is their ancestor, so it
+## processes first): Motion.clock() for the moving parts, anim_time for the shaders.
+func _process(_delta: float) -> void:
+	RenderingServer.global_shader_parameter_set(&"anim_time", Motion.tick())
+
+
 func _notification(what: int) -> void:
 	if what == NOTIFICATION_WM_CLOSE_REQUEST or what == NOTIFICATION_APPLICATION_PAUSED:
 		_save()

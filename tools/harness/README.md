@@ -174,7 +174,8 @@ an arc of UNLIT, FLICKER and JITTER strips between two posts, and a HOLO prism o
 plain and with the pedestal ghost-tinted. The second row: moving parts that SPIN about Y, SWING
 about X (SMOOTH), SLIDE along X (HAMMER) and along Z (RECOIL), and a turning cluster of FLICKER
 sparks, which has no outline. The scenario moves the moving parts itself, each frame, with
-`Motion.transform_at`, as `BuildingView` does. In both modes it checks each part's surface count
+`Motion.transform_at` at `Motion.clock()`, as `BuildingView` does (it poses them from the tree's
+`process_frame`, before `main.gd` ticks the clock, so it ticks it first). In both modes it checks each part's surface count
 (two for a hologram, its second on `MaterialKit.holo()` and never overridden), the flag bits on
 every vertex, UV2 stored uncompressed, at most eight instances, the outlines (the BOB orb's
 carries UV2 and colour, the arc's holds its posts only, the spark cluster has none), that a

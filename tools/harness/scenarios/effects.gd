@@ -10,7 +10,9 @@ extends HarnessScenario
 ## then the same again with the pedestal ghost-tinted. The second row: moving parts that SPIN
 ## about Y, SWING about X (SMOOTH), SLIDE along X (HAMMER) and SLIDE along Z (RECOIL), and one
 ## made only of FLICKER sparks, which has no outline. The scenario moves the moving parts
-## itself, with Motion.transform_at, as BuildingView does.
+## itself, with Motion.transform_at at Motion.clock(), as BuildingView does. It poses them from
+## the tree's process_frame, which fires before main.gd's _process ticks the clock, so it ticks
+## the clock itself first (Motion.tick()), so the parts match this frame's shaders as a view's do.
 ##
 ## Headless it checks each part's surfaces and flags, the outline's channels, the instance
 ## counts and that the moving parts move. Rendered it frames the rig at the closest zoom and
@@ -32,7 +34,6 @@ var _rig: Array[Dictionary] = []
 var _movers: Array[Node3D] = []
 var _motions: Array[Motion] = []
 var _rests := PackedVector3Array()
-var _time := 0.0
 var _main: MainScript
 
 
@@ -295,9 +296,9 @@ func _changed(a: Image, b: Image, region: Rect2i) -> int:
 
 
 func _update_movers() -> void:
-	_time += _main.get_process_delta_time()
+	var time := Motion.tick()
 	for i: int in _movers.size():
-		_movers[i].transform = _motions[i].transform_at(_time, _rests[i])
+		_movers[i].transform = _motions[i].transform_at(time, _rests[i])
 
 
 func _collect_movers(node: Node3D) -> void:

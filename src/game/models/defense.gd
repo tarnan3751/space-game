@@ -313,9 +313,9 @@ static func build_flak_cannon(p: Parts, level: int) -> void:
 	var per_side := 2 if level < 3 else 3
 	var pack := 0.08 + 0.13 * per_side
 	# The barrels recoil together, kicking back `kick` from where they rest and easing out again;
-	# their muzzles blink and flare. The recoil takes BLINK's period, 1.2 s, so there is one flash
-	# a kick, but not on it: BLINK runs on the shader's clock, the recoil on the view's own, which
-	# starts at 0 for each view and stops while it is busy.
+	# their muzzles blink and flare. The recoil takes BLINK's period, 1.2 s, at phase 0, and both
+	# run on the one animation clock (Motion.clock(), the shaders' anim_time), so each muzzle
+	# flashes on its barrel's kick.
 	var along := LowPolyMesh.turn(Vector3.UP, tilt)
 	var kick := 0.06
 	var guns := p.moving(centre, Motion.slide(-along, kick, 1.2, 0.0, Motion.Ease.RECOIL))

@@ -35,10 +35,10 @@ void fragment() {
 	int flags = surf_flags(UV2);
 	float phase = surf_phase(COLOR);
 	vec4 texel = texture(kit, vec3(effect_uv(UV, flags, phase), UV2.x));
-	float band = fract((world_y - TIME * BAND_SPEED) / BAND_LENGTH);
+	float band = fract((world_y - anim_time * BAND_SPEED) / BAND_LENGTH);
 	float rim = smoothstep(0.5, 1.0, 1.0 - abs(dot(NORMAL, VIEW)));
 	vec3 colour = texel.rgb * COLOR.rgb * effect_light(flags, phase);
 	ALBEDO = colour * (1.0 + BAND_BRIGHTEN * band + RIM_BRIGHTEN * rim);
-	bool dipped = fract(TIME / HOLO_DIP_PERIOD + phase) < HOLO_DIP_SECONDS / HOLO_DIP_PERIOD;
+	bool dipped = fract(anim_time / HOLO_DIP_PERIOD + phase) < HOLO_DIP_SECONDS / HOLO_DIP_PERIOD;
 	ALPHA = dipped ? HOLO_DIP_ALPHA : HOLO_ALPHA;
 }

@@ -52,12 +52,12 @@ var _lifted: bool = false
 var _ghost_tint: Material = null
 ## Whether the outlines carry the selected ink now.
 var _inked: bool = false
-## The model's moving parts, each with its Motion and its rest position, and the seconds the
-## view has spent animating them (it stands still while the building is busy).
+## The model's moving parts, each with its Motion and its rest position. They are posed at
+## Motion.clock(), the shaders' clock, while the building is idle; while it is busy they hold
+## their last pose, and on resuming they snap to the clock's.
 var _movers: Array[Node3D] = []
 var _motions: Array[Motion] = []
 var _rests: PackedVector3Array = PackedVector3Array()
-var _time: float = 0.0
 var _animate: bool = true
 ## BaseView's merged wall mesh draws this building, so its own model is hidden (set_merged).
 var _merged: bool = false
@@ -212,9 +212,9 @@ func _process(delta: float) -> void:
 		set_process(not _movers.is_empty())
 	if not _animate:
 		return
-	_time += delta
+	var time := Motion.clock()
 	for i: int in _movers.size():
-		_movers[i].transform = _motions[i].transform_at(_time, _rests[i])
+		_movers[i].transform = _motions[i].transform_at(time, _rests[i])
 
 
 ## The timer label's height with no drone over the site.

@@ -33,6 +33,9 @@ material kit, `LowPolyMesh`, the shaders, the outlines, the view states, the wal
 6. A 1 s `Timer` ticks: `state.advance_to(_now())`, `base_view.sync(state)`, the HUD refresh
    (timer labels change every second), and a save every `SAVE_EVERY_TICKS` (10) ticks.
 
+Every frame, `_process` advances the animation clock (`Motion.tick()`) and sets the shaders'
+`anim_time` global to it (`art-style.md`, **Animation**, **One clock**).
+
 `_now()` is the device clock (`Time.get_unix_time_from_system()`); the server will own time
 later. `state.changed` → `_on_state_changed`: sync the view, `placement.refresh()` (re-checks
 the ghost), refresh the HUD. The save is written on `NOTIFICATION_WM_CLOSE_REQUEST` and
@@ -248,11 +251,11 @@ each tick. `set_lifted(true)` raises the model by 0.35 while it is dragged or is
 selected or dragged view's outlines turn gold; the placement ghost keeps plain ink outlines, and
 its body takes the valid or invalid tint through `set_ghost(valid)` (`art-style.md`, **View
 states**). The nodes carrying `BuildingModels.MOVE_META` (a `Motion` each) are collected once
-in `setup`; `_process` sets each one's transform from `Motion.transform_at` on a clock that runs
-only while the building is finished and idle, without allocating, so they stop during an
-upgrade and resume where they stopped (the surface effects keep running: they come from the
-shaders' `TIME`); a view with nothing to move turns processing off in `_ready`, so walls and
-traps cost nothing per frame.
+in `setup`; while the building is finished and idle, `_process` sets each one's transform from
+`Motion.transform_at(Motion.clock(), rest)`, without allocating, on the clock the shaders' effects
+run on (`art-style.md`, **Animation**, **One clock**); during an upgrade they hold their last
+pose and on resuming snap to the clock's (the surface effects keep running); a view with nothing
+to move turns processing off in `_ready`, so walls and traps cost nothing per frame.
 
 While the building is busy a `ConstructionDrone` works over the site (`art-style.md`,
 **Construction drone**): `show_status` creates one the first time it reports `busy` with none

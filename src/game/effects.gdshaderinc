@@ -2,8 +2,14 @@
 // (docs/reference/art-style.md, **Animation**), shared by toon.gdshader (through
 // toon_common.gdshaderinc), ink.gdshader and holo.gdshader, so an outline follows its part and a
 // hologram moves like any other. The flags are bits of the integer in UV2.y; a part's phase, 0 to
-// 1 in 1/254 steps, is in COLOR.a (surf_phase) and offsets its effect's cycle. No uniforms:
-// every instance of a mesh animates alike, from TIME.
+// 1 in 1/254 steps, is in COLOR.a (surf_phase) and offsets its effect's cycle. No per-instance
+// uniforms: every instance of a mesh animates alike, from anim_time.
+
+// The game's animation clock in seconds, wrapping every hour: main.gd sets it once a frame from
+// the clock Motion.clock() returns, so the moving parts BuildingView poses keep step with these
+// effects (a muzzle's BLINK on its barrel's kick). Declared under [shader_globals] in
+// project.godot. Used instead of TIME, whose zero is the engine's first drawn frame.
+global uniform float anim_time;
 
 const int FLAG_UNLIT = 1;
 const int FLAG_GLOSSY = 2;
@@ -63,16 +69,16 @@ float effect_hash(vec3 p) {
 // scale squared.
 vec3 effect_vertex(vec3 vertex, int flags, float phase, mat4 model) {
 	if (has_flag(flags, FLAG_FLICKER)
-			&& effect_hash(vec3(floor(TIME * FLICKER_RATE), phase * 97.0, 7.0)) >= FLICKER_ON) {
+			&& effect_hash(vec3(floor(anim_time * FLICKER_RATE), phase * 97.0, 7.0)) >= FLICKER_ON) {
 		return vec3(0.0);
 	}
 	vec3 moved = vertex;
 	if (has_flag(flags, FLAG_BOB)) {
-		float lift = BOB_HEIGHT * sin(TAU * (TIME / BOB_PERIOD + phase));
+		float lift = BOB_HEIGHT * sin(TAU * (anim_time / BOB_PERIOD + phase));
 		moved += transpose(mat3(model)) * vec3(0.0, lift, 0.0) / dot(model[0].xyz, model[0].xyz);
 	}
 	if (has_flag(flags, FLAG_JITTER)) {
-		vec3 cell = floor(vertex * 1000.0) + floor(TIME * JITTER_RATE);
+		vec3 cell = floor(vertex * 1000.0) + floor(anim_time * JITTER_RATE);
 		vec3 shake = vec3(effect_hash(cell), effect_hash(cell + 17.0), effect_hash(cell + 41.0)) * 2.0 - 1.0;
 		moved += shake * JITTER_REACH;
 	}
@@ -83,17 +89,17 @@ vec3 effect_vertex(vec3 vertex, int flags, float phase, mat4 model) {
 float effect_light(int flags, float phase) {
 	float light = 1.0;
 	if (has_flag(flags, FLAG_PULSE)) {
-		light *= mix(PULSE_LOW, 1.0, 0.5 + 0.5 * sin(TAU * (TIME / PULSE_PERIOD + phase)));
+		light *= mix(PULSE_LOW, 1.0, 0.5 + 0.5 * sin(TAU * (anim_time / PULSE_PERIOD + phase)));
 	}
 	if (has_flag(flags, FLAG_BLINK)) {
-		light *= fract(TIME / BLINK_PERIOD + phase) < BLINK_ON / BLINK_PERIOD ? 1.0 : BLINK_LOW;
+		light *= fract(anim_time / BLINK_PERIOD + phase) < BLINK_ON / BLINK_PERIOD ? 1.0 : BLINK_LOW;
 	}
 	return light;
 }
 
 // The part's texture coordinates now: FLOW scrolls them along V, FLOW_U along U.
 vec2 effect_uv(vec2 uv, int flags, float phase) {
-	float shift = mod(TIME * (phase - 0.5) * FLOW_SPEED, 1.0);
+	float shift = mod(anim_time * (phase - 0.5) * FLOW_SPEED, 1.0);
 	if (has_flag(flags, FLAG_FLOW)) {
 		uv.y -= shift;
 	}

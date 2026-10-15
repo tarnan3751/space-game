@@ -394,7 +394,7 @@ triangles as the gallery counts them.
 | `missile_battery` | tilted box launcher of red-tipped tubes (4, 6 at L3, 9 at L4) with a hazard band | swing: the launcher, arms and tubes, scans ±15° (7 s). The tips blink in a chase snaking along the rows, the mast lamp (L2) pulses | 2,174 |
 | `plasma_mortar` | fat short barrel rising from a caged violet plasma chamber on a heavy ring | spin: a cooling fan on the heavy ring's flank. The chamber pulses, bubbles swell on it between the cage's ribs, arcs crackle from the ribs, the bore's lining flows up out of the muzzle | 2,982 |
 | `shield_generator` | cyan energy orb held over an emitter dome by three coil arms, their upper runs glowing conduits | spin: a hologram band round the orb, tilted off its axis so it wobbles as it turns. The orb bobs and pulses, current flows up the arms, arcs jump from the arm tips to the orb | 2,980 |
-| `flak_cannon` | barrels angled at the sky on a tall bell mount | spin: the radar dish on its mast; slide: the barrels recoil (`RECOIL`, 1.2 s). Their muzzles blink once a recoil, at BLINK's same period but on the shader's clock, not on the kick, and flare (FLICKER), the radar lamp pulses | 2,948 |
+| `flak_cannon` | barrels angled at the sky on a tall bell mount | spin: the radar dish on its mast; slide: the barrels recoil (`RECOIL`, 1.2 s). Their muzzles blink once a recoil, on the kick (BLINK and the recoil share the 1.2 s period at phase 0 on the one clock), and flare (FLICKER), the radar lamp pulses | 2,948 |
 | `arc_tower` | tesla coil of white insulator skirts round a glowing core under an arc-blue sphere; twin coils at L4 | none. Arcs climb the coil from skirt to skirt and leap from the corona to the sphere, an arc jumps between the twin spheres (L4), the core's current flows up, the spheres and the cells (L3) pulse, the corona's spike tips (L2) blink in a chase | 2,954 |
 | `cloaked_sentry` | low dark hexagonal pod with a lid gun and a hologram shimmer ring | swing: the lid gun scans ±30° (5 s). The shimmer rings are holograms, the pod's lamp and the mast lamp (L3) blink | 914 |
 | `gravity_well` | dark violet core floating over a violet well, ringed by gyro rings | spin: the rotor over the core, the gyro rings tumbling about X (L2) and about Z (L3). The core bobs and pulses, the well's swirl turns and draws in (FLOW and FLOW_U on the crystal layer), the pillar caps blink in a chase | 1,978 |
@@ -469,7 +469,7 @@ While a building is constructed or upgraded, a builder drone works over it
 
 ## Animation
 
-Two ways for a model to move: **surface effects**, which the shaders animate from `TIME` per
+Two ways for a model to move: **surface effects**, which the shaders animate from `anim_time` per
 part, and **moving parts**, nodes `BuildingView` moves. What each costs in draws:
 
 - The shader effects (PULSE, BLINK, FLICKER, FLOW, FLOW_U, BOB, JITTER) add no draw: they are
@@ -479,9 +479,21 @@ part, and **moving parts**, nodes `BuildingView` moves. What each costs in draws
 - A HOLO part puts one more surface on its mesh: one more draw, in the transparent pass, for each
   mesh (the body or a moving part) that has holograms.
 
-While a building is busy (constructing an upgrade) its moving parts stop and resume where they
-stopped; its surface effects keep running, since they come from `TIME` with no per-instance
-state. That is intended.
+**One clock.** Both run on the game's animation clock: `Motion.tick()` reads a monotonic clock
+(`Time.get_ticks_usec()`) into seconds wrapping every hour (`Motion.WRAP_SECONDS`, 3600), and
+`main.gd` calls it once a frame in its `_process`, before any view animates (main is their
+ancestor), and hands the value to the shaders as the global uniform `anim_time` (declared under
+`[shader_globals]` in `project.godot`, set with `RenderingServer.global_shader_parameter_set`).
+The shaders use `anim_time`, never `TIME`, whose zero is the engine's first drawn frame and so
+falls anywhere from a fraction of a second to seconds after the ticks' zero. Moving parts are
+posed at `Motion.clock()`, the same value, so the two agree to within a frame: a part and its
+surface effects keep step (the flak cannon's muzzles flash on the barrels' kick). A model with no
+`main.gd` above it (a HUD preview) poses its parts at 0.
+
+While a building is busy (constructing an upgrade) its moving parts hold their last pose and on
+resuming snap to the clock's (the view is normally replaced when the work finishes); its surface
+effects keep running, since they come from `anim_time` with no per-instance state. That is
+intended.
 
 ### Surface effects
 
@@ -507,9 +519,9 @@ of a mesh animates alike.
 | `JITTER` | 256 | each vertex jumps up to 0.04 in a pseudo-random direction (a hash of its position and the time step), 20 times a second; corners shared by faces move together. With UNLIT and FLICKER, a crackling arc: build it of short segments so there are corners to shake |
 | `HOLO` | 512 | a hologram (below) |
 
-Effects compose: UNLIT + PULSE, UNLIT + FLICKER + JITTER, FLOW + PULSE. `TIME` wraps every hour
-(the project's `time_rollover_secs`); BLINK, PULSE and BOB cycle evenly into the hour, FLOW and
-the hologram's dip jump once an hour.
+Effects compose: UNLIT + PULSE, UNLIT + FLICKER + JITTER, FLOW + PULSE. `anim_time` wraps every
+hour (**One clock**, above); BLINK, PULSE and BOB cycle evenly into the hour, FLOW and the
+hologram's dip jump once an hour, and so does a spin or a swing whose period does not divide it.
 
 **Holograms.** A HOLO part is transparent, so `LowPolyMesh.to_mesh()` puts it in a surface of its
 own on `MaterialKit.holo()` (`holo.gdshader`: unshaded, alpha-blended, no depth writes, back faces
@@ -539,10 +551,10 @@ the part sits at its rest moved by -amplitude along (or turned -amplitude about)
 hammer strikes and rests at -amplitude and is lifted at +amplitude, and a recoiling barrel rests
 at -amplitude and kicks out to +amplitude: point the axis the way the part kicks.
 
-`BuildingView` collects the moving nodes once and sets each one's transform every frame from
-`Motion.transform_at(time, rest)`, with no allocation, on a clock that runs only while the
-building is finished and idle, so a part stops while the building is busy and resumes where it
-stopped. A view with no moving part does no work per frame.
+`BuildingView` collects the moving nodes once and, while the building is finished and idle, sets
+each one's transform every frame from `Motion.transform_at(Motion.clock(), rest)`, with no
+allocation; while it is busy the parts hold their last pose. A view with no moving part does no
+work per frame.
 
 ### Budget and checks
 
