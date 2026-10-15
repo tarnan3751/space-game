@@ -6,10 +6,10 @@ extends Node3D
 ## owns the cell <-> world mapping: 1 cell = 1 world unit, grid centred on the origin, cell
 ## (x, y) maps to world (x, z).
 ##
-## The terrain and the rocks are generated from SCENERY_SEED, so every player's base sits in
-## the same landscape: a ring of dunes, craters, mesas and a dry channel, smooth shaded and
-## painted from the material kit's dust and rock by slope, with rocks on it. Each is one mesh with
-## its ink outline.
+## The terrain, the rocks and the crystal outcrops are generated from SCENERY_SEED, so every
+## player's base sits in the same landscape: a ring of dunes, craters, mesas and a dry channel,
+## smooth shaded and painted from the material kit's dust and rock by slope, with chamfered rocks
+## and glowing crystal clusters on it. Each is one mesh with its ink outline.
 
 const GROUND_SHADER := preload("res://src/game/ground.gdshader")
 ## The field texture the ground is drawn from, imported as an Image (tools/gen_textures.gd).
@@ -63,7 +63,18 @@ const DRIFT := 0.76
 const PAINT_SOFTNESS := 0.08
 ## Towards the key light across the ground (main.gd's sun), in world x and z.
 const SUN_ACROSS := Vector2(-0.5, 0.866)
-const ROCK_COUNT := 40
+## The rocks: how many, their radii (world units, most of them small), and how many in a hundred
+## of those over 0.8 in radius carry a smaller rock on top.
+const ROCK_COUNT := 80
+const ROCK_SMALLEST := 0.4
+const ROCK_LARGEST := 2.5
+const ROCK_STACKED := 25
+## The crystal outcrops: how many clusters, shards in each, the shards' lengths, and how close any
+## part of one may come to the field.
+const OUTCROP_COUNT := Vector2i(6, 10)
+const OUTCROP_SHARDS := Vector2i(3, 7)
+const SHARD_LENGTH := Vector2(0.6, 2.0)
+const OUTCROP_GAP := 4.0
 ## The curb round the field: its height and width, its gap from the field's edge, and how far
 ## each corner is cut back along each side. A glowing stud stands on it at every plate seam (the
 ## ground's plates are PLATE_CELLS square) and on each corner.
@@ -76,9 +87,15 @@ const PLATE_CELLS := 4
 const STUD_RADIUS := 0.1
 ## The curb's studs: domes of unlit energy cyan, too small for the outline.
 static var CURB_STUD := Surf.make(MaterialKit.Layer.GLOW, MaterialKit.ENERGY, 1.0, Surf.UNLIT, false, false)
-## The rocks' sides and tops, outlined.
+## The rocks' sides and their chamfers and tops, flat shaded and outlined.
 static var ROCK_SIDE := Surf.make(MaterialKit.Layer.ROCK, MaterialKit.ROCK)
 static var ROCK_TOP := Surf.make(MaterialKit.Layer.ROCK, MaterialKit.ROCK_LIT)
+## The outcrops' shards: glowing faceted crystal in the three resource colours, outlined.
+static var SHARDS: Array[Surf] = [
+	Surf.make(MaterialKit.Layer.CRYSTAL, MaterialKit.CRYSTAL, 0.7, Surf.UNLIT),
+	Surf.make(MaterialKit.Layer.CRYSTAL, MaterialKit.METAL, 0.7, Surf.UNLIT),
+	Surf.make(MaterialKit.Layer.CRYSTAL, MaterialKit.ANTIMATTER, 0.7, Surf.UNLIT),
+]
 
 var grid_size: Vector2i = Vector2i.ZERO
 var views: Dictionary[int, BuildingView] = {}
@@ -93,6 +110,12 @@ var boundary: MeshInstance3D
 var boundary_outline: MeshInstance3D
 var terrain: MeshInstance3D
 var terrain_outline: MeshInstance3D
+var rocks: MeshInstance3D
+var rocks_outline: MeshInstance3D
+var outcrops: MeshInstance3D
+var outcrops_outline: MeshInstance3D
+## The centre of each crystal outcrop, on the ground.
+var outcrop_spots: PackedVector3Array = PackedVector3Array()
 ## The terrain's craters, each as (x, z, radius), and its mesas, each as (x, z, radius, the
 ## height of its top).
 var craters: Array[Vector3] = []
@@ -120,6 +143,7 @@ func setup(size: Vector2i) -> void:
 	var rng := SeededRng.new(SCENERY_SEED)
 	_build_terrain(rng)
 	_build_rocks(rng)
+	_build_outcrops(rng)
 	walls = WallMesh.new()
 	walls.setup(self)
 	add_child(walls)
@@ -576,52 +600,121 @@ func _clear(at: Vector2, extent: float) -> bool:
 	return true
 
 
-## Low-poly rocks scattered on the terrain around the grid, all in one mesh.
+## Chamfered rocks scattered on the terrain clear of the curb, about a quarter of those over 0.8
+## in radius with a smaller rock on top, all in one mesh with its outline. Each sits on the lowest ground under it, so it
+## does not float on a slope.
 func _build_rocks(rng: SeededRng) -> void:
 	var half := Vector2(grid_size) * 0.5
 	var mesh := LowPolyMesh.new()
 	var placed := 0
 	while placed < ROCK_COUNT:
 		var angle := TAU * rng.range_int(0, 3599) / 3600.0
-		var distance := maxf(half.x, half.y) + 2.0 + rng.range_int(0, 2600) / 100.0
-		var radius := 0.4 + rng.range_int(0, 140) / 100.0
+		var distance := maxf(half.x, half.y) + 2.0 + rng.range_int(0, 4000) / 100.0
+		var size := rng.range_int(0, 1000) / 1000.0
+		var radius := lerpf(ROCK_SMALLEST, ROCK_LARGEST, size * size)
 		var x := cos(angle) * distance
 		var z := sin(angle) * distance
-		# The grid is square, so a ring around it still overlaps the corners.
-		if absf(x) < half.x + radius and absf(z) < half.y + radius:
+		if _out_of_field(x, z) < radius + 1.5:
 			continue
 		placed += 1
-		_rock(mesh, Vector3(x, terrain_height(x, z) - 0.2 * radius, z), radius, rng)
-	var rocks := MeshInstance3D.new()
-	rocks.mesh = mesh.to_mesh()
-	add_child(rocks)
-	var outline := MeshInstance3D.new()
-	outline.mesh = mesh.to_outline_mesh()
-	outline.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
-	add_child(outline)
+		var ground := terrain_height(x, z)
+		for k: int in 4:
+			var side := Vector2(cos(k * PI * 0.5), sin(k * PI * 0.5)) * radius * 0.8
+			ground = minf(ground, terrain_height(x + side.x, z + side.y))
+		var top := _rock(mesh, Vector3(x, ground - 0.1 * radius, z), radius, rng)
+		if radius > 0.8 and rng.range_int(0, 99) < ROCK_STACKED:
+			var lean := Vector2(rng.range_int(-25, 25), rng.range_int(-25, 25)) * radius / 100.0
+			var smaller := radius * rng.range_int(40, 55) / 100.0
+			_rock(mesh, Vector3(x + lean.x, top - 0.1 * radius, z + lean.y), smaller, rng)
+	rocks = _add_mesh(mesh.to_mesh(), true)
+	rocks_outline = _add_mesh(mesh.to_outline_mesh(), false)
 
 
-## One rock: a jittered ring on the ground, a narrower one above it and an off-centre peak.
-static func _rock(mesh: LowPolyMesh, pos: Vector3, radius: float, rng: SeededRng) -> void:
+## One rock, a chamfered chunk: a jittered ring of corners on the ground, a shoulder ring a
+## little in and most of the way up, a top ring cut in from it (the chamfer) and a low peak,
+## flat shaded. Returns the height of its top.
+static func _rock(mesh: LowPolyMesh, pos: Vector3, radius: float, rng: SeededRng) -> float:
 	var sides := rng.range_int(5, 7)
 	var turn := TAU * rng.range_int(0, 359) / 360.0
-	var height := radius * rng.range_int(80, 120) / 100.0
+	var height := radius * rng.range_int(60, 95) / 100.0
 	var lower := PackedVector3Array()
+	var shoulder := PackedVector3Array()
 	var upper := PackedVector3Array()
 	for j: int in sides:
-		var angle := turn + TAU * j / sides
-		var r := radius * rng.range_int(75, 110) / 100.0
-		lower.append(pos + Vector3(r * cos(angle), 0.0, r * sin(angle)))
-		var r_up := r * rng.range_int(55, 75) / 100.0
-		var y := height * rng.range_int(45, 70) / 100.0
-		upper.append(pos + Vector3(r_up * cos(angle + 0.3), y, r_up * sin(angle + 0.3)))
-	var lean := Vector2(rng.range_int(-20, 20), rng.range_int(-20, 20)) * radius / 100.0
-	var peak := pos + Vector3(lean.x, height, lean.y)
+		var angle := turn + TAU * (j + rng.range_int(-15, 15) / 100.0) / sides
+		var out := Vector3(cos(angle), 0.0, sin(angle)) * radius * rng.range_int(80, 105) / 100.0
+		lower.append(pos + out)
+		shoulder.append(pos + out * 0.9 + Vector3(0.0, height * rng.range_int(62, 78) / 100.0, 0.0))
+		upper.append(pos + out * 0.62 + Vector3(0.0, height * rng.range_int(90, 100) / 100.0, 0.0))
+	var lean := Vector2(rng.range_int(-15, 15), rng.range_int(-15, 15)) * radius / 100.0
+	var peak := pos + Vector3(lean.x, height * 1.06, lean.y)
 	for j: int in sides:
 		var k := (j + 1) % sides
-		mesh.triangle(lower[j], upper[j], upper[k], ROCK_SIDE)
-		mesh.triangle(lower[j], upper[k], lower[k], ROCK_SIDE)
+		mesh.triangle(lower[j], shoulder[j], shoulder[k], ROCK_SIDE)
+		mesh.triangle(lower[j], shoulder[k], lower[k], ROCK_SIDE)
+		mesh.triangle(shoulder[j], upper[j], upper[k], ROCK_TOP)
+		mesh.triangle(shoulder[j], upper[k], shoulder[k], ROCK_TOP)
 		mesh.triangle(upper[j], peak, upper[k], ROCK_TOP)
+	return pos.y + height
+
+
+## Crystal outcrops on the ring: OUTCROP_COUNT clusters of OUTCROP_SHARDS glowing shards, each a
+## six-sided crystal leaning out from its cluster's middle, in the resource colours in turn from a
+## seeded start. Every part of a cluster stays OUTCROP_GAP clear of the field, and clusters keep
+## off the mesas, out of the craters' bowls and apart. One mesh with its outline.
+func _build_outcrops(rng: SeededRng) -> void:
+	var half := Vector2(grid_size) * 0.5
+	var count := rng.range_int(OUTCROP_COUNT.x, OUTCROP_COUNT.y)
+	var first := rng.range_int(0, SHARDS.size() - 1)
+	var mesh := LowPolyMesh.new()
+	for attempt: int in 200:
+		if outcrop_spots.size() == count:
+			break
+		var angle := TAU * rng.range_int(0, 3599) / 3600.0
+		var centre := Vector2(cos(angle), sin(angle)) * (maxf(half.x, half.y) + rng.range_int(60, 260) / 10.0)
+		var shards := rng.range_int(OUTCROP_SHARDS.x, OUTCROP_SHARDS.y)
+		var spread := 0.3 + 0.15 * shards
+		# A shard's tip leans at most SHARD_LENGTH.y * sin(30 degrees) out, plus its radius.
+		if _out_of_field(centre.x, centre.y) < OUTCROP_GAP + spread + SHARD_LENGTH.y * 0.75 \
+				or not _outcrop_clear(centre, spread + 2.0):
+			continue
+		var surf := SHARDS[(first + outcrop_spots.size()) % SHARDS.size()]
+		var ground := terrain_height(centre.x, centre.y)
+		for s: int in shards:
+			var offset := Vector2.ZERO
+			var length := lerpf(SHARD_LENGTH.x, SHARD_LENGTH.y, rng.range_int(50, 100) / 100.0)
+			var tilt := rng.range_int(0, 10)
+			var yaw := rng.range_int(0, 359)
+			if s > 0:
+				var turn := TAU * rng.range_int(0, 359) / 360.0
+				offset = Vector2(cos(turn), sin(turn)) * spread * rng.range_int(45, 100) / 100.0
+				length = lerpf(SHARD_LENGTH.x, SHARD_LENGTH.y, rng.range_int(0, 55) / 100.0)
+				tilt = rng.range_int(12, 30)
+				yaw = roundi(rad_to_deg(atan2(offset.x, offset.y)))
+			var foot := centre + offset
+			var radius := length * rng.range_int(20, 27) / 100.0
+			var profile := PackedVector2Array([Vector2(radius, 0.0), Vector2(radius, length * 0.68),
+				Vector2(0.0, length)])
+			var base := Vector3(foot.x, terrain_height(foot.x, foot.y) - 0.12 * length, foot.y)
+			mesh.lathe(profile, 6, base, surf, Vector3(tilt, yaw, 0.0))
+		outcrop_spots.append(Vector3(centre.x, ground, centre.y))
+	outcrops = _add_mesh(mesh.to_mesh(), true)
+	outcrops_outline = _add_mesh(mesh.to_outline_mesh(), false)
+
+
+## Whether an outcrop reaching `extent` from `at` keeps off the mesas, out of the craters' bowls
+## and clear of the outcrops so far.
+func _outcrop_clear(at: Vector2, extent: float) -> bool:
+	for mesa: Vector4 in mesas:
+		if at.distance_to(Vector2(mesa.x, mesa.y)) < extent + mesa.z + 2.0:
+			return false
+	for crater: Vector3 in craters:
+		if at.distance_to(Vector2(crater.x, crater.y)) < extent + crater.z * 0.8:
+			return false
+	for spot: Vector3 in outcrop_spots:
+		if at.distance_to(Vector2(spot.x, spot.z)) < extent + 3.0:
+			return false
+	return true
 
 
 ## The terrain's height at a point: flat out to TERRAIN_FLAT outside the field, then ridged dunes
