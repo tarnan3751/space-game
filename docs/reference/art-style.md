@@ -354,13 +354,13 @@ triangles as the gallery counts them.
 | `metal_silo` | squat banded tank with a glowing fill gauge and a ladder; twin tanks from L4 | none moving. PULSE: the gauge; BLINK: a warning lamp on each lid; L4 FLOW: liquid metal in the pipe between the tanks | 2,830 |
 | `crystal_silo` | tall hexagonal tank of crystal-lit glass panels under a chamfered lid and a crystal finial | spin: the finial, 0.5 rad/s. PULSE: the finial and every glass panel, each on its own phase | 910 |
 | `antimatter_vault` | armoured chamfered cube with a round vault door, violet seams and a containment pylon on each corner | none moving. FLOW: the corner seams, FLOW_U: the seam band (screen layer); PULSE: the pylons' cells; BLINK: their tips (a chase); L3 UNLIT + FLICKER + JITTER: arcs between adjacent tips | 2,944 |
-| `hangar` | barrel-vaulted bays with orange ribs and hazard-striped doors, a glass-cabbed control tower | none | 4,362 |
-| `fabricator` | sawtooth-roofed factory, an orange gantry crane over a loading dock, smokestacks | none | 1,950 |
-| `heavy_fabricator` | armoured hall with orange press arms hammering anvils, a glowing furnace mouth | none | 2,024 |
-| `research_lab` | observatory dome with a telescope, in a ring of screens | spin: the radar dish on its mast | 2,704 |
-| `nanite_foundry` | vats with bands of glowing nanite-green goo, piped with ball elbows | none | 2,870 |
-| `drydock` | half-built ship in a cradle under orange gantries, welders throwing sparks | none | 2,946 |
-| `alliance_beacon` | braced transmitter tower with rings of light, a big dish and an emitter orb | none | 2,096 |
+| `hangar` | barrel-vaulted bays with orange ribs and hazard-striped doors, a glass-cabbed control tower | slide: the main bay's door, up under a hood over its lit inside (FLOW); spin: a radar on the cab's roof; swing, from L4: the big roof dish. The apron lights BLINK in a chase, the cab's glass PULSEs | 4,768 |
+| `fabricator` | sawtooth-roofed factory, an orange gantry crane over a loading dock, smokestacks | slide: the crane's trolley and hook along its bridge. The roof windows PULSE orange, the dock lamp BLINKs, HOLO smoke puffs BOB over every stack | 2,798 |
+| `heavy_fabricator` | armoured hall with orange press arms hammering anvils, a glowing furnace mouth | slide (HAMMER, out of step): each press arm's head and piston onto its anvil. FLICKER sparks off the anvils, the furnace mouth PULSEs, the molten pour FLOWs | 2,088 |
+| `research_lab` | observatory dome with a telescope, in a ring of screens | spin: the radar dish on its mast; swing: the telescope along the slit. The screens FLOW at their own speeds, the slit glows and PULSEs; from L3 a HOLO orb in two rings BOBs over the dome | 2,904 |
+| `nanite_foundry` | vats with bands of glowing nanite-green goo, piped with ball elbows; the big vat open over swirling goo | spin: the stirrer in the big vat. The goo FLOWs up every vat (and FLOW_U round the open top), bubbles BLINK on it, the pipes and the pump's screens FLOW | 2,982 |
+| `drydock` | half-built ship in a cradle under orange gantries, welders throwing sparks; the unbuilt stern a cyan hologram | slide: the first gantry along its rails. The welds BLINK, FLICKER and JITTER sparks fly off them, the reactor PULSEs (and the engines at L2), the HOLO hull completes the stern | 3,206 |
+| `alliance_beacon` | braced transmitter tower with rings of light, a big dish and an emitter orb | spin: the big dish on a collar, circling the tower. The rings BLINK in a chase up it, the orb PULSEs and BOBs with its spike, a HOLO halo BOBs over them | 2,384 |
 | `laser_turret` | domed head on the red-belted plinth, twin barrels ending in red emitters | spin: the head | 2,722 |
 | `missile_battery` | tilted box launcher of red-tipped tubes (4, 6 at L3, 9 at L4) with a hazard band | none | 2,174 |
 | `plasma_mortar` | fat short barrel rising from a caged violet plasma chamber on a heavy ring | none | 2,782 |
