@@ -7,9 +7,10 @@ extends Node3D
 ## (x, y) maps to world (x, z).
 ##
 ## The terrain, the rocks and the crystal outcrops are generated from SCENERY_SEED, so every
-## player's base sits in the same landscape: a ring of dunes, craters, mesas and a dry channel,
-## smooth shaded and painted from the material kit's dust and rock by slope, with chamfered rocks
-## and glowing crystal clusters on it. Each is one mesh with its ink outline.
+## player's base sits in the same landscape: a ring of dunes, craters, mesas and a dry channel
+## rising from low, rough ground beside the curb along an edge that wanders, smooth shaded and
+## painted from the material kit's dust and rock by slope, with chamfered rocks and glowing crystal
+## clusters on it. Each is one mesh with its ink outline.
 
 const GROUND_SHADER := preload("res://src/game/ground.gdshader")
 ## The field texture the ground is drawn from, imported as an Image (tools/gen_textures.gd).
@@ -24,15 +25,20 @@ const TERRAIN_EXTENT := 100.0
 const TERRAIN_FINE_REACH := 50.0
 const TERRAIN_COARSE := 2
 ## Outside the field the ground stays flat out to TERRAIN_FLAT (under the curb) and reaches its
-## full relief at TERRAIN_BLEND.
+## full relief between TERRAIN_BLEND_NEAR and TERRAIN_BLEND_FAR out, wandering along the edge
+## (blend_end), so no ramp runs straight along a side. Rubble, RUBBLE high either way, roughens
+## the ground from TERRAIN_FLAT out whatever the relief.
 const TERRAIN_FLAT := 0.8
-const TERRAIN_BLEND := 3.0
+const TERRAIN_BLEND_NEAR := 4.0
+const TERRAIN_BLEND_FAR := 11.0
+const RUBBLE := 0.12
 ## Spacing of the value-noise lattice behind the dunes and the dust drifts.
 const NOISE_CELL := 7.0
 const NOISE_SIZE := 24
-## The dunes' height next to the field and from 18 units out, the scale of their ridges' noise
-## (NOISE_CELL / DUNE_SCALE units across), and how much the land rises per unit out.
-const DUNES_NEAR := 0.8
+## The dunes' height next to the field and from 20 units out (they grow from where the relief is
+## full), the scale of their ridges' noise (NOISE_CELL / DUNE_SCALE units across), and how much the
+## land rises per unit out.
+const DUNES_NEAR := 0.3
 const DUNES_FAR := 5.0
 const DUNE_SCALE := 0.64
 const RISE := 0.04
@@ -564,7 +570,7 @@ func _place_features(rng: SeededRng) -> void:
 		var out := _out_of_field(at.x, at.y)
 		if maxf(absf(at.x), absf(at.y)) + radius + 2.0 <= TERRAIN_FINE_REACH and out >= radius + 6.0 \
 				and _clear(at, radius + 3.0):
-			mesas.append(Vector4(at.x, at.y, radius, 0.8 * _dune_height(out) + out * RISE + height))
+			mesas.append(Vector4(at.x, at.y, radius, 0.8 * _dune_height(out, blend_end(at.x, at.y)) + out * RISE + height))
 			_mesa_phases.append(phases)
 	var count := rng.range_int(3, 5)
 	for attempt: int in 80:
@@ -720,17 +726,23 @@ func _outcrop_clear(at: Vector2, extent: float) -> bool:
 
 ## The terrain's height at a point: flat out to TERRAIN_FLAT outside the field, then ridged dunes
 ## that grow away from it (flattened round the craters) and a gentle rise, the craters' bowls and
-## rims, the channel, and the mesas' flat tops, all blended in by TERRAIN_BLEND. The harness marches
-## the view's rays over it.
+## rims, the channel, and the mesas' flat tops, all blended in by a wandering distance out
+## (blend_end), with rubble over it all. The harness marches the view's rays over it.
 func terrain_height(x: float, z: float) -> float:
 	var out_x := maxf(absf(x) - grid_size.x * 0.5, 0.0)
 	var out_z := maxf(absf(z) - grid_size.y * 0.5, 0.0)
 	var out := sqrt(out_x * out_x + out_z * out_z)
 	if out <= TERRAIN_FLAT:
 		return 0.0
+	# From 20 out the relief is full and the dunes grown wherever the blend ends: skipped there.
+	var full_out := TERRAIN_BLEND_FAR
+	if out < 20.0:
+		full_out = blend_end(x, z)
+	var rubble := RUBBLE * (2.0 * _noise_at(x * 3.0 + 7.0, z * 3.0 + 13.0) - 1.0) \
+		* smoothstep(TERRAIN_FLAT, TERRAIN_FLAT + 2.0, out)
 	var ridge := 1.0 - absf(2.0 * _noise_at(x * DUNE_SCALE, z * DUNE_SCALE) - 1.0)
-	# _dune_height(out), written out: this runs for every point of the lattice.
-	var dunes := lerpf(DUNES_NEAR, DUNES_FAR, smoothstep(3.0, 18.0, out)) \
+	# _dune_height(out, full_out), written out: this runs for every point of the lattice.
+	var dunes := lerpf(DUNES_NEAR, DUNES_FAR, smoothstep(full_out, 20.0, out)) \
 		* (0.8 * ridge + 0.2 * _noise_at(x * 2.3 + 37.0, z * 2.3 + 11.0))
 	var height := out * RISE
 	var distance := sqrt(x * x + z * z)
@@ -743,7 +755,7 @@ func terrain_height(x: float, z: float) -> float:
 			height -= CHANNEL_DEPTH * u * u * smoothstep(_channel.z, _channel.z + 5.0, distance)
 	# The craters and mesas all lie inside the fine lattice.
 	if absf(x) > TERRAIN_FINE_REACH or absf(z) > TERRAIN_FINE_REACH:
-		return height + dunes
+		return height + dunes + rubble
 	for crater: Vector3 in craters:
 		var dx := x - crater.x
 		var dz := z - crater.y
@@ -760,12 +772,20 @@ func terrain_height(x: float, z: float) -> float:
 			var edge := _mesa_edge(k, dx, dz)
 			var top := 1.0 - smoothstep(edge - MESA_WALL, edge + MESA_FOOT, sqrt(dx * dx + dz * dz))
 			height = lerpf(height, mesa.w, top)
-	return height * smoothstep(TERRAIN_FLAT, TERRAIN_BLEND, out)
+	return height * smoothstep(TERRAIN_FLAT, full_out, out) + rubble
 
 
-## The dunes' height `out` units out from the field: low beside it, DUNES_FAR from 18 out.
-static func _dune_height(out: float) -> float:
-	return lerpf(DUNES_NEAR, DUNES_FAR, smoothstep(3.0, 18.0, out))
+## How far out from the field the terrain's relief is full at a point: between TERRAIN_BLEND_NEAR
+## and TERRAIN_BLEND_FAR, on a noise whose lattice is 4 units across, so it wanders along the edge.
+## The harness checks that it does.
+func blend_end(x: float, z: float) -> float:
+	return lerpf(TERRAIN_BLEND_NEAR, TERRAIN_BLEND_FAR, _noise_at(x * 1.75 + 101.0, z * 1.75 + 59.0))
+
+
+## The dunes' height `out` units out from the field, where the relief is full `full_out` out: low
+## beside it, growing from there to DUNES_FAR 20 out.
+static func _dune_height(out: float, full_out: float) -> float:
+	return lerpf(DUNES_NEAR, DUNES_FAR, smoothstep(full_out, 20.0, out))
 
 
 ## Mesa `k`'s outline: its distance from the mesa's centre towards (`dx`, `dz`), irregular.
