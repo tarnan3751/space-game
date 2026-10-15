@@ -4,8 +4,11 @@ extends HarnessScenario
 ## no shadow (the terrain's body none either, the perimeter's one); that the perimeter's body is two
 ## surfaces, the toon's and the holograms' (its fence); that the background is a sky drawn by a
 ## shader; that no rock or rubble vertex comes within the perimeter's reach out of the field, beside
-## the sides or in the corners (its own vertices' farthest); the terrain's triangle budget; that no part of an outcrop comes within OUTCROP_GAP of the
-## field; that along each side of the field, EDGE_OUT units out, the ground is uneven (its height
+## the sides or in the corners (its own vertices' farthest); the terrain's triangle budget; that
+## each mesa's own geometry (BaseView.mesa_indices) is closed but along its fillet's outer edge, sunk
+## MESA_SINK under the ground, has no degenerate triangle and lies on terrain_height everywhere
+## else, and that its rim stays within MESA_RIM_RISE of its top all round; that no part of an
+## outcrop comes within OUTCROP_GAP of the field; that along each side of the field, EDGE_OUT units out, the ground is uneven (its height
 ## spreads by more than EDGE_SPREAD) and low (never over EDGE_HIGHEST), and the distance at which
 ## the relief is full (BaseView.blend_end) wanders by more than BLEND_WANDER; that at the widest
 ## zoom in a WIDE window, the focus at each corner of its bounds, the ray from every screen corner
@@ -18,10 +21,16 @@ extends HarnessScenario
 ## window and in the WIDER one on the nearest corner (stars beyond the ring, no bare colour), the
 ## widest in the WIDEST one on the field's left corner (the sky's haze band beyond the ring's lower
 ## left), a crater, an outcrop and the first mesa's wall centred
-## (its foot and rim), then the mesa wider (for the perimeter, the crater, the outcrop and the mesa
-## the camera's bounds are widened, as a player cannot centre the view off the field).
+## (its foot and rim), then the mesa wider, its foot at the closest zoom and its ledge (for the
+## perimeter, the crater, the outcrop and the mesa the camera's bounds are widened, as a player
+## cannot centre the view off the field).
 
 const TERRAIN_BUDGET := 38000
+## How closely the mesas' geometry lies on terrain_height, at its points and at these weights of
+## each triangle's corners.
+const MESA_FIT := 0.02
+const MESA_SAMPLES: Array[Vector3] = [Vector3(1.0, 1.0, 1.0) / 3.0, Vector3(0.6, 0.2, 0.2),
+	Vector3(0.2, 0.6, 0.2), Vector3(0.2, 0.2, 0.6)]
 const OUTCROP_GAP := 4.0
 const EDGE_OUT := 3.8
 const EDGE_SPREAD := 0.1
@@ -70,6 +79,8 @@ func run(main: MainScript) -> void:
 		"the perimeter: its body casts a shadow, in two surfaces, the toon's and the fence's holograms'")
 	var triangles := view.terrain.mesh.get_faces().size() / 3
 	check(triangles <= TERRAIN_BUDGET, "the terrain has %d triangles, within %d" % [triangles, TERRAIN_BUDGET])
+	for k: int in view.mesas.size():
+		_check_mesa(view, k)
 	var field := view.area()
 	var nearest := INF
 	for at: Vector3 in view.outcrops.mesh.surface_get_arrays(0)[Mesh.ARRAY_VERTEX]:
@@ -154,6 +165,18 @@ func run(main: MainScript) -> void:
 	var facing := Vector3(mesa.x, mesa.w * 0.5, mesa.y) + Vector3(1.0, 0.0, 1.0).normalized() * mesa.z
 	await _shot(main, "mesa", facing, IsoCamera.MIN_ZOOM_SIZE)
 	await _shot(main, "mesas", Vector3(mesa.x, mesa.w * 0.5, mesa.y), 24.0)
+	# Its foot where it faces the camera, half way out along the fillet, and the middle of its ledge.
+	var turn := PI * 0.25
+	var profile := view.mesa_profile(0, turn)
+	var out := Vector3(cos(turn), 0.0, sin(turn))
+	var foot := Vector3(mesa.x, 0.0, mesa.y) + out * (profile[BaseView.MESA_FILLET_TOP].x + profile[profile.size() - 1].x) * 0.5
+	await _shot(main, "mesa-foot", Vector3(foot.x, view.terrain_height(foot.x, foot.z), foot.z), IsoCamera.MIN_ZOOM_SIZE)
+	var ledge := view.mesa_ledges[0]
+	turn = ledge.x + ledge.y * 0.5
+	profile = view.mesa_profile(0, turn)
+	out = Vector3(cos(turn), 0.0, sin(turn))
+	var step := profile[BaseView.MESA_RIM + 2]
+	await _shot(main, "mesa-ledge", Vector3(mesa.x, step.y, mesa.y) + out * step.x, 12.0)
 	main.camera.bounds = field
 
 
@@ -183,6 +206,75 @@ func _check_field_shade(main: MainScript) -> void:
 	check(absf(hsl[0].x - hsl[1].x) <= SHADE_L and absf(hsl[0].y - hsl[1].y) <= SHADE_S,
 		"in the widest shot the field renders L %.3f S %.3f, the ring's flats L %.3f S %.3f"
 		% [hsl[0].x, hsl[0].y, hsl[1].x, hsl[1].y])
+
+
+## Mesa `k`'s own triangles in the terrain's body (BaseView.mesa_indices), its points merged by
+## place, since the wall's bands have points of their own: every edge is shared by two triangles
+## but along the fillet's outer edge, whose points lie MESA_SINK under the ground (terrain_height);
+## no triangle is degenerate; every other point, and MESA_SAMPLES inside each triangle (the sunk
+## edge raised to the ground), lies on terrain_height within MESA_FIT; and the rim, sampled every
+## degree, is within MESA_RIM_RISE of the top.
+func _check_mesa(view: BaseView, k: int) -> void:
+	var arrays := view.terrain.mesh.surface_get_arrays(0)
+	var points: PackedVector3Array = arrays[Mesh.ARRAY_VERTEX]
+	var index: PackedInt32Array = arrays[Mesh.ARRAY_INDEX]
+	var span := view.mesa_indices[k]
+	# Each place's id, and whether it lies MESA_SINK under the ground.
+	var ids: Dictionary[Vector3i, int] = {}
+	var sunk: Array[bool] = []
+	var off := 0
+	var worst := 0.0
+	var degenerate := 0
+	var edges: Dictionary[Vector2i, int] = {}
+	for t: int in range(span.x, span.y, 3):
+		var corners := PackedInt32Array()
+		for c: int in 3:
+			var at := points[index[t + c]]
+			var key := Vector3i((at * 1000.0).round())
+			if not ids.has(key):
+				ids[key] = ids.size()
+				var below := view.terrain_height(at.x, at.z) - at.y
+				sunk.append(absf(below - BaseView.MESA_SINK) < 0.01)
+				if not sunk[sunk.size() - 1]:
+					worst = maxf(worst, absf(below))
+					if absf(below) > MESA_FIT:
+						off += 1
+			corners.append(ids[key])
+		var a := points[index[t]]
+		if (points[index[t + 1]] - a).cross(points[index[t + 2]] - a).length() < 1e-5:
+			degenerate += 1
+		for weights: Vector3 in MESA_SAMPLES:
+			var inside := Vector3.ZERO
+			for c: int in 3:
+				var lift := BaseView.MESA_SINK if sunk[corners[c]] else 0.0
+				inside += (points[index[t + c]] + Vector3(0.0, lift, 0.0)) * weights[c]
+			var miss := absf(view.terrain_height(inside.x, inside.z) - inside.y)
+			worst = maxf(worst, miss)
+			if miss > MESA_FIT:
+				off += 1
+		for c: int in 3:
+			var edge := Vector2i(mini(corners[c], corners[(c + 1) % 3]), maxi(corners[c], corners[(c + 1) % 3]))
+			edges[edge] = edges.get(edge, 0) + 1
+	var open := 0
+	var stray := 0
+	var crowded := 0
+	for edge: Vector2i in edges:
+		if edges[edge] == 1:
+			open += 1
+			if not (sunk[edge.x] and sunk[edge.y]):
+				stray += 1
+		elif edges[edge] > 2:
+			crowded += 1
+	var mesa := view.mesas[k]
+	var rim := Vector2(INF, -INF)
+	for degree: int in 360:
+		var height := view.mesa_profile(k, deg_to_rad(degree))[BaseView.MESA_RIM].y
+		rim = Vector2(minf(rim.x, height), maxf(rim.y, height))
+	check(open > 0 and stray == 0 and crowded == 0 and degenerate == 0 and off == 0
+		and rim.x >= mesa.w - BaseView.MESA_RIM_RISE - 0.001 and rim.y <= mesa.w + BaseView.MESA_RIM_RISE + 0.001,
+		("mesa %d: %d triangles, %d open edges (%d off the fillet's sunk edge), %d edges in more than two, "
+		+ "%d degenerate, %d points off terrain_height (by %.3f at most, points and inside triangles), the rim %.2f to %.2f high on a top at %.2f")
+		% [k, (span.y - span.x) / 3, open, stray, crowded, degenerate, off, worst, rim.x, rim.y, mesa.w])
 
 
 ## How far a point lies outside the field along x and along z (0 within its span).

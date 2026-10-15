@@ -48,14 +48,50 @@ const RISE := 0.04
 ## A crater's depth and rim height, in radii.
 const CRATER_DEPTH := 0.18
 const CRATER_RIM := 0.15
-## A mesa's wall: how far in from its outline its rim lies, and how far out its foot; how far
-## apart round the outline it is sampled, in degrees; how far its foot sinks below the ground, so
-## no gap shows under it; and how far inside the foot a lattice cell must lie to be left out.
+## A mesa's wall (mesa_profile): how far in from its outline its rim lies on average, and how far
+## out the wall's line meets the ground; how far apart round the outline it is sampled, in
+## degrees; how far the fillet's outer edge sinks below the ground, so no gap shows; and how far
+## inside that edge a lattice cell must lie to be left out.
 const MESA_WALL := 1.4
 const MESA_FOOT := 0.4
 const MESA_STEP := 3.0
 const MESA_SINK := 0.05
 const MESA_FOOT_MARGIN := 0.25
+## How far beyond a mesa's fillet's outer edge other features keep (_clear).
+const MESA_CLEAR := 0.5
+## The foot: the lowest MESA_FILLET of the skirt's height is a fillet, a quarter-ellipse in profile
+## from the wall's slope to the ground, MESA_FILLET_STEPS segments, running out MESA_APRON past
+## where the wall's line meets the ground.
+const MESA_FILLET := 0.35
+const MESA_FILLET_STEPS := 4
+const MESA_APRON := 1.5
+## The rim: its radius wanders by MESA_JAG of the mesa's radius either way on a noise round the
+## outline whose lattice is MESA_JAG_LATTICE degrees apart, with MESA_NOTCHES sharper notches cut
+## in, each MESA_NOTCH_DEPTH deep and MESA_NOTCH_WIDTH degrees either side of its middle; its
+## height wanders MESA_RIM_RISE either way on the same noise. The top is flat out to a ring
+## MESA_TOP_EDGE inside the rim, so only its edge rolls.
+const MESA_JAG := 0.12
+const MESA_JAG_LATTICE := 20.0
+const MESA_NOTCHES := Vector2i(3, 5)
+const MESA_NOTCH_DEPTH := Vector2(0.5, 0.9)
+const MESA_NOTCH_WIDTH := Vector2i(4, 8)
+const MESA_RIM_RISE := 0.3
+const MESA_TOP_EDGE := 1.0
+## The wall: rings between the rim and the fillet at these shares of the skirt's height (the
+## fillet starts at 1 - MESA_FILLET), each sample's radius moved MESA_ROUGH either way on a noise
+## round the outline whose lattice is MESA_ROUGH_LATTICE degrees apart, one per ring. One ledge per
+## mesa steps the wall out by MESA_LEDGE_STEP between the first ring and the second, along
+## MESA_LEDGE_LENGTH degrees of the outline, tapering in and out over MESA_LEDGE_TAPER degrees.
+const MESA_RINGS: Array[float] = [0.2, 0.28, 0.48]
+const MESA_ROUGH := 0.15
+const MESA_ROUGH_LATTICE := 15.0
+const MESA_LEDGE_STEP := Vector2(0.5, 0.7)
+const MESA_LEDGE_LENGTH := Vector2i(75, 105)
+const MESA_LEDGE_TAPER := 8.0
+## The points of a mesa's profile (mesa_profile): the top's inner ring, the rim, the wall's rings,
+## then the fillet's, the last at its outer edge.
+const MESA_RIM := 1
+const MESA_FILLET_TOP := 5
 ## The dry channel's half width, depth, and how far it wanders either side of its course (radians).
 const CHANNEL_WIDTH := 2.2
 const CHANNEL_DEPTH := 1.2
@@ -161,6 +197,10 @@ var outcrop_spots: PackedVector3Array = PackedVector3Array()
 ## height of its top).
 var craters: Array[Vector3] = []
 var mesas: Array[Vector4] = []
+## Each mesa's ledge as (start, length, step out), in radians round its outline and world units.
+var mesa_ledges: Array[Vector3] = []
+## Each mesa's triangles in the terrain body's index array, as (first index, end).
+var mesa_indices: Array[Vector2i] = []
 
 var _ground_material: ShaderMaterial
 ## The field texture, which the ground and the terrain draw their marks from.
@@ -173,6 +213,12 @@ var _walls_state: BaseState = null
 var _noise: PackedFloat32Array = PackedFloat32Array()
 ## Each mesa's outline: the phases of the two waves that make it irregular.
 var _mesa_phases: Array[Vector2] = []
+## Each mesa's rim noise (MESA_JAG_LATTICE apart round it), its wall rings' noises, one after the
+## other (MESA_ROUGH_LATTICE apart), all in [-1, 1], and its notches as (middle, depth, half width)
+## in radians and world units.
+var _mesa_rim_noise: Array[PackedFloat32Array] = []
+var _mesa_wall_noise: Array[PackedFloat32Array] = []
+var _mesa_notches: Array[PackedVector3Array] = []
 ## The dry channel: the angle of its course from the centre, the phase of its meander, and the
 ## distance from the centre it starts at; and its course as a direction.
 var _channel: Vector3 = Vector3.ZERO
@@ -499,8 +545,8 @@ func _add_mesh(mesh: Mesh, casts_shadow: bool) -> MeshInstance3D:
 ## point's normal comes from its lattice neighbours' heights, once, and the ink outline (one more
 ## mesh, on the same points and normals) inks the ridges and crater rims the camera sees over. The
 ## lattice lies on the ground without the mesas and leaves out the cells under them; each mesa is
-## a flat top and a wall of its own that follow its outline (_mesa_rings), with hard creases at the
-## rim and the foot, which the outline inks with fins (_fin).
+## a top, a wall and a fillet of its own that follow its outline (_mesa_rings), with a hard crease
+## at its jagged rim, which the outline inks with a fin (_fin), and a foot smooth into the ground.
 ## Each point is tinted by slope and place (ROCK_SLOPE_Y, SHADOW_SLOPE_Y, CRATER_FLOOR), a tint the
 ## faces between points blend and the terrain shader draws over (MaterialKit.terrain). The
 ## terrain receives shadows and casts none.
@@ -638,69 +684,74 @@ func _build_terrain(rng: SeededRng) -> void:
 		for k: int in around.size() - 1:
 			indices.append_array(PackedInt32Array([loop[fan], around[k], around[k + 1]]))
 
-	# Each mesa: its flat top, a fan from its middle out to its rim, and its wall, a skirt from the
-	# rim down to its foot below the ground, each with its own points and normals, so the rim and
-	# the foot are hard creases. The ink outline has fins along both creases: at each, a strip
-	# between the two faces' points, which the outline's push opens into a line (_fin). The foot's
-	# fins have points of their own, at the foot on the ground, after the body's in the outline.
-	var ink_vertices := PackedVector3Array()
-	var ink_normals := PackedVector3Array()
+	# Each mesa (_mesa_rings): its top, a fan from its middle out to a ring inside its rim and a
+	# band from there out to the rim; its wall, a band between each two of its rings down to the
+	# fillet, each with points of its own whose normals lean as the band does, so the wall is
+	# angular down its height and smooth round it; and the fillet, smooth shaded out into the
+	# ground, its outer edge sunk under it. The rim is a hard crease, which the ink outline inks
+	# with a fin (_fin).
 	var ink_indices := PackedInt32Array()
-	var mesa_walls: Array[Array] = []
 	for k: int in mesas.size():
+		var first := indices.size()
 		var rings := _mesa_rings(k)
-		mesa_walls.append(rings)
-		var rim := rings[0]
-		var foot := rings[1]
-		var rim_normals := rings[2]
-		var foot_normals := rings[3]
-		var count := rim.size()
+		var count := rings[0].size()
+		var centre := Vector3(mesas[k].x, mesas[k].w, mesas[k].y)
 		var middle := vertices.size()
-		var top := middle + 1
-		var wall := top + count
-		vertices.append(Vector3(mesas[k].x, mesas[k].w, mesas[k].y))
-		vertices.append_array(rim)
-		vertices.append_array(rim)
+		vertices.append(centre)
+		normals.append(Vector3.UP)
+		colors.append(_tint(Vector3.UP, 0.0))
+		# Each band as the first points of its upper ring and of its lower one.
+		var bands: Array[Vector2i] = []
+		# The top: its inner ring straight up, the rim leaning as the band out to it does.
+		var inner := vertices.size()
+		var top_rim := inner + count
+		vertices.append_array(rings[0] + rings[MESA_RIM])
+		var leans := _band_normals(rings[0], rings[MESA_RIM], centre)
 		for i: int in count:
-			vertices.append(foot[i] - Vector3(0.0, MESA_SINK, 0.0))
-		for i: int in 1 + count:
 			normals.append(Vector3.UP)
-			colors.append(_tint(Vector3.UP, 0.0))
-		normals.append_array(rim_normals + foot_normals)
-		for normal: Vector3 in rim_normals + foot_normals:
-			colors.append(_tint(normal, 0.0))
+		normals.append_array(leans)
+		bands.append(Vector2i(inner, top_rim))
+		# The wall's bands, from the rim to the fillet's top.
+		for ring: int in range(MESA_RIM, MESA_FILLET_TOP):
+			var upper := vertices.size()
+			vertices.append_array(rings[ring] + rings[ring + 1])
+			leans = _band_normals(rings[ring], rings[ring + 1], centre)
+			normals.append_array(leans + leans)
+			bands.append(Vector2i(upper, upper + count))
+		# The fillet, its normals across each ring's neighbours down the profile, the outer edge's
+		# the ground's.
+		for ring: int in range(MESA_FILLET_TOP, rings.size() - 1):
+			if ring > MESA_FILLET_TOP:
+				bands.append(Vector2i(vertices.size() - count, vertices.size()))
+			vertices.append_array(rings[ring])
+			normals.append_array(_band_normals(rings[ring - 1], rings[ring + 1], centre))
+		bands.append(Vector2i(vertices.size() - count, vertices.size()))
+		for at: Vector3 in rings[rings.size() - 1]:
+			vertices.append(at - Vector3(0.0, MESA_SINK, 0.0))
+			normals.append(_ground_normal(at.x, at.z))
+		for v: int in range(middle + 1, vertices.size()):
+			colors.append(_tint(normals[v], 0.0))
 		for i: int in count:
 			var j := (i + 1) % count
-			var out := Vector3(rim[i].x - mesas[k].x, 0.0, rim[i].z - mesas[k].y)
-			indices.append_array(_facing(vertices, middle, top + i, top + j, Vector3.UP))
-			indices.append_array(_facing(vertices, wall + i, wall + j, wall + count + j, out))
-			indices.append_array(_facing(vertices, wall + i, wall + count + j, wall + count + i, out))
-			ink_indices.append_array(_fin(rim[i], rim[j], Vector3.UP, rim_normals[i], rim_normals[j],
-				top + i, top + j, wall + j, wall + i))
-	for rings: Array in mesa_walls:
-		var foot: PackedVector3Array = rings[1]
-		var foot_normals: PackedVector3Array = rings[3]
-		var ground_normals: PackedVector3Array = rings[4]
-		var count := foot.size()
-		var ground := vertices.size() + ink_vertices.size()
-		var footing := ground + count
-		ink_vertices.append_array(foot + foot)
-		ink_normals.append_array(ground_normals + foot_normals)
-		for i: int in count:
-			var j := (i + 1) % count
-			ink_indices.append_array(_fin(foot[i], foot[j], ground_normals[i], foot_normals[i], foot_normals[j],
-				ground + i, ground + j, footing + j, footing + i))
+			indices.append_array(_facing(vertices, middle, inner + i, inner + j, Vector3.UP))
+			for band: Vector2i in bands:
+				var front := normals[band.x + i] + normals[band.y + i]
+				indices.append_array(_facing(vertices, band.x + i, band.x + j, band.y + j, front))
+				indices.append_array(_facing(vertices, band.x + i, band.y + j, band.y + i, front))
+			var wall := bands[1].x
+			ink_indices.append_array(_fin(vertices[top_rim + i], vertices[top_rim + j],
+				(normals[top_rim + i] + normals[top_rim + j]).normalized(), normals[wall + i], normals[wall + j],
+				top_rim + i, top_rim + j, wall + j, wall + i))
+		mesa_indices.append(Vector2i(first, indices.size()))
 
 	var arrays := []
 	arrays.resize(Mesh.ARRAY_MAX)
-	arrays[Mesh.ARRAY_VERTEX] = vertices + ink_vertices
-	arrays[Mesh.ARRAY_NORMAL] = normals + ink_normals
+	arrays[Mesh.ARRAY_VERTEX] = vertices
+	arrays[Mesh.ARRAY_NORMAL] = normals
 	arrays[Mesh.ARRAY_INDEX] = indices + ink_indices
 	var hull := ArrayMesh.new()
 	hull.add_surface_from_arrays(Mesh.PRIMITIVE_TRIANGLES, arrays)
 	hull.surface_set_material(0, MaterialKit.ink())
-	arrays[Mesh.ARRAY_VERTEX] = vertices
-	arrays[Mesh.ARRAY_NORMAL] = normals
 	arrays[Mesh.ARRAY_INDEX] = indices
 	arrays[Mesh.ARRAY_COLOR] = colors
 	var body := ArrayMesh.new()
@@ -762,59 +813,199 @@ static func _fin(from: Vector3, to: Vector3, face: Vector3, from_normal: Vector3
 	return fin
 
 
-## Mesa `k`'s wall, sampled every MESA_STEP degrees round its outline (_mesa_edge): its rim,
-## MESA_WALL in from the outline at the height of its top, and its foot, MESA_FOOT out from it on
-## the ground under it; each ring's normals (the wall's, smooth round it); and the ground's normals
-## at the foot. As [rim, foot, rim normals, foot normals, ground normals].
+## Mesa `k`'s rings, sampled every MESA_STEP degrees round its outline: one per point of its profile
+## (mesa_profile), in its order, from the top's inner ring to the fillet's outer edge on the ground.
 func _mesa_rings(k: int) -> Array[PackedVector3Array]:
 	var mesa := mesas[k]
 	var count := roundi(360.0 / MESA_STEP)
-	var rim := PackedVector3Array()
-	var foot := PackedVector3Array()
+	var rings: Array[PackedVector3Array] = []
 	for i: int in count:
 		var turn := TAU * i / count
 		var out := Vector2(cos(turn), sin(turn))
-		var edge := _mesa_edge(k, out.x, out.y)
-		var at := Vector2(mesa.x, mesa.y) + out * (edge - MESA_WALL)
-		rim.append(Vector3(at.x, mesa.w, at.y))
-		at = Vector2(mesa.x, mesa.y) + out * (edge + MESA_FOOT)
-		foot.append(Vector3(at.x, _height(at.x, at.y, false), at.y))
-	var rim_normals := PackedVector3Array()
-	var foot_normals := PackedVector3Array()
-	var ground_normals := PackedVector3Array()
+		var profile := mesa_profile(k, turn)
+		if rings.is_empty():
+			rings.resize(profile.size())
+		for p: int in profile.size():
+			var at := Vector2(mesa.x, mesa.y) + out * profile[p].x
+			rings[p].append(Vector3(at.x, profile[p].y, at.y))
+	return rings
+
+
+## The normals of the band between the rings `upper` and `lower` of the same samples, smooth round
+## it and leaning as it does down it, facing away from `centre` and up.
+static func _band_normals(upper: PackedVector3Array, lower: PackedVector3Array, centre: Vector3) -> PackedVector3Array:
+	var count := upper.size()
+	var normals := PackedVector3Array()
 	for i: int in count:
 		var before := (i + count - 1) % count
 		var after := (i + 1) % count
-		var out := Vector3(foot[i].x - mesa.x, 0.0, foot[i].z - mesa.y)
-		var down := foot[i] - rim[i]
-		var normal := (rim[after] - rim[before]).cross(down).normalized()
-		rim_normals.append(normal if normal.dot(out) > 0.0 else -normal)
-		normal = (foot[after] - foot[before]).cross(down).normalized()
-		foot_normals.append(normal if normal.dot(out) > 0.0 else -normal)
-		var e := 0.25
-		var x := foot[i].x
-		var z := foot[i].z
-		ground_normals.append(Vector3((_height(x - e, z, false) - _height(x + e, z, false)) / (2.0 * e), 1.0,
-			(_height(x, z - e, false) - _height(x, z + e, false)) / (2.0 * e)).normalized())
-	return [rim, foot, rim_normals, foot_normals, ground_normals]
+		var along := upper[after] - upper[before] + lower[after] - lower[before]
+		var normal := along.cross(lower[i] - upper[i]).normalized()
+		var away := Vector3(upper[i].x - centre.x, 0.0, upper[i].z - centre.z).normalized() + Vector3.UP
+		normals.append(normal if normal.dot(away) > 0.0 else -normal)
+	return normals
+
+
+## The ground's normal at a point, without the mesas.
+func _ground_normal(x: float, z: float) -> Vector3:
+	var e := 0.25
+	return Vector3((_height(x - e, z, false) - _height(x + e, z, false)) / (2.0 * e), 1.0,
+		(_height(x, z - e, false) - _height(x, z + e, false)) / (2.0 * e)).normalized()
+
+
+## Mesa `k`'s profile `turn` radians round its outline, as (distance from its middle, height):
+## the top's inner ring, MESA_TOP_EDGE inside the rim at the top's height; the rim, jagged
+## (MESA_JAG, MESA_NOTCHES) and rising and dipping MESA_RIM_RISE on the same noise; the wall's
+## rings down a straight line from the rim to MESA_FOOT outside the outline on the ground, each
+## moved MESA_ROUGH either way on its own noise and, below the ledge, stepped out; then the fillet
+## (MESA_FILLET), a quarter-ellipse sheared to leave the wall at its slope, whose height follows
+## the ground as it flattens, out to MESA_APRON past the wall's line, on the ground. Each point lies
+## at least a little further out than the one before.
+func mesa_profile(k: int, turn: float) -> PackedVector2Array:
+	var mesa := mesas[k]
+	var out := Vector2(cos(turn), sin(turn))
+	var centre := Vector2(mesa.x, mesa.y)
+	var edge := _mesa_edge(k, out.x, out.y)
+	var jag := _ring_noise(_mesa_rim_noise[k], 0, _mesa_rim_noise[k].size(), turn)
+	var notch := 0.0
+	for cut: Vector3 in _mesa_notches[k]:
+		notch = maxf(notch, cut.y * (1.0 - absf(angle_difference(turn, cut.x)) / cut.z))
+	var rim := Vector2(edge - MESA_WALL + MESA_JAG * mesa.z * jag - notch, mesa.w + MESA_RIM_RISE * jag)
+	var foot := edge + MESA_FOOT
+	var at := centre + out * foot
+	var ground := _height(at.x, at.y, false)
+	var end := foot + MESA_APRON
+	at = centre + out * end
+	var end_ground := _height(at.x, at.y, false)
+	var drop := rim.y - ground
+	var run := foot - rim.x
+	var ledge := mesa_ledges[k]
+	var into := fposmod(turn - ledge.x, TAU)
+	var step := 0.0
+	if into < ledge.y:
+		step = ledge.z * minf(1.0, minf(into, ledge.y - into) / deg_to_rad(MESA_LEDGE_TAPER))
+	var profile := PackedVector2Array([Vector2(rim.x - MESA_TOP_EDGE, mesa.w), rim])
+	var rough := _mesa_wall_noise[k]
+	var lattice := rough.size() / MESA_RINGS.size()
+	for ring: int in MESA_RINGS.size():
+		var share := MESA_RINGS[ring]
+		var noise := _ring_noise(rough, ring * lattice, lattice, turn)
+		profile.append(Vector2(rim.x + share * run + MESA_ROUGH * noise + (step if ring > 0 else 0.0),
+			rim.y - share * drop))
+	# The fillet: from (start, high) leaving at the wall's slope, `run` / `drop` out per unit down, to
+	# (end, end_ground) level, a quarter-ellipse a wide and b high sheared along the slope.
+	var start := rim.x + (1.0 - MESA_FILLET) * run + step
+	var high := rim.y - (1.0 - MESA_FILLET) * drop
+	var b := high - end_ground
+	var a := end - start - run / drop * b
+	for s: int in MESA_FILLET_STEPS + 1:
+		var angle := PI * 0.5 * s / MESA_FILLET_STEPS
+		var rise := b * (1.0 - sin(angle))
+		var x := end - a * cos(angle) - run / drop * rise
+		at = centre + out * x
+		profile.append(Vector2(x, end_ground + rise + (_height(at.x, at.y, false) - end_ground) * sin(angle)))
+	for p: int in range(1, profile.size()):
+		profile[p].x = maxf(profile[p].x, profile[p - 1].x + 0.02)
+	return profile
+
+
+## A smooth noise in [-1, 1] round an outline, `turn` radians round it, on the lattice of the
+## `count` values of `values` from `first`, evenly spaced round it.
+static func _ring_noise(values: PackedFloat32Array, first: int, count: int, turn: float) -> float:
+	var at := fposmod(turn, TAU) / TAU * count
+	var i := floori(at)
+	var f := at - i
+	return lerpf(values[first + i % count], values[first + (i + 1) % count], f * f * (3.0 - 2.0 * f))
+
+
+## Mesa `k`'s jagged rim, rough wall and ledge, drawn from a generator of its own, so the rest of
+## the scenery keeps its places.
+func _shape_mesa(k: int) -> void:
+	var rng := SeededRng.new((SCENERY_SEED * 7919 + k * 104729 + 12345) & SeededRng.MASK_32)
+	var rim := PackedFloat32Array()
+	for i: int in roundi(360.0 / MESA_JAG_LATTICE):
+		rim.append(rng.range_int(-1000, 1000) / 1000.0)
+	var wall := PackedFloat32Array()
+	for i: int in roundi(360.0 / MESA_ROUGH_LATTICE) * MESA_RINGS.size():
+		wall.append(rng.range_int(-1000, 1000) / 1000.0)
+	var notches := PackedVector3Array()
+	for n: int in rng.range_int(MESA_NOTCHES.x, MESA_NOTCHES.y):
+		notches.append(Vector3(deg_to_rad(rng.range_int(0, 359)),
+			lerpf(MESA_NOTCH_DEPTH.x, MESA_NOTCH_DEPTH.y, rng.range_int(0, 100) / 100.0),
+			deg_to_rad(rng.range_int(MESA_NOTCH_WIDTH.x, MESA_NOTCH_WIDTH.y))))
+	# The ledge's middle on the half of the outline facing the camera (+x, +z), where it shows.
+	var length := deg_to_rad(rng.range_int(MESA_LEDGE_LENGTH.x, MESA_LEDGE_LENGTH.y))
+	var ledge := Vector3(deg_to_rad(45 + rng.range_int(-30, 30)) - length * 0.5, length,
+		lerpf(MESA_LEDGE_STEP.x, MESA_LEDGE_STEP.y, rng.range_int(0, 100) / 100.0))
+	_mesa_rim_noise.append(rim)
+	_mesa_wall_noise.append(wall)
+	_mesa_notches.append(notches)
+	mesa_ledges.append(ledge)
+
+
+## Mesa `k`'s height at (`dx`, `dz`) from its middle, as its mesh draws it: between the two
+## samples round its outline either side of the point (MESA_STEP apart), in the fan from its middle
+## or in the triangle of a band between two of their profiles' points (mesa_profile) that holds it,
+## each band split as _build_terrain splits it. The fillet's outer edge is on the ground, not sunk.
+## A point on a triangle's edge may miss both sides by a rounding error, so the triangle it lies
+## deepest in is taken, up to a hundredth of a triangle outside. NAN outside the fillet's outer edge.
+func _mesa_height(k: int, dx: float, dz: float) -> float:
+	var count := roundi(360.0 / MESA_STEP)
+	var i := mini(floori(fposmod(atan2(dz, dx), TAU) / TAU * count), count - 1)
+	var j := (i + 1) % count
+	var near := mesa_profile(k, TAU * i / count)
+	var far := mesa_profile(k, TAU * j / count)
+	var near_out := Vector2(cos(TAU * i / count), sin(TAU * i / count))
+	var far_out := Vector2(cos(TAU * j / count), sin(TAU * j / count))
+	var at := Vector2(dx, dz)
+	var weights := _barycentric(at, Vector2.ZERO, near_out * near[0].x, far_out * far[0].x)
+	var deepest := minf(weights.x, minf(weights.y, weights.z))
+	var height := mesas[k].w
+	for p: int in near.size() - 1:
+		var a := near_out * near[p].x
+		var c := far_out * far[p + 1].x
+		var heights: Array[Vector3] = [Vector3(near[p].y, far[p].y, far[p + 1].y),
+			Vector3(near[p].y, far[p + 1].y, near[p + 1].y)]
+		var corners: Array[Vector2] = [far_out * far[p].x, near_out * near[p + 1].x]
+		for half: int in 2:
+			weights = _barycentric(at, a, corners[half], c) if half == 0 else _barycentric(at, a, c, corners[half])
+			var depth := minf(weights.x, minf(weights.y, weights.z))
+			if depth > deepest:
+				deepest = depth
+				height = weights.dot(heights[half])
+	return height if deepest > -0.01 else NAN
+
+
+## The weights of `a`, `b` and `c` that make `at`; all of them at least 0 inside their triangle.
+static func _barycentric(at: Vector2, a: Vector2, b: Vector2, c: Vector2) -> Vector3:
+	var area := (b - a).cross(c - a)
+	var u := (c - b).cross(at - b) / area
+	var v := (a - c).cross(at - c) / area
+	return Vector3(u, v, 1.0 - u - v)
 
 
 ## Whether the lattice cell `size` square whose first corner is (`x`, `z`) lies under a mesa: each
-## corner MESA_FOOT_MARGIN or more inside its foot, so its wall covers the cell.
+## corner MESA_FOOT_MARGIN or more inside its fillet's outer edge, so the mesa covers the cell.
 func _under_mesa(x: float, z: float, size: float) -> bool:
 	for k: int in mesas.size():
 		var under := true
+		var reach := _mesa_reach(k)
 		for corner: Vector2 in [Vector2(x, z), Vector2(x + size, z), Vector2(x, z + size), Vector2(x + size, z + size)]:
 			var dx := corner.x - mesas[k].x
 			var dz := corner.y - mesas[k].y
-			# The outline reaches at most 1.18 radii from the middle.
-			if dx * dx + dz * dz > (mesas[k].z * 1.18 + MESA_FOOT) * (mesas[k].z * 1.18 + MESA_FOOT) \
-					or sqrt(dx * dx + dz * dz) > _mesa_edge(k, dx, dz) + MESA_FOOT - MESA_FOOT_MARGIN:
+			if dx * dx + dz * dz > reach * reach \
+					or sqrt(dx * dx + dz * dz) > _mesa_edge(k, dx, dz) + MESA_FOOT + MESA_APRON - MESA_FOOT_MARGIN:
 				under = false
 				break
 		if under:
 			return true
 	return false
+
+
+## The farthest mesa `k` reaches from its middle, its fillet's outer edge where its outline reaches
+## farthest, at most 1.18 radii out.
+func _mesa_reach(k: int) -> float:
+	return mesas[k].z * 1.18 + MESA_FOOT + MESA_APRON
 
 
 ## Places the terrain's features from `rng`, inside the fine lattice: two mesas towards the far
@@ -836,6 +1027,7 @@ func _place_features(rng: SeededRng) -> void:
 				and _clear(at, radius + 3.0):
 			mesas.append(Vector4(at.x, at.y, radius, 0.8 * _dune_height(out, blend_end(at.x, at.y)) + out * RISE + height))
 			_mesa_phases.append(phases)
+			_shape_mesa(mesas.size() - 1)
 	var count := rng.range_int(3, 5)
 	for attempt: int in 80:
 		if craters.size() == count:
@@ -860,13 +1052,15 @@ func _place_features(rng: SeededRng) -> void:
 	_channel_course = Vector2(cos(course), sin(course))
 
 
-## Whether a feature reaching `extent` from `at` stays clear of every crater and mesa so far.
+## Whether a feature reaching `extent` from `at` stays clear of every crater so far, and of every
+## mesa so far by MESA_CLEAR beyond its fillet's outer edge towards it.
 func _clear(at: Vector2, extent: float) -> bool:
 	for crater: Vector3 in craters:
 		if at.distance_to(Vector2(crater.x, crater.y)) < extent + crater.z * 1.5:
 			return false
-	for mesa: Vector4 in mesas:
-		if at.distance_to(Vector2(mesa.x, mesa.y)) < extent + mesa.z + 3.0:
+	for k: int in mesas.size():
+		var away := at - Vector2(mesas[k].x, mesas[k].y)
+		if away.length() < extent + _mesa_edge(k, away.x, away.y) + MESA_FOOT + MESA_APRON + MESA_CLEAR:
 			return false
 	return true
 
@@ -1026,8 +1220,7 @@ func _outcrop_clear(at: Vector2, extent: float) -> bool:
 ## The terrain's height at a point: flat out to TERRAIN_FLAT outside the field, then ridged dunes
 ## that grow away from it (flattened round the craters) and a gentle rise, the craters' bowls and
 ## rims and the channel, all blended in by a wandering distance out (blend_end), with rubble over
-## it all; and the mesas, each a flat top on a straight wall from its rim to its foot, as their own
-## geometry draws them (_mesa_rings). The harness marches the view's rays over it.
+## it all; and the mesas, exactly as their own geometry draws them (_mesa_height). The harness marches the view's rays over it.
 func terrain_height(x: float, z: float) -> float:
 	return _height(x, z, true)
 
@@ -1072,13 +1265,13 @@ func _height(x: float, z: float, with_mesas: bool) -> float:
 	if not with_mesas:
 		return height
 	for k: int in mesas.size():
-		var mesa := mesas[k]
-		var dx := x - mesa.x
-		var dz := z - mesa.y
-		if dx * dx + dz * dz < (mesa.z + 3.0) * (mesa.z + 3.0):
-			var edge := _mesa_edge(k, dx, dz)
-			var top := clampf((edge + MESA_FOOT - sqrt(dx * dx + dz * dz)) / (MESA_FOOT + MESA_WALL), 0.0, 1.0)
-			height = lerpf(height, mesa.w, top)
+		var dx := x - mesas[k].x
+		var dz := z - mesas[k].y
+		var reach := _mesa_reach(k)
+		if dx * dx + dz * dz < reach * reach:
+			var on_mesa := _mesa_height(k, dx, dz)
+			if not is_nan(on_mesa):
+				return on_mesa
 	return height
 
 

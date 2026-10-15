@@ -73,7 +73,7 @@ building's silhouette is constant and the base stays readable on a phone.
 Its near and far planes bracket the scene and no more, at every zoom: `_apply()` sets them from
 the camera's distance, the size (the view's top and bottom edges move a point's depth by
 size / 2 × cot 35°) and the scene's height range, `SCENE_BOTTOM` (−2) to `SCENE_TOP` (13: the
-terrain dips to about −1 and its mesas rise to about 10.3, and no building with its arriving
+terrain dips to about −1 and its mesas rise to about 10.4, and no building with its arriving
 construction drone comes near), with `PLANE_MARGIN` (1) on each side: about 29 to 72 at the
 closest zoom, 19 to 82 at the start, 5 to 96 at the widest. The key light's shadow map is fitted
 to the camera's slice between them, so they set the shadow's texel size (`art-style.md`,
@@ -198,6 +198,7 @@ the origin, cell (x, y) on world (x, z).
 | `clear()` | Frees every view (used when the state is replaced). |
 | `terrain`, `boundary`, `rocks`, `outcrops` | The scenery's body instances, each with its ink outline beside it (`terrain_outline`, `boundary_outline`, `rocks_outline`, `outcrops_outline`), which casts no shadow. |
 | `craters`, `mesas`, `outcrop_spots` | The terrain's craters as (x, z, radius) and mesas as (x, z, radius, top height), and each crystal outcrop's centre on the ground. |
+| `mesa_profile(k, turn)`, `mesa_ledges`, `mesa_indices` | Mesa `k`'s profile `turn` radians round it, as (distance from its middle, height) from the top's inner ring through the rim (`MESA_RIM`) and the wall's rings to the fillet (from `MESA_FILLET_TOP`), which the mesh and `terrain_height` share; each mesa's ledge as (start, length, step out); and each mesa's triangles in the terrain body's index array as (first index, end), for the harness. |
 
 `setup(size)` builds the ground and the scenery once; the terrain, the rocks and the outcrops are
 drawn from `SeededRng.new(SCENERY_SEED)` (7) in that order, so every player's base sits in the
@@ -220,9 +221,10 @@ same landscape. How each looks is in `art-style.md`, **Environment**:
   meet with no seam; it is flat out to `TERRAIN_FLAT` (2.4), past the kerb, reaches its relief
   between 4 and 11 units out, wandering along the edge, and is roughened by a low rubble from 2.4
   out.
-  Its craters, mesas, channel and dunes are placed from the seed; each mesa is a flat top and a
-  wall of its own, following its outline, over the lattice's ground with the cells under it left
-  out; it has its ink outline, receives
+  Its craters, mesas, channel and dunes are placed from the seed; each mesa is a flat top with a
+  jagged rim, a rough wall and a fillet into the ground of its own, following its outline, over
+  the lattice's ground with the cells under it left out, its jags, roughness and ledge drawn from
+  a generator of its own so the rest of the scenery keeps its places; it has its ink outline, receives
   shadows and casts none. `terrain_height(x, z)` is its height function, which the harness
   marches the view's rays over, and `blend_end(x, z)` how far out from the field its relief is full
   there, which the harness checks wanders along each side. At the widest zoom it fills the view

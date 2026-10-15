@@ -829,30 +829,62 @@ shapes:
 - three to five craters, radius 6 to 12, each a flat floor 0.18 radii deep, a wall steepening to
   a rim 0.15 radii high and a gentler outer slope, in ground flattened round it;
 - two irregular flat-topped mesas towards the far edge of the view, 4 to 6 above the dunes' crests,
-  with steep walls (below);
+  with jagged rims, rough steep walls and feet that run out into the ground (below);
 - a meandering dry channel running out from near the field, away from the mesas.
 
 Each point's normal comes once from its lattice neighbours' heights, so the ring is smooth shaded
 and the cel bands sweep across the dunes. The lattice runs on under the mesas, on the ground
-without them, and leaves out the cells a quarter unit or more inside a mesa's foot.
+without them, and leaves out the cells a quarter unit or more inside the outer edge of a mesa's
+fillet.
 
 **The mesas** are geometry of their own in the terrain's mesh, following their outlines rather than
-the lattice: a flat top at the mesa's height, a fan from its middle to its rim 1.4 inside the
-outline (`MESA_WALL`), and a wall, a skirt from the rim straight down to its foot 0.4 outside it
-(`MESA_FOOT`) on the ground, sunk 0.05 into it so no gap shows. The outline is sampled every 3
-degrees (`MESA_STEP`). The top and the wall have their own points and normals, the wall's smooth
-round the mesa and the top's straight up, so the rim and the foot are hard creases that follow
-the outline: the cel bands' edges on the wall run down it in clean arcs and the rock strata stop
-at the rim. The terrain's ink outline adds a fin along each crease, two triangles between the
-two faces' points, which lie on one line until the ink shader pushes each point along its own
-normal and opens the fin into a line of the outline's width; so the rim and the foot are inked
-from every side, beside the hull's silhouette lines. `terrain_height` gives the same shape (a flat
-top on a straight wall from the rim to the foot), for the rocks and the harness. Each point is tinted by slope and place: `TERRAIN`,
+the lattice, sampled every 3 degrees round them (`MESA_STEP`). Each sample is a profile
+(`mesa_profile`), the same function giving the mesh's rings and `terrain_height`:
+
+- **The rim** lies on average 1.4 inside the outline (`MESA_WALL`), its radius wandering 12 % of
+  the mesa's radius either way on a noise round the outline whose lattice is 20 degrees apart
+  (`MESA_JAG`), with three to five sharper V notches cut in, 0.5 to 0.9 deep and 4 to 8 degrees
+  either side of their middles; its height wanders 0.3 either way on the same noise
+  (`MESA_RIM_RISE`). So the top's edge dips and rises unevenly.
+- **The top** is flat at the mesa's height: a fan from its middle to a ring 1 inside the rim
+  (`MESA_TOP_EDGE`), straight up, then a band out to the rim, smooth shaded from straight up to
+  the band's lean, so only the edge rolls.
+- **The wall** runs from the rim down a straight line to 0.4 outside the outline on the ground
+  (`MESA_FOOT`), in four bands between the rim, three rings at 0.2, 0.28 and 0.48 of the skirt's
+  height (`MESA_RINGS`) and the fillet's top, each ring's radius moved up to 0.15 either way on a
+  noise of its own round the outline (`MESA_ROUGH`, lattice 15 degrees). Each band has points of
+  its own, their normals leaning as the band does, so the shading is hard between the bands and
+  smooth round the mesa: angular bands, like the rocks' chamfers. One ledge per mesa steps the
+  wall out 0.5 to 0.7 between the first ring and the second, a shelf, along 75 to 105 degrees of the
+  outline, tapering in and out over 8 degrees (`mesa_ledges`). Its middle is seeded within 30
+  degrees of the side facing the camera, since the camera never turns and a ledge on the far side
+  would never be seen. Each point lies at least a little further out than the one above it,
+  so the wall never overhangs.
+- **The foot**: the lowest 35 % of the skirt's height (`MESA_FILLET`) is a fillet, a
+  quarter-ellipse in profile, sheared so that it leaves the wall at the wall's slope, flattening
+  to the ground 1.5 beyond the wall's line (`MESA_APRON`), in four segments; its height follows
+  the ground under it as it flattens, and its outer edge is sunk 0.05 under the ground
+  (`MESA_SINK`), its normals the ground's. It is smooth shaded throughout, so the cel bands and
+  the terrain shader's slope blend (marks below about 28 degrees, strata above) run down it into
+  the ground with no line.
+
+The rim is the one hard crease: the top's points and the wall's are separate there. The
+terrain's ink outline adds a fin along it, two triangles between the two faces' points, which
+lie on one line until the ink shader pushes each point along its own normal and opens the fin
+into a line of the outline's width; so the rim is inked from every side, beside the hull's
+silhouette lines, and follows its jags. The rocks and the harness read the same shape through
+`terrain_height`, which takes the profiles of the two samples either side of a point and
+interpolates in the triangle of the mesh that holds it, split as the mesh splits it, so it
+matches the mesh everywhere, not only at its points (the fillet's outer edge on the ground, not
+sunk). The `environment` scenario checks that every point of the mesas' own geometry but the
+sunk edge, and four points inside each triangle, lie on it within 0.02, that the geometry has no
+open edge but that edge and no degenerate triangle, and that the rim stays within 0.3 of the
+top. Each point is tinted by slope and place: `TERRAIN`,
 blended towards `TERRAIN_DARK` on crater floors and the shadow side of slopes over 18 degrees,
 towards `TERRAIN_LIGHT` on the lit side of slopes over 25 degrees, and towards `ROCK` on slopes
 over 35 degrees (crater walls, mesa sides). The blends are soft over a few points, so the patches
 are rounded, not triangles; the mesas' walls are rock and their tops the plain tint. Its ink
-outline is a second mesh on the same points and normals, with the mesas' fins, so it inks the
+outline is a second mesh on the same points and normals, with the mesas' rim fins, so it inks the
 crater rims and the ridges the camera looks over. The body receives shadows and casts
 none.
 
@@ -926,15 +958,16 @@ where the rays pass under the ring's raised outer edge.
 
 **Budgets**: the field 1 draw; the perimeter, the terrain, the rocks and the outcrops a body and an
 outline each, the perimeter's body two surfaces (its fence a hologram) and drawn into the shadow
-map. The terrain is 32,208 triangles on 16,796 points, its outline 33,168 with the mesas' fins
+map. The terrain is 35,794 triangles on 19,561 points, its outline 36,274 with the mesas' fins
 (the `environment` scenario allows the body 38,000), the rocks about 3,900 (about 1,100 of them
 the rubble) and the outcrops about 900. It is
 all built once, in about 110 ms on the development Mac (88 to 97 warm before the perimeter's
 pylons and fence added about 22, and 74 to 79 before a half-unit lattice round the mesas, since
 gone, and the rock texture,
 each measured side by side; the kit's build and the field and rock textures' loads and mipmaps
-included), the terrain 59 to 66 ms of it (45 to 49 before), the perimeter about 25 and the rubble
-about 5; phones are unmeasured. Nothing runs per frame beyond the shaders.
+included; the mesas' fillets, rough walls and jagged rims left it about the same), the terrain 59
+to 66 ms of it (45 to 49 before), the perimeter about 25 and the rubble about 5; phones are
+unmeasured. Nothing runs per frame beyond the shaders.
 
 ## HUD
 

@@ -8,7 +8,7 @@ const YAW_DEG := 45.0
 ## Orthographic, so distance only needs to keep everything between near and far.
 const DISTANCE := 60.0
 ## The scene's height range, with room to spare: the terrain dips to about -1 and its mesas rise
-## to about 10.3; nothing else is higher than a building with its construction drone arriving
+## to about 10.4; nothing else is higher than a building with its construction drone arriving
 ## above it. The near and far planes bracket it at every zoom, and no further: the key light's
 ## shadow map is fitted to the camera's slice between them, so a loose slice coarsens every
 ## shadow (docs/reference/art-style.md, **Light and shading**).
