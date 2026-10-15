@@ -67,6 +67,15 @@ A `Camera3D` with a fixed angle: orthographic, pitch −35°, yaw 45°, placed 6
 along its own axis from `focus`, the ground point it looks at. It never rotates, so every
 building's silhouette is constant and the base stays readable on a phone.
 
+Its near and far planes bracket the scene and no more, at every zoom: `_apply()` sets them from
+the camera's distance, the size (the view's top and bottom edges move a point's depth by
+size / 2 × cot 35°) and the scene's height range, `SCENE_BOTTOM` (−2) to `SCENE_TOP` (13: the
+terrain dips to about −1 and its mesas rise to about 10.3, and no building with its arriving
+construction drone comes near), with `PLANE_MARGIN` (1) on each side: about 29 to 72 at the
+closest zoom, 19 to 82 at the start, 5 to 96 at the widest. The key light's shadow map is fitted
+to the camera's slice between them, so they set the shadow's texel size (`art-style.md`,
+**Light and shading**).
+
 | Member | What |
 | --- | --- |
 | `size` | The orthographic size: 24 at start, clamped between 10 (closest) and 44. |
