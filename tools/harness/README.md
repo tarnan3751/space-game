@@ -137,6 +137,20 @@ close-up screenshot: the selected Command Center's outlines in gold (and the ove
 deselecting), the placement ghost's body tinted valid on a free spot and invalid on the Command
 Center with its outline left plain ink, and a new building's scaffold. It first says the fresh base's draw calls and frame rate.
 
+`scenarios/environment.gd` checks the ground and the scenery on a fresh base
+(`docs/reference/art-style.md`, **Environment**): the terrain, the curb, the rocks and the
+crystal outcrops are each a body with an ink outline on `MaterialKit.ink()` that casts no shadow,
+the terrain's and the curb's bodies casting none either; the terrain's triangles are within
+35,000; no vertex of an outcrop lies within 4 units of the field; and at the widest zoom, in a
+1560x720 window (a 19.5:9 phone) and with the focus at each corner of its bounds, the ray from
+every corner of the screen meets the terrain, so the clear colour never shows: marched in half-unit
+steps over `BaseView.terrain_height`, it must enter the terrain's extent above the ground (not
+under its raised outer edge) and meet the ground before it leaves. That check is worked out from
+the camera's transform, so it holds headless. It screenshots the start zoom, the closest zoom on
+the field (plates, craters, grid), the widest zoom in the wide window, and a crater and an outcrop
+each centred, for which it widens the camera's bounds to the terrain's, since the player cannot
+centre the view on the ring.
+
 `scenarios/hud_menu.gd` checks the HUD on a fresh base: antimatter hidden in the top bar,
 every menu type in exactly one tab and in menu order, an entry's built/max and a locked
 entry's "Needs Command Center N", that taps on a tab and an entry and a drag across the
