@@ -18,6 +18,10 @@ const FOOTPRINT_COLORS := {
 	Footprint.INVALID: Color(0.95, 0.3, 0.3, 0.65),
 }
 const LIFT_HEIGHT := 0.35
+## The timer label's text, in font pixels, and its outline (the stroke reaches a quarter of
+## outline_size out): about 2 px of ink round the text at the starting zoom.
+const LABEL_FONT_SIZE := 48
+const LABEL_OUTLINE_SIZE := 20
 
 var building_id: int = 0
 var building_type: String = ""
@@ -74,14 +78,16 @@ func setup(id: int, type: String, level: int, size: int) -> void:
 	_footprint.position = Vector3(0, 0.03, 0)
 	add_child(_footprint)
 
+	# In the HUD's font and colours, its own Lilita One, ink-outlined.
 	_label = Label3D.new()
 	_label.billboard = BaseMaterial3D.BILLBOARD_ENABLED
 	_label.no_depth_test = true
-	_label.font_size = 48
-	_label.outline_size = 14
+	_label.font = Hud.BODY_FONT
+	_label.font_size = LABEL_FONT_SIZE
+	_label.outline_size = LABEL_OUTLINE_SIZE
 	_label.pixel_size = 0.016
-	_label.modulate = Color("e9f6ff")
-	_label.outline_modulate = Color(0, 0, 0, 0.85)
+	_label.modulate = Hud.TEXT
+	_label.outline_modulate = Hud.INK
 	_label.position = Vector3(0, 1.4 + size * 0.4, 0)
 	add_child(_label)
 
