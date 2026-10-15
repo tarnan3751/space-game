@@ -89,8 +89,8 @@ const OUTCROP_SHARDS := Vector2i(3, 7)
 const SHARD_LENGTH := Vector2(0.6, 2.0)
 const OUTCROP_GAP := 4.0
 ## The curb round the field: its height and width, its gap from the field's edge, and how far
-## each corner is cut back along each side. A glowing stud stands on it at every plate seam (the
-## ground's plates are PLATE_CELLS square) and on each corner.
+## each corner is cut back along each side. A glowing stud stands on it every PLATE_CELLS cells
+## (the field texture's tiles are as wide) and on each corner.
 const CURB_HEIGHT := 0.2
 const CURB_WIDTH := 0.3
 const CURB_GAP := 0.3
@@ -285,7 +285,7 @@ func _build_ground() -> void:
 
 
 ## The curb round the field (CURB_*): an octagonal band of concrete with bevelled top edges and
-## a glowing stud on it at every plate seam and on each corner, in one mesh with its outline.
+## a glowing stud on it every PLATE_CELLS cells and on each corner, in one mesh with its outline.
 ## Neither casts a shadow.
 func _build_boundary() -> void:
 	var mesh := LowPolyMesh.new()
@@ -302,7 +302,7 @@ func _build_boundary() -> void:
 	_curb_band(mesh, outer_top, outer_shoulder, 1.0)
 	_curb_band(mesh, outer_shoulder, outer, 1.0)
 
-	# A stud on the middle of the top at every plate seam along the straight sides, and on the
+	# A stud on the middle of the top every PLATE_CELLS cells along the straight sides, and on the
 	# middle of each corner cut (between corners 2k and 2k + 1 of the loop).
 	var middle := _curb_loop(CURB_WIDTH * 0.5, CURB_HEIGHT)
 	var straight := Vector2(middle[0].x, middle[1].z)
