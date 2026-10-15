@@ -144,9 +144,9 @@ slowly, spent only on top-tier levels). A 40×40 grid, the Command Center with f
 | resources | `metal_extractor` | Metal Extractor | 3 | 1 | 5 | 2,3,4,5,6 | produces metal |
 | resources | `crystal_harvester` | Crystal Harvester | 3 | 1 | 5 | 2,3,4,5,6 | produces crystal |
 | resources | `antimatter_siphon` | Antimatter Siphon | 3 | 4 | 3 | 0,0,0,1,2 | produces antimatter |
-| resources | `metal_silo` | Metal Silo | 3 | 1 | 5 | 1,2,2,3,3 | stores metal |
-| resources | `crystal_silo` | Crystal Silo | 3 | 1 | 5 | 1,2,2,3,3 | stores crystal |
-| resources | `antimatter_vault` | Antimatter Vault | 3 | 4 | 3 | 0,0,0,1,1 | stores antimatter |
+| resources | `metal_silo` | Metal Silo | 3 | 1 | 5 | 1,2,3,4,4 | stores metal |
+| resources | `crystal_silo` | Crystal Silo | 3 | 1 | 5 | 1,2,3,4,4 | stores crystal |
+| resources | `antimatter_vault` | Antimatter Vault | 3 | 4 | 3 | 0,0,0,1,2 | stores antimatter |
 | army | `hangar` | Hangar | 5 | 1 | 5 | 1,1,2,2,3 | capacity 20–45 |
 | army | `fabricator` | Fabricator | 3 | 1 | 5 | 1,2,2,3,3 | |
 | army | `heavy_fabricator` | Heavy Fabricator | 3 | 4 | 3 | 0,0,0,1,2 | |
@@ -185,8 +185,8 @@ The curve, which `test_catalog.gd` checks for affordability and for never going 
   army, defence and trap types, and on the Siphon's and the Vault's top levels: 20 to 300.
   The Command Center costs 1,500 metal to reach level 2, rising to 25,000 metal and 10,000
   crystal for level 5.
-- **Reachable storage** per main resource at Command Center 1–5 is 2,500, 9,500, 19,000,
-  52,000 and 95,000 (the Command Center plus its silos); antimatter is 500 at 4 and 1,300 at 5.
+- **Reachable storage** per main resource at Command Center 1–5 is 2,500, 9,500, 26,000,
+  66,000 and 120,000 (the Command Center plus its silos); antimatter is 500 at 4 and 2,100 at 5.
   Every price fits the storage at its level's `requires_cc`.
 - **Build times** run from 10–30 s at level 1 of a cheap building to 10–20 min at the top
   levels; the Command Center takes 2, 10, 30 and 60 min to reach levels 2 to 5; walls and the
