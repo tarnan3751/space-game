@@ -277,9 +277,15 @@ while the old drone leaves under the base view, starting clear of the finished m
 frees itself. Then, with the metal and the crystal topped up by the scenario (the start's
 amounts and caps do not cover both), the Command Center goes to level 2 and an upgrade of the
 silo gets a drone again, clear of the model on its orbit a second in and firing at it with the
-same checks. It screenshots the drone arriving, firing at the scaffold (twice, a fifth of a
-second apart, to compare the sparks, the rotors and the beam's flow), leaving and firing at the
-upgrading silo, at camera size 10 on the silo.
+same checks. Last, with the upgrade finished, a Metal Extractor is placed (its cost topped up)
+and selected, a drag on it begins through `WorldInput`'s signals, and it finishes while the drag
+holds: synced, the dragged view is kept and shows the finished model, and its drone leaves,
+starting clear of that model's top (`site_height()`; the log also says the top of the model
+lifted, `LIFT_HEIGHT` higher); dropped one cell along x, the new view has no drone, the building
+and its view are at the drop cell, and the grid's occupancy matches every footprint. It
+screenshots the drone arriving, firing at the scaffold (twice, a fifth of a second apart, to
+compare the sparks, the rotors and the beam's flow), leaving, firing at the upgrading silo, and
+leaving the dragged extractor, at camera size 10.
 
 `scenarios/template_base.gd` checks the debug build's Template base (`TemplateBase`,
 `docs/reference/input-camera.md`): it presses the HUD's button (`template_button()`) and checks

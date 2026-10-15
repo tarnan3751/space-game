@@ -4,7 +4,9 @@ extends HarnessScenario
 ## when the silo is finished the view has no drone and stops processing while the old drone
 ## climbs away and frees itself. Then, the Command Center taken to level 2 (the metal and the
 ## crystal topped up by the scenario: the start's amounts and caps do not cover both upgrades),
-## an upgrade of the silo gets a drone again, firing at the finished model.
+## an upgrade of the silo gets a drone again, firing at the finished model. Last, a Metal
+## Extractor finishes while the player drags it: the dragged view is kept, now showing the
+## finished model, and its drone leaves clear of that model's top (site_height()).
 
 const CLOSE_UP_SIZE := 10.0
 ## How long to wait for the drone's first shot: arriving, an orbit and the swoop take about 5 s.
@@ -99,6 +101,59 @@ func run(main: MainScript) -> void:
 	await frames(2)
 	await screenshot("upgrading")
 
+	# Finished while dragged: the view is kept (BaseView leaves a dragged view alone until it is
+	# dropped), so its scaffold gives way to the finished model under the drone, which must leave
+	# clear of that model.
+	advance(state.seconds_left(id))
+	main.base_view.sync(state)
+	var cost: Dictionary = state.catalog.level_stats("metal_extractor", 1)["cost"]
+	for res: String in cost:
+		state.resources[res] = maxi(state.resources[res], int(cost[res]))
+	placement.begin_place("metal_extractor")
+	check(placement.ghost_is_valid(), "the extractor's ghost found a free spot")
+	placement.confirm_place()
+	var dragged_id := state.last_added_id
+	check(state.buildings.has(dragged_id) and state.buildings[dragged_id].level == 0
+		and state.buildings[dragged_id].is_busy(), "the extractor is under construction")
+	placement.select(dragged_id)
+	await frames(1)
+	var dragged: BuildingView = main.base_view.views[dragged_id]
+	main.camera.pan(centre, centre - main.camera.unproject_position(dragged.position + Vector3(0, 1, 0)))
+	await _wait(main, 1.5)
+	# From the centre of the footprint's first cell to the next cell's: a move one cell along x.
+	var start: Vector2i = state.buildings[dragged_id].cell
+	var drop := start + Vector2i(1, 0)
+	var press := main.camera.unproject_position(main.base_view.cell_to_world(start, 1))
+	var finger := main.camera.unproject_position(main.base_view.cell_to_world(drop, 1))
+	main.world_input.drag_started.emit(press)
+	main.world_input.dragged.emit(finger, finger - press)
+	await frames(1)
+	check(main.base_view.dragging_id == dragged_id and state.check_move(dragged_id, drop) == "",
+		"the extractor is being dragged to a free spot")
+	drone = dragged.drone()
+	check(drone != null and not drone.is_leaving(), "its drone works while it is dragged")
+	if drone == null:
+		return
+	advance(state.seconds_left(dragged_id))
+	main.base_view.sync(state)
+	await frames(1)
+	check(state.buildings[dragged_id].level == 1 and main.base_view.views[dragged_id] == dragged
+		and dragged.is_model_visible(), "finished while dragged, the kept view shows the finished model")
+	check(dragged.drone() == drone and drone.is_leaving(), "the drone leaves the dragged view")
+	_check_clear(drone, dragged.site_height(), "the leaving drone starts clear of the finished model")
+	# site_height() is the model's top unlifted; the dragged model stands LIFT_HEIGHT higher.
+	say("lifted, the finished model's top is %.2f" % (dragged.site_height() + BuildingView.LIFT_HEIGHT))
+	await screenshot("finished-while-dragged")
+	main.world_input.drag_ended.emit(finger)
+	await _wait(main, 1.0)
+	check(main.base_view.dragging_id == 0 and main.base_view.views[dragged_id].drone() == null,
+		"dropped, the extractor's view has no drone")
+	var moved: BuildingView = main.base_view.views[dragged_id]
+	check(state.buildings[dragged_id].cell == drop
+		and moved.position.is_equal_approx(main.base_view.cell_to_world(drop, moved.footprint_size)),
+		"the move landed: the extractor and its view at %s" % drop)
+	_check_grid(state)
+
 
 ## Waits in steps of a tenth of a second until the drone fires, up to FIRE_WAIT_SECONDS.
 func _until_firing(main: MainScript, drone: ConstructionDrone) -> bool:
@@ -128,6 +183,18 @@ func _check_clear(drone: ConstructionDrone, top: float, what: String) -> void:
 	var lowest := drone.drone_position().y - drone.reach_below()
 	check(lowest >= top + ConstructionDrone.CLEARANCE - 0.001,
 		"%s: its lowest point %.2f, the top %.2f" % [what, lowest, top])
+
+
+## The grid's occupancy, cell by cell, is exactly every building's footprint.
+func _check_grid(state: BaseState) -> void:
+	var grid := BaseGrid.new(state.grid.width, state.grid.height)
+	for building: BuildingState in state.buildings.values():
+		grid.occupy(building.id, building.cell, state.catalog.size_of(building.type))
+	var wrong := 0
+	for y: int in grid.height:
+		for x: int in grid.width:
+			wrong += 1 if state.grid.occupant_at(Vector2i(x, y)) != grid.occupant_at(Vector2i(x, y)) else 0
+	check(wrong == 0, "the grid's occupancy matches every footprint (%d cells differ)" % wrong)
 
 
 func _instances(node: Node) -> int:
