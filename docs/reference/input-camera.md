@@ -219,7 +219,9 @@ same landscape. How each looks is in `art-style.md`, **Environment**:
   texture), whose inner edge lies on the field's at y = 0, so the two
   meet with no seam; it is within 0.03 of flat under the curb, reaches its relief between 4 and 11
   units out, wandering along the edge, and is roughened by a low rubble from 0.8 out.
-  Its craters, mesas, channel and dunes are placed from the seed; it has its ink outline, receives
+  Its craters, mesas, channel and dunes are placed from the seed; each mesa is a flat top and a
+  wall of its own, following its outline, over the lattice's ground with the cells under it left
+  out; it has its ink outline, receives
   shadows and casts none. `terrain_height(x, z)` is its height function, which the harness
   marches the view's rays over, and `blend_end(x, z)` how far out from the field its relief is full
   there, which the harness checks wanders along each side. At the widest zoom it fills the view

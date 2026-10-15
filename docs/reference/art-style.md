@@ -799,16 +799,31 @@ shapes:
 - three to five craters, radius 6 to 12, each a flat floor 0.18 radii deep, a wall steepening to
   a rim 0.15 radii high and a gentler outer slope, in ground flattened round it;
 - two irregular flat-topped mesas towards the far edge of the view, 4 to 6 above the dunes' crests,
-  with steep walls;
+  with steep walls (below);
 - a meandering dry channel running out from near the field, away from the mesas.
 
 Each point's normal comes once from its lattice neighbours' heights, so the ring is smooth shaded
-and the cel bands sweep across the dunes. Each point is tinted by slope and place: `TERRAIN`,
+and the cel bands sweep across the dunes. The lattice runs on under the mesas, on the ground
+without them, and leaves out the cells a quarter unit or more inside a mesa's foot.
+
+**The mesas** are geometry of their own in the terrain's mesh, following their outlines rather than
+the lattice: a flat top at the mesa's height, a fan from its middle to its rim 1.4 inside the
+outline (`MESA_WALL`), and a wall, a skirt from the rim straight down to its foot 0.4 outside it
+(`MESA_FOOT`) on the ground, sunk 0.05 into it so no gap shows. The outline is sampled every 3
+degrees (`MESA_STEP`). The top and the wall have their own points and normals, the wall's smooth
+round the mesa and the top's straight up, so the rim and the foot are hard creases that follow
+the outline: the cel bands' edges on the wall run down it in clean arcs and the rock strata stop
+at the rim. The terrain's ink outline adds a fin along each crease, two triangles between the
+two faces' points, which lie on one line until the ink shader pushes each point along its own
+normal and opens the fin into a line of the outline's width; so the rim and the foot are inked
+from every side, beside the hull's silhouette lines. `terrain_height` gives the same shape (a flat
+top on a straight wall from the rim to the foot), for the rocks and the harness. Each point is tinted by slope and place: `TERRAIN`,
 blended towards `TERRAIN_DARK` on crater floors and the shadow side of slopes over 18 degrees,
 towards `TERRAIN_LIGHT` on the lit side of slopes over 25 degrees, and towards `ROCK` on slopes
 over 35 degrees (crater walls, mesa sides). The blends are soft over a few points, so the patches
-are rounded, not triangles. Its ink outline is a second mesh on the same points and normals, so it
-inks the crater rims and the ridges the camera looks over. The body receives shadows and casts
+are rounded, not triangles; the mesas' walls are rock and their tops the plain tint. Its ink
+outline is a second mesh on the same points and normals, with the mesas' fins, so it inks the
+crater rims and the ridges the camera looks over. The body receives shadows and casts
 none.
 
 Its surface is drawn over the tint by `terrain.gdshader` (`MaterialKit.terrain()`, its outline on
@@ -857,17 +872,6 @@ focus at each corner of its bounds (a 19.5:9 phone is 2.17:1, and the `environme
 1560x720). Beyond that the clear colour shows first along the bottom of the screen, where the rays
 pass under the ring's raised outer edge. There is no sky.
 
-A known limitation: at a mesa's foot the steep wall meets level ground within a few lattice
-steps, so the normal turns from wall to flat over a few points and, where the wall's shadow band
-tapers to the foot, the edge of the cel bands breaks into small triangular teeth. The half-unit
-lattice within the mesas' reach spreads the turn over twice as many points and reduces the teeth
-to about half their size; it does not remove them. Beside them, at the mesas' rims, where the wall
-meets the flat top, small notches show along the line where the strata give way to the marks, as
-the slope crosses 28 to 38 degrees within a few points. A hard crease along the foot and the rim
-(the wall and the ground each with their own vertices and normals) was tried and is worse: on the
-square lattice the crease follows the triangles' edges, so it runs as a sawtooth. Removing both
-would take wall geometry that follows the mesa's outline rather than the lattice.
-
 **The scenery**:
 
 - **Rocks**: 80 chamfered chunks, 0.8 to 5 units across and most of them small, of five to seven
@@ -890,8 +894,8 @@ would take wall geometry that follows the mesa's outline rather than the lattice
 
 **Budgets**: the field 1 draw; the perimeter, the terrain, the rocks and the outcrops a body and an
 outline each, the perimeter's body two surfaces (its fence a hologram) and drawn into the shadow
-map. The terrain is 35,820 triangles on 18,190 points (the `environment` scenario allows
-38,000), the rocks about 3,900 (about 1,100 of them the rubble) and the outcrops about 900. It is
+map. The terrain is 34,492 triangles on 17,990 points, its outline 35,452 with the mesas' fins (the
+`environment` scenario allows the body 38,000), the rocks about 3,900 (about 1,100 of them the rubble) and the outcrops about 900. It is
 all built once, in about 110 ms on the development Mac (88 to 97 warm before the perimeter's
 pylons and fence added about 22, and 74 to 79 before the half-unit lattice and the rock texture,
 each measured side by side; the kit's build and the field and rock textures' loads and mipmaps

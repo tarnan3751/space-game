@@ -11,8 +11,9 @@ extends HarnessScenario
 ## start zoom, the closest on the field, the closest on a point where four of the field texture's
 ## tiles meet (nothing should show where they do), a wider stretch of the field, the perimeter at
 ## the middle of each side, a side and a corner of it at the closest zoom, the widest in the WIDE window, and
-## a crater and an outcrop centred (for the perimeter, the crater and the outcrop the camera's
-## bounds are widened, as a player cannot centre the view off the field).
+## a crater, an outcrop and the first mesa's wall centred, then the mesa wider (for the perimeter,
+## the crater, the outcrop and the mesa the camera's bounds are widened, as a player cannot centre
+## the view off the field).
 
 const TERRAIN_BUDGET := 38000
 const OUTCROP_GAP := 4.0
@@ -91,6 +92,11 @@ func run(main: MainScript) -> void:
 	main.camera.bounds = field.grow(BaseView.TERRAIN_EXTENT - field.end.x)
 	await _shot(main, "crater", Vector3(view.craters[0].x, 0.0, view.craters[0].y), 24.0)
 	await _shot(main, "outcrop", view.outcrop_spots[0], 12.0)
+	# The first mesa's wall where it faces the camera (+x, +z), its foot and its rim.
+	var mesa := view.mesas[0]
+	var facing := Vector3(mesa.x, mesa.w * 0.5, mesa.y) + Vector3(1.0, 0.0, 1.0).normalized() * mesa.z
+	await _shot(main, "mesa", facing, IsoCamera.MIN_ZOOM_SIZE)
+	await _shot(main, "mesas", Vector3(mesa.x, mesa.w * 0.5, mesa.y), 24.0)
 	main.camera.bounds = field
 
 

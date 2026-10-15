@@ -50,9 +50,14 @@ const RISE := 0.04
 ## A crater's depth and rim height, in radii.
 const CRATER_DEPTH := 0.18
 const CRATER_RIM := 0.15
-## A mesa's wall: how far in from its outline the rim's edge lies, and how far out its foot.
+## A mesa's wall: how far in from its outline its rim lies, and how far out its foot; how far
+## apart round the outline it is sampled, in degrees; how far its foot sinks below the ground, so
+## no gap shows under it; and how far inside the foot a lattice cell must lie to be left out.
 const MESA_WALL := 1.4
 const MESA_FOOT := 0.4
+const MESA_STEP := 3.0
+const MESA_SINK := 0.05
+const MESA_FOOT_MARGIN := 0.25
 ## The dry channel's half width, depth, and how far it wanders either side of its course (radians).
 const CHANNEL_WIDTH := 2.2
 const CHANNEL_DEPTH := 1.2
@@ -449,7 +454,10 @@ func _add_mesh(mesh: Mesh, casts_shadow: bool) -> MeshInstance3D:
 ## TERRAIN_COARSE, TERRAIN_MESA_REACH). Where larger cells meet smaller ones, a larger cell fans
 ## out from the point in the middle of its edge, so no point lies on another cell's edge. Each
 ## point's normal comes from its lattice neighbours' heights, once, and the ink outline (one more
-## mesh, on the same points and normals) inks the ridges and crater rims the camera sees over.
+## mesh, on the same points and normals) inks the ridges and crater rims the camera sees over. The
+## lattice lies on the ground without the mesas and leaves out the cells under them; each mesa is
+## a flat top and a wall of its own that follow its outline (_mesa_rings), with hard creases at the
+## rim and the foot, which the outline inks with fins (_fin).
 ## Each point is tinted by slope and place (ROCK_SLOPE_Y, SHADOW_SLOPE_Y, CRATER_FLOOR), a tint the
 ## faces between points blend and the terrain shader draws over (MaterialKit.terrain). The
 ## terrain receives shadows and casts none.
@@ -487,7 +495,8 @@ func _build_terrain(rng: SeededRng) -> void:
 				cells.append(Vector3i(i, j, coarse))
 	for j: int in range(fine_low.y, fine_high.y, 2):
 		for i: int in range(fine_low.x, fine_high.x, 2):
-			if i < 0 or i >= 2 * grid_size.x or j < 0 or j >= 2 * grid_size.y:
+			if (i < 0 or i >= 2 * grid_size.x or j < 0 or j >= 2 * grid_size.y) \
+					and not _under_mesa(i * 0.5 - half.x, j * 0.5 - half.y, 1.0):
 				# A refined cell keeps a fine cell's width from the coarse ones, so a coarse cell's
 				# edge holds at most one point between its corners.
 				var inside := i > fine_low.x and i < fine_high.x - 2 and j > fine_low.y and j < fine_high.y - 2
@@ -518,7 +527,7 @@ func _build_terrain(rng: SeededRng) -> void:
 	for place: int in places:
 		var x := (place % columns + low.x) * 0.5 - half.x
 		var z := (place / columns + low.y) * 0.5 - half.y
-		var y := terrain_height(x, z)
+		var y := _height(x, z, false)
 		ids[place] = vertices.size()
 		heights[place] = y
 		vertices.append(Vector3(x, y, z))
@@ -561,23 +570,8 @@ func _build_terrain(rng: SeededRng) -> void:
 		var normal := Vector3(-along_x, 1.0, -along_z).normalized()
 		normals.append(normal)
 		var at := vertices[v]
-		# Each weight steps smoothly from 0 to 1 across its threshold. A slope is steeper than a
-		# threshold where its normal's y is below it.
-		var steep := smoothstep(ROCK_SLOPE_Y + 0.1, ROCK_SLOPE_Y - 0.1, normal.y)
-		var tint := MaterialKit.ROCK
-		if steep < 1.0:
-			var facing := normal.x * SUN_ACROSS.x + normal.z * SUN_ACROSS.y
-			var shadow_side := smoothstep(SHADOW_SLOPE_Y + 0.03, SHADOW_SLOPE_Y - 0.03, normal.y) \
-				* smoothstep(-0.05, -0.15, facing)
-			var lit_side := smoothstep(LIT_SLOPE_Y + 0.03, LIT_SLOPE_Y - 0.03, normal.y) * smoothstep(0.1, 0.2, facing)
-			# The craters all lie inside the fine lattice.
-			var floor_weight := 0.0
-			if step < coarse:
-				floor_weight = _crater_floor(at.x, at.z)
-			tint = MaterialKit.TERRAIN.lerp(MaterialKit.TERRAIN_LIGHT, lit_side) \
-				.lerp(MaterialKit.TERRAIN_DARK, maxf(shadow_side, floor_weight)) \
-				.lerp(MaterialKit.ROCK, steep)
-		colors.append(tint)
+		# The craters all lie inside the fine lattice.
+		colors.append(_tint(normal, _crater_floor(at.x, at.z) if step < coarse else 0.0))
 
 	# Each cell's triangles, going round as (i, j), (i + span, j), (i + span, j + span),
 	# (i, j + span), which faces up; a refined cell's four quarters each the same. A cell with no
@@ -615,14 +609,70 @@ func _build_terrain(rng: SeededRng) -> void:
 		for k: int in around.size() - 1:
 			indices.append_array(PackedInt32Array([loop[fan], around[k], around[k + 1]]))
 
+	# Each mesa: its flat top, a fan from its middle out to its rim, and its wall, a skirt from the
+	# rim down to its foot below the ground, each with its own points and normals, so the rim and
+	# the foot are hard creases. The ink outline has fins along both creases: at each, a strip
+	# between the two faces' points, which the outline's push opens into a line (_fin). The foot's
+	# fins have points of their own, at the foot on the ground, after the body's in the outline.
+	var ink_vertices := PackedVector3Array()
+	var ink_normals := PackedVector3Array()
+	var ink_indices := PackedInt32Array()
+	var mesa_walls: Array[Array] = []
+	for k: int in mesas.size():
+		var rings := _mesa_rings(k)
+		mesa_walls.append(rings)
+		var rim := rings[0]
+		var foot := rings[1]
+		var rim_normals := rings[2]
+		var foot_normals := rings[3]
+		var count := rim.size()
+		var middle := vertices.size()
+		var top := middle + 1
+		var wall := top + count
+		vertices.append(Vector3(mesas[k].x, mesas[k].w, mesas[k].y))
+		vertices.append_array(rim)
+		vertices.append_array(rim)
+		for i: int in count:
+			vertices.append(foot[i] - Vector3(0.0, MESA_SINK, 0.0))
+		for i: int in 1 + count:
+			normals.append(Vector3.UP)
+			colors.append(_tint(Vector3.UP, 0.0))
+		normals.append_array(rim_normals + foot_normals)
+		for normal: Vector3 in rim_normals + foot_normals:
+			colors.append(_tint(normal, 0.0))
+		for i: int in count:
+			var j := (i + 1) % count
+			var out := Vector3(rim[i].x - mesas[k].x, 0.0, rim[i].z - mesas[k].y)
+			indices.append_array(_facing(vertices, middle, top + i, top + j, Vector3.UP))
+			indices.append_array(_facing(vertices, wall + i, wall + j, wall + count + j, out))
+			indices.append_array(_facing(vertices, wall + i, wall + count + j, wall + count + i, out))
+			ink_indices.append_array(_fin(rim[i], rim[j], Vector3.UP, rim_normals[i], rim_normals[j],
+				top + i, top + j, wall + j, wall + i))
+	for rings: Array in mesa_walls:
+		var foot: PackedVector3Array = rings[1]
+		var foot_normals: PackedVector3Array = rings[3]
+		var ground_normals: PackedVector3Array = rings[4]
+		var count := foot.size()
+		var ground := vertices.size() + ink_vertices.size()
+		var footing := ground + count
+		ink_vertices.append_array(foot + foot)
+		ink_normals.append_array(ground_normals + foot_normals)
+		for i: int in count:
+			var j := (i + 1) % count
+			ink_indices.append_array(_fin(foot[i], foot[j], ground_normals[i], foot_normals[i], foot_normals[j],
+				ground + i, ground + j, footing + j, footing + i))
+
 	var arrays := []
 	arrays.resize(Mesh.ARRAY_MAX)
-	arrays[Mesh.ARRAY_VERTEX] = vertices
-	arrays[Mesh.ARRAY_NORMAL] = normals
-	arrays[Mesh.ARRAY_INDEX] = indices
+	arrays[Mesh.ARRAY_VERTEX] = vertices + ink_vertices
+	arrays[Mesh.ARRAY_NORMAL] = normals + ink_normals
+	arrays[Mesh.ARRAY_INDEX] = indices + ink_indices
 	var hull := ArrayMesh.new()
 	hull.add_surface_from_arrays(Mesh.PRIMITIVE_TRIANGLES, arrays)
 	hull.surface_set_material(0, MaterialKit.ink())
+	arrays[Mesh.ARRAY_VERTEX] = vertices
+	arrays[Mesh.ARRAY_NORMAL] = normals
+	arrays[Mesh.ARRAY_INDEX] = indices
 	arrays[Mesh.ARRAY_COLOR] = colors
 	var body := ArrayMesh.new()
 	body.add_surface_from_arrays(Mesh.PRIMITIVE_TRIANGLES, arrays)
@@ -641,6 +691,101 @@ static func _cell_quad(a: int, b: int, c: int, d: int, even: bool) -> PackedInt3
 	if even:
 		return PackedInt32Array([a, b, c, a, c, d])
 	return PackedInt32Array([a, b, d, b, c, d])
+
+
+## The terrain's tint at a point whose normal is `normal`, `floor_weight` on a crater's floor: by
+## slope and place (ROCK_SLOPE_Y, SHADOW_SLOPE_Y, LIT_SLOPE_Y). Each weight steps smoothly from 0
+## to 1 across its threshold; a slope is steeper than a threshold where its normal's y is below it.
+static func _tint(normal: Vector3, floor_weight: float) -> Color:
+	var steep := smoothstep(ROCK_SLOPE_Y + 0.1, ROCK_SLOPE_Y - 0.1, normal.y)
+	if steep >= 1.0:
+		return MaterialKit.ROCK
+	var facing := normal.x * SUN_ACROSS.x + normal.z * SUN_ACROSS.y
+	var shadow_side := smoothstep(SHADOW_SLOPE_Y + 0.03, SHADOW_SLOPE_Y - 0.03, normal.y) \
+		* smoothstep(-0.05, -0.15, facing)
+	var lit_side := smoothstep(LIT_SLOPE_Y + 0.03, LIT_SLOPE_Y - 0.03, normal.y) * smoothstep(0.1, 0.2, facing)
+	return MaterialKit.TERRAIN.lerp(MaterialKit.TERRAIN_LIGHT, lit_side) \
+		.lerp(MaterialKit.TERRAIN_DARK, maxf(shadow_side, floor_weight)) \
+		.lerp(MaterialKit.ROCK, steep)
+
+
+## The triangle `a`, `b`, `c` of `points`, in the order that faces `front` (the terrain's meshes
+## are raw arrays: a triangle faces away from the cross product of its first two edges).
+static func _facing(points: PackedVector3Array, a: int, b: int, c: int, front: Vector3) -> PackedInt32Array:
+	if (points[b] - points[a]).cross(points[c] - points[a]).dot(front) > 0.0:
+		return PackedInt32Array([a, c, b])
+	return PackedInt32Array([a, b, c])
+
+
+## An ink fin along a crease of a mesa, from `from` to `to`: two triangles between the points
+## `a`, `b` (on one face, both of normal `face`) and `c`, `d` (on the other, at `to` and `from`, of
+## normals `to_normal` and `from_normal`). They lie on one line until the ink shader pushes each
+## point out along its normal, which opens the fin into a strip about the outline's width across
+## the crease. It faces into the crease, so the ink shader, which draws back faces, draws it.
+static func _fin(from: Vector3, to: Vector3, face: Vector3, from_normal: Vector3, to_normal: Vector3,
+		a: int, b: int, c: int, d: int) -> PackedInt32Array:
+	var pushed := PackedVector3Array([from + face * 0.1, to + face * 0.1, to + to_normal * 0.1, from + from_normal * 0.1])
+	var into := -(face + from_normal)
+	var fin := _facing(pushed, 0, 1, 2, into) + _facing(pushed, 0, 2, 3, into)
+	var corners := PackedInt32Array([a, b, c, d])
+	for k: int in fin.size():
+		fin[k] = corners[fin[k]]
+	return fin
+
+
+## Mesa `k`'s wall, sampled every MESA_STEP degrees round its outline (_mesa_edge): its rim,
+## MESA_WALL in from the outline at the height of its top, and its foot, MESA_FOOT out from it on
+## the ground under it; each ring's normals (the wall's, smooth round it); and the ground's normals
+## at the foot. As [rim, foot, rim normals, foot normals, ground normals].
+func _mesa_rings(k: int) -> Array[PackedVector3Array]:
+	var mesa := mesas[k]
+	var count := roundi(360.0 / MESA_STEP)
+	var rim := PackedVector3Array()
+	var foot := PackedVector3Array()
+	for i: int in count:
+		var turn := TAU * i / count
+		var out := Vector2(cos(turn), sin(turn))
+		var edge := _mesa_edge(k, out.x, out.y)
+		var at := Vector2(mesa.x, mesa.y) + out * (edge - MESA_WALL)
+		rim.append(Vector3(at.x, mesa.w, at.y))
+		at = Vector2(mesa.x, mesa.y) + out * (edge + MESA_FOOT)
+		foot.append(Vector3(at.x, _height(at.x, at.y, false), at.y))
+	var rim_normals := PackedVector3Array()
+	var foot_normals := PackedVector3Array()
+	var ground_normals := PackedVector3Array()
+	for i: int in count:
+		var before := (i + count - 1) % count
+		var after := (i + 1) % count
+		var out := Vector3(foot[i].x - mesa.x, 0.0, foot[i].z - mesa.y)
+		var down := foot[i] - rim[i]
+		var normal := (rim[after] - rim[before]).cross(down).normalized()
+		rim_normals.append(normal if normal.dot(out) > 0.0 else -normal)
+		normal = (foot[after] - foot[before]).cross(down).normalized()
+		foot_normals.append(normal if normal.dot(out) > 0.0 else -normal)
+		var e := 0.25
+		var x := foot[i].x
+		var z := foot[i].z
+		ground_normals.append(Vector3((_height(x - e, z, false) - _height(x + e, z, false)) / (2.0 * e), 1.0,
+			(_height(x, z - e, false) - _height(x, z + e, false)) / (2.0 * e)).normalized())
+	return [rim, foot, rim_normals, foot_normals, ground_normals]
+
+
+## Whether the lattice cell `size` square whose first corner is (`x`, `z`) lies under a mesa: each
+## corner MESA_FOOT_MARGIN or more inside its foot, so its wall covers the cell.
+func _under_mesa(x: float, z: float, size: float) -> bool:
+	for k: int in mesas.size():
+		var under := true
+		for corner: Vector2 in [Vector2(x, z), Vector2(x + size, z), Vector2(x, z + size), Vector2(x + size, z + size)]:
+			var dx := corner.x - mesas[k].x
+			var dz := corner.y - mesas[k].y
+			# The outline reaches at most 1.18 radii from the middle.
+			if dx * dx + dz * dz > (mesas[k].z * 1.18 + MESA_FOOT) * (mesas[k].z * 1.18 + MESA_FOOT) \
+					or sqrt(dx * dx + dz * dz) > _mesa_edge(k, dx, dz) + MESA_FOOT - MESA_FOOT_MARGIN:
+				under = false
+				break
+		if under:
+			return true
+	return false
 
 
 ## Places the terrain's features from `rng`, inside the fine lattice: two mesas towards the far
@@ -851,9 +996,15 @@ func _outcrop_clear(at: Vector2, extent: float) -> bool:
 
 ## The terrain's height at a point: flat out to TERRAIN_FLAT outside the field, then ridged dunes
 ## that grow away from it (flattened round the craters) and a gentle rise, the craters' bowls and
-## rims, the channel, and the mesas' flat tops, all blended in by a wandering distance out
-## (blend_end), with rubble over it all. The harness marches the view's rays over it.
+## rims and the channel, all blended in by a wandering distance out (blend_end), with rubble over
+## it all; and the mesas, each a flat top on a straight wall from its rim to its foot, as their own
+## geometry draws them (_mesa_rings). The harness marches the view's rays over it.
 func terrain_height(x: float, z: float) -> float:
+	return _height(x, z, true)
+
+
+## The terrain's height at a point, with the mesas or, for the ground under them, without.
+func _height(x: float, z: float, with_mesas: bool) -> float:
 	var out_x := maxf(absf(x) - grid_size.x * 0.5, 0.0)
 	var out_z := maxf(absf(z) - grid_size.y * 0.5, 0.0)
 	var out := sqrt(out_x * out_x + out_z * out_z)
@@ -888,15 +1039,18 @@ func terrain_height(x: float, z: float) -> float:
 			dunes *= smoothstep(0.8, 1.9, t)
 			height += crater.z * _crater_profile(t)
 	height += dunes
+	height = height * smoothstep(TERRAIN_FLAT, full_out, out) + rubble
+	if not with_mesas:
+		return height
 	for k: int in mesas.size():
 		var mesa := mesas[k]
 		var dx := x - mesa.x
 		var dz := z - mesa.y
 		if dx * dx + dz * dz < (mesa.z + 3.0) * (mesa.z + 3.0):
 			var edge := _mesa_edge(k, dx, dz)
-			var top := 1.0 - smoothstep(edge - MESA_WALL, edge + MESA_FOOT, sqrt(dx * dx + dz * dz))
+			var top := clampf((edge + MESA_FOOT - sqrt(dx * dx + dz * dz)) / (MESA_FOOT + MESA_WALL), 0.0, 1.0)
 			height = lerpf(height, mesa.w, top)
-	return height * smoothstep(TERRAIN_FLAT, full_out, out) + rubble
+	return height
 
 
 ## Whether a point lies within TERRAIN_MESA_REACH of a mesa's outline (_mesa_edge), where the

@@ -213,9 +213,11 @@ nothing should show the tiles' edges), a wider stretch of the field at camera si
 the perimeter at the middle of each side of the field at size 16 (`edge-top-left`, `edge-top-right`,
 `edge-bottom-right`, `edge-bottom-left`, by the screen corner each side faces), the middle of the
 +z side and the +x +z corner of the perimeter at the closest zoom (`perimeter-side`,
-`perimeter-corner`), the widest zoom in the wide window, and a crater and an outcrop each
-centred; for the perimeter, the crater and the outcrop it widens the camera's bounds to the terrain's, since the player cannot centre the view
-off the field.
+`perimeter-corner`), the widest zoom in the wide window, a crater and an outcrop each centred,
+the first mesa's wall where it faces the camera at the closest zoom (`mesa`, its foot and its rim)
+and the mesa at size 24 (`mesas`); for the perimeter, the crater, the outcrop and the mesa it
+widens the camera's bounds to the terrain's, since the player cannot centre the view off the
+field.
 
 `scenarios/hud_menu.gd` checks the HUD on a fresh base. The top bar: antimatter hidden, each
 meter's fill as wide as its track times amount over capacity (to a pixel) and the drone ring's
