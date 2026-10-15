@@ -365,10 +365,10 @@ triangles as the gallery counts them.
 | `missile_battery` | tilted box launcher of red-tipped tubes (4, 6 at L3, 9 at L4) with a hazard band | swing: the launcher, arms and tubes, scans ±15° (7 s). The tips blink in a chase snaking along the rows, the mast lamp (L2) pulses | 2,174 |
 | `plasma_mortar` | fat short barrel rising from a caged violet plasma chamber on a heavy ring | spin: a cooling fan on the heavy ring's flank. The chamber pulses, bubbles swell on it between the cage's ribs, arcs crackle from the ribs, the bore's lining flows up out of the muzzle | 2,982 |
 | `shield_generator` | cyan energy orb held over an emitter dome by three coil arms, their upper runs glowing conduits | spin: a hologram band round the orb, tilted off its axis so it wobbles as it turns. The orb bobs and pulses, current flows up the arms, arcs jump from the arm tips to the orb | 2,980 |
-| `flak_cannon` | barrels angled at the sky on a tall bell mount | spin: the radar dish on its mast | 2,900 |
-| `arc_tower` | tesla coil of white insulator skirts under an arc-blue sphere; twin coils at L4 | none | 2,794 |
-| `cloaked_sentry` | low dark hexagonal pod with a lid gun and a dim cyan shimmer ring | none | 854 |
-| `gravity_well` | dark core floating over a violet well, ringed by gyro rings | spin: the rotor over the core | 1,978 |
+| `flak_cannon` | barrels angled at the sky on a tall bell mount | spin: the radar dish on its mast; slide: the barrels recoil (`RECOIL`, 1.2 s). Their muzzles blink once a recoil, at BLINK's same period but on the shader's clock, not on the kick, and flare (FLICKER), the radar lamp pulses | 2,948 |
+| `arc_tower` | tesla coil of white insulator skirts round a glowing core under an arc-blue sphere; twin coils at L4 | none. Arcs climb the coil from skirt to skirt and leap from the corona to the sphere, an arc jumps between the twin spheres (L4), the core's current flows up, the spheres and the cells (L3) pulse, the corona's spike tips (L2) blink in a chase | 2,954 |
+| `cloaked_sentry` | low dark hexagonal pod with a lid gun and a hologram shimmer ring | swing: the lid gun scans ±30° (5 s). The shimmer rings are holograms, the pod's lamp and the mast lamp (L3) blink | 914 |
+| `gravity_well` | dark violet core floating over a violet well, ringed by gyro rings | spin: the rotor over the core, the gyro rings tumbling about X (L2) and about Z (L3). The core bobs and pulses, the well's swirl turns and draws in (FLOW and FLOW_U on the crystal layer), the pillar caps blink in a chase | 1,978 |
 | `emp_tower` | yellow core in a bar cage atop a stepped tower ringed by capacitor cans | none | 2,854 |
 | `railgun` | two long rails across the screen with a cyan strip between them, capacitor banks | none | 2,088 |
 | `ion_beam` | big crystal lens and focusing rings on a tripod | none | 1,964 |

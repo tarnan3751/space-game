@@ -29,16 +29,17 @@ static var BARREL := Surf.make(MaterialKit.Layer.PIPE, MaterialKit.GUNMETAL, 1.0
 static var RIBBED := Surf.make(MaterialKit.Layer.PIPE, MaterialKit.HULL_MID, 2.0, Surf.LIT, true)
 static var HAZARD_FINE := Surf.make(MaterialKit.Layer.HAZARD, Color.WHITE, 3.0)
 static var GOLD := Surf.make(MaterialKit.Layer.FLAT, MaterialKit.CORE_GOLD, 1.0, Surf.GLOSSY, true)
-## The gravity well's dark core: glossy, so it catches a hard highlight.
-static var CORE := Surf.make(MaterialKit.Layer.FLAT, MaterialKit.HULL_DARK, 1.0, Surf.GLOSSY, true)
+## The gravity well's dark core: glossy, so it catches a hard highlight; violet, floating and
+## swelling.
+static var CORE := Surf.make(MaterialKit.Layer.FLAT, MaterialKit.ANTIMATTER.darkened(0.55), 1.0,
+	Surf.GLOSSY | Surf.PULSE | Surf.BOB, true)
 static var LENS := Surf.make(MaterialKit.Layer.CRYSTAL, MaterialKit.ENERGY, 2.0, Surf.GLOSSY, true)
 static var LASER := _glow(MaterialKit.DEFENCE)
 static var PLASMA := _glow(MaterialKit.ANTIMATTER)
-static var ARC := _glow(MaterialKit.ARC_BLUE)
 static var ION := _glow(MaterialKit.ENERGY)
 static var EMP := _glow(MaterialKit.HAZARD)
-## The cloaked sentry's shimmer: energy cyan seen through a dim tint.
-static var SHIMMER := _glow(MaterialKit.ENERGY.darkened(0.55))
+## The cloaked sentry's shimmer: a hologram, phasing.
+static var SHIMMER := Surf.make(MaterialKit.Layer.GLOW, MaterialKit.ENERGY, 1.0, Surf.HOLO)
 ## The plinth's red belt, its plates creeping round it.
 static var BELT := Surf.make(MaterialKit.Layer.PLATE, MaterialKit.DEFENCE, 1.0, Surf.FLOW_U, false, true, 0.6)
 static var LASER_PULSE := _glow(MaterialKit.DEFENCE, Surf.PULSE)
@@ -56,6 +57,18 @@ static var ION_ORB := _glow(MaterialKit.ENERGY, Surf.PULSE | Surf.BOB)
 static var ION_CURRENT := _current(MaterialKit.ENERGY, 0.8)
 static var ION_ARC := _spark(MaterialKit.ENERGY)
 static var ION_HOLO := Surf.make(MaterialKit.Layer.GLOW, MaterialKit.ENERGY, 1.0, Surf.HOLO)
+## A muzzle's flash: a yellow flare, there and gone.
+static var FLARE := Surf.make(MaterialKit.Layer.GLOW, MaterialKit.HAZARD, 1.0, Surf.UNLIT | Surf.FLICKER)
+static var ARC_PULSE := _glow(MaterialKit.ARC_BLUE, Surf.PULSE)
+static var ARC_BLINK := _glow(MaterialKit.ARC_BLUE, Surf.BLINK)
+static var ARC_SPARK := _spark(MaterialKit.ARC_BLUE.lightened(0.35))
+## The tesla coil's core, its current climbing between the skirts.
+static var ARC_CURRENT := _current(MaterialKit.ARC_BLUE, 0.8)
+## The gravity well's swirl: crystal facets, which vary along U, turning round the disc and
+## drawn in towards its middle.
+static var SWIRL := Surf.make(MaterialKit.Layer.CRYSTAL, MaterialKit.ANTIMATTER, 1.0,
+	Surf.UNLIT | Surf.FLOW | Surf.FLOW_U, false, true, 0.62)
+static var PLASMA_BLINK := _glow(MaterialKit.ANTIMATTER, Surf.BLINK)
 
 ## A crackling arc's struts: too thin to ink, and never inked anyway (FLICKER, JITTER).
 const ARC_WIDTH := 0.03
@@ -289,16 +302,27 @@ static func build_flak_cannon(p: Parts, level: int) -> void:
 		m.box_chamfered(Vector3(0.7, 0.07, 0.84), 0.02, centre + Vector3(0, 0.56, 0), GOLD, heading)
 	var per_side := 2 if level < 3 else 3
 	var pack := 0.08 + 0.13 * per_side
+	# The barrels recoil together, kicking back `kick` from where they rest and easing out again;
+	# their muzzles blink and flare. The recoil takes BLINK's period, 1.2 s, so there is one flash
+	# a kick, but not on it: BLINK runs on the shader's clock, the recoil on the view's own, which
+	# starts at 0 for each view and stops while it is busy.
+	var along := LowPolyMesh.turn(Vector3.UP, tilt)
+	var kick := 0.06
+	var guns := p.moving(centre, Motion.slide(-along, kick, 1.2, 0.0, Motion.Ease.RECOIL))
+	var breech := -along * kick
+	var flare := 0
 	for side: float in [-1.0, 1.0]:
 		m.box_chamfered(Vector3(pack, 0.38, 0.56), 0.04, _at(centre, Vector3(side * (0.33 + pack * 0.5), 0.12, 0), heading),
 			ARMOUR, heading)
 		for k: int in per_side:
-			var root := _at(centre, Vector3(side * (0.41 + 0.13 * k), 0.4, 0.05), heading)
+			var root := _at(breech, Vector3(side * (0.41 + 0.13 * k), 0.4, 0.05), heading)
 			var length := 1.05
-			m.prism(0.06, 0.06, length, 16, root, BARREL, tilt)
-			m.tube(0.04, 0.085, 0.16, 16, _at(root, Vector3(0, length - 0.12, 0), tilt),
+			guns.prism(0.06, 0.06, length, 16, root, BARREL, tilt)
+			guns.tube(0.04, 0.085, 0.16, 16, _at(root, Vector3(0, length - 0.12, 0), tilt),
 				GOLD if level >= 4 else Parts.GUNMETAL, tilt)
-			m.orb(0.05, 12, 6, _at(root, Vector3(0, length + 0.05, 0), tilt), LASER)
+			guns.orb(0.05, 12, 6, _at(root, Vector3(0, length + 0.05, 0), tilt), LASER_BLINK)
+			guns.cone(0.06, 0.16, 8, _at(root, Vector3(0, length + 0.08, 0), tilt), FLARE.phased(flare / 6.0), tilt)
+			flare += 1
 		if level >= 3:
 			m.prism(0.18, 0.18, 0.2, 16, _at(centre, Vector3(side * (0.33 + pack), 0.22, -0.12), heading),
 				SHELL_MID, heading + Vector3(0, 0, -90 * side))
@@ -310,37 +334,58 @@ static func build_flak_cannon(p: Parts, level: int) -> void:
 		Vector2(0.06, 0), Vector2(0.32, 0.1), Vector2(0.3, 0.13), Vector2(0, 0.04),
 	]), 24, Vector3(0, 0.12, -0.08), SHELL, face)
 	radar.prism(0.05, 0.05, 0.14, 16, Vector3.ZERO, Parts.GUNMETAL)
-	radar.orb(0.05, 12, 6, Vector3(0, 0.12, 0) + LowPolyMesh.turn(Vector3(0, 0.25, 0), face), LASER)
+	radar.orb(0.05, 12, 6, Vector3(0, 0.12, 0) + LowPolyMesh.turn(Vector3(0, 0.25, 0), face), LASER_PULSE)
 
 
 static func build_arc_tower(p: Parts, level: int) -> void:
 	var m := p.body
 	var top := _plinth(m, 3, 1.1, 0.3)
 	Parts.drum(m, 0.62, 0.24, 0.06, 20, Vector3(0, top, 0), SHELL_MID)
-	var crown := _coil(m, Vector3(0, top + 0.24, 0), 0.85 + 0.2 * mini(level, 3), 0.5, level >= 4)
+	var height := 0.85 + 0.2 * mini(level, 3)
+	var foot := Vector3(0, top + 0.24, 0)
+	var crown := _coil(m, foot, height, 0.5, level >= 4)
 	var sphere := 0.28 + 0.03 * level
-	m.orb(sphere, 16, 8, crown + Vector3(0, sphere * 0.85, 0), ARC)
+	var centre := crown + Vector3(0, sphere * 0.85, 0)
+	m.orb(sphere, 16, 8, centre, ARC_PULSE)
+	# Arcs climb the coil from skirt to skirt on the side facing the viewer, then leap from the
+	# corona to the sphere.
+	var skirts := _skirts(height)
+	var strip := 0
+	for i: int in skirts - 1:
+		var degrees := 20.0 + 32.0 * i
+		_arc(m, foot + _skirt_rim(height, 0.5, i, degrees), foot + _skirt_rim(height, 0.5, i + 1, degrees + 28.0), 3, 0.04,
+			ARC_SPARK.phased(strip / 6.0))
+		strip += 1
+	for degrees: float in [30.0, 95.0]:
+		_arc(m, crown + Parts.around(0.48, degrees, 0.06), centre + _on_sphere(sphere - 0.02, Vector2(degrees + 15.0, 38.0)),
+			3, 0.04, ARC_SPARK.phased(strip / 6.0))
+		strip += 1
 	if level >= 2:
-		for degrees: float in [0.0, 90.0, 180.0, 270.0]:
-			var root := crown + Parts.around(0.42, degrees, 0.0)
-			var tip := crown + Parts.around(0.66, degrees, -0.08)
+		for k: int in 4:
+			var root := crown + Parts.around(0.42, 90.0 * k, 0.0)
+			var tip := crown + Parts.around(0.66, 90.0 * k, -0.08)
 			m.prism(0.025, 0.015, root.distance_to(tip), 8, root, Parts.ROD, Parts.facing(tip - root))
-			m.orb(0.05, 8, 4, tip, ARC)
+			m.orb(0.05, 8, 4, tip, ARC_BLINK.phased(_chase(k, 4)))
 	if level >= 3:
-		for degrees: float in [45.0, 225.0, 315.0]:
-			_cell(m, Parts.around(1.42, degrees, Parts.PAD_HEIGHT), 0.42, ARC)
+		var cells: Array[float] = [45.0, 225.0, 315.0]
+		for k: int in cells.size():
+			_cell(m, Parts.around(1.42, cells[k], Parts.PAD_HEIGHT), 0.42, ARC_PULSE.phased(0.25 + k / 3.0))
 	if level >= 4:
 		var twin := Parts.around(1.38, 135.0, Parts.PAD_HEIGHT)
 		Parts.drum(m, 0.26, 0.16, 0.04, 16, twin, SHELL_MID)
 		var twin_crown := _coil(m, twin + Vector3(0, 0.16, 0), 0.85, 0.26, true)
-		m.orb(0.2, 16, 8, twin_crown + Vector3(0, 0.17, 0), ARC)
+		var twin_centre := twin_crown + Vector3(0, 0.17, 0)
+		m.orb(0.2, 16, 8, twin_centre, ARC_PULSE.phased(0.5))
+		# An arc jumps between the twin spheres.
+		var jump := (centre - twin_centre).normalized()
+		_arc(m, twin_centre + jump * 0.18, centre - jump * (sphere - 0.02), 6, 0.07, ARC_SPARK.phased(0.95))
 
 
 static func build_cloaked_sentry(p: Parts, level: int) -> void:
 	var m := p.body
 	Parts.foundation(m, 2)
 	var base := Vector3(0, Parts.PAD_HEIGHT, 0)
-	m.ring(0.8, 0.86, 0.05, 6, base, SHIMMER)
+	Parts.torus(m, 0.83, 0.035, 6, 8, base, SHIMMER)
 	m.lathe(PackedVector2Array([
 		Vector2(0.74, 0), Vector2(0.74, 0.2), Vector2(0.58, 0.34), Vector2(0, 0.34),
 	]), 6, base, POD)
@@ -351,37 +396,42 @@ static func build_cloaked_sentry(p: Parts, level: int) -> void:
 	Parts.drum(m, 0.44, 0.05, 0.02, 6, base + Vector3(0, 0.34, 0), Parts.HULL_DARK)
 	if level >= 3:
 		m.ring(0.43, 0.47, 0.06, 6, base + Vector3(0, 0.34, 0), GOLD)
-	var lid := base + Vector3(0, 0.39, 0)
+	# The lid gun scans, turning about the pod's axis.
+	var lid := p.moving(base + Vector3(0, 0.39, 0), Motion.swing(Vector3.UP, 30.0, 5.0))
 	var guns: Array[float] = [0.0]
 	if level >= 2:
 		guns = [-0.17, 0.17]
 	for offset: float in guns:
 		var yaw := SCREEN_RIGHT - 30.0
-		_sentry_gun(m, lid + LowPolyMesh.turn(Vector3(offset, 0, 0), Vector3(0, yaw, 0)), yaw)
-	Parts.drum(m, 0.08, 0.14, 0.02, 16, base + Parts.around(0.3, 225.0, 0.34), Parts.GUNMETAL)
-	m.orb(0.06, 12, 6, base + Parts.around(0.3, 225.0, 0.52), LASER)
+		_sentry_gun(lid, LowPolyMesh.turn(Vector3(offset, 0, 0), Vector3(0, yaw, 0)), yaw)
+	# The lamp and the mast stand near the lid's rim, outside the guns' sweep: past the heads'
+	# reach (0.35 from the axis) and away from the barrels' arc in front.
+	Parts.drum(m, 0.05, 0.14, 0.02, 16, base + Parts.around(0.525, 225.0, 0.34), Parts.GUNMETAL)
+	m.orb(0.05, 12, 6, base + Parts.around(0.525, 225.0, 0.52), LASER_BLINK)
 	if level >= 2:
-		m.ring(0.6, 0.64, 0.04, 6, base + Vector3(0, 0.36, 0), SHIMMER)
+		m.ring(0.6, 0.64, 0.04, 6, base + Vector3(0, 0.36, 0), SHIMMER.phased(0.5))
 	if level >= 3:
-		Parts.mast(m, base + Parts.around(0.36, 285.0, 0.34), 0.32, 0.045, LASER)
+		Parts.mast(m, base + Parts.around(0.525, 165.0, 0.34), 0.32, 0.045, LASER_BLINK.phased(0.5))
 
 
 static func build_gravity_well(p: Parts, level: int) -> void:
 	var m := p.body
 	var top := _plinth(m, 2, 0.8, 0.22)
 	Parts.torus(m, 0.5, 0.08, 16, 10, Vector3(0, top, 0), SHELL_MID)
-	m.disc(0.44, 20, Vector3(0, top + 0.01, 0), PLASMA)
+	m.disc(0.44, 20, Vector3(0, top + 0.01, 0), SWIRL)
 	var core := Vector3(0, top + 0.7, 0)
 	for k: int in 3:
 		var degrees := 30.0 + 120.0 * k
 		var foot := Parts.around(0.66, degrees, top)
 		m.box_chamfered(Vector3(0.14, 0.82, 0.18), 0.04, foot, SHELL_MID, Vector3(0, 90.0 - degrees, 0))
-		m.box_chamfered(Vector3(0.1, 0.08, 0.12), 0.02, foot + Vector3(0, 0.82, 0), PLASMA, Vector3(0, 90.0 - degrees, 0))
+		m.box_chamfered(Vector3(0.1, 0.08, 0.12), 0.02, foot + Vector3(0, 0.82, 0), PLASMA_BLINK.phased(_chase(k, 3)),
+			Vector3(0, 90.0 - degrees, 0))
 	m.orb(0.17, 12, 6, core, CORE)
+	# The gyro rings tumble about the core: each lies across the axis it turns about.
 	if level >= 2:
-		_gyro(m, core, 0.38, 0.04, Vector3(62, 0, 25), SHELL)
+		_gyro(p.moving(core, Motion.spin(Vector3.RIGHT, 1.3)), Vector3.ZERO, 0.38, 0.04, Vector3(62, 0, 0), SHELL)
 	if level >= 3:
-		_gyro(m, core, 0.29, 0.035, Vector3(-55, 0, -35), GOLD)
+		_gyro(p.moving(core, Motion.spin(Vector3.BACK, -0.9)), Vector3.ZERO, 0.29, 0.035, Vector3(0, 0, -35), GOLD)
 	var rotor := p.moving(core + Vector3(0, 0.5, 0), Motion.spin(Vector3.UP, 1.5))
 	Parts.torus(rotor, 0.42, 0.05, 16, 10, Vector3(0, -0.05, 0), SHELL)
 	Parts.drum(rotor, 0.1, 0.1, 0.03, 16, Vector3(0, -0.05, 0), Parts.GUNMETAL)
@@ -592,8 +642,8 @@ static func _sentry_gun(m: LowPolyMesh, pos: Vector3, yaw: float) -> void:
 ## A tesla coil standing on `base`: a dark column `height` tall stacked with white insulator
 ## skirts `flare` wide at the foot, crowned with a corona ring. Returns the crown's centre.
 static func _coil(m: LowPolyMesh, base: Vector3, height: float, flare: float, gold: bool) -> Vector3:
-	m.prism(flare * 0.4, flare * 0.28, height, 16, base, Parts.GUNMETAL)
-	var skirts := maxi(3, int(height / 0.26))
+	m.prism(flare * 0.4, flare * 0.28, height, 16, base, ARC_CURRENT)
+	var skirts := _skirts(height)
 	for i: int in skirts:
 		var t := float(i) / skirts
 		var column := lerpf(flare * 0.4, flare * 0.28, t + 0.3 / skirts)
@@ -604,9 +654,21 @@ static func _coil(m: LowPolyMesh, base: Vector3, height: float, flare: float, go
 	var crown := base + Vector3(0, height, 0)
 	# A small coil's corona is a tiny ring, and takes fewer faces.
 	var big := flare >= 0.4
-	Parts.torus(m, flare * 0.8, flare * 0.16, 20 if big else 16, 12 if big else 6, crown - Vector3(0, flare * 0.16, 0),
+	Parts.torus(m, flare * 0.8, flare * 0.16, 20 if big else 16, 10 if big else 6, crown - Vector3(0, flare * 0.16, 0),
 		GOLD if gold else Parts.GUNMETAL)
 	return crown
+
+
+## How many insulator skirts a tesla coil `height` tall carries.
+static func _skirts(height: float) -> int:
+	return maxi(3, int(height / 0.26))
+
+
+## The point on the rim of skirt `i` of a tesla coil `height` tall and `flare` wide (_coil), just
+## outside it at Parts.around() angle `degrees`, from the coil's base.
+static func _skirt_rim(height: float, flare: float, i: int, degrees: float) -> Vector3:
+	var t := float(i) / _skirts(height)
+	return Parts.around(lerpf(flare, flare * 0.62, t) + 0.03, degrees, height * t + 0.06 + 0.05)
 
 
 ## A ring round the gravity well's core, tilted by `rot`, centred on `centre`.
