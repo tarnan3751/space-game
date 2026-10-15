@@ -189,11 +189,11 @@ func site_height() -> float:
 ## Hands a drone that is still over the site to `parent`, where it finishes its work or its
 ## leaving: the view is about to be freed. Returns it, or null when there is none.
 func release_drone(parent: Node) -> ConstructionDrone:
-	var drone := _drone
-	if drone != null:
-		drone.release(parent)
+	var released := _drone
+	if released != null:
+		released.release(parent)
 		_drone = null
-	return drone
+	return released
 
 
 func _process(delta: float) -> void:
