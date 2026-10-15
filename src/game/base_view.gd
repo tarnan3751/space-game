@@ -18,8 +18,8 @@ const GROUND_SHADER := preload("res://src/game/ground.gdshader")
 ## The field texture the ground is drawn from, imported as an Image (tools/gen_textures.gd).
 const FIELD_TEXTURE := "res://assets/textures/field.png"
 const SCENERY_SEED := 7
-## Strength of the ground's cell lines, normally and while placing.
-const GRID_LINES := 0.1
+## Strength of the ground's cell lines, normally (hidden) and while building.
+const GRID_LINES := 0.0
 const GRID_LINES_PLACING := 0.45
 ## The terrain reaches TERRAIN_EXTENT from the centre in x and z, on a lattice of 1 unit within
 ## TERRAIN_FINE_REACH of the centre and of TERRAIN_COARSE beyond.
@@ -269,9 +269,15 @@ func area() -> Rect2:
 	return Rect2(-grid_size.x * 0.5, -grid_size.y * 0.5, grid_size.x, grid_size.y)
 
 
-## Brightens the cell grid while a building is being placed.
+## Shows the cell grid while building (placing, painting walls or moving a building), and hides it.
 func set_grid_highlight(on: bool) -> void:
 	_ground_material.set_shader_parameter("line_strength", GRID_LINES_PLACING if on else GRID_LINES)
+
+
+## Whether the cell grid is shown (set_grid_highlight).
+func is_grid_shown() -> bool:
+	var strength: float = _ground_material.get_shader_parameter("line_strength")
+	return strength > 0.0
 
 
 ## Creates, updates and removes building views to match the state.

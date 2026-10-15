@@ -3,7 +3,8 @@ extends Node
 ## Interprets gestures on the base: camera pan/zoom, selecting buildings, placing new
 ## ones (ghost + confirm, like Clash), and dragging the selected building to move it.
 ## Walls are painted instead: until Done, a tap places one, and a drag one on every free
-## cell the finger crosses. This is the only game-layer code that calls BaseState.apply().
+## cell the finger crosses. The ground's cell grid shows only during these (_show_grid).
+## This is the only game-layer code that calls BaseState.apply().
 ##
 ## While the ghost, a building or the wall brush is dragged with the finger near the
 ## screen's edge, the camera scrolls toward that edge and the dragged thing keeps following
@@ -102,7 +103,7 @@ func begin_place(type: String) -> void:
 	_ghost.setup(0, type, 1, size)
 	_ghost.set_lifted(true)
 	base_view.add_child(_ghost)
-	base_view.set_grid_highlight(true)
+	_show_grid()
 	var start := Vector2i(state.grid.width / 2, state.grid.height / 2)
 	var centre: Variant = camera.ground_point(camera.get_viewport().get_visible_rect().size * 0.5)
 	if typeof(centre) == TYPE_VECTOR3:
@@ -137,7 +138,7 @@ func cancel_place() -> void:
 	if placing_type != "":
 		placing_type = ""
 		_painting = false
-		base_view.set_grid_highlight(false)
+		_show_grid()
 		placing_changed.emit()
 
 
@@ -349,6 +350,13 @@ static func _edge_push(at: float, length: float, margin: float) -> float:
 func _set_drag(drag: Drag) -> void:
 	_drag = drag
 	set_process(drag == Drag.GHOST or drag == Drag.BUILDING or drag == Drag.PAINT)
+	_show_grid()
+
+
+## The cell grid shows only while building: placing (the ghost or the wall brush) or moving a
+## building.
+func _show_grid() -> void:
+	base_view.set_grid_highlight(is_placing() or _drag == Drag.BUILDING)
 
 
 func _set_ghost_cell(cell: Vector2i) -> void:

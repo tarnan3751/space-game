@@ -189,8 +189,9 @@ any two for the flickering parts, which can be off in two shots.
 close-up screenshot: the selected Command Center's outlines in gold (and the override cleared on
 deselecting), the placement ghost's body tinted valid on a free spot and invalid on the Command
 Center with its outline left plain ink (a body whose surface 0 is a hologram passes with no
-override, since a ghost leaves holograms alone), and a new building's scaffold. It first says the
-fresh base's draw calls and frame rate.
+override, since a ghost leaves holograms alone), and a new building's scaffold; the cell grid hidden
+with the selection, shown with the ghost and hidden again once it is placed. It first says the fresh
+base's draw calls and frame rate.
 
 `scenarios/environment.gd` checks the ground and the scenery on a fresh base
 (`docs/reference/art-style.md`, **Environment**): the terrain, the perimeter, the rocks and the
@@ -216,7 +217,7 @@ headless. One check runs rendered only (headless it logs that it skipped): on th
 the 1560x720 window, the average colour of an 80x40 pixel box round the centre of each of the
 field's four quarters (clear of the buildings) and round two flat stretches of the ring agree
 within 0.01 in HSL lightness and 0.02 in saturation, so the field renders in the ring's shade
-(**Colour**); it prints both. It screenshots the start zoom, the closest zoom on the field (its marks and the grid),
+(**Colour**); it prints both. It screenshots the start zoom, the closest zoom on the field (its marks; the grid is hidden),
 the closest zoom on a point where four of the field texture's tiles meet (`tile-corner`, where
 nothing should show the tiles' edges), a wider stretch of the field at camera size 12 (`tiles`),
 the perimeter at the middle of each side of the field at size 16 (`edge-top-left`, `edge-top-right`,
@@ -258,21 +259,23 @@ that. Back on the whole screen, a real one-finger drag across the card strip scr
 presses nothing. Last, it presses Build, resizes the window to 1280x900 two frames into the
 opening slide, and checks that the panel ends open on the new bottom edge, and screenshots it.
 
-`scenarios/paint_walls.gd` checks wall painting and the edge scroll on a fresh base: Barrier
-Wall from the menu enters paint mode with Done on the place bar; a drag along a row of twelve
-cells places twelve walls at level 1's cost, drawn as one merged wall mesh whose triangles are
-its twelve pieces' (an end piece at each end, ten joined both ways), with an outline instance
-that casts no shadow; a tap places one and a tap on a wall nothing; a fast drag across the row
-fills the cells it jumped and skips the wall; with no metal a drag places nothing and shows one
-toast; the brush is VALID on the wall it just placed and INVALID with no metal; a drag held at
-the right edge scrolls the camera and paints under the finger; a drag past the count limit stops
-there with one toast; Done ends the mode with the walls kept. Then the ghost of a 3x3 type and
-the selected drone bay are each held near the right edge: the camera scrolls right, each stays
-under the finger, and the bay drops there. Last, a drag of the bay that a second finger
-interrupts by pressing Close, then Reset base, ends at once and moves nothing, on the old base
-or the new one. It screenshots the brush, the painted row and a close-up of it at the closest
-zoom, the place bar with Done, and the ghost and the bay at the edge. A held drag scrolls for a
-number of frames, so how far depends on the frame rate; the checks hold at any distance.
+`scenarios/paint_walls.gd` checks wall painting and the edge scroll on a fresh base: Barrier Wall
+from the menu enters paint mode with Done on the place bar; a drag along a row of twelve cells
+places twelve walls at level 1's cost, drawn as one merged wall mesh whose triangles are its twelve
+pieces' (an end piece at each end, ten joined both ways), with an outline instance that casts no
+shadow; a tap places one and a tap on a wall nothing; a fast drag across the row fills the cells it
+jumped and skips the wall; with no metal a drag places nothing and shows one toast; the brush is
+VALID on the wall it just placed and INVALID with no metal; a drag held at the right edge scrolls
+the camera and paints under the finger; a drag past the count limit stops there with one toast; Done
+ends the mode with the walls kept. The cell grid shows with the brush and is hidden after Done. Then
+the ghost of a 3x3 type and the selected drone bay are each held near the right edge: the camera
+scrolls right, each stays under the finger, and the bay drops there; the grid is hidden with the bay
+selected, shown while it is dragged and hidden once it drops. Last, a drag of the bay that a second
+finger interrupts by pressing Close, then Reset base, ends at once (the grid hidden) and moves
+nothing, on the old base or the new one. It screenshots the brush, the painted row and a close-up of
+it at the closest zoom, the place bar with Done, the field after Done (`after-done`), and the ghost
+and the bay at the edge. A held drag scrolls for a number of frames, so how far depends on the frame
+rate; the checks hold at any distance.
 
 `scenarios/wall_junctions.gd` checks walls that connect. It grows a fresh base to Command
 Center 5, paints a straight run, a corner, a T, a cross, a ramp (a run whose walls end at

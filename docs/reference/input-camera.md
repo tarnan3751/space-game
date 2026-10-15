@@ -129,7 +129,7 @@ while a drag nears the screen's edge.
 
 **Placing** (`begin_place(type)`): any placement is cancelled and the selection cleared; a
 `BuildingView` with id 0 is created as the ghost (level 1's model), lifted, and the ground's
-cell grid is brightened (`BaseView.set_grid_highlight`); its starting cell is the footprint
+cell grid is shown (`BaseView.set_grid_highlight`); its starting cell is the footprint
 centred on the screen centre's ground point (the grid centre when the centre is off the ground),
 moved to the nearest free spot searching outward in square rings (`_find_free_cell`). While
 placing (walls are painted instead, below), a tap moves the ghost so the footprint is centred on
@@ -194,7 +194,7 @@ the origin, cell (x, y) on world (x, z).
 | `area()` | The buildable area as a `Rect2` in world x/z; the camera's bounds. |
 | `sync(state)` | Makes `views` match `state.buildings`: frees views whose building is gone, changed type or has a new finished level (except the `dragging_id` view, which keeps its model until it is dropped), first handing a view's construction drone to the base view (`release_drone`) and, once the views are made, telling it to leave over the new view's site (`site_height()`), creates missing ones, pushes `show_status` to each, and for all but `dragging_id` sets the position, un-lifts, and shows the SELECTED tile on `selected_id`. Last it brings the merged wall mesh up to date (`_sync_walls`, **Walls**). |
 | `walls` | The `WallMesh` that draws every finished wall but the dragged one. |
-| `set_grid_highlight(on)` | Brightens the ground's cell lines (`GRID_LINES_PLACING`) or dims them back (`GRID_LINES`); `PlacementController` calls it as placement begins and ends. |
+| `set_grid_highlight(on)`, `is_grid_shown()` | Shows the ground's cell lines (`GRID_LINES_PLACING`) or hides them (`GRID_LINES`, 0). `PlacementController._show_grid` derives it from its own mode: shown while placing (the ghost or the wall brush) or while a building is dragged to move it, hidden otherwise; a selection or the open build panel alone does not show it. |
 | `clear()` | Frees every view (used when the state is replaced). |
 | `terrain`, `boundary`, `rocks`, `outcrops` | The scenery's body instances, each with its ink outline beside it (`terrain_outline`, `boundary_outline`, `rocks_outline`, `outcrops_outline`), which casts no shadow. |
 | `craters`, `mesas`, `outcrop_spots` | The terrain's craters as (x, z, radius) and mesas as (x, z, radius, top height), and each crystal outcrop's centre on the ground. |
@@ -208,8 +208,9 @@ same landscape. How each looks is in `art-style.md`, **Environment**:
   plane), with `ground.gdshader` on the field texture (`assets/textures/field.png`, an atlas of
   four tiles loaded as an `Image` and mipmapped here) and the field's colour roles: one seamless
   plain, laid with the tiles each turned its own way, with inked craters, pits, pebbles, shards and
-  cracks lit from `SUN_ACROSS`, and a cell grid whose `line_strength` is faint by default and
-  brighter while placing; `grid_size` and `sun_across` are uniforms.
+  cracks lit from `SUN_ACROSS`, and a cell grid whose `line_strength` is 0 by default and 0.45
+  while building, its outermost line along the field's edge; `grid_size` and `sun_across` are
+  uniforms.
 - **The perimeter** (`boundary`): a concrete kerb round the field, `CURB_GAP` (1.1) outside its
   edge, far enough that no pylon covers a field cell from the camera, with a pylon every four
   cells and one at each corner, `CORNER_PYLON_OUT` (0.9) further out on a concrete footing, and a low rail-and-hologram fence

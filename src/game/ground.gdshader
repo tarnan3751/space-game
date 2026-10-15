@@ -3,8 +3,8 @@ render_mode ambient_light_disabled;
 
 // The buildable field (docs/reference/art-style.md, **The field**): one seamless levelled plain
 // of regolith with scattered marks, and the cell grid in holographic cyan, its outermost line along
-// the field's edge, faint by default and brighter while placing (BaseView.set_grid_highlight sets
-// line_strength); all under the comic style's light (toon_common): the three bands, the halftone
+// the field's edge, shown only while building (BaseView.set_grid_highlight sets line_strength,
+// 0 otherwise); all under the comic style's light (toon_common): the three bands, the halftone
 // in the shadow band. Cells are 1 world unit; the plane is centred on 0.
 //
 // The marks come from the field texture (assets/textures/field.png, tools/gen_textures.gd,

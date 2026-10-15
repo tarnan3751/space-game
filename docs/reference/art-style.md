@@ -195,11 +195,11 @@ maxed from across the base. Under the warm key light every lit colour leans warm
 The field's and the terrain's roles are picked so that, under the warm key light and over their
 textures, they render as the art direction asks: each is bluer and more saturated than it shows.
 The rendered column is the average over flat ground at the widest zoom (the `environment`
-scenario's widest shot, measured in HSL): the field as a whole, ground, marks and grid together,
-over each quarter of it clear of the HUD and the buildings; and the ring's flat dust. The field
-renders in the ring's shade, within 0.01 in L and 0.02 in S (the `environment` scenario checks it,
-rendered): it reads as a plain of its own by its marks and its grid, and the kerb is its border,
-not its tone. The buildings' hulls are the lightest things on screen.
+scenario's widest shot, measured in HSL): the field as a whole, ground and marks together (the
+grid is hidden outside building), over each quarter of it clear of the HUD and the buildings; and
+the ring's flat dust. The field renders in the ring's shade, within 0.01 in L and 0.02 in S (the
+`environment` scenario checks it, rendered): it reads as a plain of its own by its marks, and the
+kerb is its border, not its tone. The buildings' hulls are the lightest things on screen.
 
 | Role | Constant | Value | Rendered | Where |
 | --- | --- | --- | --- | --- |
@@ -715,8 +715,8 @@ at 60 % by the dust, with a fine grain drawn by the shader in world space, so it
 across the field: two octaves of value noise at 6 and 12 repeats a cell, each 3.5 % either way, each
 fading out as its lattice falls under a pixel so it does not shimmer at the widest zooms. A value
 noise twelve cells across varies the plain 6 % either way, and it darkens by 10 % from half way out
-to its edge. The 1-cell grid is drawn in holographic cyan (`line_strength` 0.1, 0.45 while
-placing), and its outermost line,
+to its edge. The 1-cell grid is drawn in holographic cyan only while building (`line_strength`
+0.45 while placing, painting walls or moving a building, 0 otherwise), and its outermost line,
 along the field's edge, is drawn like the inner ones, at the same width (the plane ends there, so
 it lies just inside). There is no other line, seam or square on it. The lighting is `light()`
 from `toon_common`, as on the buildings. The hash, the noise, the grain and the tiles' sampling and

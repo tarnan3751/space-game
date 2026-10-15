@@ -7,7 +7,8 @@ extends HarnessScenario
 ## kept. Then the ghost of a 3x3 type and the selected building are each held near the right
 ## edge: the camera scrolls right and each keeps following the finger. Last, a building drag
 ## that a second finger interrupts by pressing Close, or Reset base, ends there and moves
-## nothing. Gestures are WorldInput's signals, as tap_cell sends them.
+## nothing. The cell grid shows with the brush, the ghost and a building being moved, and
+## nowhere else. Gestures are WorldInput's signals, as tap_cell sends them.
 
 const WALL := "barrier_wall"
 const WallModels := preload("res://src/game/models/walls.gd")
@@ -48,6 +49,7 @@ func run(main: MainScript) -> void:
 	check(hud.place_button().text == "Done" and not hud.place_button().disabled,
 		"the place bar reads Done (%s, %s)" % [hud.place_button().text,
 			"disabled" if hud.place_button().disabled else "enabled"])
+	check(main.base_view.is_grid_shown(), "the grid shows with the brush")
 	await screenshot("brush")
 
 	# A drag along a row of twelve free cells places a wall on each, at level 1's cost.
@@ -162,6 +164,8 @@ func run(main: MainScript) -> void:
 	check(state.count_of(WALL) == limit, "the walls are kept (%d)" % state.count_of(WALL))
 	check(placement.selected_id == 0, "nothing is selected")
 	check(not hud.place_button().is_visible_in_tree(), "the place bar is gone")
+	check(not main.base_view.is_grid_shown(), "the grid is hidden after Done")
+	await screenshot("after-done")
 
 	# The ghost of a 3x3 type, dragged by its centre and held near the right edge.
 	placement.begin_place("metal_extractor")
@@ -194,6 +198,7 @@ func run(main: MainScript) -> void:
 	var bay: BuildingState = state.buildings[bay_id]
 	var bay_size := catalog.size_of("drone_bay")
 	placement.select(bay_id)
+	check(not main.base_view.is_grid_shown(), "the grid is hidden with the drone bay selected")
 	_zoom_in(main)
 	press = _screen_of(main, bay.cell)
 	finger = Vector2(screen.x - EDGE_INSET, press.y)
@@ -206,9 +211,11 @@ func run(main: MainScript) -> void:
 	var view: BuildingView = main.base_view.views[bay_id]
 	check(view.position.is_equal_approx(main.base_view.cell_to_world(under, bay_size)),
 		"the drone bay is under the finger (finger on %s)" % under)
+	check(main.base_view.is_grid_shown(), "the grid shows while the drone bay is moved")
 	await screenshot("building-at-edge")
 	var drop_ok := state.check_move(bay_id, under) == ""
 	main.world_input.drag_ended.emit(finger)
+	check(not main.base_view.is_grid_shown(), "the grid is hidden once the drone bay is dropped")
 	check((bay.cell == under) if drop_ok else (bay.cell != under),
 		"the drop %s at %s" % ["moved it" if drop_ok else "was refused", under])
 
@@ -236,7 +243,7 @@ func _drone_bay(state: BaseState) -> BuildingState:
 
 ## Selects `building`, drags it from its cell three cells away, has `interrupt` press a HUD
 ## button as a second finger would, and lifts the finger. Returns whether the drag was still
-## going (the edge scroll still processing) after the press.
+## going (the edge scroll still processing, or the grid still shown) after the press.
 func _interrupted_drag(main: MainScript, building: BuildingState, interrupt: Callable) -> bool:
 	main.placement.select(building.id)
 	var from := _screen_of(main, building.cell)
@@ -246,7 +253,7 @@ func _interrupted_drag(main: MainScript, building: BuildingState, interrupt: Cal
 	await frames(1)
 	interrupt.call()
 	await frames(1)
-	var dragging := main.placement.is_processing()
+	var dragging := main.placement.is_processing() or main.base_view.is_grid_shown()
 	main.world_input.drag_ended.emit(to)
 	await frames(2)
 	return dragging

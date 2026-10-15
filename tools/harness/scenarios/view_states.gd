@@ -1,7 +1,8 @@
 extends HarnessScenario
 ## The comic style's view states on a fresh base, each checked and screenshotted close up: the
 ## selected Command Center's gold outlines, the placement ghost tinted (its outline plain) on a
-## free spot and on a taken one, and a new building's scaffold. Also says the fresh base's draw calls and fps.
+## free spot and on a taken one, and a new building's scaffold; the cell grid shows only with the
+## ghost. Also says the fresh base's draw calls and fps.
 
 const CLOSE_UP_SIZE := 12.0
 
@@ -21,6 +22,7 @@ func run(main: MainScript) -> void:
 	main.camera.pan(centre, centre - main.camera.unproject_position(cc_view.position))
 	main.placement.select(cc_id)
 	check(_all_overridden(cc_view, true, MaterialKit.ink_selected()), "the selected building's outlines are gold")
+	check(not main.base_view.is_grid_shown(), "the grid is hidden with a building selected")
 	await _shot("selected")
 	main.placement.select(0)
 	check(_all_overridden(cc_view, true, null), "deselecting clears the outline override")
@@ -32,6 +34,7 @@ func run(main: MainScript) -> void:
 	tap_cell(main, cc.cell + Vector2i(1, 6))
 	check(main.placement.ghost_is_valid() and _all_overridden(ghost, false, MaterialKit.ghost_valid())
 		and _all_overridden(ghost, true, null), "the ghost on a free spot takes the valid tint, its outline plain")
+	check(main.base_view.is_grid_shown(), "the grid shows while placing")
 	await _shot("ghost-valid")
 	tap_cell(main, cc.cell + Vector2i(1, 1))
 	check(not main.placement.ghost_is_valid() and _all_overridden(ghost, false, MaterialKit.ghost_invalid()),
@@ -41,6 +44,7 @@ func run(main: MainScript) -> void:
 	main.placement.confirm_place()
 	main.placement.select(0)
 	check(main.state.buildings[main.state.last_added_id].level == 0, "the new building is under construction")
+	check(not main.base_view.is_grid_shown(), "the grid is hidden once the building is placed")
 	await _shot("construction")
 
 
