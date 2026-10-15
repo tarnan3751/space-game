@@ -29,11 +29,12 @@ const TERRAIN_EXTENT := 100.0
 const TERRAIN_FINE_REACH := 50.0
 const TERRAIN_COARSE := 2
 const TERRAIN_MESA_REACH := 3.0
-## Outside the field the ground stays flat out to TERRAIN_FLAT (under the curb) and reaches its
-## full relief between TERRAIN_BLEND_NEAR and TERRAIN_BLEND_FAR out, wandering along the edge
-## (blend_end), so no ramp runs straight along a side. Rubble, RUBBLE high either way, roughens
-## the ground from TERRAIN_FLAT out whatever the relief.
-const TERRAIN_FLAT := 0.8
+## Outside the field the ground stays flat out to TERRAIN_FLAT, about a unit past the kerb's outer
+## face (CURB_GAP + CURB_WIDTH), so the kerb and the corner footings stand on flat ground, and
+## reaches its full relief between TERRAIN_BLEND_NEAR and TERRAIN_BLEND_FAR out, wandering along
+## the edge (blend_end), so no ramp runs straight along a side. Rubble, RUBBLE high either way,
+## roughens the ground from TERRAIN_FLAT out whatever the relief.
+const TERRAIN_FLAT := 2.4
 const TERRAIN_BLEND_NEAR := 4.0
 const TERRAIN_BLEND_FAR := 11.0
 const RUBBLE := 0.12
@@ -84,7 +85,7 @@ const ROCK_STACKED := 25
 ## they lie, spread evenly round its four sides.
 const RUBBLE_ROCKS := 36
 const RUBBLE_ROCK_RADIUS := Vector2(0.15, 0.4)
-const RUBBLE_ROCK_OUT := Vector2(1.6, 6.6)
+const RUBBLE_ROCK_OUT := Vector2(2.4, 7.4)
 ## The crystal outcrops: how many clusters, shards in each, the shards' lengths, and how close any
 ## part of one may come to the field.
 const OUTCROP_COUNT := Vector2i(6, 10)
@@ -100,7 +101,19 @@ const OUTCROP_GAP := 4.0
 ## its upper half out by as much.
 const CURB_HEIGHT := 0.25
 const CURB_WIDTH := 0.35
-const CURB_GAP := 0.3
+## The kerb stands far enough out that no pylon covers a field cell from the camera, which looks
+## down 35 degrees (IsoCamera.PITCH_DEG) along the view's diagonal: a point h up hides the ground
+## h / tan 35 = 1.43 h beyond it along the diagonal, which is 1.01 h across a side. A side pylon's
+## cap is 0.98 up and 0.23 wide from its middle, so it reaches 0.23 + 1.01 x 0.98 = 1.22 inwards,
+## plus 0.03 for its ink line at the closest zoom: 1.25, which the pylon's middle line,
+## CURB_GAP + CURB_WIDTH / 2 out, must reach. At the corner nearest the camera the reach is along
+## the diagonal, the whole 1.43 h: the beacon, 1.44 up and 0.12 wide, reaches 0.12 + 1.43 x 1.44 +
+## 0.03 = 2.21 (the cap 2.09), but the middle of the kerb's corner cut lies only
+## sqrt 2 x (CURB_GAP + CURB_WIDTH / 2 - the cut's half run, 0.35) = 1.31 from the field's corner,
+## so each corner pylon stands CORNER_PYLON_OUT further out along the diagonal, on a concrete
+## footing that runs out to it from the cut.
+const CURB_GAP := 1.1
+const CORNER_PYLON_OUT := 0.9
 const CURB_CORNER := 0.6
 const CURB_BEVEL := 0.05
 const PLATE_CELLS := 4
@@ -344,8 +357,18 @@ func _build_boundary() -> void:
 	for k: int in 4:
 		var from := middle[2 * k + 1]
 		var to := middle[(2 * k + 2) % middle.size()]
-		course.append((middle[2 * k] + from) * 0.5)
+		var cut := (middle[2 * k] + from) * 0.5
+		var diagonal := Vector3(cut.x, 0.0, cut.z).normalized()
+		course.append(cut + diagonal * CORNER_PYLON_OUT)
 		kinds.append(2)
+		# The corner pylon's footing, from inside the kerb to just past the pylon, along the
+		# diagonal: turned 45 degrees, the box's z runs along the (1, 1) diagonal and its x along
+		# (1, -1).
+		var run := CORNER_PYLON_OUT + 2.0 * PYLON_WIDTH
+		var size := Vector3(PYLON_WIDTH + 0.2, CURB_HEIGHT, run) if cut.x * cut.z > 0.0 \
+			else Vector3(run, CURB_HEIGHT, PYLON_WIDTH + 0.2)
+		mesh.box_chamfered(size, CURB_BEVEL, cut + diagonal * CORNER_PYLON_OUT * 0.5, Parts.CONCRETE_PAD,
+			Vector3(0, 45.0, 0))
 		course.append(from)
 		kinds.append(0)
 		for t: float in _pylon_spots(from, to):

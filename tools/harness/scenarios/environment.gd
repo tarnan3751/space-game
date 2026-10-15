@@ -3,7 +3,8 @@ extends HarnessScenario
 ## terrain, the perimeter, the rocks and the outcrops are each a body with an ink outline that casts
 ## no shadow (the terrain's body none either, the perimeter's one); that the perimeter's body is two
 ## surfaces, the toon's and the holograms' (its fence); that the background is a sky drawn by a
-## shader; the terrain's triangle budget; that no part of an outcrop comes within OUTCROP_GAP of the
+## shader; that no rock or rubble vertex comes within the perimeter's reach out of the field, beside
+## the sides or in the corners (its own vertices' farthest); the terrain's triangle budget; that no part of an outcrop comes within OUTCROP_GAP of the
 ## field; that along each side of the field, EDGE_OUT units out, the ground is uneven (its height
 ## spreads by more than EDGE_SPREAD) and low (never over EDGE_HIGHEST), and the distance at which
 ## the relief is full (BaseView.blend_end) wanders by more than BLEND_WANDER; that at the widest
@@ -20,7 +21,7 @@ extends HarnessScenario
 
 const TERRAIN_BUDGET := 38000
 const OUTCROP_GAP := 4.0
-const EDGE_OUT := 3.0
+const EDGE_OUT := 3.8
 const EDGE_SPREAD := 0.1
 const EDGE_HIGHEST := 0.4
 const BLEND_WANDER := 3.0
@@ -63,6 +64,24 @@ func run(main: MainScript) -> void:
 	for at: Vector3 in view.outcrops.mesh.surface_get_arrays(0)[Mesh.ARRAY_VERTEX]:
 		nearest = minf(nearest, (Vector2(absf(at.x), absf(at.z)) - field.end).max(Vector2.ZERO).length())
 	check(nearest >= OUTCROP_GAP, "%d outcrops, the nearest %.1f from the field" % [view.outcrop_spots.size(), nearest])
+	# No rock or rubble vertex within the perimeter's reach out of the field, measured from its own
+	# mesh: along the sides (the kerb's band) and in the corners' quadrants (the cut, the corner
+	# pylons and their footings). The rocks' placement rule does not ensure it.
+	var reach := Vector2.ZERO
+	for surface: int in perimeter.get_surface_count():
+		for at: Vector3 in perimeter.surface_get_arrays(surface)[Mesh.ARRAY_VERTEX]:
+			reach = _widen_reach(reach, _out_of(field, at))
+	var closest := Vector2(INF, INF)
+	for surface: int in view.rocks.mesh.get_surface_count():
+		for at: Vector3 in view.rocks.mesh.surface_get_arrays(surface)[Mesh.ARRAY_VERTEX]:
+			var out := _out_of(field, at)
+			if out.x > 0.0 and out.y > 0.0:
+				closest.y = minf(closest.y, out.length())
+			else:
+				closest.x = minf(closest.x, out.length())
+	check(closest.x > reach.x and closest.y > reach.y,
+		"the rocks keep off the perimeter: nearest %.2f out beside a side (it reaches %.2f), %.2f in a corner (%.2f)"
+		% [closest.x, reach.x, closest.y, reach.y])
 	# Each side by the screen corner it faces, and its outward direction in world x and z.
 	var sides := {"top-left": Vector2(-1, 0), "top-right": Vector2(0, -1), "bottom-right": Vector2(1, 0),
 		"bottom-left": Vector2(0, 1)}
@@ -79,7 +98,7 @@ func run(main: MainScript) -> void:
 			heights = Vector2(minf(heights.x, height), maxf(heights.y, height))
 			full = Vector2(minf(full.x, full_out), maxf(full.y, full_out))
 		check(heights.y - heights.x > EDGE_SPREAD and heights.y <= EDGE_HIGHEST and full.y - full.x > BLEND_WANDER,
-			"%.0f out from the %s side the ground is %.2f to %.2f high, its relief full %.1f to %.1f out"
+			"%.1f out from the %s side the ground is %.2f to %.2f high, its relief full %.1f to %.1f out"
 			% [EDGE_OUT, side, heights.x, heights.y, full.x, full.y])
 	await _shot(main, "start", Vector3.ZERO, main.camera.size)
 	await _shot(main, "closest-field", view.cell_to_world(Vector2i(9, 9), 1), IsoCamera.MIN_ZOOM_SIZE)
@@ -124,6 +143,18 @@ func run(main: MainScript) -> void:
 	await _shot(main, "mesa", facing, IsoCamera.MIN_ZOOM_SIZE)
 	await _shot(main, "mesas", Vector3(mesa.x, mesa.w * 0.5, mesa.y), 24.0)
 	main.camera.bounds = field
+
+
+## How far a point lies outside the field along x and along z (0 within its span).
+func _out_of(field: Rect2, at: Vector3) -> Vector2:
+	return (Vector2(absf(at.x), absf(at.z)) - field.end).max(Vector2.ZERO)
+
+
+## `reach` (beside the sides, in the corners) widened to take in a point `out` out of the field.
+func _widen_reach(reach: Vector2, out: Vector2) -> Vector2:
+	if out.x > 0.0 and out.y > 0.0:
+		return Vector2(reach.x, maxf(reach.y, out.length()))
+	return Vector2(maxf(reach.x, out.length()), reach.y)
 
 
 ## Whether the ray from every corner of the camera's view, `aspect` wide, meets the terrain: marched

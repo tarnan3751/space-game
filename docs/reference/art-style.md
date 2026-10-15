@@ -772,11 +772,22 @@ their own, and no made thing (patch, bolt or joint) among the marks.
 **The perimeter** (`boundary`, `_build_boundary`): a fence round the field in the buildings'
 language, with no gate.
 
-- **The kerb**: a concrete band (`CONCRETE_PAD`) 0.25 high and 0.35 wide, 0.3 outside the field's
-  edge, its top edges chamfered 0.05 and its corners cut at 45 degrees. The ink line along the
-  field's edge (`ground.gdshader`) stays inside it.
+- **The kerb**: a concrete band (`CONCRETE_PAD`) 0.25 high and 0.35 wide, 1.1 outside the field's
+  edge (`CURB_GAP`), its top edges chamfered 0.05 and its corners cut at 45 degrees. The ink line
+  along the field's edge (`ground.gdshader`) stays where it is. The kerb stands that far out so
+  that from the camera no pylon covers a field cell at any zoom. The camera looks down 35 degrees
+  along the view's diagonal, so a point h up hides the ground 1.43 h (h / tan 35) beyond it along
+  the diagonal, 1.01 h across a side. A side pylon's cap, 0.98 up and 0.23 from the pylon's middle
+  to its edge, reaches 0.23 + 1.01 × 0.98 = 1.22 inwards, 1.25 with its ink line at the closest
+  zoom, which the pylons' middle line (`CURB_GAP` + half the kerb's width, 1.275) clears. At the
+  corner nearest the camera the reach is along the diagonal: the corner beacon, 1.44 up and 0.12
+  in radius, reaches 0.12 + 1.43 × 1.44 + 0.03 = 2.21 (the corner cap 2.09), while the middle of
+  the kerb's corner cut lies 1.31 from the field's corner, so each corner pylon stands 0.9 further
+  out along the diagonal (`CORNER_PYLON_OUT`) on a chamfered concrete footing, 0.6 wide, that runs
+  out to it from the cut.
 - **Pylons**: on the kerb's middle line, one every four cells along each side (where the field
-  texture's tiles meet) and one on the middle of each corner cut, 40 on the 40×40 field: a
+  texture's tiles meet) and one at each corner, on its footing out from the middle of the cut, 40
+  on the 40×40 field: a
   chamfered post 0.4 square and 0.9 tall on the plate layer in `HULL_MID`, a hazard-striped band
   near its top, a gunmetal cap, and on the cap an energy cyan lamp (unlit, PULSE) whose phase is
   the pylon's place round the loop over the count, so the pulse travels round the perimeter. The
@@ -802,13 +813,13 @@ unit apart within 50 of the centre and 2 apart beyond, cut to half a unit within
 mesa's outline (`TERRAIN_MESA_REACH`, measured from `_mesa_edge`; a half-unit cell keeps a
 one-unit cell from the coarse ones). A cell beside smaller ones fans out from the point in the
 middle of its edge, so no point lies on another cell's edge. Its
-height function is flat out to 0.8 (`TERRAIN_FLAT`) and the mesh is within 0.03 of flat under the
-curb (it has no point between the field's edge and a unit out). From there the relief rises to its
-full height by a distance out that wanders along the edge between 4 and 11 units
-(`TERRAIN_BLEND_NEAR`, `TERRAIN_BLEND_FAR`, on a noise whose lattice is 4 units across), so no
+height function is flat out to 2.4 (`TERRAIN_FLAT`), about a unit past the kerb's outer face (1.45
+out), so the ground under the kerb and the corner footings is flat. From there
+the relief rises to its full height by a distance out that wanders along the edge between 4 and
+11 units (`TERRAIN_BLEND_NEAR`, `TERRAIN_BLEND_FAR`, on a noise whose lattice is 4 units across), so no
 ramp, and no band of slope or shadow, runs straight along a side; and rubble, a noise 0.12 either
-way (`RUBBLE`) on a lattice 2.3 units across, roughens the ground from 0.8 out, in full by 2.8,
-whatever the relief, so the ground by the curb is low (under 0.3 three units out) and uneven. Its
+way (`RUBBLE`) on a lattice 2.3 units across, roughens the ground from 2.4 out, in full by 4.4,
+whatever the relief, so the ground by the curb is low (under 0.3 at 3.8 out) and uneven. Its
 shapes:
 
 - ridged dunes, 0.3 high beside the field and growing from where the relief is full to 5 units high
@@ -895,12 +906,14 @@ where the rays pass under the ring's raised outer edge.
   sides, a shoulder ring, a chamfer and a low peak, flat shaded, sides in `ROCK` and chamfers and
   tops in `ROCK_LIT`; about a quarter of those over 1.6 units across carry a smaller rock on top.
   Each sits on the lowest ground under it. One mesh with its outline; the body casts shadows.
+  Their rule keeps a rock only its radius plus 1.5 outside the field, which does not by itself
+  keep it off the perimeter; that clearance is checked (the `environment` scenario), not enforced.
 - **Rubble**: 36 more rocks of the same make, 0.3 to 0.8 units across, strewn beside the curb
-  between 1.6 and 6.6 units outside the field (`RUBBLE_ROCKS`, `RUBBLE_ROCK_RADIUS`,
+  between 2.4 and 7.4 units outside the field (`RUBBLE_ROCKS`, `RUBBLE_ROCK_RADIUS`,
   `RUBBLE_ROCK_OUT`), nine along each side, each in a stretch of the side of its own at a random
-  distance out, so they spread evenly, form no line, and the nearest is about a unit past the
-  curb's outer face. Each keeps clear of the craters, the mesas, the channel, the other rocks and
-  the outcrops, and rests on the lowest ground under it, sunk by a fifth of its radius. They are in
+  distance out, so they spread evenly, form no line, and none comes within about half a unit of
+  the curb's outer face, the nearest centres about a unit past it. Each keeps clear of the craters,
+  the mesas, the channel, the other rocks and the outcrops, and rests on the lowest ground under it, sunk by a fifth of its radius. They are in
   the rocks' mesh, and draw from the seed after the outcrops, so the rocks and the outcrops keep
   their places.
 - **Crystal outcrops**: six to ten clusters of three to seven shards, each a six-sided crystal 0.6

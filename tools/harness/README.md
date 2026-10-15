@@ -197,8 +197,11 @@ fresh base's draw calls and frame rate.
 crystal outcrops are each a body with an ink outline on `MaterialKit.ink()` that casts no shadow,
 the terrain's body casting none either; the perimeter's body casts a shadow and is two surfaces,
 the toon's and the holograms' (its fence); the background is a sky (`BG_SKY`) drawn by a
-`ShaderMaterial`; the terrain's triangles are within 38,000; no
-vertex of an outcrop lies within 4 units of the field; along each side of the field, 3 units out,
+`ShaderMaterial`; no vertex of a rock or of the rubble lies within the perimeter's reach out of the
+field (its own vertices' farthest, beside the sides and in the corners' quadrants, the corner
+pylons' footings included), which the rocks' placement rule does not ensure; the terrain's
+triangles are within 38,000; no
+vertex of an outcrop lies within 4 units of the field; along each side of the field, 3.8 units out,
 at 40 evenly spaced points, the terrain's heights spread by more than 0.1 (the ground is uneven)
 and never pass 0.4 (it stays low by the curb), and the distance out at which its relief is full
 (`BaseView.blend_end`) spreads by more than 3 units (the edge wanders; the terrain before the

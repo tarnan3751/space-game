@@ -209,16 +209,18 @@ same landscape. How each looks is in `art-style.md`, **Environment**:
   plain, laid with the tiles each turned its own way, with inked craters, pits, pebbles, shards and
   cracks lit from `SUN_ACROSS`, and a cell grid whose `line_strength` is faint by default and
   brighter while placing; `grid_size` and `sun_across` are uniforms.
-- **The perimeter** (`boundary`): a concrete kerb round the field, `CURB_GAP` (0.3) outside its
-  edge, with a pylon every four cells and on each cut corner and a low rail-and-hologram fence
+- **The perimeter** (`boundary`): a concrete kerb round the field, `CURB_GAP` (1.1) outside its
+  edge, far enough that no pylon covers a field cell from the camera, with a pylon every four
+  cells and one at each corner, `CORNER_PYLON_OUT` (0.9) further out on a concrete footing, and a low rail-and-hologram fence
   between them (`art-style.md`, **Environment**); its body casts a shadow.
 - **The terrain**: one smooth-shaded, indexed `ArrayMesh` from the field's edge out to
   ±`TERRAIN_EXTENT` (100), on a lattice of 1 unit within `TERRAIN_FINE_REACH` (50) of the centre
   and of `TERRAIN_COARSE` (2) beyond, cut to half a unit within `TERRAIN_MESA_REACH` (3) of a
   mesa's outline, drawn by `terrain.gdshader` (`MaterialKit.terrain()`, given the ground's field
   texture), whose inner edge lies on the field's at y = 0, so the two
-  meet with no seam; it is within 0.03 of flat under the curb, reaches its relief between 4 and 11
-  units out, wandering along the edge, and is roughened by a low rubble from 0.8 out.
+  meet with no seam; it is flat out to `TERRAIN_FLAT` (2.4), past the kerb, reaches its relief
+  between 4 and 11 units out, wandering along the edge, and is roughened by a low rubble from 2.4
+  out.
   Its craters, mesas, channel and dunes are placed from the seed; each mesa is a flat top and a
   wall of its own, following its outline, over the lattice's ground with the cells under it left
   out; it has its ink outline, receives
@@ -228,7 +230,7 @@ same landscape. How each looks is in `art-style.md`, **Environment**:
   with the focus anywhere on the grid on every aspect up to about 2.98:1 (a 19.5:9 phone is
   2.17:1); beyond that the sky shows.
 - **The rocks**: `ROCK_COUNT` (80) chamfered rocks, some stacked, on the terrain clear of the
-  curb, and `RUBBLE_ROCKS` (36) small ones strewn round the field 1.6 to 6.6 units out, all in one
+  curb, and `RUBBLE_ROCKS` (36) small ones strewn round the field 2.4 to 7.4 units out, all in one
   mesh with its outline.
 - **The outcrops**: six to ten clusters of glowing crystal shards in one mesh with its outline,
   never within `OUTCROP_GAP` (4) of the field.
