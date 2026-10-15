@@ -10,20 +10,43 @@ extends SceneTree
 ## Each layer is SIZE x SIZE RGBA8. RGB is the albedo: near-white greys (0.78 to 1.0, ink lines
 ## at the ink colour) for the layers a tint multiplies, real colours for the fixed ones (hazard,
 ## solar). A is the emission mask: 0 on plain surfaces, up to 1 where the surface glows. The
-## field texture is FIELD_SIZE square and holds weights, not colours (_draw_field).
+## field texture is FIELD_SIZE square, an atlas of four plates, and holds weights, not colours
+## (_draw_field).
 ##
 ## Everything is drawn from SEED with SeededRng, so a run gives byte-identical PNGs. Every
-## primitive wraps modulo the image's size, so every texture tiles seamlessly. One layer covers
-## one world unit at the default UV scale: an ink line of INK_WIDTH pixels is about 0.012 units
-## wide.
+## primitive wraps modulo the image's size, so every layer tiles seamlessly; the field's plates
+## keep their marks off their edges instead. One layer covers one world unit at the default UV
+## scale: an ink line of INK_WIDTH pixels is about 0.012 units wide.
 
 const SIZE := 256
 const SEED := 20261014
 const OUT_DIR := "res://assets/textures/kit"
-## The field texture: one landing plate of the ground (4x4 cells), drawn after the kit from its
-## own seed.
+## The field texture: an atlas of four landing plates of the ground (4x4 cells each), drawn after
+## the kit from its own seed.
 const FIELD_PATH := "res://assets/textures/field.png"
 const FIELD_SIZE := 1024
+## A plate's tile in the field atlas (TILE_CELL pixels a cell), how far its marks keep from its
+## edges and from each other, and the plus or minus of its grain.
+const TILE := 512
+const TILE_CELL := 128
+const TILE_MARGIN := 12.0
+const MARK_GAP := 6.0
+const FIELD_GRAIN := 0.04
+## A bolt's radius; and the stipple's lattice, how far in from its side it thins out to nothing,
+## and its dots' chance in a hundred at the side.
+const BOLT := 7.0
+const STIPPLE_STEP := 4
+const STIPPLE_DEPTH := TILE_CELL * 6 / 10
+const STIPPLE_DENSITY := 60
+## The four plates, tile q at column q % 2 and row q / 2 of the atlas, each: its crater's radius
+## (0 for none) and the cracks running out from its rim, its pits, loose cracks and pebbles, how
+## many sides are stippled, and whether it has a joint with a bolt in each corner, and a patch.
+const PLATES := [
+	[0, 0, 3, 1, 6, 1, false, false],
+	[45, 0, 2, 0, 4, 0, true, false],
+	[64, 2, 3, 0, 8, 0, false, false],
+	[45, 0, 0, 1, 5, 2, false, true],
+]
 ## The layers, in array order. MaterialKit.LAYERS must match.
 const LAYERS := [
 	"flat", "hull", "hull_dense", "plate", "vent", "pipe", "grating", "concrete",
@@ -33,7 +56,8 @@ const INK := Color("1b1a2e")
 const INK_WIDTH := 3.0
 const HAZARD_YELLOW := Color("ffd60a")
 ## Towards the key light across the ground, in the ground's texture space (u along world x, v
-## along world z, so image y is world z): craters and pebbles are shaded from it.
+## along world z, so image y is world z): the rock's plates and the dust's pebbles are shaded from
+## it. The field texture is not: the ground shader lights its lean.
 const SUN := Vector2(-0.5, 0.866)
 
 var _rgb := PackedColorArray()
@@ -365,88 +389,189 @@ func _draw_regolith() -> void:
 		_disc(spot + SUN * radius * 0.3, radius * 0.5, _grey(1.0))
 
 
-## The ground's field texture: one landing plate of the buildable plain, which the ground shader
-## turns into the field's tints (ground.gdshader). Not colours but four weights, so the tints stay
-## MaterialKit roles:
-## - R, dust: raw value noise the shader steps into two-tone blobs (field base and light).
-## - G, shade: the field's dark tint. Crater floors, the shadow side of crater walls (the inner
-##   wall towards the light, the outer slope away from it), pebbles' shadow sides and shadows.
-## - B, ink: crater rims, pebble outlines, hairline cracks.
-## - A, light: 0.5 for the field's light tint (the lit crater walls, pebble tops), 1 for a bright
-##   shard fleck.
-## Per two cells, one large crater and two small ones (a cell is 256 pixels: radii of 0.35 to
-## 0.45 of a cell and 0.15 to 0.22), ten pebbles, two long cracks and a few flecks, so four of
-## each placed freely over the plate, all shaded from SUN, leaving big flat areas of dust. Each
-## channel is drawn in greys in its own pass and read off the red.
+## The ground's field texture: an atlas of four landing plates (PLATES), TILE pixels square, which
+## the ground shader picks from and turns per plate (ground.gdshader). Not colours but weights, so
+## the tints stay MaterialKit roles, and no light is baked in:
+## - R and G, lean: the way the surface's normal leans across the tile (x, y), 0.5 flat, 0 and 1 a
+##   full lean of -1 and +1: out from a pebble's or a bolt's middle, in down a crater's wall, out
+##   down its rim's outer slope. The shader lights the side leaning towards the sun and shades the
+##   side leaning away, however the tile is turned.
+## - B, ink: crater and pit rims, pebble outlines, bolt rings, a joint, a patch's border, cracks
+##   and stipple.
+## - A, tone: 0.5 neutral; below it darker (crater and pit floors, a patch, a joint's one side,
+##   stipple), above it lighter (pebbles, bolt heads, a joint's other side); a fine grain over all.
+## Every mark is a hard-edged drawn shape (sizes in pixels, TILE_CELL a cell): a crater, radius 45
+## or 64, an ink rim 3 wide, its wall leaning in at 0.8 from 0.45 radii, its rim's outer slope, from
+## 1.0 to 1.3 radii, leaning out at 0.45, its floor at tone 0.35; a pit, the same at 10 to 19 with a
+## rim 2 wide and its floor at 0.4; a pebble, a jittered hexagon of 6 to 15 outlined in 1.5, leaning
+## out at 0.7, tone 0.6; a bolt, a disc of BOLT ringed in 1.5, leaning out at 0.6, its head tone
+## 0.6; a joint, a line 2 wide right across the plate at 0.3 to 0.7 of it (not on the middle cell
+## line), its sides at tone 0.47 and 0.53; a crack, 1.5 wide and 15 to 30 long; a patch, 1 to 1.4
+## cells by 0.6 to 0.9, bordered in 2, tone 0.44, a bolt in each corner; stipple, dots 2 across
+## thinning out from a side over STIPPLE_DEPTH; grain, FIELD_GRAIN either way on lattices of 8 and
+## 16.
+## Marks never overlap and keep TILE_MARGIN clear of a tile's edges (but stipple, which runs from
+## a side, and a joint, which runs across), so none straddles a seam. The lean is drawn in R and G
+## in its own pass, and tone and ink in greys, each in its own pass, read off the red.
 func _draw_field() -> void:
-	var dust := _noise_field([512, 256, 128], [0.6, 0.3, 0.1])
-	var craters: Array[Vector3] = []
-	for i: int in 4:
-		craters.append(_free_spot(craters, _rng.range_int(90, 115), 1.3))
-	for i: int in 8:
-		craters.append(_free_spot(craters, _rng.range_int(38, 56), 1.4))
-	# Pebbles: jittered hexagons, each with its centre and radius.
+	# Craters and pits as (x, y, radius, rim width); pebbles' corners, and each one's (x, y, reach);
+	# bolts; joints, each the darker side of its tile, the joint along its inner edge; patches;
+	# cracks as (x, y, heading), any way when the heading is negative; stipple dots.
+	var bowls: Array[Vector4] = []
 	var pebbles: Array[PackedVector2Array] = []
-	var spots: Array[Vector3] = []
-	var taken := craters.duplicate()
-	for i: int in 40:
-		var spot := _free_spot(taken, _rng.range_int(100, 180) / 10.0, 1.3)
-		taken.append(spot)
-		spots.append(spot)
-		var corners := PackedVector2Array()
-		var turn := TAU * _rng.range_int(0, 59) / 360.0
-		for k: int in 6:
-			var angle := turn + TAU * k / 6.0
-			var reach := spot.z * _rng.range_int(72, 100) / 100.0
-			corners.append(Vector2(spot.x, spot.y) + Vector2(cos(angle), sin(angle)) * reach)
-		pebbles.append(corners)
+	var pebble_spots: Array[Vector3] = []
+	var bolts: Array[Vector2] = []
+	var joints: Array[Rect2i] = []
+	var patches: Array[Rect2i] = []
+	var cracks: Array[Vector3] = []
+	var dots: Array[Vector2] = []
+	for q: int in PLATES.size():
+		var plate: Array = PLATES[q]
+		var tile := Rect2i(TILE * (q % 2), TILE * (q / 2), TILE, TILE)
+		var inner := Rect2(tile).grow(-TILE_MARGIN)
+		# Every mark on this tile so far, as (x, y, reach).
+		var taken: Array[Vector3] = []
+		var jointed: bool = plate[6]
+		if jointed:
+			# 0.3 to 0.7 of the way across, clear of the middle cell line.
+			var at := TILE / 2 + (1 if _rng.range_int(0, 1) == 0 else -1) * _rng.range_int(20, TILE / 5)
+			var upright := _rng.range_int(0, 1) == 0
+			joints.append(Rect2i(tile.position, Vector2i(at, TILE) if upright else Vector2i(TILE, at)))
+			for k: int in range(0, TILE, 8):
+				taken.append(Vector3(tile.position.x + (at if upright else k), tile.position.y + (k if upright else at), 1.0))
+			for corner: Vector2i in [Vector2i(0, 0), Vector2i(1, 0), Vector2i(0, 1), Vector2i(1, 1)]:
+				var bolt := Vector2(tile.position) + Vector2(14.0 + corner.x * (TILE - 28), 14.0 + corner.y * (TILE - 28))
+				bolts.append(bolt)
+				taken.append(Vector3(bolt.x, bolt.y, BOLT))
+		var patched: bool = plate[7]
+		if patched:
+			var size := Vector2i(_rng.range_int(TILE_CELL, TILE_CELL * 14 / 10),
+				_rng.range_int(TILE_CELL * 6 / 10, TILE_CELL * 9 / 10))
+			if _rng.range_int(0, 1) == 0:
+				size = Vector2i(size.y, size.x)
+			var spot := _free_spot(taken, Vector2(size).length() * 0.5, inner)
+			taken.append(spot)
+			var patch := Rect2i(Vector2i(roundi(spot.x - size.x * 0.5), roundi(spot.y - size.y * 0.5)), size)
+			patches.append(patch)
+			# A bolt in each corner, inside the border.
+			var inset := 2.0 + BOLT + 3.0
+			for corner: Vector2i in [Vector2i(0, 0), Vector2i(1, 0), Vector2i(0, 1), Vector2i(1, 1)]:
+				bolts.append(Vector2(patch.position) + Vector2(inset + corner.x * (size.x - 2.0 * inset),
+					inset + corner.y * (size.y - 2.0 * inset)))
+		var crater: int = plate[0]
+		var rim_cracks: int = plate[1]
+		if crater > 0:
+			# The rim's outer slope reaches 1.3 radii, and a crack from the rim up to 30 beyond it.
+			var spot := _free_spot(taken, crater + 32.0 if rim_cracks > 0 else crater * 1.3, inner)
+			taken.append(spot)
+			bowls.append(Vector4(spot.x, spot.y, crater, 3.0))
+			var heading := TAU * _rng.range_int(0, 359) / 360.0
+			for k: int in rim_cracks:
+				var angle := heading + TAU * k / rim_cracks + deg_to_rad(_rng.range_int(-40, 40))
+				var out := Vector2(cos(angle), sin(angle)) * (crater + 2.0)
+				cracks.append(Vector3(spot.x + out.x, spot.y + out.y, fposmod(angle, TAU)))
+		var pits: int = plate[2]
+		for k: int in pits:
+			var radius := _rng.range_int(10, 19)
+			var spot := _free_spot(taken, radius * 1.3, inner)
+			taken.append(spot)
+			bowls.append(Vector4(spot.x, spot.y, radius, 2.0))
+		var loose: int = plate[3]
+		for k: int in loose:
+			var spot := _free_spot(taken, 30.0, inner)
+			taken.append(spot)
+			cracks.append(Vector3(spot.x, spot.y, -1.0))
+		var pebble_count: int = plate[4]
+		for k: int in pebble_count:
+			var spot := _free_spot(taken, _rng.range_int(60, 150) / 10.0, inner)
+			taken.append(spot)
+			pebble_spots.append(spot)
+			var corners := PackedVector2Array()
+			var turn := TAU * _rng.range_int(0, 59) / 360.0
+			for c: int in 6:
+				var angle := turn + TAU * c / 6.0
+				var reach := spot.z * _rng.range_int(72, 100) / 100.0
+				corners.append(Vector2(spot.x, spot.y) + Vector2(cos(angle), sin(angle)) * reach)
+			pebbles.append(corners)
+		# Stipple along `sides` sides in a row from a random one (0 top, 1 right, 2 bottom, 3 left):
+		# dots on a jittered lattice, fewer the further in, none on a mark, and none in the tile's
+		# first or last two pixels along the side, so none paints a neighbouring tile.
+		var sides: int = plate[5]
+		var first := _rng.range_int(0, 3)
+		for k: int in sides:
+			var side := (first + k) % 4
+			for along: int in range(3, TILE - 3, STIPPLE_STEP):
+				for depth: int in range(0, STIPPLE_DEPTH, STIPPLE_STEP):
+					var chance := roundi(STIPPLE_DENSITY * (1.0 - float(depth) / STIPPLE_DEPTH))
+					if _rng.range_int(0, 99) >= chance:
+						continue
+					var u := along + _rng.range_int(0, 2)
+					var v := 1.5 + depth + _rng.range_int(0, 2)
+					var dot: Vector2 = Vector2(tile.position) + [Vector2(u, v), Vector2(TILE - v, u),
+						Vector2(u, TILE - v), Vector2(v, u)][side]
+					var free := true
+					for other: Vector3 in taken:
+						free = free and dot.distance_to(Vector2(other.x, other.y)) > other.z + MARK_GAP * 0.5
+					if free:
+						dots.append(dot)
 
-	_fill(_grey(0.0))
-	for crater: Vector3 in craters:
-		var centre := Vector2(crater.x, crater.y)
-		var r := crater.z
-		_disc(centre, r, _grey(0.15))
-		_crescent(centre, r, centre - SUN * r * 0.5, r * 0.95, _grey(1.0))
-		_crescent(centre - SUN * r * 0.22, r * 1.18, centre, r, _grey(0.6))
-		_crescent(centre, r * 0.97, centre + SUN * r * 0.35, r * 0.97, _grey(0.0))
+	_fill(Color(0.5, 0.5, 0.0))
+	for bowl: Vector4 in bowls:
+		var centre := Vector2(bowl.x, bowl.y)
+		_lean(centre, bowl.z * 0.45, bowl.z, -0.8)
+		_lean(centre, bowl.z, bowl.z * 1.3, 0.45)
 	for i: int in pebbles.size():
-		var r := spots[i].z
-		_polygon(_moved(pebbles[i], -SUN * r * 0.55, 1.0), _grey(0.4))
-		_polygon(pebbles[i], _grey(0.75))
-		_polygon(_moved(pebbles[i], SUN * r * 0.2, 0.7), _grey(0.0))
-	var shade := _channel()
+		_lean(Vector2(pebble_spots[i].x, pebble_spots[i].y), 0.0, pebble_spots[i].z, 0.7, pebbles[i])
+	for bolt: Vector2 in bolts:
+		_lean(bolt, 0.0, BOLT, 0.6)
+	var lean := _rgb.duplicate()
+
+	_fill(_grey(0.5))
+	for half: Rect2i in joints:
+		_rect(half.position.x, half.position.y, TILE, TILE, _grey(0.53))
+		_rect(half.position.x, half.position.y, half.size.x, half.size.y, _grey(0.47))
+	for patch: Rect2i in patches:
+		_rect(patch.position.x, patch.position.y, patch.size.x, patch.size.y, _grey(0.44))
+	for bowl: Vector4 in bowls:
+		_disc(Vector2(bowl.x, bowl.y), bowl.z * 0.45, _grey(0.35 if bowl.w > 2.0 else 0.4))
+	for corners: PackedVector2Array in pebbles:
+		_polygon(corners, _grey(0.6))
+	for bolt: Vector2 in bolts:
+		_disc(bolt, BOLT * 0.45, _grey(0.6))
+	for dot: Vector2 in dots:
+		_disc(dot, 1.0, _grey(0.35))
+	var tone := _channel()
 
 	_fill(_grey(0.0))
-	for crater: Vector3 in craters:
-		var centre := Vector2(crater.x, crater.y)
-		var r := crater.z
-		_crescent(centre + SUN * r * 0.22, r * 1.18, centre, r, _grey(0.5))
-		_crescent(centre, r * 0.97, centre + SUN * r * 0.35, r * 0.97, _grey(0.5))
-	for i: int in pebbles.size():
-		_polygon(_moved(pebbles[i], SUN * spots[i].z * 0.3, 0.4), _grey(0.5))
-	for i: int in 48:
-		var at := Vector2(_rng.range_int(0, _width - 1), _rng.range_int(0, _height - 1))
-		var angle := TAU * _rng.range_int(0, 359) / 360.0
-		var along := Vector2(cos(angle), sin(angle)) * _rng.range_int(50, 80) / 10.0
-		var across := Vector2(-along.y, along.x) * 0.35
-		_polygon(PackedVector2Array([at - along, at + across, at + along, at - across]), _grey(1.0))
-	var light := _channel()
-
-	_fill(_grey(0.0))
-	for crater: Vector3 in craters:
-		var thin := clampf(crater.z * 0.055, 5.0, 7.0)
-		_rim(Vector2(crater.x, crater.y), crater.z, thin, thin * 2.2, _grey(1.0))
+	for half: Rect2i in joints:
+		# The joint runs along the darker side's inner edge, its round ends inside the tile.
+		var end := Vector2(half.end)
+		if half.size.x < TILE:
+			_line(Vector2(end.x, half.position.y + 1), Vector2(end.x, end.y - 1), 2.0, _grey(1.0))
+		else:
+			_line(Vector2(half.position.x + 1, end.y), Vector2(end.x - 1, end.y), 2.0, _grey(1.0))
+	for patch: Rect2i in patches:
+		_rect(patch.position.x, patch.position.y, patch.size.x, 2, _grey(1.0))
+		_rect(patch.position.x, patch.end.y - 2, patch.size.x, 2, _grey(1.0))
+		_rect(patch.position.x, patch.position.y, 2, patch.size.y, _grey(1.0))
+		_rect(patch.end.x - 2, patch.position.y, 2, patch.size.y, _grey(1.0))
+	for bowl: Vector4 in bowls:
+		_ring(Vector2(bowl.x, bowl.y), bowl.z, bowl.w, _grey(1.0))
 	for corners: PackedVector2Array in pebbles:
 		for k: int in corners.size():
 			_line(corners[k], corners[(k + 1) % corners.size()], 1.5, _grey(1.0))
-	for i: int in 8:
-		_crack(Vector2(_rng.range_int(0, _width - 1), _rng.range_int(0, _height - 1)), _rng.range_int(20, 26), 2.0,
-			_grey(1.0))
+	for bolt: Vector2 in bolts:
+		_ring(bolt, BOLT - 0.75, 1.5, _grey(1.0))
+	for crack: Vector3 in cracks:
+		_crack(Vector2(crack.x, crack.y), 3, 1.5, _grey(1.0), Vector2i(5, 10), crack.z)
+	for dot: Vector2 in dots:
+		_disc(dot, 1.0, _grey(1.0))
 	var ink := _channel()
 
+	var grain := _noise_field([8, 16], [0.5, 0.5])
 	for i: int in _rgb.size():
-		_rgb[i] = Color(dust[i], shade[i], ink[i], 1.0)
-		_mask[i] = light[i]
+		_rgb[i] = Color(lean[i].r, lean[i].g, ink[i], 1.0)
+		_mask[i] = tone[i] + FIELD_GRAIN * (2.0 * grain[i] - 1.0)
 
 
 # --- Shared motifs ------------------------------------------------------------------
@@ -483,31 +608,21 @@ func _rivet(centre: Vector2) -> void:
 	_disc(centre - Vector2(0.8, 0.8), 0.6, _grey(1.0))
 
 
-## A spot for a round feature of `radius` (x, y, radius) at least `spacing` times the sum of
-## the radii from every one in `taken`, on the wrapping image; the last try if none is free.
-func _free_spot(taken: Array[Vector3], radius: float, spacing: float) -> Vector3:
+## A spot for a mark reaching `radius` (x, y, radius) whose reach lies inside `within` and stays
+## MARK_GAP clear of every one in `taken`; the last try if none is free.
+func _free_spot(taken: Array[Vector3], radius: float, within: Rect2) -> Vector3:
 	var spot := Vector3.ZERO
-	for attempt: int in 60:
-		spot = Vector3(_rng.range_int(0, _width - 1), _rng.range_int(0, _height - 1), radius)
+	for attempt: int in 200:
+		spot = Vector3(_rng.range_int(ceili(within.position.x + radius), floori(within.end.x - radius)),
+			_rng.range_int(ceili(within.position.y + radius), floori(within.end.y - radius)), radius)
 		var free := true
 		for other: Vector3 in taken:
-			if _wrapped(Vector2(other.x - spot.x, other.y - spot.y)).length() < (other.z + radius) * spacing:
+			if Vector2(other.x - spot.x, other.y - spot.y).length() < other.z + radius + MARK_GAP:
 				free = false
 				break
 		if free:
 			break
 	return spot
-
-
-## `corners` scaled by `scale` about their centre, then moved by `offset`.
-func _moved(corners: PackedVector2Array, offset: Vector2, scale: float) -> PackedVector2Array:
-	var centre := Vector2.ZERO
-	for corner: Vector2 in corners:
-		centre += corner / corners.size()
-	var moved := PackedVector2Array()
-	for corner: Vector2 in corners:
-		moved.append(centre + (corner - centre) * scale + offset)
-	return moved
 
 
 ## The buffer's red channel: a channel of the field texture, drawn in greys.
@@ -519,13 +634,17 @@ func _channel() -> PackedFloat32Array:
 	return channel
 
 
-## A crack: a jagged polyline of `segments` steps from `start`, drifting in direction.
-func _crack(start: Vector2, segments: int, width: float, color: Color) -> void:
-	var angle := TAU * _rng.range_int(0, 359) / 360.0
+## A crack: a jagged polyline of `segments` steps, each `steps.x` to `steps.y` pixels, from
+## `start`, setting off along `heading` (radians; any way when negative) and drifting in direction.
+func _crack(start: Vector2, segments: int, width: float, color: Color, steps := Vector2i(10, 22),
+		heading := -1.0) -> void:
+	var angle := heading
+	if heading < 0.0:
+		angle = TAU * _rng.range_int(0, 359) / 360.0
 	var at := start
 	for i: int in segments:
 		angle += deg_to_rad(_rng.range_int(-50, 50))
-		var step := Vector2(cos(angle), sin(angle)) * _rng.range_int(10, 22)
+		var step := Vector2(cos(angle), sin(angle)) * _rng.range_int(steps.x, steps.y)
 		_line(at, at + step, width, color)
 		at += step
 
@@ -565,28 +684,28 @@ func _disc(centre: Vector2, radius: float, color: Color, mask: float = -1.0) -> 
 			_paint(px, py, color, radius + 0.5 - d, mask)
 
 
-## An antialiased crescent: the disc of `radius` at `centre` less the disc of `cut_radius` at
-## `cut_centre`.
-func _crescent(centre: Vector2, radius: float, cut_centre: Vector2, cut_radius: float, color: Color) -> void:
-	for py: int in range(floori(centre.y - radius - 1), ceili(centre.y + radius + 1)):
-		for px: int in range(floori(centre.x - radius - 1), ceili(centre.x + radius + 1)):
-			var p := Vector2(px + 0.5, py + 0.5)
-			var inside := clampf(radius + 0.5 - p.distance_to(centre), 0.0, 1.0)
-			_paint(px, py, color, inside * clampf(p.distance_to(cut_centre) - cut_radius + 0.5, 0.0, 1.0))
-
-
-## An ink rim round a crater: a circle outline `thin` pixels wide on the side away from SUN,
-## swelling inwards to `thick` on the side towards it, where the crater's inner wall is in shadow
-## (a comic line, heavier on the shadow side).
-func _rim(centre: Vector2, radius: float, thin: float, thick: float, color: Color) -> void:
-	var reach := radius + thick
-	for py: int in range(floori(centre.y - reach - 1), ceili(centre.y + reach + 1)):
-		for px: int in range(floori(centre.x - reach - 1), ceili(centre.x + reach + 1)):
+## A lean brush, for the field texture: over the ring from `inner` to `outer` pixels round
+## `centre` (a disc when `inner` is 0), clipped to the polygon `clip` when it has corners, the
+## surface leans straight out from the centre by `strength` (in when negative), written into R and
+## G as 0.5 plus half the lean, antialiased.
+func _lean(centre: Vector2, inner: float, outer: float, strength: float,
+		clip: PackedVector2Array = PackedVector2Array()) -> void:
+	for py: int in range(floori(centre.y - outer - 1), ceili(centre.y + outer + 1)):
+		for px: int in range(floori(centre.x - outer - 1), ceili(centre.x + outer + 1)):
 			var offset := Vector2(px + 0.5, py + 0.5) - centre
 			var d := offset.length()
-			var towards := 0.5 + 0.5 * offset.dot(SUN) / maxf(d, 0.001)
-			var inner := radius + thin * 0.5 - lerpf(thin, thick, towards * towards)
-			_paint(px, py, color, clampf(minf(d - inner, radius + thin * 0.5 - d) + 0.5, 0.0, 1.0))
+			var coverage := clampf(outer + 0.5 - d, 0.0, 1.0)
+			if inner > 0.0:
+				coverage *= clampf(d - inner + 0.5, 0.0, 1.0)
+			if coverage > 0.0 and not clip.is_empty():
+				var inside := 0
+				for sy: int in 4:
+					for sx: int in 4:
+						if Geometry2D.is_point_in_polygon(Vector2(px + (sx + 0.5) / 4.0, py + (sy + 0.5) / 4.0), clip):
+							inside += 1
+				coverage *= inside / 16.0
+			var lean := offset / maxf(d, 0.001) * strength * 0.5
+			_paint(px, py, Color(0.5 + lean.x, 0.5 + lean.y, 0.0), coverage)
 
 
 ## An antialiased circle outline `width` pixels thick.
