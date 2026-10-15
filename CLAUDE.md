@@ -64,7 +64,7 @@ or `data/`.
 | Core and economy: catalog, base state, commands, timers, production, grid, seeded RNG | `src/core/` | `docs/reference/core-economy.md` |
 | Data format: `rules.json`, `buildings.json`, the fixtures, the save file | `data/`, `test/support/fixtures/` | `docs/reference/data-format.md` |
 | Input and camera: the scene, camera, gestures, placement, views | `src/game/` (all but the HUD's and the art style's files) | `docs/reference/input-camera.md` |
-| Art style: the look, light, colours, the material kit, `LowPolyMesh`, outlines, models, animation, view states | `src/game/models/`, `src/game/*.gdshader*`, `material_kit.gd`, `surf.gd`, `motion.gd`, `low_poly_mesh.gd`, `assets/textures/kit/`, `tools/gen_textures.gd` | `docs/reference/art-style.md` |
+| Art style: the look, light, colours, the material kit, `LowPolyMesh`, outlines, models, animation, view states | `src/game/models/`, `src/game/*.gdshader*`, `material_kit.gd`, `surf.gd`, `motion.gd`, `low_poly_mesh.gd`, `assets/textures/kit/`, `assets/textures/*.png`, `tools/gen_textures.gd` | `docs/reference/art-style.md` |
 | HUD: the theme and fonts, top bar (meters, drone ring), Build button and build panel, place bar, info panel, toasts | `src/game/hud.gd`, `hud_icon.gd`, `drone_ring.gd`, `format.gd`, `assets/fonts/` | `docs/reference/hud.md` |
 | Testing and tools: runner, fixtures, gate, harness, landing, API dump | `test/`, `tools/` | `docs/reference/testing-tools.md`, `tools/harness/README.md` |
 
@@ -122,7 +122,8 @@ src/core/        catalog, base_state, building_state, base_grid, seeded_rng
 src/game/        main, template_base, iso_camera, world_input, placement_controller, base_view,
                  building_view, building_models, wall_mesh, low_poly_mesh, surf, motion, material_kit,
                  hud, hud_icon, drone_ring, format, toon.gdshader, toon_common.gdshaderinc,
-                 effects.gdshaderinc, ink.gdshader, holo.gdshader, ground.gdshader
+                 effects.gdshaderinc, ink.gdshader, holo.gdshader, ground.gdshader, terrain.gdshader,
+                 field_marks.gdshaderinc
 src/game/models/ parts (the model being built, shared helpers and surfaces), then one file of
                  model builders per category: core, resources, army, defense, traps, walls
 test/core/       test_*.gd (one file per core area)
@@ -131,8 +132,9 @@ tools/           run_tests.sh, test_runner.gd, gates.sh, land_series.sh, dump_ap
                  gen_textures.gd
 tools/harness/   driver.gd, scenario.gd, scenarios/, run.sh, README.md (output in out/, gitignored)
 .claude/agents/  scout, researcher, developer, reviewer
-assets/          textures/kit/ (the material kit, generated); fonts/ (the HUD's two fonts, each with
-                 its OFL.txt); real models/audio later
+assets/          textures/kit/ (the material kit, generated); textures/field.png and
+                 terrain_rock.png (the ground's and the terrain's, generated); fonts/ (the HUD's two
+                 fonts, each with its OFL.txt); real models/audio later
 server/          Nakama TypeScript runtime later (.gdignore keeps Godot out)
 ```
 
@@ -266,8 +268,9 @@ Constraints:
 
 - Exclude `test/*`, `tools/*`, `server/*` in export presets.
 - If `data/*.json` goes missing in an export, add it to the preset's include filter.
-- The material kit's PNGs under `assets/textures/kit/` are loaded by path (`MaterialKit`), so a
-  preset that exports selected resources only must include them.
+- The material kit's PNGs under `assets/textures/kit/`, and the field and rock textures beside
+  it, are loaded by path (`MaterialKit`, `BaseView`), so a preset that exports selected resources
+  only must include them.
 - The HUD's fonts under `assets/fonts/` are imported resources (each `.ttf` with its `.import`),
   preloaded by `hud.gd`, so they export with it; the `OFL.txt` beside each is not a resource and
   needs the preset's include filter to ship.

@@ -201,7 +201,9 @@ same landscape. How each looks is in `art-style.md`, **Environment**:
   edge, with a glowing stud every four cells and on each cut corner; casts no shadow.
 - **The terrain**: one smooth-shaded, indexed `ArrayMesh` from the field's edge out to
   ±`TERRAIN_EXTENT` (100), on a lattice of 1 unit within `TERRAIN_FINE_REACH` (50) of the centre
-  and of `TERRAIN_COARSE` (2) beyond, whose inner edge lies on the field's at y = 0, so the two
+  and of `TERRAIN_COARSE` (2) beyond, cut to half a unit within `TERRAIN_MESA_REACH` (3) of a
+  mesa's outline, drawn by `terrain.gdshader` (`MaterialKit.terrain()`, given the ground's field
+  texture), whose inner edge lies on the field's at y = 0, so the two
   meet with no seam; it is within 0.03 of flat under the curb, reaches its relief between 4 and 11
   units out, wandering along the edge, and is roughened by a low rubble from 0.8 out.
   Its craters, mesas, channel and dunes are placed from the seed; it has its ink outline, receives
