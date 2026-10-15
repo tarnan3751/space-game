@@ -1,7 +1,9 @@
 extends RefCounted
 ## Models of the traps, in the comic style (docs/reference/art-style.md): low, squat devices on
 ## concrete pads, gunmetal casings banded in hazard stripes, one warning glow each, gold trim
-## at the top level, each well inside its footprint and its budget.
+## at the top level, each well inside its footprint and its budget. Each is animated by its
+## surfaces alone (docs/reference/art-style.md, **Animation**): warning lights BLINK, glows PULSE,
+## the gravity trap's vortex streams inward.
 ##
 ## BuildingModels calls one static build_<type>(p: Parts, level: int) per type. Each builds
 ## its level as a run of additions, so the levels of a type read as one trap growing.
@@ -11,17 +13,32 @@ static var HAZARD_FINE := Surf.make(MaterialKit.Layer.HAZARD, Color.WHITE, 3.0, 
 static var CASING := Surf.make(MaterialKit.Layer.PLATE, MaterialKit.GUNMETAL, 2.0, Surf.LIT, true)
 static var CASING_MID := Surf.make(MaterialKit.Layer.PLATE, MaterialKit.HULL_MID, 2.0, Surf.LIT, true)
 static var RED := Surf.make(MaterialKit.Layer.GLOW, MaterialKit.DEFENCE, 1.0, Surf.UNLIT, true)
+## Warning lights, blinking; phased per lamp so a ring of them chases.
+static var RED_BLINK := Surf.make(MaterialKit.Layer.GLOW, MaterialKit.DEFENCE, 1.0, Surf.UNLIT | Surf.BLINK, true)
+static var RED_PULSE := Surf.make(MaterialKit.Layer.GLOW, MaterialKit.DEFENCE, 1.0, Surf.UNLIT | Surf.PULSE, true)
 static var VIOLET := Surf.make(MaterialKit.Layer.GLOW, MaterialKit.ANTIMATTER, 1.0, Surf.UNLIT, true)
-static var YELLOW := Surf.make(MaterialKit.Layer.GLOW, MaterialKit.HAZARD, 1.0, Surf.UNLIT, true)
-## The vortex's swirl: thin violet strips, too thin for an outline.
-static var SWIRL := Surf.make(MaterialKit.Layer.GLOW, MaterialKit.ANTIMATTER, 1.0, Surf.UNLIT, true, false)
+static var VIOLET_PULSE := Surf.make(MaterialKit.Layer.GLOW, MaterialKit.ANTIMATTER, 1.0, Surf.UNLIT | Surf.PULSE, true)
+## The glow layer's stripes run along U, so a vortex's glow streams along V (FLOW), its stripes
+## drawn larger (0.4) so they show on so small a part: at 0.3, about two units a second inward (V
+## grows outward on the throat and along each swirl strip, from its inner end to its outer one).
+static var VIOLET_INFLOW := Surf.make(MaterialKit.Layer.GLOW, MaterialKit.ANTIMATTER, 0.4,
+	Surf.UNLIT | Surf.FLOW, true, true, 0.3)
+## The vortex's swirl: thin violet strips, too thin for an outline, streaming inward.
+static var SWIRL := Surf.make(MaterialKit.Layer.GLOW, MaterialKit.ANTIMATTER, 0.4, Surf.UNLIT | Surf.FLOW,
+	true, false, 0.3)
+static var YELLOW_PULSE := Surf.make(MaterialKit.Layer.GLOW, MaterialKit.HAZARD, 1.0, Surf.UNLIT | Surf.PULSE, true)
+## The flak mine's sensor lens, flashing.
+static var LENS := Surf.make(MaterialKit.Layer.GLASS, MaterialKit.CORE_GLASS, 1.0, Surf.GLOSSY | Surf.BLINK, true)
+## The mega mine's seams: a dim red glow, too thin for an outline, swelling faintly.
+static var SEAM := Surf.make(MaterialKit.Layer.GLOW, MaterialKit.DEFENCE.darkened(0.45), 1.0,
+	Surf.UNLIT | Surf.PULSE, true, false)
 ## The dark throat of the gravity trap's vortex.
 static var VOID := Surf.make(MaterialKit.Layer.FLAT, MaterialKit.INK, 1.0, Surf.LIT, true)
 static var GOLD_ROUND := Surf.make(MaterialKit.Layer.FLAT, MaterialKit.CORE_GOLD, 1.0, Surf.GLOSSY, true)
 
 
 ## A low domed disc on a hazard rim, spikes round its crown and a red warning light. More
-## spikes at 2, a second light at 3.
+## spikes at 2, a second light at 3. The lights blink in turn.
 static func build_proximity_mine(p: Parts, level: int) -> void:
 	var m := p.body
 	var base := Vector3(0, Parts.PAD_HEIGHT, 0)
@@ -37,24 +54,26 @@ static func build_proximity_mine(p: Parts, level: int) -> void:
 		var out := Parts.around(1.0, degrees, 0.0)
 		m.cone(0.035, 0.13, 8, Parts.around(0.18, degrees, 0.0) + base + Vector3(0, 0.14, 0),
 			CASING_MID, Parts.facing(out * 0.4 + Vector3.UP))
-	m.dome(0.07, 0.07, 16, 3, base + Vector3(0, 0.162, 0), RED)
+	m.dome(0.07, 0.07, 16, 3, base + Vector3(0, 0.162, 0), RED_BLINK)
 	if level >= 3:
 		m.ring(0.07, 0.1, 0.03, 16, base + Vector3(0, 0.152, 0), GOLD_ROUND)
-		m.dome(0.04, 0.04, 16, 3, Parts.around(0.31, 45, 0.07) + base, RED)
+		m.dome(0.04, 0.04, 16, 3, Parts.around(0.31, 45, 0.07) + base, RED_BLINK.phased(0.5))
 
 
 ## A ring emitter round a dark funnel with a violet vortex at its bottom, coils on its rim. A
-## second ring, in gold, hovering over it at 2.
+## second ring, in gold, hovering over it at 2. The emitter's lip and the hovering ring pulse; the
+## vortex's glow streams inward down the funnel.
 static func build_grav_trap(p: Parts, level: int) -> void:
 	var m := p.body
 	var base := Vector3(0, Parts.PAD_HEIGHT, 0)
 	Parts.foundation(m, 1)
 	m.lathe(PackedVector2Array([
-		Vector2(0.32, 0), Vector2(0.34, 0.05), Vector2(0.32, 0.11), Vector2(0.26, 0.135), Vector2(0.2, 0.12),
+		Vector2(0.32, 0), Vector2(0.34, 0.05), Vector2(0.32, 0.11), Vector2(0.26, 0.135),
 	]), 16, base, CASING_MID)
+	m.lathe(PackedVector2Array([Vector2(0.26, 0.135), Vector2(0.2, 0.12)]), 16, base, VIOLET_PULSE)
 	m.lathe(PackedVector2Array([Vector2(0.2, 0.12), Vector2(0.1, 0.055)]), 16, base, VOID)
 	m.lathe(PackedVector2Array([Vector2(0.1, 0.055), Vector2(0.04, 0.03), Vector2(0, 0.03)]), 16, base,
-		VIOLET)
+		VIOLET_INFLOW)
 	for i: int in 3:
 		var degrees := 120.0 * i
 		m.strut(Parts.around(0.19, degrees, 0.118) + base, Parts.around(0.1, degrees + 70.0, 0.058) + base,
@@ -70,11 +89,11 @@ static func build_grav_trap(p: Parts, level: int) -> void:
 			m.strut(Parts.around(0.24, degrees, 0.12) + base, Parts.around(0.2, degrees, 0.0) + hover, 0.03,
 				Parts.ROD)
 		m.ring(0.15, 0.23, 0.05, 16, hover, GOLD_ROUND)
-		m.ring(0.13, 0.15, 0.03, 16, hover + Vector3(0, 0.01, 0), VIOLET)
+		m.ring(0.13, 0.15, 0.03, 16, hover + Vector3(0, 0.01, 0), VIOLET_PULSE.phased(0.5))
 
 
 ## A squat pod banded in hazard stripes with upward barrels round a sensor lens, their bores
-## glowing. A barrel more at each level.
+## glowing. A barrel more at each level. The bores pulse in turn and the lens flashes.
 static func build_flak_mine(p: Parts, level: int) -> void:
 	var m := p.body
 	var base := Vector3(0, Parts.PAD_HEIGHT, 0)
@@ -86,14 +105,15 @@ static func build_flak_mine(p: Parts, level: int) -> void:
 	for i: int in barrels:
 		var spot := Parts.around(0.15, 135.0 + 360.0 * i / barrels, 0.0) + top
 		m.prism(0.05, 0.05, 0.16, 12, spot, CASING_MID)
-		m.disc(0.032, 12, spot + Vector3(0, 0.161, 0), YELLOW)
-	m.dome(0.075, 0.07, 16, 3, top, Parts.GLASS)
+		m.disc(0.032, 12, spot + Vector3(0, 0.161, 0), YELLOW_PULSE.phased(float(i) / barrels))
+	m.dome(0.075, 0.07, 16, 3, top, LENS)
 	if level >= 3:
 		m.ring(0.075, 0.1, 0.025, 16, top, GOLD_ROUND)
 
 
 ## A big armoured dome on a hazard band, warning lights round its foot and a fuse cap on its
-## crown. A thicker dome and more lights at 2.
+## crown. A thicker dome and more lights at 2. The lights chase round the band, glowing seams run
+## up the dome between them, swelling faintly, and the fuse light pulses.
 static func build_mega_mine(p: Parts, level: int) -> void:
 	var m := p.body
 	var base := Vector3(0, Parts.PAD_HEIGHT, 0)
@@ -106,11 +126,31 @@ static func build_mega_mine(p: Parts, level: int) -> void:
 		m.ring(radius - 0.02, radius + 0.04, 0.05, 24, base + Vector3(0, 0.1, 0), GOLD_ROUND)
 	var lights := 4 if level < 2 else 6
 	for i: int in lights:
-		m.dome(0.06, 0.06, 16, 3, Parts.around(0.67, 45.0 + 360.0 * i / lights, 0.12) + base, RED)
+		var degrees := 45.0 + 360.0 * i / lights
+		m.dome(0.06, 0.06, 16, 3, Parts.around(0.67, degrees, 0.12) + base, RED_BLINK.phased(float(i) / lights))
+		_dome_seam(m, radius, height, base + Vector3(0, 0.06, 0), degrees + 180.0 / lights,
+			SEAM.phased(float(i) / lights))
 	var crown := base + Vector3(0, 0.06 + height - 0.02, 0)
 	m.prism(0.13, 0.11, 0.08, 16, crown, CASING_MID)
-	m.dome(0.07, 0.07, 16, 3, crown + Vector3(0, 0.08, 0), RED)
+	m.dome(0.07, 0.07, 16, 3, crown + Vector3(0, 0.08, 0), RED_PULSE)
 	for i: int in 3:
 		var degrees := 90.0 + 120.0 * i
 		var foot := Parts.around(0.1, degrees, 0.06) + crown
 		m.cone(0.025, 0.14, 8, foot, CASING_MID, Parts.facing(Parts.around(0.5, degrees, 1.0)))
+
+
+## A seam up a dome of `radius` and `height` standing on `pos`, at `degrees` round it: a chain of
+## thin strips just proud of the surface, from its foot to under the crown (within 0.15 of the
+## axis).
+static func _dome_seam(m: LowPolyMesh, radius: float, height: float, pos: Vector3, degrees: float,
+		surface: Surf) -> void:
+	const STEPS := 4
+	const PROUD := 0.012
+	var last := acos(0.15 / radius)
+	var from := Vector3.ZERO
+	for k: int in STEPS + 1:
+		var angle := last * k / STEPS
+		var at := Parts.around((radius + PROUD) * cos(angle), degrees, (height + PROUD) * sin(angle)) + pos
+		if k > 0:
+			m.strut(from, at, 0.03, surface)
+		from = at

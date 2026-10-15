@@ -372,10 +372,10 @@ triangles as the gallery counts them.
 | `railgun` | two long rails across the screen with a cyan strip between them, capacitor banks | none | 2,088 |
 | `ion_beam` | big crystal lens and focusing rings on a tripod | none | 1,964 |
 | `orbital_cannon` | massive gunmetal barrel aimed at the sky with cyan coils, on a two-tier bunker | none | 4,496 |
-| `proximity_mine` | spiked domed disc on a hazard rim with a red warning light | none | 542 |
-| `grav_trap` | ring emitter round a dark funnel with a violet swirl | none | 580 |
-| `flak_mine` | hazard-banded pod, upward barrels with glowing bores round a lens | none | 574 |
-| `mega_mine` | big armoured dome on a hazard band ringed with red lights | none | 1,214 |
+| `proximity_mine` | spiked domed disc on a hazard rim with a red warning light | blink: the warning light (and the rim light at L3, half a cycle apart) | 542 |
+| `grav_trap` | ring emitter round a dark funnel with a violet swirl | pulse: the emitter's violet lip, and the hovering ring from L2; flow: the vortex's throat and swirl strips stream inward | 580 |
+| `flak_mine` | hazard-banded pod, upward barrels with glowing bores round a lens | pulse: the bores, phased in turn; blink: the sensor lens | 574 |
+| `mega_mine` | big armoured dome on a hazard band ringed with red lights, dim red seams up the dome between them | blink: the band's lights in a chase; pulse: the seams, faintly and in turn, and the fuse light | 1,454 |
 
 ### Construction drone
 
