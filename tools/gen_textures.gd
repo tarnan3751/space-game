@@ -2,8 +2,9 @@ extends SceneTree
 ## Draws the material kit: the 16 layers of the Texture2DArray every building, the terrain and
 ## the rocks are painted from (docs/reference/art-style.md, **The material kit**), saved as
 ## assets/textures/kit/<index>_<name>.png; and the field texture the buildable ground is drawn
-## from, assets/textures/field.png (**The field**). Run it after an import (tools/gates.sh does
-## one), from the project root:
+## from, assets/textures/field.png (**The field**); and the rock texture the terrain's steep faces
+## are drawn from, assets/textures/terrain_rock.png (**Environment**). Run it after an import
+## (tools/gates.sh does one), from the project root:
 ##
 ##   $GODOT --headless --path . -s res://tools/gen_textures.gd
 ##
@@ -11,11 +12,12 @@ extends SceneTree
 ## at the ink colour) for the layers a tint multiplies, real colours for the fixed ones (hazard,
 ## solar). A is the emission mask: 0 on plain surfaces, up to 1 where the surface glows. The
 ## field texture is FIELD_SIZE square, an atlas of four tiles, and holds weights, not colours
-## (_draw_field).
+## (_draw_field); the rock texture is ROCK_SIZE square, a single tile in the same channels
+## (_draw_terrain_rock).
 ##
 ## Everything is drawn from SEED with SeededRng, so a run gives byte-identical PNGs. Every
-## primitive wraps modulo the image's size, so every layer tiles seamlessly; the field's tiles
-## keep their marks off their edges instead. One layer covers one world unit at the default UV
+## primitive wraps modulo the image's size, so every layer and the rock texture tile seamlessly;
+## the field's tiles keep their marks off their edges instead. One layer covers one world unit at the default UV
 ## scale: an ink line of INK_WIDTH pixels is about 0.012 units wide.
 
 const SIZE := 256
@@ -50,6 +52,20 @@ const FIELD_TILES := [
 	[64, 2, 3, 0, 8, false, false, Vector2(269, 328)],
 	[45, 0, 2, 1, 0, false, true, Vector2(155, 387)],
 ]
+## The rock texture: one tile of the terrain's steep faces, drawn after the field from its own
+## seed. Its strata: how many bands a tile, the spacing of the corners along a band's jagged edge
+## and how far they wander up or down, and how deep the lean runs below a band's top edge (its lit
+## edge) and above its bottom (its shaded underside), all in pixels; and how many cracks and
+## outcrop plates.
+const ROCK_PATH := "res://assets/textures/terrain_rock.png"
+const ROCK_SIZE := 512
+const STRATA := Vector2i(4, 7)
+const STRATA_STEP := Vector2i(18, 34)
+const STRATA_JAG := 7
+const STRATA_TOP := 7.0
+const STRATA_UNDER := 9.0
+const ROCK_CRACKS := Vector2i(3, 5)
+const ROCK_PLATES := Vector2i(2, 3)
 ## The layers, in array order. MaterialKit.LAYERS must match.
 const LAYERS := [
 	"flat", "hull", "hull_dense", "plate", "vent", "pipe", "grating", "concrete",
@@ -82,6 +98,10 @@ func _initialize() -> void:
 	_begin(FIELD_SIZE, FIELD_SIZE, SEED + LAYERS.size())
 	_draw_field()
 	if not _save(FIELD_PATH):
+		return
+	_begin(ROCK_SIZE, ROCK_SIZE, SEED + LAYERS.size() + 1)
+	_draw_terrain_rock()
+	if not _save(ROCK_PATH):
 		return
 	quit(0)
 
@@ -534,6 +554,120 @@ func _draw_field() -> void:
 	for i: int in _rgb.size():
 		_rgb[i] = Color(lean[i].r, lean[i].g, ink[i], 1.0)
 		_mask[i] = tone[i]
+
+
+## The terrain's rock texture (ROCK_SIZE square, tiling both ways), in the field texture's
+## channels: R and G the lean (x along the face, y down it), B ink, A tone. The terrain shader
+## projects it onto the steep faces with image y down the slope and lights the lean from the sun,
+## which stands high, so a face leaning up is lit. Strata: STRATA bands across the tile, their
+## edges jagged ink lines 3 wide; each band leans up for STRATA_TOP below its top edge (its lit
+## edge) and down for STRATA_UNDER above its bottom (its shaded underside), in one of two tones,
+## 0.5 or 0.8, never the same as the band above (but across the tile's wrap). A few cracks, ink 2
+## wide, run down from a band's top edge most of the way through it. Two or three chunky outcrop
+## plates, jittered polygons of five or six corners 44 to 64 out, lean out from their middles at
+## 0.7 in tone 0.8 with an ink outline 3 wide, over the strata.
+func _draw_terrain_rock() -> void:
+	# Each band's top edge as its corners' heights at x = 0, step, 2 step ... ROCK_SIZE (the last
+	# the first again, so the edge wraps).
+	var count := _rng.range_int(STRATA.x, STRATA.y)
+	var edges: Array[PackedVector2Array] = []
+	var tones := PackedFloat32Array()
+	for k: int in count:
+		var middle := (k + 0.5 + _rng.range_int(-15, 15) / 100.0) * ROCK_SIZE / count
+		var edge := PackedVector2Array()
+		var x := 0
+		while x < ROCK_SIZE:
+			edge.append(Vector2(x, middle + _rng.range_int(-STRATA_JAG, STRATA_JAG)))
+			x += _rng.range_int(STRATA_STEP.x, STRATA_STEP.y)
+		edge.append(Vector2(ROCK_SIZE, edge[0].y))
+		edges.append(edge)
+		var tone := 0.5 if _rng.range_int(0, 1) == 0 else 0.8
+		if k > 0 and tone == tones[k - 1]:
+			tone = 1.3 - tone
+		tones.append(tone)
+	var plates: Array[PackedVector2Array] = []
+	var plate_spots: Array[Vector3] = []
+	for k: int in _rng.range_int(ROCK_PLATES.x, ROCK_PLATES.y):
+		var spot := _free_spot(plate_spots, _rng.range_int(44, 64), Rect2(0, 0, ROCK_SIZE, ROCK_SIZE))
+		plate_spots.append(spot)
+		plates.append(_chunk(spot, _rng.range_int(5, 6)))
+	# Each crack: its start on a band's top edge and its corners down from there.
+	var cracks: Array[PackedVector2Array] = []
+	for k: int in _rng.range_int(ROCK_CRACKS.x, ROCK_CRACKS.y):
+		var band := _rng.range_int(0, count - 1)
+		var x := float(_rng.range_int(0, ROCK_SIZE - 1))
+		var top := _edge_height(edges[band], x)
+		var bottom := _edge_height(edges[(band + 1) % count], x)
+		if bottom < top:
+			bottom += ROCK_SIZE
+		var crack := PackedVector2Array([Vector2(x, top)])
+		var at := Vector2(x, top)
+		while at.y < top + (bottom - top) * 0.8:
+			at += Vector2(_rng.range_int(-4, 4), _rng.range_int(8, 14))
+			crack.append(at)
+		cracks.append(crack)
+
+	# Each edge's height at the middle of each column of pixels, and each pixel's band.
+	var heights: Array[PackedFloat32Array] = []
+	for edge: PackedVector2Array in edges:
+		var column := PackedFloat32Array()
+		for x: int in ROCK_SIZE:
+			column.append(_edge_height(edge, x + 0.5))
+		heights.append(column)
+	var bands := PackedInt32Array()
+	bands.resize(ROCK_SIZE * ROCK_SIZE)
+	for y: int in ROCK_SIZE:
+		for x: int in ROCK_SIZE:
+			# The last band whose top edge is above the pixel; above the first edge, the last band.
+			var band := count - 1
+			for k: int in count:
+				if heights[k][x] <= y + 0.5:
+					band = k
+			bands[y * ROCK_SIZE + x] = band
+
+	# The lean, then the tone and the ink each in greys, read off the red.
+	for y: int in ROCK_SIZE:
+		for x: int in ROCK_SIZE:
+			var band := bands[y * ROCK_SIZE + x]
+			var below_top := wrapf(y + 0.5 - heights[band][x], 0.0, ROCK_SIZE)
+			var above_bottom := wrapf(heights[(band + 1) % count][x] - y - 0.5, 0.0, ROCK_SIZE)
+			var tilt := 0.4 * clampf(STRATA_TOP + 0.5 - below_top, 0.0, 1.0) \
+				- 0.4 * clampf(STRATA_UNDER + 0.5 - above_bottom, 0.0, 1.0)
+			_rgb[y * ROCK_SIZE + x] = Color(0.5, 0.5 - tilt, 0.0)
+	for i: int in plates.size():
+		_lean(Vector2(plate_spots[i].x, plate_spots[i].y), 0.0, plate_spots[i].z, 0.7, plates[i])
+	var lean := _rgb.duplicate()
+
+	for i: int in _rgb.size():
+		_rgb[i] = _grey(tones[bands[i]])
+	for corners: PackedVector2Array in plates:
+		_polygon(corners, _grey(0.8))
+	var tone := _channel()
+
+	_fill(_grey(0.0))
+	for edge: PackedVector2Array in edges:
+		for k: int in edge.size() - 1:
+			_line(edge[k], edge[k + 1], INK_WIDTH, _grey(1.0))
+	for crack: PackedVector2Array in cracks:
+		for k: int in crack.size() - 1:
+			_line(crack[k], crack[k + 1], 2.0, _grey(1.0))
+	for corners: PackedVector2Array in plates:
+		_polygon(corners, _grey(0.0))
+		for k: int in corners.size():
+			_line(corners[k], corners[(k + 1) % corners.size()], INK_WIDTH, _grey(1.0))
+	var ink := _channel()
+
+	for i: int in _rgb.size():
+		_rgb[i] = Color(lean[i].r, lean[i].g, ink[i], 1.0)
+		_mask[i] = tone[i]
+
+
+## The height of a band's top edge (its corners, as _draw_terrain_rock keeps them) at `x`.
+func _edge_height(edge: PackedVector2Array, x: float) -> float:
+	for k: int in edge.size() - 1:
+		if x <= edge[k + 1].x:
+			return lerpf(edge[k].y, edge[k + 1].y, (x - edge[k].x) / (edge[k + 1].x - edge[k].x))
+	return edge[edge.size() - 1].y
 
 
 ## A pebble or a shard of `corners` corners round `spot` (x, y, reach): jittered in angle and in
