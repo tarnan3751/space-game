@@ -6,7 +6,8 @@ extends HarnessScenario
 ## written to the run's own file, user://base.json untouched. Screenshots: the whole base at the
 ## widest zoom in a WIDE window, then each band at BAND_ZOOM centred on it (the Command Center's
 ## with the first category's), in even parts PART_CELLS wide at most so none runs under the HUD
-## or off the screen, each again a second later where a part turns.
+## or off the screen, each again a second later where a part turns. The first shot waits until
+## the "Template base" toast, which covers the Command Center's antenna, has faded.
 
 const WIDE := Vector2i(1560, 720)
 const BAND_ZOOM := 16.0
@@ -14,6 +15,9 @@ const PART_CELLS := 16
 ## How long the moving parts are sampled, and how many frames apart.
 const MOVE_SAMPLE_SECONDS := 1.5
 const MOVE_SAMPLE_FRAMES := 4
+## Seconds from the press until the HUD's toast has faded (Hud.show_message: 1.8 s shown, then
+## 0.6 s fading out).
+const TOAST_SECONDS := 2.5
 
 
 func run(main: MainScript) -> void:
@@ -21,6 +25,7 @@ func run(main: MainScript) -> void:
 	var real_saved := func() -> int: return FileAccess.get_modified_time(real) if FileAccess.file_exists(real) else 0
 	var real_saved_before: int = real_saved.call()
 	main.hud.template_button().pressed.emit()
+	var toast := main.get_tree().create_timer(TOAST_SECONDS)
 	var state: BaseState = main.state
 	var catalog: Catalog = state.catalog
 	var pieces := 2 * mini(TemplateBase.WALL_SIZE.x, catalog.grid_size.x) + 3 * (TemplateBase.WALL_SIZE.y - 2)
@@ -73,6 +78,8 @@ func run(main: MainScript) -> void:
 	check(moved.size() > 0 and moved.size() == turning.size(), "%d of %d moving parts moved within %.1f s"
 		% [moved.size(), turning.size(), MOVE_SAMPLE_SECONDS])
 
+	if toast.time_left > 0.0:
+		await toast.timeout
 	main.get_window().size = WIDE
 	await _shot(main, "whole", Vector3.ZERO, IsoCamera.MAX_ZOOM_SIZE)
 	for band: String in catalog.categories:

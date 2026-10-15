@@ -290,7 +290,8 @@ the ring too; that the base was saved to the run's own file while `user://base.j
 modification time stayed the same; and that every moving part of every model (each node
 carrying `BuildingModels.MOVE_META`) moves: sampled every four frames for 1.5 seconds, a part
 passes once any sample differs from its first pose, so a hammer's hold or a period that divides
-the gap cannot hide it. It screenshots the whole base at the widest zoom in a 1560x720
-window, then each category's band at camera size 16 centred on it (the Command Center's with
-the first category's), a band wider than 16 cells in even parts so none runs under the HUD or off
-the screen, each part again a second later where a part turns in it, to compare the two.
+the gap cannot hide it. Once the "Template base" toast has faded (2.5 seconds after the press),
+it screenshots the whole base at the widest zoom in a 1560x720 window, then each category's
+band at camera size 16 centred on it (the Command Center's with the first category's), a band
+wider than 16 cells in even parts so none runs under the HUD or off the screen, each part again
+a second later where a part turns in it, to compare the two.
