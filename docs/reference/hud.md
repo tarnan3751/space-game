@@ -35,7 +35,7 @@ no focus.
 **Fonts** (`assets/fonts/`, Google Fonts under the SIL Open Font License, each with its
 `OFL.txt`, imported with Godot's default dynamic font settings): **Bangers** for the Build
 button, the category tabs, the panel's close button, the info panel's title and the place bar's
-and Reset base's buttons; **Lilita One**, the theme's default, for every other text. No text is
+and the debug row's buttons; **Lilita One**, the theme's default, for every other text. No text is
 smaller than 15 px at 720p. Lilita One has no `∞`, which the meters show under the dev cheats,
 so the meters' amounts take a `FontVariation` of it (`_meter_font`) whose fallback is the
 engine's own font, `ThemeDB.fallback_font`: the sign draws the same on every platform rather
@@ -49,7 +49,7 @@ the building view's timer label included, wider.
 | --- | --- | --- |
 | Ink `INK` | `1B1A2E` | every outline, text outlines; `SHADOW` is the ink at 60 %, every flat shadow |
 | Panel `PANEL` | `262348` at 96 % | the build panel, the info panel, the place bar, the toast |
-| Card `CARD` | `3B3670` | cards, unselected tabs, the close button, Cancel, Close, Reset base |
+| Card `CARD` | `3B3670` | cards, unselected tabs, the close button, Cancel, Close, Template base, Reset base |
 | Card disabled `CARD_DISABLED` | `2E2B55` | a card or button that cannot be pressed now, a busy drone |
 | Text `TEXT` | `F4F2FF` | names, amounts |
 | Text dim `TEXT_DIM` | `9A95C4` | counts, reasons, the scroll bar's grabber |
@@ -84,7 +84,7 @@ so its parts — the Build button above all — draw over the panel.
 | Place bar | bottom centre | A panel holding `Cancel` and `Place` (170×72); `Place` is disabled unless the ghost is valid. While walls are painted it reads `Done` and is always enabled: there is nothing to confirm. |
 | Info panel | bottom centre, 460 wide | Title `"Name   Lv N"` with a `Close` button; detail lines (**Info panel**); the upgrade button; a note under it. |
 | Toast | top centre, 96 down | A small panel with a centred line that fades out after 1.8 s over 0.6 s, then hides. |
-| Reset base | debug builds only (`OS.is_debug_build()`): the top bar's second row, right-aligned | Emits `reset_pressed`. On a row of its own so a long top bar never runs under it. |
+| Debug row | debug builds only (`OS.is_debug_build()`): the top bar's second row, right-aligned | Template base, which emits `template_pressed`, then Reset base, which emits `reset_pressed`, 16 apart. On a row of its own so a long top bar never runs under it. |
 
 The place bar and the info panel are anchored to the bottom edge and grow upward
 (`_anchor_bottom`).
@@ -275,6 +275,7 @@ that inset stays until the device's safe area changes.
 | `upgrade_pressed` | the upgrade button | `placement.upgrade_selected` |
 | `close_pressed` | Close; Build, opening the panel over the info panel | `placement.select(0)` |
 | `reset_pressed` | Reset base | `main._reset_base` |
+| `template_pressed` | Template base | `main._template_base` |
 
 ## Queries for the harness
 
@@ -285,9 +286,9 @@ Read-only, so a scenario never reads a private member (`tools/harness/README.md`
 `entry_status(type)` is a card's status line; `resource_panel(res)` is the top bar's meter for a
 resource and `resource_fill(res)` its fill, whose parent is the track it grows across;
 `place_button()` is the place bar's `Place` (or `Done`); `drones_panel()` is the `DroneRing`,
-whose `free_count()` and `total_count()` are the counts it shows; `reset_button()` is the debug
-Reset base button (null in a release build). `MENU_OPEN_SECONDS` and `MENU_CLOSE_SECONDS` say how
-long to wait for a slide.
+whose `free_count()` and `total_count()` are the counts it shows; `reset_button()` and
+`template_button()` are the debug row's Reset base and Template base (null in a release build).
+`MENU_OPEN_SECONDS` and `MENU_CLOSE_SECONDS` say how long to wait for a slide.
 
 ## Messages
 
@@ -306,4 +307,5 @@ is none:
 | `max_level` | Already at max level |
 
 `PlacementController.command_failed` is connected to `show_error`; `_reset_base` shows "Base
-reset". Amounts, costs and durations are formatted by `Format` (`input-camera.md`).
+reset" and `_template_base` "Template base". Amounts, costs and durations are formatted by
+`Format` (`input-camera.md`).

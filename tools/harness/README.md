@@ -88,8 +88,8 @@ through the game layer as the player would, and read the state through `BaseStat
 |---|---|
 | `main.placement` | `begin_place(type)`, `confirm_place()`, `cancel_place()`, `select(id)`, `upgrade_selected()`, `is_placing()`, `is_painting()`, `ghost_is_valid()`, `ghost_cell()`, `selected_id` |
 | `main.world_input` signals | `tapped`, `drag_started`, `dragged`, `drag_ended`, `pinched`, `panned`; emit them to simulate a gesture (`tap_cell` below does) |
-| `main.hud` signals | `build_pressed`, `confirm_pressed`, `cancel_pressed`, `upgrade_pressed`, `close_pressed`, `reset_pressed`; emit them to press a button |
-| `main.hud` queries | `build_button()`, `is_menu_open()`, `build_panel()`, `close_button()`, `tab_button(category)`, `entry_button(type)`, `entry_status(type)`, `resource_panel(res)`, `resource_fill(res)`, `place_button()`, `drones_panel()` (the `DroneRing`: `free_count()`, `total_count()`), `reset_button()` (`docs/reference/hud.md`); `apply_safe_area(inset)` to try a notch-like inset |
+| `main.hud` signals | `build_pressed`, `confirm_pressed`, `cancel_pressed`, `upgrade_pressed`, `close_pressed`, `reset_pressed`, `template_pressed`; emit them to press a button |
+| `main.hud` queries | `build_button()`, `is_menu_open()`, `build_panel()`, `close_button()`, `tab_button(category)`, `entry_button(type)`, `entry_status(type)`, `resource_panel(res)`, `resource_fill(res)`, `place_button()`, `drones_panel()` (the `DroneRing`: `free_count()`, `total_count()`), `reset_button()`, `template_button()` (`docs/reference/hud.md`); `apply_safe_area(inset)` to try a notch-like inset |
 | `main.state` | the `BaseState`: `buildings`, `resources`, `capacity()`, `builders_free()`, `seconds_left(id)`, `check_*` |
 | `main.camera`, `main.base_view` | `IsoCamera` and `BaseView`, for cell and screen mapping |
 
@@ -230,3 +230,15 @@ and mask is within the 250 body triangles of a wall piece. Last, it selects the 
 which stays merged with no gold outline (its own model, whose outlines turn gold, stays hidden),
 and lifts it: the mesh drops it and its neighbours' joints, its own post shows, and carried back
 and dropped it rejoins the cross; screenshots show it selected and in the air.
+
+`scenarios/template_base.gd` checks the debug build's Template base (`TemplateBase`,
+`docs/reference/input-camera.md`): it presses the HUD's button (`template_button()`) and checks
+that every type but the walls is there exactly once and the walls are the enclosure's pieces,
+all at their top level and finished; that no two footprints overlap and all lie inside the grid
+(on a `BaseGrid` of its own); that every resource is at its cap; that every drone is free, on
+the ring too; that the base was saved to the run's own file while `user://base.json`'s
+modification time stayed the same; and that every turning part of every model turns in a
+second. It screenshots the whole base at the widest zoom in a 1560x720
+window, then each category's band at camera size 16 centred on it (the Command Center's with
+the first category's), a band wider than 16 cells in even parts so none runs under the HUD or off
+the screen, each part again a second later where a part turns in it, to compare the two.

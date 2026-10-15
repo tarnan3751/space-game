@@ -1,8 +1,8 @@
 # Input and camera
 
-How `src/game/` turns touches into commands and draws the base: `main.gd`, `IsoCamera`,
-`WorldInput`, `PlacementController`, `BaseView`, `BuildingView`, `BuildingModels` and
-`WallMesh`. The HUD is in `hud.md`; how the models, the ground and the scenery look (the
+How `src/game/` turns touches into commands and draws the base: `main.gd` (with `TemplateBase`),
+`IsoCamera`, `WorldInput`, `PlacementController`, `BaseView`, `BuildingView`, `BuildingModels`
+and `WallMesh`. The HUD is in `hud.md`; how the models, the ground and the scenery look (the
 material kit, `LowPolyMesh`, the shaders, the outlines, the view states, the wall pieces) is in
 `art-style.md`. This layer reads `BaseState` and never mutates it except through
 `PlacementController.apply` calls (`CLAUDE.md`, **Architecture rules**).
@@ -23,10 +23,10 @@ material kit, `LowPolyMesh`, the shaders, the outlines, the view states, the wal
    (`placement.clock = _now`) and connected to the input signals.
 4. The HUD's signals are wired to the controller (`build_pressed` → `begin_place`,
    `confirm_pressed` → `confirm_place`, `cancel_pressed` → `cancel_place`, `upgrade_pressed` →
-   `upgrade_selected`, `close_pressed` → `select(0)`, `reset_pressed` → `_reset_base`); the
-   controller's `selection_changed` refreshes the HUD, `placing_changed` calls
-   `hud.refresh_placing` (`_on_placing_changed`; a ghost move updates only the Place button),
-   and `command_failed` shows a toast.
+   `upgrade_selected`, `close_pressed` → `select(0)`, `reset_pressed` → `_reset_base`,
+   `template_pressed` → `_template_base`); the controller's `selection_changed` refreshes the
+   HUD, `placing_changed` calls `hud.refresh_placing` (`_on_placing_changed`; a ghost move
+   updates only the Place button), and `command_failed` shows a toast.
 5. The state is loaded or created (`_load_or_create`) and installed (`_set_state`: disconnects
    the old state's `changed`, connects the new one, hands it to the controller, cancels any
    placement and selection, clears and syncs the view).
@@ -43,7 +43,23 @@ argument (after `--` on the command line, read from `OS.get_cmdline_user_args()`
 another file. The gate's headless boot and the harness pass one, so a tool run never opens
 the owner's save. Loading parses the JSON, calls `BaseState.from_dict`, then `advance_to(now)`
 for offline progress; an unreadable file starts a new base with a warning. `_reset_base`
-(the debug button) creates a new base and saves at once.
+(the debug row's Reset base) creates a new base and saves at once.
+
+**The template base.** `_template_base` (the debug row's Template base, `hud.md`) installs a
+showcase base the same way and saves at once: `TemplateBase.build(catalog, grid, now)`
+(`template_base.gd`) returns a save dictionary (`data-format.md`, **The save file**), loaded
+through `BaseState.from_dict`. Every type in the catalog, hidden ones included, is there at its
+top level and finished, grouped by category, and every resource is at the cap of the base as
+laid out, which a throwaway `BaseState` works out. The bands are `core`, then
+`catalog.categories` in tab order, from the top of the field (cell y 0) down; in a band, one of
+each type, in `menu_order`, runs left to right from x 0 a cell apart, wrapping to a new row a
+cell below the row's tallest footprint when the next would pass the field's right edge. The
+walls band (`PlacementController.PAINT_CATEGORY`) is an enclosure of its first type instead,
+`WALL_SIZE` (12×6) with a run from the middle of its top side to the middle of its bottom, so it
+shows corners, T junctions and straight runs; it narrows to a narrower field. The layout is
+checked on a `BaseGrid` as it is made: a building that does not fit is left out, with an error
+naming the first, rather than overlap. The `template_base` harness scenario checks it
+(`tools/harness/README.md`).
 
 ## IsoCamera (`iso_camera.gd`)
 

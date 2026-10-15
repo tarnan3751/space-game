@@ -119,7 +119,7 @@ data/            game data shared with the server
 docs/            project_overview.md (scope, status, roadmap, decisions); reference/ (one file per area)
 scenes/          main.tscn only
 src/core/        catalog, base_state, building_state, base_grid, seeded_rng
-src/game/        main, iso_camera, world_input, placement_controller, base_view,
+src/game/        main, template_base, iso_camera, world_input, placement_controller, base_view,
                  building_view, building_models, wall_mesh, low_poly_mesh, surf, material_kit, hud,
                  hud_icon, drone_ring, format, toon.gdshader, toon_common.gdshaderinc, ink.gdshader,
                  ground.gdshader
