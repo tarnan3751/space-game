@@ -160,7 +160,9 @@ static func _vault(p: Parts, back: Vector3, width: float, length: float, wall: f
 	m.box_chamfered(Vector3(width, wall, length + 0.02), 0.06, back + Vector3(0, 0, length * 0.5 + 0.01),
 		ARMOUR)
 	var axis := back + Vector3(0, wall, 0)
-	m.prism(radius, radius, length, 24, axis, HULL_ROUND, Vector3(90, 0, 0))
+	# The barrel roof: the half of a cylinder lying along +Z that stands above the walls,
+	# which, turned so, is 180 to 360 degrees round its own axis.
+	m.prism(radius, radius, length, 24, axis, HULL_ROUND, Vector3(90, 0, 0), 180.0, 360.0)
 	var gable := PackedVector3Array()
 	for k: int in 13:
 		var angle := PI * k / 12
