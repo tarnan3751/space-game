@@ -3,9 +3,10 @@
 #   tools/harness/run.sh <scenario>                 headless: logic checks only
 #   tools/harness/run.sh <scenario> --rendered      opens a window and saves screenshots
 #   tools/harness/run.sh <scenario> --out <dir>     output directory (default tools/harness/out/<scenario>)
-# The save file is <out>/base.json, never user://base.json. The output directory is
-# emptied first, so every run starts from a new base. Exits non-zero when a check fails
-# or Godot logs a script error.
+# The save file is <out>/base.json, never user://base.json, and --no-cheats keeps a debug
+# build's dev cheats off (main.gd), so every scenario runs on the real numbers. The output
+# directory is emptied first, so every run starts from a new base. Exits non-zero when a
+# check fails or Godot logs a script error.
 #
 # A rendered run needs its window drawn, and Godot stops drawing a window that is fully
 # covered, so rendered runs keep their window on top and take turns on a machine: each
@@ -96,7 +97,7 @@ if [ -z "$mode" ]; then
 fi
 
 output="$("$GODOT" $mode $window --path . -s res://tools/harness/driver.gd -- \
-  "--scenario=$scenario" "--out=$out" "--save-path=$out/base.json" 2>&1)"
+  "--scenario=$scenario" "--out=$out" "--save-path=$out/base.json" --no-cheats 2>&1)"
 status=$?
 echo "$output"
 if grep -qE "SCRIPT ERROR|Parse Error|Failed to load script" <<<"$output"; then

@@ -6,10 +6,12 @@ extends SceneTree
 ## this directly; the README in this folder documents both.
 ##
 ##   $GODOT [--headless] --path . -s res://tools/harness/driver.gd -- \
-##       --scenario=<name> --out=<dir> --save-path=<file>
+##       --scenario=<name> --out=<dir> --save-path=<file> --no-cheats
 ##
 ## --save-path is required and is the same argument main.gd honours, so a run never
-## touches user://base.json. Headless runs check logic only; a rendered run (no
+## touches user://base.json. --no-cheats is main.gd's too: without it a debug build makes
+## every level free and one second at most, so run.sh passes it and scenarios run on the
+## real numbers. Headless runs check logic only; a rendered run (no
 ## --headless) also saves screenshots. The exit code is 0 when every check passed.
 ##
 ## Time: the harness clock starts CLOCK_LEAD seconds ahead of the device clock and moves
