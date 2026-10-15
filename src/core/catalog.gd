@@ -19,6 +19,10 @@ const CORE_CATEGORY := "core"
 const TARGETS := ["ground", "air", "both"]
 ## Per-level fields that must be whole and non-negative when present.
 const WHOLE_FIELDS := ["builders", "capacity", "hp", "damage", "range_cells", "fire_ms"]
+## Shared, read-only defaults for lookups, so a lookup builds no new {} or [] per call
+## (BaseState's checks run every frame while a ghost is dragged).
+const _NONE := {}
+const _NO_LIST := []
 
 ## Empty when the data loaded and validated cleanly, otherwise a readable list of problems.
 var load_error: String = ""
@@ -106,7 +110,7 @@ func targets_of(type: String) -> String:
 
 ## The number of levels; 0 when `levels` is missing or not a list (validation reports it).
 func max_level(type: String) -> int:
-	var levels: Variant = _def(type).get("levels", [])
+	var levels: Variant = _def(type).get("levels", _NO_LIST)
 	if typeof(levels) != TYPE_ARRAY:
 		return 0
 	var level_list: Array = levels
@@ -114,17 +118,17 @@ func max_level(type: String) -> int:
 
 
 ## Stats for one level (1-based): cost, build_seconds, hp, produces, storage, builders...
-## Returns an empty Dictionary when the type or level doesn't exist.
+## Returns a shared, read-only empty Dictionary when the type or level doesn't exist.
 func level_stats(type: String, level: int) -> Dictionary:
-	var levels: Array = _def(type).get("levels", [])
+	var levels: Array = _def(type).get("levels", _NO_LIST)
 	if level < 1 or level > levels.size():
-		return {}
+		return _NONE
 	return levels[level - 1]
 
 
 ## How many of `type` a base may own at the given Command Center level.
 func max_count(type: String, cc_level: int) -> int:
-	var counts: Array = _def(type).get("max_count", [])
+	var counts: Array = _def(type).get("max_count", _NO_LIST)
 	if counts.is_empty():
 		return 0
 	return int(counts[clampi(cc_level, 1, counts.size()) - 1])
@@ -148,7 +152,7 @@ func apply_dev_cheats() -> void:
 
 
 func _def(type: String) -> Dictionary:
-	return _buildings.get(type, {})
+	return _buildings.get(type, _NONE)
 
 
 func _read(rules: Dictionary, buildings: Dictionary) -> void:

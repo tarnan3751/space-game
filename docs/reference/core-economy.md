@@ -30,7 +30,7 @@ read-only is `apply_dev_cheats()`, below.
 | `has_type`, `types()`, `display_name`, `size_of` (default 1) | Per-type lookups. |
 | `category_of(type)`, `is_hidden(type)`, `targets_of(type)` | The type's `category`, `hidden` (default `false`) and `targets` (`""` when it has none). The last two are display only until the battle sim. |
 | `max_level(type)` | The number of entries in the type's `levels`. |
-| `level_stats(type, level)` | The stats dictionary for a 1-based level, or `{}` when the type or level does not exist. |
+| `level_stats(type, level)` | The stats dictionary for a 1-based level, or a shared, read-only empty dictionary when the type or level does not exist (callers only read it). |
 | `max_count(type, cc_level)` | `max_count[cc_level - 1]`, with `cc_level` clamped into the list; `0` when the list is empty. |
 | `max_cc_level()` | The Command Center's level count, which is the length of every `max_count` list. |
 | `apply_dev_cheats()` | The dev cheats, which `main.gd` applies once after loading in a debug build unless `--no-cheats` is given (`input-camera.md`): rewrites every level of every type in place to `cost` `{}` and `build_seconds` `min(build_seconds, 1)`: a level that takes time takes one second, and an instant one (walls, the drone bay) stays instant, so it still needs no builder. Nothing else changes (`requires_cc`, `max_count`, `storage`, `produces`, `builders`), so levels still unlock in order. `BaseState` never knows, so a save made under the cheats is an ordinary save. |
