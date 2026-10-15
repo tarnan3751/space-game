@@ -12,9 +12,10 @@
 # covered, so rendered runs keep their window on top and take turns on a machine: each
 # holds a lock directory under ${TMPDIR:-/tmp} (mkdir is atomic), waiting up to LOCK_WAIT
 # seconds for it and taking over one older than LOCK_STALE seconds, left by a run that
-# died. Headless runs take no lock. A rendered run whose screenshots are all byte-identical
-# fails: its window stopped drawing. Two identical in a row only warn, since a scenario may
-# mean to show that nothing changed.
+# died. Headless runs take no lock. A rendered run fails when any screenshot is
+# byte-identical to an earlier one: its window stopped drawing. A shot the scenario took with
+# screenshot(name, true) is logged "(may repeat)" and exempt, for one meant to show that
+# nothing changed.
 set -uo pipefail
 
 LOCK_DIR="${TMPDIR:-/tmp}/space-game-harness-rendered.lock"
@@ -105,24 +106,28 @@ if grep -qE "SCRIPT ERROR|Parse Error|Failed to load script" <<<"$output"; then
   exit 1
 fi
 if [ -z "$mode" ]; then
+  # Every shot against every earlier one: cksum first, cmp to confirm a match.
   shots=("$out"/*.png)
-  if [ ${#shots[@]} -ge 2 ] && [ -e "${shots[0]}" ]; then
-    frozen=1
-    for shot in "${shots[@]:1}"; do
-      if ! cmp -s "${shots[0]}" "$shot"; then
-        frozen=0
-        break
+  sums=()
+  repeated=0
+  if [ -e "${shots[0]}" ]; then
+    for i in "${!shots[@]}"; do
+      sums[$i]="$(cksum < "${shots[$i]}")"
+      name="$(basename "${shots[$i]}")"
+      if grep -F "screenshot $name " "$out/log.txt" | grep -qF "(may repeat)"; then
+        continue
       fi
+      for ((j = 0; j < i; j++)); do
+        if [ "${sums[$j]}" = "${sums[$i]}" ] && cmp -s "${shots[$j]}" "${shots[$i]}"; then
+          echo "FAILED: $name is identical to $(basename "${shots[$j]}"); the window stopped drawing (covered, minimised or on another Space?)." >&2
+          repeated=1
+          break
+        fi
+      done
     done
-    if [ $frozen -eq 1 ]; then
-      echo "FAILED: all ${#shots[@]} screenshots are identical; the window stopped drawing (covered, minimised or on another Space?)." >&2
-      exit 1
-    fi
-    for i in $(seq 1 $((${#shots[@]} - 1))); do
-      if cmp -s "${shots[$((i - 1))]}" "${shots[$i]}"; then
-        echo "harness: warning: $(basename "${shots[$i]}") is identical to the screenshot before it; was the window covered?" >&2
-      fi
-    done
+  fi
+  if [ $repeated -eq 1 ]; then
+    exit 1
   fi
 fi
 echo "output in $out"

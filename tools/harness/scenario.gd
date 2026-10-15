@@ -44,9 +44,11 @@ func frames(count: int) -> void:
 	await harness.frames(count)
 
 
-## Saves a PNG of the window to the output directory. Headless runs log and skip it.
-func screenshot(name: String) -> void:
-	await harness.screenshot(name)
+## Saves a PNG of the window to the output directory. Headless runs log and skip it. A rendered
+## run fails when a shot is byte-identical to an earlier one (the window stopped drawing),
+## unless the scenario passes `may_repeat` for a shot meant to show that nothing changed.
+func screenshot(name: String, may_repeat: bool = false) -> void:
+	await harness.screenshot(name, may_repeat)
 
 
 ## Opens the build panel the way the player does: presses the Build button (unless the panel

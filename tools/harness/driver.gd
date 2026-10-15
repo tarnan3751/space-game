@@ -133,11 +133,14 @@ func frames(count: int) -> void:
 		await process_frame
 
 
-func screenshot(name: String) -> void:
+## `may_repeat` marks a shot that may match an earlier one byte for byte: its log line ends
+## in "(may repeat)", which exempts it from run.sh's stale-frame guard.
+func screenshot(name: String, may_repeat: bool = false) -> void:
 	_screenshots += 1
 	var file_name := "%02d-%s.png" % [_screenshots, name]
+	var marker := " (may repeat)" if may_repeat else ""
 	if headless:
-		say("screenshot %s skipped (headless)" % file_name)
+		say("screenshot %s skipped (headless)%s" % [file_name, marker])
 		return
 	# Two frames so the scene and the HUD reflect the latest state change.
 	await process_frame
@@ -146,6 +149,6 @@ func screenshot(name: String) -> void:
 	var path := out_dir.path_join(file_name)
 	var error := image.save_png(path)
 	if error == OK:
-		say("screenshot %s (%dx%d)" % [file_name, image.get_width(), image.get_height()])
+		say("screenshot %s (%dx%d)%s" % [file_name, image.get_width(), image.get_height(), marker])
 	else:
 		check(false, "could not save %s: %s" % [path, error_string(error)])

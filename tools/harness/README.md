@@ -48,11 +48,12 @@ later screenshot repeating its last frame, so `run.sh` guards rendered runs thre
   it is waiting and polls every two seconds for up to twenty minutes, then fails; a lock older
   than fifteen minutes was left by a run that died and is taken over. A lane just runs `run.sh`
   and waits. Headless runs take no lock.
-- A rendered run whose screenshots are all byte-identical fails. Two identical in a row print a
-  warning only, since a scenario may mean to show that nothing changed.
+- A rendered run fails when any screenshot is byte-identical to any earlier one, so a window
+  that stops drawing part-way is caught too. A shot meant to show that nothing changed is taken
+  with `screenshot(name, true)`: the log line ends in `(may repeat)` and `run.sh` exempts it.
 
-A run exits 0 only when every `check()` passed, Godot logged no `SCRIPT ERROR`, and a rendered
-run's screenshots are not all identical. The last lines of `log.txt` are `HARNESS PASS:
+A run exits 0 only when every `check()` passed, Godot logged no `SCRIPT ERROR`, and no rendered
+screenshot repeats an earlier one unless it may. The last lines of `log.txt` are `HARNESS PASS:
 <scenario>` or `HARNESS FAIL: <scenario>, N failed check(s)` followed by each failed check.
 
 ## How a run is isolated
@@ -102,7 +103,8 @@ Helpers on `HarnessScenario`:
   does; construction finishes and production is paid exactly as it would over real time.
 - `await frames(n)` — waits `n` frames, so the views and the HUD catch up with a state change
   before a screenshot or a check of a view.
-- `await screenshot(name)` — saves `NN-name.png` in a rendered run, logs a skip headless.
+- `await screenshot(name, may_repeat = false)` — saves `NN-name.png` in a rendered run, logs a
+  skip headless. `may_repeat` exempts the shot from the guard against repeated frames.
 - `tap_cell(main, cell)` — emits `WorldInput.tapped` at the screen position of a cell's
   centre, so `PlacementController` handles it exactly as a real tap.
 - `await open_build_menu(main)` — presses the HUD's Build button (unless the build panel is
