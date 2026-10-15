@@ -105,8 +105,6 @@ static var CRYSTAL_LAMP := Surf.make(MaterialKit.Layer.GLOW, MaterialKit.CRYSTAL
 static var LEG := Surf.make(MaterialKit.Layer.PLATE, MaterialKit.HULL_MID)
 ## The conveyor belt: grating running up towards the hopper.
 static var BELT := Surf.make(MaterialKit.Layer.GRATING, MaterialKit.GUNMETAL, 3.0, Surf.FLOW, false, true, 0.7)
-## The exhaust stacks' puffs: pale hologram smoke, bobbing.
-static var PUFF := Surf.make(MaterialKit.Layer.GLOW, MaterialKit.HULL_LIGHT, 1.0, Surf.HOLO | Surf.BOB, true)
 static var STACK := Surf.make(MaterialKit.Layer.PIPE, MaterialKit.HULL_MID, 2.0, Surf.LIT, true)
 static var SOOT := Surf.make(MaterialKit.Layer.FLAT, MaterialKit.INK)
 static var ENGINE_VENT := Surf.make(MaterialKit.Layer.VENT, MaterialKit.HULL_DARK, 2.0)
@@ -255,9 +253,7 @@ static func _stack(m: LowPolyMesh, pos: Vector3, height: float, gold: bool, phas
 	m.prism(0.09, 0.09, height, 16, pos, STACK)
 	m.ring(0.07, 0.12, 0.08, 16, pos + Vector3(0, height, 0), Parts.GOLD_ROUND if gold else Parts.HULL_DARK_ROUND)
 	m.disc(0.07, 16, pos + Vector3(0, height + 0.04, 0), SOOT)
-	for k: int in 2:
-		m.orb(0.06 + 0.015 * k, 8, 3, pos + Vector3(0.03 * k, height + 0.2 + 0.16 * k, 0.0),
-			PUFF.phased(fposmod(phase + 0.4 * k, 1.0)))
+	Parts.puffs(m, pos + Vector3(0, height + 0.08, 0), phase, 2, 8, 3)
 
 
 ## The walking beam rocking on its pin, built along ACROSS: a beam with a horse head over the
