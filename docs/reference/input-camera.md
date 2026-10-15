@@ -173,23 +173,27 @@ drawn from `SeededRng.new(SCENERY_SEED)` (7) in that order, so every player's ba
 same landscape. How each looks is in `art-style.md`, **Environment**:
 
 - **The ground**: a `PlaneMesh` of the grid's size, flat at y = 0 (the camera picks against that
-  plane), with `ground.gdshader` on the field texture (`assets/textures/field.png`, loaded as an
-  `Image` and mipmapped here) and the field's colour roles: landing plates, dust, comic craters, a
-  cell grid whose `line_strength` is faint by default and brighter while placing; `grid_size` is
-  a uniform.
+  plane), with `ground.gdshader` on the field texture (`assets/textures/field.png`, an atlas of
+  four plate tiles loaded as an `Image` and mipmapped here) and the field's colour roles: landing
+  plates, each one of the tiles turned its own way, with inked craters, pebbles, bolts, joints and
+  patches lit from `SUN_ACROSS`, and a cell grid whose `line_strength` is faint by default and
+  brighter while placing; `grid_size` and `sun_across` are uniforms.
 - **The curb** (`boundary`): a low concrete band round the field, `CURB_GAP` (0.3) outside its
   edge, with a glowing stud at every plate seam and on each cut corner; casts no shadow.
 - **The terrain**: one smooth-shaded, indexed `ArrayMesh` from the field's edge out to
   ±`TERRAIN_EXTENT` (100), on a lattice of 1 unit within `TERRAIN_FINE_REACH` (50) of the centre
   and of `TERRAIN_COARSE` (2) beyond, whose inner edge lies on the field's at y = 0, so the two
-  meet with no seam; it is within 0.03 of flat under the curb and reaches its relief 3 units out.
+  meet with no seam; it is within 0.03 of flat under the curb, reaches its relief between 4 and 11
+  units out, wandering along the edge, and is roughened by a low rubble from 0.8 out.
   Its craters, mesas, channel and dunes are placed from the seed; it has its ink outline, receives
   shadows and casts none. `terrain_height(x, z)` is its height function, which the harness
-  marches the view's rays over. At the widest zoom it fills the view with the focus anywhere on
-  the grid on every aspect up to about 2.98:1 (a 19.5:9 phone is 2.17:1); beyond that the clear
-  colour shows.
-- **The rocks**: `ROCK_COUNT` (80) chamfered rocks, some stacked, in one mesh with its outline,
-  on the terrain clear of the curb.
+  marches the view's rays over, and `blend_end(x, z)` how far out from the field its relief is full
+  there, which the harness checks wanders along each side. At the widest zoom it fills the view
+  with the focus anywhere on the grid on every aspect up to about 2.98:1 (a 19.5:9 phone is
+  2.17:1); beyond that the clear colour shows.
+- **The rocks**: `ROCK_COUNT` (80) chamfered rocks, some stacked, on the terrain clear of the
+  curb, and `RUBBLE_ROCKS` (36) small ones strewn round the field 1.6 to 6.6 units out, all in one
+  mesh with its outline.
 - **The outcrops**: six to ten clusters of glowing crystal shards in one mesh with its outline,
   never within `OUTCROP_GAP` (4) of the field.
 

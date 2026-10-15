@@ -138,15 +138,16 @@ maxed from across the base. Under the warm key light every lit colour leans warm
 The field's and the terrain's roles are picked so that, under the warm key light and over their
 textures, they render as the art direction asks: each is bluer and more saturated than it shows.
 The rendered column is the average over flat ground at the widest zoom (the `environment`
-scenario's widest shot, measured in HSL): the field as a whole, plates, dust, drifts and craters
-together, and the ring's flat dust. The field is the lighter, cooler plain; the ring the deeper,
-more saturated land round it; the buildings' hulls the lightest things on screen.
+scenario's widest shot, measured in HSL): the field as a whole, plates, dust, marks, seams and
+grid together, over each quarter of it clear of the HUD and the buildings; and the ring's flat
+dust. The field is the lighter, cooler plain; the ring the deeper, more saturated land round it;
+the buildings' hulls the lightest things on screen.
 
 | Role | Constant | Value | Rendered | Where |
 | --- | --- | --- | --- | --- |
-| Field dust | `FIELD` | `543FCC` | the field: `5B5197` to `5F549D` (L 0.46 to 0.48, S 0.30) | the field's dust, covering a plate at 60 %; the most saturated, as the plate greys it |
-| Field light | `FIELD_LIGHT` | `827FD7` | | the dust's light drifts, lit crater walls |
-| Field dark | `FIELD_DARK` | `4D479F` | | crater shadows, pebbles' shadow sides |
+| Field dust | `FIELD` | `543FCC` | the field: `554B94` to `584E99` (L 0.44 to 0.45, S 0.32) | the field's dust, covering a plate at 60 %; the most saturated, as the plate greys it |
+| Field light | `FIELD_LIGHT` | `827FD7` | | the lit sides of the field's marks (crater walls, pebbles, bolts), its light tones |
+| Field dark | `FIELD_DARK` | `4D479F` | | the shadow sides of the field's marks, its dark tones (crater floors, patches, stipple) |
 | Field plate | `FIELD_PLATE` | `8083C3` | | the landing plates under the dust (a cooler grey-violet) |
 | Terrain | `TERRAIN` | `564AC5` | the ring's flats: `4F4398` to `5143A0` (L 0.43 to 0.45, S 0.39 to 0.40) | the ring's dust |
 | Terrain light | `TERRAIN_LIGHT` | `7A73E3` | | dust drifts and the lit side of slopes over 25 degrees |
@@ -154,8 +155,8 @@ more saturated land round it; the buildings' hulls the lightest things on screen
 | Rock | `ROCK` | `50619B` | | slopes over 35 degrees (crater walls, mesa sides), the scenery rocks' sides, the crystal harvester's rock bed |
 | Rock lit | `ROCK_LIT` | `768BC9` | | the scenery rocks' chamfers and tops |
 
-The shard flecks on the field take `CRYSTAL`; the curb is `CONCRETE` with `ENERGY` studs; the
-outcrops are `CRYSTAL`, `METAL` and `ANTIMATTER`.
+The curb is `CONCRETE` with `ENERGY` studs; the outcrops are `CRYSTAL`, `METAL` and
+`ANTIMATTER`.
 
 ## The material kit
 
@@ -193,7 +194,7 @@ mipmaps (the Compatibility renderer makes none for a layered texture) and calls
 `create_from_images`. That takes about 12 ms on the development Mac, once.
 
 **Regenerating.** `tools/gen_textures.gd` draws every layer, and then the field texture
-(**Environment**), with its own wrapped line, disc, ring, crescent, polygon and value-noise
+(**Environment**), with its own wrapped line, disc, ring, polygon, lean and value-noise
 helpers, each image from its own seed through `SeededRng`, so two runs write byte-identical PNGs.
 After an import (the gate does one):
 
@@ -440,28 +441,63 @@ builds it all once; the terrain, the rocks and the outcrops come from `SeededRng
 `SCENERY_SEED` (7), so every base sits in the same landscape (`input-camera.md`, **BaseView**).
 
 **The field** (`ground.gdshader`, on the 40×40 `PlaneMesh` at y = 0): landing plates four cells
-square, each the plate tint varied 4 % either way by a cell hash, covered at 60 % by the dust.
+square, each the plate tint varied 4 % either way in value by a cell hash and up to 3 % warmer or
+cooler (red up and blue down, or the reverse) by a second, covered at 60 % by the dust.
 Ink seams 2 px wide run along every fourth grid line and an ink line 3 px wide along the field's
 edge, both at a 720 px viewport height and scaled with it, like the ink outline; the 1-cell grid
 stays in holographic cyan (`line_strength` 0.1, 0.45 while placing). A value noise twelve cells
 across varies the plain 6 % either way, and it darkens by 10 % from half way out to its edge. The
 lighting is `light()` from `toon_common`, as on the buildings.
 
-The field texture, `assets/textures/field.png` (1024×1024, one repeat per plate, 256 pixels a
-cell, the image importer like the kit), holds weights, not colours, so the tints stay
-`MaterialKit` roles: R dust noise, G shade, B ink, A light (0.5) and a shard fleck (1). Per two
-cells it has one large crater and two small ones, ten pebbles and two cracks, placed freely over
-the plate (four large and eight small craters, forty pebbles and eight cracks in all), so the
-craters form no lattice. The craters are drawn comic style: an ink rim heavier on the side towards
-the light, the inner wall there in full shade, the far wall lit, and a light and a dark crescent
-outside. The pebbles are polygons with 1.5 px ink edges, a cast shadow, a dark side and a lit top;
-the cracks long hairlines; and a few shard flecks glint. All of it is shaded from the key light's
-direction across the ground (`SUN` in the generator), so the texture is never turned. The shader
-samples it twice: shifted by an offset of each plate's own, for the detail, so neighbouring plates
-do not repeat; and turned 37 degrees at 0.31 repeats a cell, for the dust's mottling, so its blobs
-are one to two cells across and do not repeat with the plates. Where the dust passes its step, a
-light drift lies over the plate in `FIELD_LIGHT` and buries 95 % of the detail under it, so the
-plain reads as big flat areas of colour.
+The field texture, `assets/textures/field.png` (1024×1024, the image importer like the kit), is
+an atlas of four plate tiles, 512 pixels square (128 a cell), tile q at column q % 2 and row q / 2.
+It holds weights, not colours, so the tints stay `MaterialKit` roles, and no light is baked in:
+
+- R and G, the lean: the way the surface's normal leans across the tile, along its x and y, 0.5
+  flat and 0 and 1 a full lean of −1 and +1. A dome leans out from its middle; a crater's wall
+  leans in, towards its centre.
+- B, ink.
+- A, tone: 0.5 neutral; below it mixes towards `FIELD_DARK` and above it towards `FIELD_LIGHT`,
+  each in full at 0 and 1.
+
+The four tiles share one base, so they sit together at a glance: a fine grain over all (the tone
+0.04 either way, on lattices of 8 and 16 pixels: tooth, not blobs), then 0 *plain*: three pits,
+a crack, six pebbles and stipple along one side; 1 *jointed*: a joint, a bolt in each corner, a
+crater of 45, two pits and four pebbles; 2 *cratered*: a crater of 64 with two cracks running out
+from its rim, three pits and eight pebbles; 3 *patched*: a bolted patch, a crater of 45, a crack,
+five pebbles and stipple along two adjacent sides. Every mark is a hard-edged, inked shape (sizes
+in pixels of the tile):
+
+- a crater, radius 45 to 64: an ink rim 3 wide, the wall leaning in at 0.8 from 0.45 radii to the
+  rim, the rim's outer slope, from 1.0 to 1.3 radii, leaning out at 0.45, a flat floor at tone
+  0.35;
+- a pit, a crater of 10 to 19 with a rim 2 wide and its floor at 0.4;
+- a pebble, a jittered hexagon of 6 to 15 outlined in 1.5, leaning out at 0.7, tone 0.6;
+- a bolt, a disc of 7 ringed in 1.5, leaning out at 0.6, its head tone 0.6; a jointed plate's
+  bolts sit 14 in from its corners;
+- a joint, a line 2 wide right across the plate, parallel to a side, 0.3 to 0.7 of the way across
+  but clear of the middle cell line, the plate's two sides at tone 0.47 and 0.53;
+- a crack, 1.5 wide and 15 to 30 long;
+- a patch, 1 to 1.4 cells by 0.6 to 0.9, bordered in ink 2 wide, tone 0.44, a bolt in each corner;
+- stipple, ink dots 2 across, on dark tone, thinning out from a side to nothing 0.6 cells in.
+
+Marks never overlap and keep 12 pixels clear of a tile's edges (but the stipple, which runs from a
+side, a joint, which runs across, and the corner bolts), so none straddles a seam and the mipmaps'
+bleed between quarters at the widest zoom does not show.
+
+Each plate takes a tile (its variant, 0 to 3) and an orientation (0 to 7: a quarter turn count 0 to
+3, mirrored from 4 on) from its cell hash at two offsets, so a stipple's side and a joint's
+direction turn with the plate: 32 looks, and the hash offsets are picked so that no two plates of
+the 40×40 field that touch, along a side or at a corner, share both (checked on the development
+Mac's GPU). The shader turns the plate's own coordinates into the tile's about its middle and
+samples the atlas with the gradients of the unturned coordinates, so the mipmap does not jump at a
+seam. It turns the stored lean back into the field's axes (the turn's transpose) and lights it from
+`sun_across` (`BaseView.SUN_ACROSS`, the key light's direction across the ground): where the lean
+towards the sun passes 0.25 it mixes towards `FIELD_LIGHT`, in full by 0.4, and away from it
+towards `FIELD_DARK` the same way. So however a tile lies, a crater's wall is lit on the side away
+from the sun and a pebble on the side towards it. Then the tone, then the ink. There is no dust
+texture, drift or fleck over the plates: their variety is the tiles' marks, the turn, and each
+plate's tint.
 
 **The curb** (`boundary`): a concrete band 0.2 high and 0.3 wide, 0.3 outside the field's edge,
 its corners cut at 45 degrees and its top edges bevelled, with a glowing energy cyan stud (unlit,
@@ -471,12 +507,17 @@ casts a shadow.
 **The terrain ring**: one indexed mesh from the field's edge to ±100, on a lattice of points 1
 unit apart within 50 of the centre and 2 apart beyond; a coarse cell beside the fine lattice fans
 out from the fine point in the middle of its edge, so no point lies on another cell's edge. Its
-height function is flat out to 0.8 and the mesh is within 0.03 of flat under the curb (it has no
-point between the field's edge and a unit out); it reaches its full relief 3 units out. Its
+height function is flat out to 0.8 (`TERRAIN_FLAT`) and the mesh is within 0.03 of flat under the
+curb (it has no point between the field's edge and a unit out). From there the relief rises to its
+full height by a distance out that wanders along the edge between 4 and 11 units
+(`TERRAIN_BLEND_NEAR`, `TERRAIN_BLEND_FAR`, on a noise whose lattice is 4 units across), so no
+ramp, and no band of slope or shadow, runs straight along a side; and rubble, a noise 0.12 either
+way (`RUBBLE`) on a lattice 2.3 units across, roughens the ground from 0.8 out, in full by 2.8,
+whatever the relief, so the ground by the curb is low (under 0.3 three units out) and uneven. Its
 shapes:
 
-- ridged dunes, low beside the field and 5 units high from 18 out, whose flanks fall into the mid
-  band on their shadow side;
+- ridged dunes, 0.3 high beside the field and growing from where the relief is full to 5 units high
+  20 out, whose flanks fall into the mid band on their shadow side;
 - three to five craters, radius 6 to 12, each a flat floor 0.18 radii deep, a wall steepening to
   a rim 0.15 radii high and a gentler outer slope, in ground flattened round it;
 - two irregular flat-topped mesas towards the far edge of the view, 4 to 6 above the dunes' crests,
@@ -513,6 +554,14 @@ of 0.5 within the mesas' reach, a later item.
   sides, a shoulder ring, a chamfer and a low peak, flat shaded, sides in `ROCK` and chamfers and
   tops in `ROCK_LIT`; about a quarter of those over 1.6 units across carry a smaller rock on top.
   Each sits on the lowest ground under it. One mesh with its outline; the body casts shadows.
+- **Rubble**: 36 more rocks of the same make, 0.3 to 0.8 units across, strewn beside the curb
+  between 1.6 and 6.6 units outside the field (`RUBBLE_ROCKS`, `RUBBLE_ROCK_RADIUS`,
+  `RUBBLE_ROCK_OUT`), nine along each side, each in a stretch of the side of its own at a random
+  distance out, so they spread evenly, form no line, and the nearest is about a unit past the
+  curb's outer face. Each keeps clear of the craters, the mesas, the channel, the other rocks and
+  the outcrops, and rests on the lowest ground under it, sunk by a fifth of its radius. They are in
+  the rocks' mesh, and draw from the seed after the outcrops, so the rocks and the outcrops keep
+  their places.
 - **Crystal outcrops**: six to ten clusters of three to seven shards, each a six-sided crystal 0.6
   to 2 units long leaning out from the cluster's middle, on the crystal layer, unlit, in
   `CRYSTAL`, `METAL` and `ANTIMATTER` in turn from a seeded start, outlined. No part of one comes
@@ -521,9 +570,10 @@ of 0.5 within the mesas' reach, a later item.
 
 **Budgets**: the field 1 draw; the curb, the terrain, the rocks and the outcrops a body and an
 outline each. The terrain is 32,000 triangles on 16,280 points (the `environment` scenario allows
-35,000), the rocks about 2,800 and the outcrops about 900. It is all built once, in about 80 ms on
-the development Mac under load (the kit's build and the field texture's load and mipmaps included),
-the terrain about 50 ms of it; phones are unmeasured. Nothing runs per frame.
+35,000), the rocks about 3,900 (about 1,100 of them the rubble) and the outcrops about 900. It is
+all built once, in under 80 ms on the development Mac (76 to 79 warm, the kit's build and the field
+texture's load and mipmaps included), the terrain about 45 ms of it and the rubble about 5; phones
+are unmeasured. Nothing runs per frame.
 
 ## Cost
 
