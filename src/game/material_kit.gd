@@ -58,7 +58,7 @@ const TERRAIN_LIGHT := Color("7a73e3")
 const TERRAIN_DARK := Color("3e388c")
 const ROCK := Color("50619b")
 const ROCK_LIT := Color("768bc9")
-## The scene: the clear colour, the environment's ambient light and the key light.
+## The scene: the sky's base colour (deep space), the environment's ambient light and the key light.
 const SPACE := Color("0d0b1a")
 const AMBIENT := Color("8c8cff")
 const SUN := Color("fff4e0")
