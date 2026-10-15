@@ -232,8 +232,8 @@ static func ladder(m: LowPolyMesh, foot: Vector3, height: float, width: float, y
 
 # --- Effects shared by the model files (docs/reference/art-style.md, **Animation**) ----
 
-## A crackling arc's strut width.
-const ARC_WIDTH := 0.03
+## A crackling arc's radius: its segments are three-sided tubes about 0.03 across.
+const ARC_RADIUS := 0.02
 
 ## Smoke puffs: pale hologram smoke, bobbing; HULL_MID is too faint against the violet ground.
 static var SMOKE := Surf.make(MaterialKit.Layer.GLOW, MaterialKit.HULL_LIGHT, 1.0, Surf.HOLO | Surf.BOB, true)
@@ -262,10 +262,10 @@ static func on_sphere(radius: float, at: Vector2) -> Vector3:
 	return around(radius * cos(elevation), at.x, radius * sin(elevation))
 
 
-## A crackling arc from `from` to `to`: `segments` struts, the corners between them kinked
-## `kink` to either side of the straight line in turn, so JITTER has corners to shake. Built
-## for a spark() surface, which is never outlined; give each arc its own phase of it, so the
-## arcs flicker apart.
+## A crackling arc from `from` to `to`: `segments` thin three-sided tubes, the corners between
+## them kinked `kink` to either side of the straight line in turn, so JITTER has corners to
+## shake. Built for a spark() surface, which is never outlined; give each arc its own phase of
+## it, so the arcs flicker apart.
 static func arc(m: LowPolyMesh, from: Vector3, to: Vector3, segments: int, kink: float, surface: Surf) -> void:
 	var along := (to - from).normalized()
 	var side := along.cross(Vector3.UP)
@@ -277,7 +277,7 @@ static func arc(m: LowPolyMesh, from: Vector3, to: Vector3, segments: int, kink:
 		var point := from.lerp(to, float(k) / segments)
 		if k < segments:
 			point += side * kink * (1.0 if k % 2 == 1 else -1.0)
-		m.strut(last, point, ARC_WIDTH, surface)
+		pipe(m, last, point, ARC_RADIUS, surface, 3, false)
 		last = point
 
 

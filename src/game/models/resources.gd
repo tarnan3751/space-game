@@ -396,7 +396,7 @@ static var ANTIMATTER_GLASS := Surf.make(MaterialKit.Layer.GLASS, MaterialKit.AN
 ## its pylons.
 static var SIPHON_CORE_GLOW := Surf.make(MaterialKit.Layer.GLOW, MaterialKit.ANTIMATTER, 1.0, Surf.UNLIT | Surf.PULSE | Surf.BOB, true)
 static var COIL_CURRENT := Surf.make(MaterialKit.Layer.SCREEN, MaterialKit.ANTIMATTER, 3.0, Surf.UNLIT | Surf.FLOW, true, true, 0.75)
-static var ARC := Surf.make(MaterialKit.Layer.GLOW, MaterialKit.ANTIMATTER, 1.0, Surf.UNLIT | Surf.FLICKER | Surf.JITTER)
+static var ARC := Parts.spark(MaterialKit.ANTIMATTER)
 
 ## The antimatter siphon's core (the torus turns round it), its field pylons (degrees, the
 ## camera's corner left open) and the coils on the torus by level.
@@ -431,7 +431,7 @@ static func build_antimatter_siphon(p: Parts, level: int) -> void:
 	for k: int in SIPHON_PYLONS.size():
 		var tip := _field_pylon(m, SIPHON_PYLONS[k], level, gold)
 		var core := Vector3(0, SIPHON_CORE + 0.1, 0)
-		_arc(m, tip, core + (tip - core).normalized() * 0.2, 4, 0.05, ARC.phased(k / 3.0))
+		Parts.arc(m, tip, core + (tip - core).normalized() * 0.2, 4, 0.05, ARC.phased(k / 3.0))
 
 	# Capacitors piped to the pedestal.
 	_capacitor(m, Vector3(0.95, ground, 0.95), gold)
@@ -474,22 +474,6 @@ static func _field_pylon(m: LowPolyMesh, degrees: float, level: int, gold: bool)
 	var tip := head + Vector3(0, 0.08, 0) + inward * 0.3
 	m.orb(0.07 + 0.015 * level, 10, 4, tip, ANTIMATTER_GLOW)
 	return tip
-
-
-## A crackling arc from `from` to `to`: `segments` thin three-sided tubes zigzagging up to
-## `sway` either side of the line, so JITTER has corners to shake. Built for UNLIT, FLICKER
-## and JITTER surfaces, which are never outlined.
-static func _arc(m: LowPolyMesh, from: Vector3, to: Vector3, segments: int, sway: float, surface: Surf) -> void:
-	var along := to - from
-	var side := along.cross(Vector3.UP).normalized()
-	var up := side.cross(along).normalized()
-	var last := from
-	for k: int in range(1, segments + 1):
-		var point := from + along * (float(k) / segments)
-		if k < segments:
-			point += side * sway * (1.0 if k % 2 == 1 else -1.0) + up * sway * 0.6 * (1.0 if k % 3 == 1 else -1.0)
-		Parts.pipe(m, last, point, 0.02, surface, 3, false)
-		last = point
 
 
 ## A capacitor: an armoured block with a violet glass window and a glowing cap.
@@ -730,7 +714,7 @@ static func build_antimatter_vault(p: Parts, level: int) -> void:
 			gold, k / 4.0))
 	if gold:
 		for k: int in tips.size():
-			_arc(m, tips[k], tips[(k + 1) % tips.size()], 5, 0.07, ARC.phased(k / 4.0 + 0.1))
+			Parts.arc(m, tips[k], tips[(k + 1) % tips.size()], 5, 0.07, ARC.phased(k / 4.0 + 0.1))
 
 
 ## The vault door: a round plate in a rim, a hub and a three-spoke handwheel, violet lock
