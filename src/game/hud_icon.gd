@@ -13,8 +13,6 @@ const BOX := 40.0
 const OUTLINE := 2.5
 ## Inner edges between the facets of one part.
 const EDGE := 2.0
-## The drone's rotors' outline: thinner, so a small rotor keeps a light disc inside its rim.
-const ROTOR_OUTLINE := 1.5
 const SHADOW_OFFSET := Vector2(2, 2)
 
 ## "metal", "crystal", "antimatter" or "drones"; anything else draws a plain gem.
@@ -94,56 +92,34 @@ static func _orb(pen: Pen, tint: Color) -> void:
 	pen.band(_ellipse(centre, ring_radii, 0.0, PI, 12, tilt), ring_color)
 
 
-## A drone in three-quarter view, from the front-left and above: a saucer body, the icon's
-## mass (a darker underside band, a lighter top facet), under a canopy, an ink eye at its front,
-## and four small rotors on short arms, thinly outlined, the front two larger (a quarter of the
-## box) and lower, the rear two higher and partly behind the body.
+## A quadcopter seen from above, the drone's classic glyph, its parts kept clear of the drone
+## ring's sectors: a large light rotor disc on each diagonal with a white highlight and an ink
+## hub, round a rounded square body, the icon's colour, with a lighter facet and an ink eye at
+## its front.
 static func _drone(pen: Pen, tint: Color) -> void:
-	var arm_color := tint.darkened(0.35)
-	var rotor_color := tint.lightened(0.5)
-	# [x, y, half width] of each rotor.
-	for rear: Vector3 in [Vector3(10.5, 12.5, 3.8), Vector3(29.5, 12, 3.5)]:
-		pen.band(PackedVector2Array([Vector2(20, 18), Vector2(rear.x, rear.y)]), arm_color)
-		_rotor(pen, Vector2(rear.x, rear.y), rear.z, rotor_color)
-	# The saucer, the icon's mass: the top face's upper half, then the underside's lower half
-	# 4 lower.
-	var top_centre := Vector2(20, 18.5)
-	var radii := Vector2(11, 6)
-	var drop := Vector2(0, 4)
-	var body := _ellipse(top_centre, radii, PI, TAU, 14)
-	body.append_array(_ellipse(top_centre + drop, radii, 0.0, PI, 14))
+	var rotors: Array[Vector2] = [Vector2(12, 12), Vector2(28, 12), Vector2(12, 28), Vector2(28, 28)]
+	for centre: Vector2 in rotors:
+		var disc := _ellipse(centre, Vector2(6, 6), 0.0, TAU, 16)
+		pen.shape(disc, tint.lightened(0.5))
+		pen.facet(_ellipse(centre - Vector2(1.8, 1.8), Vector2(2.4, 2.4), 0.0, TAU, 10), Color(1, 1, 1, 0.8))
+		pen.outline(disc)
+		pen.facet(_ellipse(centre, Vector2(1.6, 1.6), 0.0, TAU, 8), Hud.INK)
+	var body := _rounded_square(Vector2(20, 20), 6.5, 4.0)
 	pen.shape(body, tint)
-	var rim := _ellipse(top_centre, radii, 0.0, PI, 14)
-	var underside := rim.duplicate()
-	var bottom := _ellipse(top_centre + drop, radii, 0.0, PI, 14)
-	bottom.reverse()
-	underside.append_array(bottom)
-	pen.facet(underside, tint.darkened(0.3))
-	pen.facet(_ellipse(Vector2(13.8, 17.5), Vector2(3, 1.6), 0.0, TAU, 10, -0.3), tint.lightened(0.45))
+	pen.facet(_ellipse(Vector2(17.2, 16.8), Vector2(2.2, 1.4), 0.0, TAU, 10, -0.7), tint.lightened(0.6))
 	pen.outline(body)
-	# The canopy, a dome on the top face inked along its crown only, and the eye on the front of
-	# the underside. Few inner lines, so the saucer stays a mass of colour at the ring's size.
-	var dome := _ellipse(Vector2(20.5, 18), Vector2(6, 5.5), PI, TAU, 12)
-	var canopy := dome.duplicate()
-	canopy.append_array(_ellipse(Vector2(20.5, 18), Vector2(6, 2.2), 0.0, PI, 12))
-	pen.shape(canopy, tint.lightened(0.55))
-	pen.facet(_ellipse(Vector2(18.5, 15.2), Vector2(2, 1.3), 0.0, TAU, 8, -0.5), Color(1, 1, 1, 0.85))
-	pen.edge(dome)
-	pen.facet(_ellipse(Vector2(17, 26.6), Vector2(2.4, 1.4), 0.0, TAU, 10), Hud.INK)
-	for front: Vector3 in [Vector3(33.5, 29.5, 4.8), Vector3(6.5, 30.5, 5.2)]:
-		var root := Vector2(20 + signf(front.x - 20) * 8.0, 25.5)
-		pen.band(PackedVector2Array([root, Vector2(front.x, front.y)]), arm_color)
-		_rotor(pen, Vector2(front.x, front.y), front.z, rotor_color)
+	pen.facet(_ellipse(Vector2(20, 21), Vector2(2.6, 2.6), 0.0, TAU, 12), Hud.INK)
 
 
-## A rotor seen from 35 degrees up: an ellipse `half_width` across each way of its centre, with
-## a highlight facet and a thin outline.
-static func _rotor(pen: Pen, centre: Vector2, half_width: float, fill: Color) -> void:
-	var radii := Vector2(half_width, half_width * 0.56)
-	var disc := _ellipse(centre, radii, 0.0, TAU, 16)
-	pen.shape(disc, fill)
-	pen.facet(_ellipse(centre - radii * Vector2(0.25, 0.2), radii * 0.45, 0.0, TAU, 10), Color(1, 1, 1, 0.7))
-	pen.outline(disc, ROTOR_OUTLINE)
+## A square `half` across each way of `centre`, its corners rounded to `radius`.
+static func _rounded_square(centre: Vector2, half: float, radius: float) -> PackedVector2Array:
+	var points := PackedVector2Array()
+	var inset := half - radius
+	for corner: int in 4:
+		var angle := -PI / 2.0 + corner * PI / 2.0
+		var at := centre + Vector2(signf(cos(angle + PI / 4.0)), signf(sin(angle + PI / 4.0))) * inset
+		points.append_array(_ellipse(at, Vector2(radius, radius), angle, angle + PI / 2.0, 4))
+	return points
 
 
 ## A cut gem, for a resource with no silhouette of its own.
@@ -206,9 +182,9 @@ class Pen:
 		if not shadow:
 			add_stroke(place(points), HudIcon.EDGE * _thinning, Hud.INK, false)
 
-	func outline(points: PackedVector2Array, width: float = HudIcon.OUTLINE) -> void:
+	func outline(points: PackedVector2Array) -> void:
 		if not shadow:
-			add_stroke(place(points), width * _thinning, Hud.INK, true)
+			add_stroke(place(points), HudIcon.OUTLINE * _thinning, Hud.INK, true)
 
 	## An open stroke with a shadow of its own: an ink band, and a core of `fill` unless the
 	## band is ink itself.

@@ -24,7 +24,7 @@ const HIGHLIGHT := Color(1, 1, 1, 0.35)
 const HIGHLIGHT_RADIUS := 23.6
 const HIGHLIGHT_WIDTH := 1.6
 const HIGHLIGHT_INSET := PI / 60.0
-const ICON_SIZE := 26.0
+const ICON_SIZE := 30.0
 
 var _free: int = 0
 var _total: int = 0
