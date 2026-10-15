@@ -50,8 +50,9 @@ const FIELD := Color("543fcc")
 const FIELD_LIGHT := Color("827fd7")
 const FIELD_DARK := Color("4d479f")
 const FIELD_PLATE := Color("8083c3")
-## The terrain around the field, a shade deeper: its dust, lit slopes and drifts, and crater
-## floors and shadow sides; and rock, its faces and lit faces.
+## The terrain around the field, a shade deeper: its dust, its lit slopes and the light sides of
+## its marks and ripples, and its crater floors, shadow sides and the dark sides of its marks,
+## ripples and strata; and rock, its faces, and its lit faces and strata.
 const TERRAIN := Color("564ac5")
 const TERRAIN_LIGHT := Color("7a73e3")
 const TERRAIN_DARK := Color("3e388c")
@@ -68,6 +69,10 @@ const GHOST_MIX := 0.65
 const TOON_SHADER := preload("res://src/game/toon.gdshader")
 const INK_SHADER := preload("res://src/game/ink.gdshader")
 const HOLO_SHADER := preload("res://src/game/holo.gdshader")
+const TERRAIN_SHADER := preload("res://src/game/terrain.gdshader")
+## The rock texture the terrain's steep faces are drawn from, imported as an Image
+## (tools/gen_textures.gd).
+const TERRAIN_ROCK_TEXTURE := "res://assets/textures/terrain_rock.png"
 
 static var _texture: Texture2DArray
 static var _toon: ShaderMaterial
@@ -76,6 +81,7 @@ static var _ink_selected: ShaderMaterial
 static var _holo: ShaderMaterial
 static var _ghost_valid: ShaderMaterial
 static var _ghost_invalid: ShaderMaterial
+static var _terrain: ShaderMaterial
 
 
 ## The kit: one layer per entry of LAYERS, mipmapped, built on first use.
@@ -134,6 +140,24 @@ static func ghost_invalid() -> ShaderMaterial:
 	if _ghost_invalid == null:
 		_ghost_invalid = _toon_material(Color(DEFENCE, GHOST_MIX))
 	return _ghost_invalid
+
+
+## The terrain ring's body: its vertex tint drawn over with the field texture's marks and the rock
+## texture's strata, in the terrain's roles. Built on first use, the rock texture set then;
+## BaseView sets the field texture (the ground's), the field's size and the sun's direction on it.
+static func terrain() -> ShaderMaterial:
+	if _terrain == null:
+		var rock: Image = load(TERRAIN_ROCK_TEXTURE)
+		# Mipmapped here: the image importer keeps the PNG as it is.
+		rock.generate_mipmaps()
+		_terrain = ShaderMaterial.new()
+		_terrain.shader = TERRAIN_SHADER
+		_terrain.set_shader_parameter("rock", ImageTexture.create_from_image(rock))
+		_terrain.set_shader_parameter("terrain_light", TERRAIN_LIGHT)
+		_terrain.set_shader_parameter("terrain_dark", TERRAIN_DARK)
+		_terrain.set_shader_parameter("rock_lit", ROCK_LIT)
+		_terrain.set_shader_parameter("ink_color", INK)
+	return _terrain
 
 
 static func _toon_material(ghost_tint: Color) -> ShaderMaterial:

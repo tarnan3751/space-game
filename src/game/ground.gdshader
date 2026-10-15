@@ -66,7 +66,7 @@ void fragment() {
 	vec2 cells_per_px = vec2(length(vec2(dFdx(cell.x), dFdy(cell.x))), length(vec2(dFdx(cell.y), dFdy(cell.y))));
 
 	mat2 turn;
-	vec4 marks = field_marks(field, cell, TILE, vec2(VARIANT_HASH, ORIENTATION_HASH), turn);
+	vec4 marks = field_marks(field, cell, TILE, vec2(VARIANT_HASH, ORIENTATION_HASH), false, turn);
 	vec3 albedo = mix(plate_color.rgb, field_color.rgb, DUST_SHOWS) * grain(cell, cells_per_px);
 	albedo = shade_marks(albedo, marks, turn, sun_across, field_light.rgb, field_dark.rgb, ink_color.rgb);
 

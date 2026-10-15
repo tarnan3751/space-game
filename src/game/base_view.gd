@@ -8,9 +8,10 @@ extends Node3D
 ##
 ## The terrain, the rocks and the crystal outcrops are generated from SCENERY_SEED, so every
 ## player's base sits in the same landscape: a ring of dunes, craters, mesas and a dry channel
-## rising from low, rough ground beside the curb along an edge that wanders, smooth shaded and
-## painted from the material kit's dust and rock by slope, with chamfered rocks, small ones strewn
-## beside the curb as rubble, and glowing crystal clusters on it. Each is one mesh with its ink
+## rising from low, rough ground beside the curb along an edge that wanders, smooth shaded, tinted
+## by slope and drawn over by the terrain shader (the field's marks, wind ripples, rock strata),
+## with chamfered rocks, small ones strewn beside the curb as rubble, and glowing crystal clusters
+## on it. Each is one mesh with its ink
 ## outline.
 
 const GROUND_SHADER := preload("res://src/game/ground.gdshader")
@@ -33,7 +34,7 @@ const TERRAIN_FLAT := 0.8
 const TERRAIN_BLEND_NEAR := 4.0
 const TERRAIN_BLEND_FAR := 11.0
 const RUBBLE := 0.12
-## Spacing of the value-noise lattice behind the dunes and the dust drifts.
+## Spacing of the value-noise lattice behind the dunes.
 const NOISE_CELL := 7.0
 const NOISE_SIZE := 24
 ## The dunes' height next to the field and from 20 units out (they grow from where the relief is
@@ -53,23 +54,17 @@ const MESA_FOOT := 0.4
 const CHANNEL_WIDTH := 2.2
 const CHANNEL_DEPTH := 1.2
 const CHANNEL_MEANDER := 0.22
-## Texture repeats per world unit on the terrain: one layer covers between five and six units.
-const TERRAIN_UV := 0.18
-## The terrain's painting: the rock tint where its normal's y is below ROCK_SLOPE_Y (slopes over
-## 35 degrees); the shadow side of slopes over 18 degrees (SHADOW_SLOPE_Y) dark and the lit side
-## of slopes over 25 degrees (LIT_SLOPE_Y) light; crater floors (within CRATER_FLOOR radii of the
-## centre) dark; dust drifts where the drift noise passes DRIFT. Each blends in smoothly across its
-## threshold (the drifts over PAINT_SOFTNESS either side), so the patches between points are
-## rounded. The texture is the dust layer everywhere but on the mesas' walls, which take the rock
-## layer: the shader cannot blend two layers, so they switch only at the mesas' rims.
+## The terrain's tint: the rock tint where its normal's y is below ROCK_SLOPE_Y (slopes over 35
+## degrees); the shadow side of slopes over 18 degrees (SHADOW_SLOPE_Y) dark and the lit side of
+## slopes over 25 degrees (LIT_SLOPE_Y) light; crater floors (within CRATER_FLOOR radii of the
+## centre) dark. Each blends in smoothly across its threshold, so the patches between points are
+## rounded. The terrain shader draws the surface over it (MaterialKit.terrain).
 const ROCK_SLOPE_Y := 0.819
 const SHADOW_SLOPE_Y := 0.95
 const LIT_SLOPE_Y := 0.906
 const CRATER_FLOOR := 0.75
-const DRIFT := 0.76
-const PAINT_SOFTNESS := 0.08
 ## Towards the key light across the ground (main.gd's sun), in world x and z: the terrain's
-## painting and the ground shader's light on the field's marks.
+## tint, and the ground and terrain shaders' light on their marks.
 const SUN_ACROSS := Vector2(-0.5, 0.866)
 ## The rocks: how many, their radii (world units, most of them small), and how many in a hundred
 ## of those over 0.8 in radius carry a smaller rock on top.
@@ -135,6 +130,8 @@ var craters: Array[Vector3] = []
 var mesas: Array[Vector4] = []
 
 var _ground_material: ShaderMaterial
+## The field texture, which the ground and the terrain draw their marks from.
+var _field_texture: ImageTexture
 ## The walls `walls` draws, as (x << 32 | y << 16 | level) in id order: unchanged, no rebuild.
 var _wall_signature: PackedInt64Array = PackedInt64Array()
 ## The state the pending wall rebuild reads; null when none is pending.
@@ -268,7 +265,8 @@ func _build_ground() -> void:
 	_ground_material = ShaderMaterial.new()
 	_ground_material.shader = GROUND_SHADER
 	_ground_material.set_shader_parameter("grid_size", Vector2(grid_size))
-	_ground_material.set_shader_parameter("field", ImageTexture.create_from_image(field))
+	_field_texture = ImageTexture.create_from_image(field)
+	_ground_material.set_shader_parameter("field", _field_texture)
 	_ground_material.set_shader_parameter("field_color", MaterialKit.FIELD)
 	_ground_material.set_shader_parameter("field_light", MaterialKit.FIELD_LIGHT)
 	_ground_material.set_shader_parameter("field_dark", MaterialKit.FIELD_DARK)
@@ -369,9 +367,9 @@ func _add_mesh(mesh: Mesh, casts_shadow: bool) -> MeshInstance3D:
 ## fine point in the middle of its edge, so no point lies on another cell's edge. Each point's
 ## normal comes from its lattice neighbours' heights, once, and the ink outline (one more mesh,
 ## on the same points and normals) inks the ridges and crater rims the camera sees over. Each
-## point is painted by slope and place (ROCK_SLOPE_Y, SHADOW_SLOPE_Y, CRATER_FLOOR, DRIFT): its
-## tint, which the faces between points blend, and its kit layer, the dust but on the mesas' walls
-## (rock). The terrain receives shadows and casts none.
+## point is tinted by slope and place (ROCK_SLOPE_Y, SHADOW_SLOPE_Y, CRATER_FLOOR), a tint the
+## faces between points blend and the terrain shader draws over (MaterialKit.terrain). The
+## terrain receives shadows and casts none.
 func _build_terrain(rng: SeededRng) -> void:
 	_noise.resize(NOISE_SIZE * NOISE_SIZE)
 	for i: int in _noise.size():
@@ -426,14 +424,7 @@ func _build_terrain(rng: SeededRng) -> void:
 			vertices.append(Vector3(x, y, z))
 
 	var normals := PackedVector3Array()
-	var uvs := PackedVector2Array()
-	var uv2s := PackedVector2Array()
 	var colors := PackedColorArray()
-	# Only points in here can be on a mesa's wall.
-	var mesa_area := Rect2()
-	for k: int in mesas.size():
-		var around := Rect2(mesas[k].x, mesas[k].y, 0.0, 0.0).grow(mesas[k].z + 3.0)
-		mesa_area = around if k == 0 else mesa_area.merge(around)
 	for v: int in vertices.size():
 		var place := places[v]
 		var column := place % columns
@@ -473,7 +464,6 @@ func _build_terrain(rng: SeededRng) -> void:
 		var normal := Vector3(-along_x, 1.0, -along_z).normalized()
 		normals.append(normal)
 		var at := vertices[v]
-		uvs.append(Vector2(at.x, at.z) * TERRAIN_UV)
 		# Each weight steps smoothly from 0 to 1 across its threshold. A slope is steeper than a
 		# threshold where its normal's y is below it.
 		var steep := smoothstep(ROCK_SLOPE_Y + 0.1, ROCK_SLOPE_Y - 0.1, normal.y)
@@ -487,15 +477,9 @@ func _build_terrain(rng: SeededRng) -> void:
 			var floor_weight := 0.0
 			if step == 1:
 				floor_weight = _crater_floor(at.x, at.z)
-			var drift := smoothstep(DRIFT - PAINT_SOFTNESS, DRIFT + PAINT_SOFTNESS,
-				_noise_at(at.x * 1.9 + 71.0, at.z * 1.9 + 23.0))
-			tint = MaterialKit.TERRAIN.lerp(MaterialKit.TERRAIN_LIGHT, maxf(lit_side, drift)) \
+			tint = MaterialKit.TERRAIN.lerp(MaterialKit.TERRAIN_LIGHT, lit_side) \
 				.lerp(MaterialKit.TERRAIN_DARK, maxf(shadow_side, floor_weight)) \
 				.lerp(MaterialKit.ROCK, steep)
-		var layer := MaterialKit.Layer.REGOLITH
-		if mesa_area.has_point(Vector2(at.x, at.z)) and _on_mesa_wall(at.x, at.z):
-			layer = MaterialKit.Layer.ROCK
-		uv2s.append(Vector2(layer, Surf.LIT))
 		colors.append(tint)
 
 	# The cells' triangles, going round as (i, j), (i + 1, j), (i + 1, j + 1), (i, j + 1), which
@@ -554,12 +538,14 @@ func _build_terrain(rng: SeededRng) -> void:
 	var hull := ArrayMesh.new()
 	hull.add_surface_from_arrays(Mesh.PRIMITIVE_TRIANGLES, arrays)
 	hull.surface_set_material(0, MaterialKit.ink())
-	arrays[Mesh.ARRAY_TEX_UV] = uvs
-	arrays[Mesh.ARRAY_TEX_UV2] = uv2s
 	arrays[Mesh.ARRAY_COLOR] = colors
 	var body := ArrayMesh.new()
 	body.add_surface_from_arrays(Mesh.PRIMITIVE_TRIANGLES, arrays)
-	body.surface_set_material(0, MaterialKit.toon())
+	var material := MaterialKit.terrain()
+	material.set_shader_parameter("field", _field_texture)
+	material.set_shader_parameter("grid_size", Vector2(grid_size))
+	material.set_shader_parameter("sun_across", SUN_ACROSS)
+	body.surface_set_material(0, material)
 	terrain = _add_mesh(body, false)
 	terrain_outline = _add_mesh(hull, false)
 
@@ -851,19 +837,6 @@ func _mesa_edge(k: int, dx: float, dz: float) -> float:
 	var turn := atan2(dz, dx)
 	var phases := _mesa_phases[k]
 	return mesas[k].z * (1.0 + 0.12 * sin(3.0 * turn + phases.x) + 0.06 * sin(5.0 * turn + phases.y))
-
-
-## Whether a point is on a mesa's wall: below its rim's edge and out to a unit past its foot,
-## where the rock layer meets the dust on level ground.
-func _on_mesa_wall(x: float, z: float) -> bool:
-	for k: int in mesas.size():
-		var dx := x - mesas[k].x
-		var dz := z - mesas[k].y
-		if dx * dx + dz * dz < (mesas[k].z + 3.0) * (mesas[k].z + 3.0):
-			var edge := _mesa_edge(k, dx, dz)
-			var distance := sqrt(dx * dx + dz * dz)
-			return distance > edge - MESA_WALL and distance < edge + MESA_FOOT + 1.0
-	return false
 
 
 ## A crater's height `t` radii from its centre, in radii: a flat floor CRATER_DEPTH deep out to

@@ -1,10 +1,10 @@
 extends SceneTree
-## Draws the material kit: the 16 layers of the Texture2DArray every building, the terrain and
-## the rocks are painted from (docs/reference/art-style.md, **The material kit**), saved as
-## assets/textures/kit/<index>_<name>.png; and the field texture the buildable ground is drawn
-## from, assets/textures/field.png (**The field**); and the rock texture the terrain's steep faces
-## are drawn from, assets/textures/terrain_rock.png (**Environment**). Run it after an import
-## (tools/gates.sh does one), from the project root:
+## Draws the material kit: the 16 layers of the Texture2DArray every building and the rocks are
+## painted from (docs/reference/art-style.md, **The material kit**), saved as
+## assets/textures/kit/<index>_<name>.png; the field texture the buildable ground and the terrain's
+## marks are drawn from, assets/textures/field.png (**The field**); and the rock texture the
+## terrain's steep faces are drawn from, assets/textures/terrain_rock.png (**Environment**). Run it
+## after an import (tools/gates.sh does one), from the project root:
 ##
 ##   $GODOT --headless --path . -s res://tools/gen_textures.gd
 ##
@@ -17,8 +17,8 @@ extends SceneTree
 ##
 ## Everything is drawn from SEED with SeededRng, so a run gives byte-identical PNGs. Every
 ## primitive wraps modulo the image's size, so every layer and the rock texture tile seamlessly;
-## the field's tiles keep their marks off their edges instead. One layer covers one world unit at the default UV
-## scale: an ink line of INK_WIDTH pixels is about 0.012 units wide.
+## the field's tiles keep their marks off their edges instead. One layer covers one world unit at
+## the default UV scale: an ink line of INK_WIDTH pixels is about 0.012 units wide.
 
 const SIZE := 256
 const SEED := 20261014
@@ -396,9 +396,8 @@ func _draw_rock() -> void:
 		_disc(Vector2(_rng.range_int(0, SIZE - 1), _rng.range_int(0, SIZE - 1)), 0.9, _grey(0.76))
 
 
-## The terrain's dust, at the ring's scale (the terrain takes it at 0.18 repeats a unit): large
-## soft blobs in two tones and two pebbles, shaded from SUN. No ink: the ring's craters and ridges
-## are its shapes.
+## Dust for a large surface, a layer covering five to six units: large soft blobs in two tones
+## and two pebbles, shaded from SUN, no ink. Unused since the terrain took its own shader.
 func _draw_regolith() -> void:
 	var noise := _noise_field([128, 64], [0.7, 0.3])
 	for i: int in noise.size():

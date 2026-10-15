@@ -1,4 +1,4 @@
-// The comic style's lighting, shared by toon.gdshader and ground.gdshader
+// The comic style's lighting, shared by toon.gdshader, ground.gdshader and terrain.gdshader
 // (docs/reference/art-style.md, **Light and shading**): a light() that quantises the key
 // light, its shadow included, into three bands, darkens the shadow band with a screen-space
 // halftone and draws a hard-edged specular disc on glossy surfaces. The surface flags a mesh

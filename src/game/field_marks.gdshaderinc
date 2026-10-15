@@ -52,11 +52,19 @@ float grain(vec2 cell, vec2 cells_per_px) {
 // The atlas's texel at `cell`, laid in tiles `tile_cells` square. The tile's variant and its
 // orientation come from its cell hash at the offsets `hashes` (x the variant's, y the
 // orientation's); `turn` takes the tile's own axes to the variant's about its middle: a quarter
-// turn count, then mirrored from 4 on.
-vec4 field_marks(sampler2D atlas, vec2 cell, float tile_cells, vec2 hashes, out mat2 turn) {
+// turn count, then mirrored from 4 on. With `turn_by_place`, the hash picks only the variant and
+// the mirror, and the quarter turn count is (column mod 2) + 2 (row mod 2) - variant, mod 4: tiles
+// touching along a side or at a corner differ in (column mod 2, row mod 2), so two of them with
+// the same variant never share a turn, and no two touching tiles look the same, however large the
+// laid area.
+vec4 field_marks(sampler2D atlas, vec2 cell, float tile_cells, vec2 hashes, bool turn_by_place, out mat2 turn) {
 	vec2 tile = floor(cell / tile_cells);
 	float variant = floor(cell_tone(tile + hashes.x) * 4.0);
 	float orientation = floor(cell_tone(tile + hashes.y) * 8.0);
+	if (turn_by_place) {
+		float quarters = mod(mod(tile.x, 2.0) + 2.0 * mod(tile.y, 2.0) - variant, 4.0);
+		orientation = floor(cell_tone(tile + hashes.y) * 2.0) * 4.0 + quarters;
+	}
 	float angle = mod(orientation, 4.0) * PI * 0.5;
 	float c = round(cos(angle));
 	float s = round(sin(angle));
