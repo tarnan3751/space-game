@@ -1,8 +1,8 @@
 // The comic style's lighting, shared by toon.gdshader and ground.gdshader
 // (docs/reference/art-style.md, **Light and shading**): a light() that quantises the key
 // light, its shadow included, into three bands, darkens the shadow band with a screen-space
-// halftone and draws a hard-edged specular disc on glossy surfaces; and the surface flags a
-// mesh carries in UV2.y. There is no rim light: with the orthographic camera a fresnel rim falls
+// halftone and draws a hard-edged specular disc on glossy surfaces. The surface flags a mesh
+// carries in UV2.y, and their effects, are in effects.gdshaderinc. There is no rim light: with the orthographic camera a fresnel rim falls
 // under the ink outline, which does that job.
 //
 // The Compatibility renderer adds the shadow-casting key light in a pass of its own, already
@@ -11,9 +11,7 @@
 // the shaders that include this file set render_mode ambient_light_disabled and the bands below
 // carry the whole lit colour: each band's tone is then exact for every tint.
 
-// UV2.y: 0 lit, 1 unlit (emissive), 2 glossy.
-const float FLAG_UNLIT = 1.0;
-const float FLAG_GLOSSY = 2.0;
+#include "res://src/game/effects.gdshaderinc"
 
 // The band edges on NdotL times the shadow term, and the width of their smoothstep.
 const float LIT_EDGE = 0.55;
@@ -39,7 +37,7 @@ const float SPECULAR_EDGE = 0.92;
 const float SPECULAR_STRENGTH = 0.35;
 
 bool is_unlit(vec2 uv2) {
-	return abs(uv2.y - FLAG_UNLIT) < 0.5;
+	return has_flag(surf_flags(uv2), FLAG_UNLIT);
 }
 
 // 1 inside a halftone dot at this pixel, 0 outside, antialiased over a pixel.
@@ -64,7 +62,7 @@ void light() {
 		vec3 band = mix(mix(BAND_SHADOW, BAND_MID, mid), BAND_LIT, lit);
 		band *= 1.0 - HALFTONE_DARKEN * (1.0 - mid) * halftone(FRAGCOORD.xy, VIEWPORT_SIZE.y);
 		DIFFUSE_LIGHT += band * LIGHT_COLOR / PI;
-		if (UV2.y > FLAG_GLOSSY - 0.5) {
+		if (has_flag(surf_flags(UV2), FLAG_GLOSSY)) {
 			float disc = smoothstep(SPECULAR_EDGE - 0.005, SPECULAR_EDGE + 0.005, dot(NORMAL, normalize(LIGHT + VIEW)));
 			SPECULAR_LIGHT += disc * lit * SPECULAR_STRENGTH * LIGHT_COLOR / PI;
 		}

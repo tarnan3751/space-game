@@ -15,13 +15,13 @@ extends RefCounted
 ## Surf's uv_scale, so a texture repeat covers one world unit by default. Round parts take U
 ## from the angle around their axis (a whole number of repeats around, so bands wrap) and V
 ## from the distance along the profile, or from the radius on a cap or a disc. UV2 carries the
-## layer and the flags, the vertex colour the tint. A flat part has a normal per face; a smooth
-## part averages the normals of its faces that meet at less than SMOOTH_ANGLE, so curves shade
-## smoothly while caps and chamfers stay hard.
+## layer and the flags, the vertex colour the tint and, in its alpha, the phase. A flat part
+## has a normal per face; a smooth part averages the normals of its faces that meet at less than
+## SMOOTH_ANGLE, so curves shade smoothly while caps and chamfers stay hard.
 ##
-## The outline holds the triangles of every part whose Surf has outline on, with the face
-## normals averaged by position across the whole mesh, so the hull the ink shader pushes out
-## along them stays closed at hard edges.
+## The outline holds the triangles of every part whose Surf has outline on and none of
+## Surf.NO_OUTLINE's flags, with the face normals averaged by position across the whole mesh, so
+## the hull the ink shader pushes out along them stays closed at hard edges.
 
 ## Faces of a smooth part that meet at a smaller angle than this share normals.
 const SMOOTH_ANGLE := 40.0
@@ -78,15 +78,21 @@ func to_outline_mesh() -> ArrayMesh:
 	return mesh
 
 
-## The outline's surface arrays (vertex, normal); empty when no part is outlined.
+## The outline's surface arrays (vertex, normal, and each part's UV2 and colour, which carry the
+## flags and the phase, so the ink shader moves the outline with a bobbing or jittering part);
+## empty when no part is outlined.
 func to_outline_arrays() -> Array:
 	var vertices := PackedVector3Array()
+	var uv2s := PackedVector2Array()
+	var colors := PackedColorArray()
 	var sums: Dictionary[Vector3i, Vector3] = {}
 	for t: int in _outlined.size():
 		if _outlined[t] == 0:
 			continue
 		for i: int in range(t * 3, t * 3 + 3):
 			vertices.append(_vertices[i])
+			uv2s.append(_uv2s[i])
+			colors.append(_colors[i])
 			var key := _weld(_vertices[i])
 			var sum: Vector3 = sums.get(key, Vector3.ZERO)
 			sums[key] = sum + _face_normals[t] * _corner_angle(i)
@@ -99,6 +105,8 @@ func to_outline_arrays() -> Array:
 	arrays.resize(Mesh.ARRAY_MAX)
 	arrays[Mesh.ARRAY_VERTEX] = vertices
 	arrays[Mesh.ARRAY_NORMAL] = normals
+	arrays[Mesh.ARRAY_TEX_UV2] = uv2s
+	arrays[Mesh.ARRAY_COLOR] = colors
 	return arrays
 
 
@@ -432,12 +440,14 @@ func _emit(a: Vector3, b: Vector3, c: Vector3, uv_a: Vector2, uv_b: Vector2, uv_
 	_uv2s.append(uv2)
 	_uv2s.append(uv2)
 	_uv2s.append(uv2)
-	var tint := surf.tint
+	# The phase in 254 steps, a quarter step up so the 8-bit store keeps the byte whether it
+	# rounds or truncates; surf_phase (effects.gdshaderinc) decodes it.
+	var tint := Color(surf.tint, (roundi(surf.phase * 254.0) + 0.25) / 255.0)
 	_colors.append(tint)
 	_colors.append(tint)
 	_colors.append(tint)
 	_face_normals.append(normal)
-	_outlined.append(1 if surf.outline else 0)
+	_outlined.append(1 if surf.outline and (surf.flags & Surf.NO_OUTLINE) == 0 else 0)
 	_hard.append(1 if hard else 0)
 
 
