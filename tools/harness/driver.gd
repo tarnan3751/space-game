@@ -6,13 +6,17 @@ extends SceneTree
 ## this directly; the README in this folder documents both.
 ##
 ##   $GODOT [--headless] --path . -s res://tools/harness/driver.gd -- \
-##       --scenario=<name> --out=<dir> --save-path=<file> --no-cheats
+##       --scenario=<name> --out=<dir> --save-path=<file> --no-cheats [--timeout=<s>]
 ##
 ## --save-path is required and is the same argument main.gd honours, so a run never
 ## touches user://base.json. --no-cheats is main.gd's too: without it a debug build makes
 ## every level free and one second at most, so run.sh passes it and scenarios run on the
 ## real numbers. Headless runs check logic only; a rendered run (no
 ## --headless) also saves screenshots. The exit code is 0 when every check passed.
+##
+## A watchdog ends a run that has not finished --timeout seconds (HARNESS_TIMEOUT_SECONDS by
+## default) after the scenario started: one stopped by a runtime error, or awaiting a signal
+## that never comes, fails with exit code 1 instead of leaving Godot running.
 ##
 ## Time: the harness clock starts CLOCK_LEAD seconds ahead of the device clock and moves
 ## only when a scenario calls advance(). PlacementController's clock is replaced with it,
@@ -23,18 +27,23 @@ extends SceneTree
 const SCENARIO_DIR := "res://tools/harness/scenarios"
 const MAIN_SCENE := "res://scenes/main.tscn"
 const CLOCK_LEAD := 1_000_000
+const HARNESS_TIMEOUT_SECONDS := 300
 const MainScript := preload("res://src/game/main.gd")
 
 var scenario_name: String = ""
 var out_dir: String = ""
 var save_path: String = ""
 var headless: bool = false
+var timeout_seconds: int = HARNESS_TIMEOUT_SECONDS
 var failures: PackedStringArray = PackedStringArray()
 
 var _main: MainScript
 var _log: FileAccess
 var _clock: int = 0
 var _screenshots: int = 0
+## The last check()'s message, for the watchdog's report.
+var _last_check: String = ""
+var _ended: bool = false
 
 
 func _initialize() -> void:
@@ -45,8 +54,10 @@ func _initialize() -> void:
 			out_dir = arg.trim_prefix("--out=")
 		elif arg.begins_with("--save-path="):
 			save_path = arg.trim_prefix("--save-path=")
-	if scenario_name == "" or out_dir == "" or save_path == "":
-		printerr("usage: driver.gd -- --scenario=<name> --out=<dir> --save-path=<file>")
+		elif arg.begins_with("--timeout="):
+			timeout_seconds = arg.trim_prefix("--timeout=").to_int()
+	if scenario_name == "" or out_dir == "" or save_path == "" or timeout_seconds <= 0:
+		printerr("usage: driver.gd -- --scenario=<name> --out=<dir> --save-path=<file> [--timeout=<s>]")
 		quit(2)
 		return
 	if save_path.begins_with("user://"):
@@ -65,7 +76,7 @@ func _initialize() -> void:
 	_clock = int(Time.get_unix_time_from_system()) + CLOCK_LEAD
 	say("harness: scenario %s, %s, out %s" % [
 		scenario_name, "headless" if headless else "rendered", out_dir])
-	say("harness: save %s, clock starts at %d" % [save_path, _clock])
+	say("harness: save %s, clock starts at %d, timeout %d s" % [save_path, _clock, timeout_seconds])
 
 	var scene: PackedScene = load(MAIN_SCENE)
 	_main = scene.instantiate()
@@ -90,25 +101,42 @@ func _run(scenario_path: String) -> void:
 		scenario = script.new() as HarnessScenario
 	if scenario == null:
 		say("HARNESS FAIL: %s, script failed to load" % scenario_name)
-		_log.close()
-		quit(1)
+		_end(1)
 		return
 	scenario.harness = self
 	say("harness: run %s" % scenario_name)
+	create_timer(timeout_seconds).timeout.connect(_on_timeout)
 	await scenario.run(_main)
 	_finish()
 
 
+func _on_timeout() -> void:
+	if _ended:
+		return
+	say("HARNESS FAIL: %s, timed out after %d s (last check: %s)" % [scenario_name, timeout_seconds,
+		_last_check if _last_check != "" else "none"])
+	_end(1)
+
+
 func _finish() -> void:
+	if _ended:
+		return
 	if failures.is_empty():
 		say("HARNESS PASS: %s" % scenario_name)
 	else:
 		say("HARNESS FAIL: %s, %d failed check(s)" % [scenario_name, failures.size()])
 		for failure: String in failures:
 			say("  failed: " + failure)
+	_end(0 if failures.is_empty() else 1)
+
+
+## Closes the log and quits with `code`; a later _finish() or timeout does nothing.
+func _end(code: int) -> void:
+	_ended = true
 	if _log != null:
 		_log.close()
-	quit(0 if failures.is_empty() else 1)
+		_log = null
+	quit(code)
 
 
 # --- Services for scenarios -----------------------------------------------------------
@@ -120,6 +148,7 @@ func say(text: String) -> void:
 
 
 func check(condition: bool, message: String) -> void:
+	_last_check = message
 	if condition:
 		say("ok   " + message)
 	else:

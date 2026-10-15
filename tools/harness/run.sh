@@ -3,6 +3,8 @@
 #   tools/harness/run.sh <scenario>                 headless: logic checks only
 #   tools/harness/run.sh <scenario> --rendered      opens a window and saves screenshots
 #   tools/harness/run.sh <scenario> --out <dir>     output directory (default tools/harness/out/<scenario>)
+#   tools/harness/run.sh <scenario> --timeout <s>   fail a run still going after <s> seconds
+#                                                   (default: the driver's, 300)
 # The save file is <out>/base.json, never user://base.json, and --no-cheats keeps a debug
 # build's dev cheats off (main.gd), so every scenario runs on the real numbers. The output
 # directory is emptied first, so every run starts from a new base. Exits non-zero when a
@@ -36,18 +38,20 @@ fi
 scenario=""
 mode="--headless"
 out=""
+timeout=()
 while [ $# -gt 0 ]; do
   case "$1" in
     --rendered) mode="" ;;
     --headless) mode="--headless" ;;
     --out) out="$2"; shift ;;
+    --timeout) timeout=("--timeout=$2"); shift ;;
     -*) echo "unknown option $1" >&2; exit 2 ;;
     *) scenario="$1" ;;
   esac
   shift
 done
 if [ -z "$scenario" ]; then
-  echo "usage: tools/harness/run.sh <scenario> [--rendered] [--out <dir>]" >&2
+  echo "usage: tools/harness/run.sh <scenario> [--rendered] [--out <dir>] [--timeout <s>]" >&2
   echo "scenarios:" >&2
   ls tools/harness/scenarios/*.gd 2>/dev/null | sed 's#.*/##; s#\.gd$##; s#^#  #' >&2
   exit 2
@@ -98,7 +102,7 @@ if [ -z "$mode" ]; then
 fi
 
 output="$("$GODOT" $mode $window --path . -s res://tools/harness/driver.gd -- \
-  "--scenario=$scenario" "--out=$out" "--save-path=$out/base.json" --no-cheats 2>&1)"
+  "--scenario=$scenario" "--out=$out" "--save-path=$out/base.json" --no-cheats ${timeout[@]+"${timeout[@]}"} 2>&1)"
 status=$?
 echo "$output"
 if grep -qE "SCRIPT ERROR|Parse Error|Failed to load script" <<<"$output"; then

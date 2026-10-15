@@ -23,6 +23,7 @@ between `src/core`, `src/game` and the scene.
 tools/harness/run.sh place_and_build                 # headless: logic checks only
 tools/harness/run.sh place_and_build --rendered      # a window; screenshots are saved
 tools/harness/run.sh place_and_build --out <dir>     # output elsewhere
+tools/harness/run.sh place_and_build --timeout 60    # fail if still running after 60 s
 tools/harness/run.sh                                 # lists the scenarios
 ```
 
@@ -56,7 +57,12 @@ A run exits 0 only when every `check()` passed, Godot logged no `SCRIPT ERROR`, 
 screenshot repeats an earlier one unless it may. The last lines of `log.txt` are `HARNESS PASS:
 <scenario>` or `HARNESS FAIL: <scenario>, N failed check(s)` followed by each failed check. A
 scenario that does not parse ends the run at once with `HARNESS FAIL: <scenario>, script failed
-to load` and exit code 1.
+to load` and exit code 1. A watchdog ends a scenario still running 300 seconds after it started
+(the driver's `HARNESS_TIMEOUT_SECONDS`; `--timeout <s>` sets another) with `HARNESS FAIL:
+<scenario>, timed out after N s (last check: <message>)` and exit code 1, so one awaiting a
+signal that never comes cannot hang the run; the longest real run, `model_gallery` rendered,
+takes about half a minute. A runtime error inside `run()` ends the scenario where it happened;
+Godot logs it as a `SCRIPT ERROR`, which fails the run in `run.sh`.
 
 ## How a run is isolated
 
