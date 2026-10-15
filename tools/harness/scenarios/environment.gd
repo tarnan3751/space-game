@@ -7,10 +7,11 @@ extends HarnessScenario
 ## (never over EDGE_HIGHEST), and the distance at which the relief is full (BaseView.blend_end)
 ## wanders by more than BLEND_WANDER; and that at the widest zoom in a WIDE window, the focus at
 ## each corner of its bounds, the ray from every screen corner meets the terrain. Screenshots: the
-## start zoom, the closest on the field, about six plates close up, the curb at the middle of each
-## side, the widest in the WIDE window, and a crater and an outcrop centred (for the curb, the
-## crater and the outcrop the camera's bounds are widened, as a player cannot centre the view off
-## the field).
+## start zoom, the closest on the field, the closest on a point where four of the field texture's
+## tiles meet (nothing should show where they do), a wider stretch of the field, the curb at the
+## middle of each side, the widest in the WIDE window, and a crater and an outcrop centred (for the
+## curb, the crater and the outcrop the camera's bounds are widened, as a player cannot centre the
+## view off the field).
 
 const TERRAIN_BUDGET := 35000
 const OUTCROP_GAP := 4.0
@@ -61,7 +62,10 @@ func run(main: MainScript) -> void:
 			% [EDGE_OUT, side, heights.x, heights.y, full.x, full.y])
 	await _shot(main, "start", Vector3.ZERO, main.camera.size)
 	await _shot(main, "closest-field", view.cell_to_world(Vector2i(9, 9), 1), IsoCamera.MIN_ZOOM_SIZE)
-	await _shot(main, "plates", view.cell_to_world(Vector2i(12, 26), 1), 12.0)
+	# Cells (12, 28) are a corner of the field texture's tiles, which are 4 cells square.
+	var tile_corner := field.position + Vector2(12, 28)
+	await _shot(main, "tile-corner", Vector3(tile_corner.x, 0.0, tile_corner.y), IsoCamera.MIN_ZOOM_SIZE)
+	await _shot(main, "tiles", view.cell_to_world(Vector2i(12, 26), 1), 12.0)
 	main.camera.bounds = field.grow(BaseView.TERRAIN_EXTENT - field.end.x)
 	var curb := field.end + Vector2.ONE * (BaseView.CURB_GAP + BaseView.CURB_WIDTH * 0.5)
 	for side: String in sides:

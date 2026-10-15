@@ -151,12 +151,14 @@ each corner of its bounds, the ray from every corner of the screen meets the ter
 colour never shows: marched in half-unit steps over `BaseView.terrain_height`, it must enter the
 terrain's extent above the ground (not under its raised outer edge) and meet the ground before it
 leaves. Those checks are worked out from `BaseView` and the camera's transform, so they hold
-headless. It screenshots the start zoom, the closest zoom on the field (plates, craters, grid),
-about six plates close up at camera size 12 (`plates`), the curb at the middle of each side of the
-field at size 16 (`edge-top-left`, `edge-top-right`, `edge-bottom-right`, `edge-bottom-left`, by
-the screen corner each side faces), the widest zoom in the wide window, and a crater and an
-outcrop each centred; for the curb, the crater and the outcrop it widens the camera's bounds to
-the terrain's, since the player cannot centre the view off the field.
+headless. It screenshots the start zoom, the closest zoom on the field (its marks and the grid),
+the closest zoom on a point where four of the field texture's tiles meet (`tile-corner`, where
+nothing should show the tiles' edges), a wider stretch of the field at camera size 12 (`tiles`),
+the curb at the middle of each side of the field at size 16 (`edge-top-left`, `edge-top-right`,
+`edge-bottom-right`, `edge-bottom-left`, by the screen corner each side faces), the widest zoom in
+the wide window, and a crater and an outcrop each centred; for the curb, the crater and the
+outcrop it widens the camera's bounds to the terrain's, since the player cannot centre the view
+off the field.
 
 `scenarios/hud_menu.gd` checks the HUD on a fresh base: antimatter hidden in the top bar,
 every menu type in exactly one tab and in menu order, an entry's built/max and a locked
