@@ -128,7 +128,7 @@ static func build_mega_mine(p: Parts, level: int) -> void:
 	for i: int in lights:
 		var degrees := 45.0 + 360.0 * i / lights
 		m.dome(0.06, 0.06, 16, 3, Parts.around(0.67, degrees, 0.12) + base, RED_BLINK.phased(float(i) / lights))
-		_dome_seam(m, radius, height, base + Vector3(0, 0.06, 0), degrees + 180.0 / lights,
+		Parts.dome_seam(m, radius, height, base + Vector3(0, 0.06, 0), degrees + 180.0 / lights,
 			SEAM.phased(float(i) / lights))
 	var crown := base + Vector3(0, 0.06 + height - 0.02, 0)
 	m.prism(0.13, 0.11, 0.08, 16, crown, CASING_MID)
@@ -137,20 +137,3 @@ static func build_mega_mine(p: Parts, level: int) -> void:
 		var degrees := 90.0 + 120.0 * i
 		var foot := Parts.around(0.1, degrees, 0.06) + crown
 		m.cone(0.025, 0.14, 8, foot, CASING_MID, Parts.facing(Parts.around(0.5, degrees, 1.0)))
-
-
-## A seam up a dome of `radius` and `height` standing on `pos`, at `degrees` round it: a chain of
-## thin strips just proud of the surface, from its foot to under the crown (within 0.15 of the
-## axis).
-static func _dome_seam(m: LowPolyMesh, radius: float, height: float, pos: Vector3, degrees: float,
-		surface: Surf) -> void:
-	const STEPS := 4
-	const PROUD := 0.012
-	var last := acos(0.15 / radius)
-	var from := Vector3.ZERO
-	for k: int in STEPS + 1:
-		var angle := last * k / STEPS
-		var at := Parts.around((radius + PROUD) * cos(angle), degrees, (height + PROUD) * sin(angle)) + pos
-		if k > 0:
-			m.strut(from, at, 0.03, surface)
-		from = at

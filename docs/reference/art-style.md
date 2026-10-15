@@ -366,6 +366,12 @@ job; a helper is added, never renamed or removed.
 | `torus(m, major, minor, sides, segments, pos, surf, rot)` | a closed ring of round section resting on `pos` (its bottom at `pos.y`): coils, coronas, gyro rings; 10 or more `segments` for a ring that shows |
 | `HULL_LIGHT_ROUND`, `HULL_MID_ROUND`, `HULL_DARK_ROUND`, `GOLD_ROUND` | the hull and gold surfaces smooth shaded, for drums, tanks, collars and caps |
 | `ladder(m, foot, height, width, yaw, surf)` | two rails and a rung every 0.16 up a wall, its face turned `yaw` degrees from +Z; on `ROD`, too thin to ink |
+| `dome_seam(m, radius, height, pos, degrees, surf)` | a seam up a dome of `radius` and `height` standing on `pos`, at `degrees` round it: a chain of thin struts just proud of the surface, from its foot to within 0.15 of the axis |
+| `on_sphere(radius, at)` | the point `radius` from a sphere's centre at `around()` angle `at.x` and elevation `at.y` (degrees) |
+| `chase(k, count)` | the BLINK phase of lamp `k` of `count` lit in turn, lamp 0 first: a chase |
+| `spark(tint)`, `current(tint, phase)` | new surfaces: a crackling arc's (unlit glow, FLICKER and JITTER, so never inked) and a current's (the pipe layer's bands, unlit, FLOW at `phase`: above 0.5 towards a pipe's far end) |
+| `arc(m, from, to, segments, kink, surf)` | a crackling arc on a `spark` surface: `segments` struts `ARC_WIDTH` (0.03) thick, the corners between them kinked `kink` to either side in turn, so JITTER has corners to shake; give each arc its own phase |
+| `puffs(m, mouth, phase, count = 3, sides = 10, rings = 4)`, `SMOKE` | `count` hologram smoke puffs (`SMOKE`: HOLO and BOB, pale `HULL_LIGHT` smoke, as HULL_MID is too faint on the violet ground), orbs of `sides` and `rings`, over a stack's `mouth`, growing as they rise, each bobbing out of step from `phase` |
 
 ### Model table
 

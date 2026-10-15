@@ -228,3 +228,80 @@ static func ladder(m: LowPolyMesh, foot: Vector3, height: float, width: float, y
 		m.box(Vector3(0.05, height, 0.05), foot + LowPolyMesh.turn(Vector3(side * width * 0.5, 0, 0), turn), surface, turn)
 	for k: int in int((height - 0.06) / 0.16):
 		m.box(Vector3(width, 0.035, 0.035), foot + Vector3(0, 0.12 + 0.16 * k, 0), surface, turn)
+
+
+# --- Effects shared by the model files (docs/reference/art-style.md, **Animation**) ----
+
+## A crackling arc's strut width.
+const ARC_WIDTH := 0.03
+
+## Smoke puffs: pale hologram smoke, bobbing; HULL_MID is too faint against the violet ground.
+static var SMOKE := Surf.make(MaterialKit.Layer.GLOW, MaterialKit.HULL_LIGHT, 1.0, Surf.HOLO | Surf.BOB, true)
+
+
+## A crackling arc's surface: a glow in `tint` that flickers and shakes.
+static func spark(tint: Color) -> Surf:
+	return Surf.make(MaterialKit.Layer.GLOW, tint, 1.0, Surf.UNLIT | Surf.FLICKER | Surf.JITTER)
+
+
+## A current: the pipe layer's ribbed bands glowing in `tint` and flowing at the FLOW speed
+## `phase` (above 0.5 along V: towards a pipe's far end, a box's +Z on its top).
+static func current(tint: Color, phase: float) -> Surf:
+	return Surf.make(MaterialKit.Layer.PIPE, tint, 3.0, Surf.UNLIT | Surf.FLOW, true, true, phase)
+
+
+## The BLINK phase of lamp `k` of `count` lit in turn, lamp 0 first: a chase.
+static func chase(k: int, count: int) -> float:
+	return fposmod(-float(k) / count, 1.0)
+
+
+## A point `radius` from a sphere's centre, at around() angle `at.x` and elevation `at.y`
+## (degrees).
+static func on_sphere(radius: float, at: Vector2) -> Vector3:
+	var elevation := deg_to_rad(at.y)
+	return around(radius * cos(elevation), at.x, radius * sin(elevation))
+
+
+## A crackling arc from `from` to `to`: `segments` struts, the corners between them kinked
+## `kink` to either side of the straight line in turn, so JITTER has corners to shake. Built
+## for a spark() surface, which is never outlined; give each arc its own phase of it, so the
+## arcs flicker apart.
+static func arc(m: LowPolyMesh, from: Vector3, to: Vector3, segments: int, kink: float, surface: Surf) -> void:
+	var along := (to - from).normalized()
+	var side := along.cross(Vector3.UP)
+	if side.length() < 0.1:
+		side = along.cross(Vector3.RIGHT)
+	side = side.normalized()
+	var last := from
+	for k: int in range(1, segments + 1):
+		var point := from.lerp(to, float(k) / segments)
+		if k < segments:
+			point += side * kink * (1.0 if k % 2 == 1 else -1.0)
+		m.strut(last, point, ARC_WIDTH, surface)
+		last = point
+
+
+## A seam up a dome of `radius` and `height` standing on `pos`, at `degrees` round it: a chain of
+## thin strips just proud of the surface, from its foot to under the crown (within 0.15 of the
+## axis).
+static func dome_seam(m: LowPolyMesh, radius: float, height: float, pos: Vector3, degrees: float,
+		surface: Surf) -> void:
+	const STEPS := 4
+	const PROUD := 0.012
+	var last := acos(0.15 / radius)
+	var from := Vector3.ZERO
+	for k: int in STEPS + 1:
+		var angle := last * k / STEPS
+		var at := around((radius + PROUD) * cos(angle), degrees, (height + PROUD) * sin(angle)) + pos
+		if k > 0:
+			m.strut(from, at, 0.03, surface)
+		from = at
+
+
+## Smoke over a stack's `mouth`: `count` SMOKE puffs, orbs of `sides` and `rings`, growing as
+## they rise and drifting a little, each bobbing out of step from `phase`.
+static func puffs(m: LowPolyMesh, mouth: Vector3, phase: float, count: int = 3, sides: int = 10,
+		rings: int = 4) -> void:
+	for k: int in count:
+		m.orb(0.06 + 0.025 * k, sides, rings, mouth + Vector3(0.02 * k, 0.12 + 0.17 * k, 0),
+			SMOKE.phased(fposmod(phase + 0.3 * k, 1.0)))

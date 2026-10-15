@@ -67,8 +67,7 @@ static var PIPE_FLOW := Surf.make(MaterialKit.Layer.PIPE, MaterialKit.HULL_MID, 
 static var CAB_GLASS := Surf.make(MaterialKit.Layer.GLASS, MaterialKit.CORE_GLASS, 1.0,
 	Surf.GLOSSY | Surf.PULSE, true)
 static var WINDOW_GLOW := Surf.make(MaterialKit.Layer.GLASS, MaterialKit.ARMY, 1.0, Surf.UNLIT | Surf.PULSE)
-## Smoke puffs, holograms, and the beacon's floating emitter and spike.
-static var SMOKE := Surf.make(MaterialKit.Layer.GLOW, MaterialKit.HULL_MID, 1.0, Surf.HOLO | Surf.BOB, true)
+## Holograms, and the beacon's floating emitter and spike.
 static var HOLOGRAM := Surf.make(MaterialKit.Layer.GLOW, MaterialKit.ENERGY, 1.0, Surf.HOLO | Surf.BOB, true)
 static var HOLO_HULL := Surf.make(MaterialKit.Layer.HULL, MaterialKit.ENERGY, 1.0, Surf.HOLO, true)
 static var ORB_BOB := Surf.make(MaterialKit.Layer.GLOW, MaterialKit.ARMY, 1.0,
@@ -269,15 +268,7 @@ static func build_fabricator(p: Parts, level: int) -> void:
 		var height := 1.2 - 0.18 * i + 0.05 * level
 		var foot := stacks[i] + Vector3(0, g + 0.35, 0)
 		_stack(m, foot, 0.13, height, level)
-		_puffs(m, foot + Vector3(0, height, 0), 0.29 * i)
-
-
-## Smoke over a stack's `mouth`: three hologram puffs, growing as they rise and drifting a
-## little, each bobbing out of step from `phase`.
-static func _puffs(m: LowPolyMesh, mouth: Vector3, phase: float) -> void:
-	for k: int in 3:
-		m.orb(0.06 + 0.025 * k, 10, 4, mouth + Vector3(0.02 * k, 0.12 + 0.17 * k, 0),
-			SMOKE.phased(fposmod(phase + 0.3 * k, 1.0)))
+		Parts.puffs(m, foot + Vector3(0, height, 0), 0.29 * i)
 
 
 ## A smokestack standing on `foot`: a ribbed pipe with an orange band and a glowing mouth.

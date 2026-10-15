@@ -7,7 +7,7 @@ extends RefCounted
 ##
 ## They animate (docs/reference/art-style.md, **Animation**): heads scan and barrels recoil as
 ## moving parts, emitters pulse, lamps blink in chases, currents flow along conduits, and arcs
-## crackle where a weapon holds its charge (_arc).
+## crackle where a weapon holds its charge (Parts.arc).
 ##
 ## BuildingModels calls one static build_<type>(p: Parts, level: int) per type. A part's
 ## heading is a yaw in degrees from +Z towards +X: the camera looks from the +X+Z corner, so
@@ -46,22 +46,22 @@ static var PLASMA_PULSE := _glow(MaterialKit.ANTIMATTER, Surf.PULSE)
 ## Bubbles surfacing on the plasma chamber: a paler violet, swelling, so they stay lighter than
 ## the chamber.
 static var BUBBLE := _glow(MaterialKit.ANTIMATTER.lightened(0.75), Surf.PULSE)
-static var PLASMA_ARC := _spark(MaterialKit.ANTIMATTER.lightened(0.3))
+static var PLASMA_ARC := Parts.spark(MaterialKit.ANTIMATTER.lightened(0.3))
 ## The mortar's bore lining, its bands running out of the muzzle.
-static var BORE := _current(MaterialKit.ANTIMATTER, 0.3)
+static var BORE := Parts.current(MaterialKit.ANTIMATTER, 0.3)
 ## The shield generator's orb, floating and swelling.
 static var ION_ORB := _glow(MaterialKit.ENERGY, Surf.PULSE | Surf.BOB)
 ## Current running along a conduit towards where its pipe ends (Parts.pipe's `to`).
-static var ION_CURRENT := _current(MaterialKit.ENERGY, 0.8)
-static var ION_ARC := _spark(MaterialKit.ENERGY)
+static var ION_CURRENT := Parts.current(MaterialKit.ENERGY, 0.8)
+static var ION_ARC := Parts.spark(MaterialKit.ENERGY)
 static var ION_HOLO := Surf.make(MaterialKit.Layer.GLOW, MaterialKit.ENERGY, 1.0, Surf.HOLO)
 ## A muzzle's flash: a yellow flare, there and gone.
 static var FLARE := Surf.make(MaterialKit.Layer.GLOW, MaterialKit.HAZARD, 1.0, Surf.UNLIT | Surf.FLICKER)
 static var ARC_PULSE := _glow(MaterialKit.ARC_BLUE, Surf.PULSE)
 static var ARC_BLINK := _glow(MaterialKit.ARC_BLUE, Surf.BLINK)
-static var ARC_SPARK := _spark(MaterialKit.ARC_BLUE.lightened(0.35))
+static var ARC_SPARK := Parts.spark(MaterialKit.ARC_BLUE.lightened(0.35))
 ## The tesla coil's core, its current climbing between the skirts.
-static var ARC_CURRENT := _current(MaterialKit.ARC_BLUE, 0.8)
+static var ARC_CURRENT := Parts.current(MaterialKit.ARC_BLUE, 0.8)
 ## The gravity well's swirl: crystal facets, which vary along U, turning round the disc and
 ## drawn in towards its middle.
 static var SWIRL := Surf.make(MaterialKit.Layer.CRYSTAL, MaterialKit.ANTIMATTER, 1.0,
@@ -69,19 +69,16 @@ static var SWIRL := Surf.make(MaterialKit.Layer.CRYSTAL, MaterialKit.ANTIMATTER,
 static var PLASMA_BLINK := _glow(MaterialKit.ANTIMATTER, Surf.BLINK)
 static var EMP_CORE := _glow(MaterialKit.HAZARD, Surf.PULSE | Surf.BOB)
 static var EMP_BLINK := _glow(MaterialKit.HAZARD, Surf.BLINK)
-static var EMP_ARC := _spark(MaterialKit.HAZARD.lightened(0.3))
+static var EMP_ARC := Parts.spark(MaterialKit.HAZARD.lightened(0.3))
 static var ION_PULSE := _glow(MaterialKit.ENERGY, Surf.PULSE)
 static var ION_BLINK := _glow(MaterialKit.ENERGY, Surf.BLINK)
 ## The railgun's strip, its current racing to the muzzle.
-static var RAIL_CURRENT := _current(MaterialKit.ENERGY, 0.95)
+static var RAIL_CURRENT := Parts.current(MaterialKit.ENERGY, 0.95)
 ## The ion beam's tripod conduits: a dimmer current, so the tripod still reads dark.
-static var CONDUIT := _current(MaterialKit.ENERGY.darkened(0.35), 0.8)
+static var CONDUIT := Parts.current(MaterialKit.ENERGY.darkened(0.35), 0.8)
 ## The orbital cannon's bore, its bands rippling out.
-static var BORE_ION := _current(MaterialKit.ENERGY, 0.3)
+static var BORE_ION := Parts.current(MaterialKit.ENERGY, 0.3)
 static var LENS_PULSE := Surf.make(MaterialKit.Layer.CRYSTAL, MaterialKit.ENERGY, 2.0, Surf.GLOSSY | Surf.PULSE, true)
-
-## A crackling arc's struts: too thin to ink, and never inked anyway (FLICKER, JITTER).
-const ARC_WIDTH := 0.03
 
 
 static func build_laser_turret(p: Parts, level: int) -> void:
@@ -164,7 +161,7 @@ static func build_missile_battery(p: Parts, level: int) -> void:
 			var mouth := _at(trunnion, face, aim)
 			var turn_order := column if row % 2 == 0 else columns - 1 - column
 			launcher.tube(0.1, 0.14, 0.1, 16, mouth, Parts.GUNMETAL, tube_aim)
-			launcher.cone(0.085, 0.2, 16, mouth, LASER_BLINK.phased(_chase(row * columns + turn_order, rows * columns)),
+			launcher.cone(0.085, 0.2, 16, mouth, LASER_BLINK.phased(Parts.chase(row * columns + turn_order, rows * columns)),
 				tube_aim)
 	if level >= 2:
 		launcher.box_chamfered(Vector3(width * 0.8, 0.05, depth * 0.45), 0.02,
@@ -213,14 +210,14 @@ static func build_plasma_mortar(p: Parts, level: int) -> void:
 	# Plasma bubbles surfacing between the bars, and arcs crackling from the ribs to the band.
 	var bubbles: Array[Vector2] = [Vector2(35, 22), Vector2(70, 40), Vector2(92, 14)]
 	for k: int in bubbles.size():
-		m.orb(0.05, 8, 3, breech + _on_sphere(chamber - 0.01, bubbles[k]), BUBBLE.phased(k / 3.0 + 0.1))
+		m.orb(0.05, 8, 3, breech + Parts.on_sphere(chamber - 0.01, bubbles[k]), BUBBLE.phased(k / 3.0 + 0.1))
 	var arcs: Array[Array] = [
 		[Vector2(15, 30), Vector2(52, 52)], [Vector2(105, 30), Vector2(78, 12)], [Vector2(15, 8), Vector2(50, 6)],
 	]
 	for k: int in arcs.size():
 		var ends: Array = arcs[k]
-		_arc(m, breech + _on_sphere(chamber + 0.06, ends[0]), breech + _on_sphere(chamber + 0.06, ends[1]), 3, 0.03,
-			PLASMA_ARC.phased(k / 3.0))
+		Parts.arc(m, breech + Parts.on_sphere(chamber + 0.06, ends[0]), breech + Parts.on_sphere(chamber + 0.06, ends[1]),
+			3, 0.03, PLASMA_ARC.phased(k / 3.0))
 	# A cooling fan on the heavy ring's flank, turning about the outward +Z.
 	var fan := Vector3(0, top + 0.15, 1.08)
 	m.ring(0.1, 0.13, 0.07, 12, fan - Vector3(0, 0, 0.06), Parts.GUNMETAL, Vector3(90, 0, 0))
@@ -268,7 +265,7 @@ static func build_shield_generator(p: Parts, level: int) -> void:
 		Parts.pipe_run(m, PackedVector3Array([elbow, tip]), 0.09, ION_CURRENT)
 		m.orb(0.15, 12, 5, elbow, knuckle)
 		m.cone(0.11, 0.18, 16, tip, ION, Parts.facing(orb - tip))
-		_arc(m, orb + toward * (orb_radius + 0.12), orb + toward * (orb_radius - 0.02), 3, 0.03, ION_ARC.phased(k / 3.0))
+		Parts.arc(m, orb + toward * (orb_radius + 0.12), orb + toward * (orb_radius - 0.02), 3, 0.03, ION_ARC.phased(k / 3.0))
 		if level >= 2:
 			Parts.torus(m, 0.13, 0.04, 12, 6, elbow.lerp(tip, 0.45), ION, Parts.facing(tip - elbow))
 		if level >= 3:
@@ -363,19 +360,19 @@ static func build_arc_tower(p: Parts, level: int) -> void:
 	var strip := 0
 	for i: int in skirts - 1:
 		var degrees := 20.0 + 32.0 * i
-		_arc(m, foot + _skirt_rim(height, 0.5, i, degrees), foot + _skirt_rim(height, 0.5, i + 1, degrees + 28.0), 3, 0.04,
-			ARC_SPARK.phased(strip / 6.0))
+		Parts.arc(m, foot + _skirt_rim(height, 0.5, i, degrees), foot + _skirt_rim(height, 0.5, i + 1, degrees + 28.0),
+			3, 0.04, ARC_SPARK.phased(strip / 6.0))
 		strip += 1
 	for degrees: float in [30.0, 95.0]:
-		_arc(m, crown + Parts.around(0.48, degrees, 0.06), centre + _on_sphere(sphere - 0.02, Vector2(degrees + 15.0, 38.0)),
-			3, 0.04, ARC_SPARK.phased(strip / 6.0))
+		Parts.arc(m, crown + Parts.around(0.48, degrees, 0.06),
+			centre + Parts.on_sphere(sphere - 0.02, Vector2(degrees + 15.0, 38.0)), 3, 0.04, ARC_SPARK.phased(strip / 6.0))
 		strip += 1
 	if level >= 2:
 		for k: int in 4:
 			var root := crown + Parts.around(0.42, 90.0 * k, 0.0)
 			var tip := crown + Parts.around(0.66, 90.0 * k, -0.08)
 			m.prism(0.025, 0.015, root.distance_to(tip), 8, root, Parts.ROD, Parts.facing(tip - root))
-			m.orb(0.05, 8, 4, tip, ARC_BLINK.phased(_chase(k, 4)))
+			m.orb(0.05, 8, 4, tip, ARC_BLINK.phased(Parts.chase(k, 4)))
 	if level >= 3:
 		var cells: Array[float] = [45.0, 225.0, 315.0]
 		for k: int in cells.size():
@@ -388,7 +385,7 @@ static func build_arc_tower(p: Parts, level: int) -> void:
 		m.orb(0.2, 16, 8, twin_centre, ARC_PULSE.phased(0.5))
 		# An arc jumps between the twin spheres.
 		var jump := (centre - twin_centre).normalized()
-		_arc(m, twin_centre + jump * 0.18, centre - jump * (sphere - 0.02), 6, 0.07, ARC_SPARK.phased(0.95))
+		Parts.arc(m, twin_centre + jump * 0.18, centre - jump * (sphere - 0.02), 6, 0.07, ARC_SPARK.phased(0.95))
 
 
 static func build_cloaked_sentry(p: Parts, level: int) -> void:
@@ -434,7 +431,7 @@ static func build_gravity_well(p: Parts, level: int) -> void:
 		var degrees := 30.0 + 120.0 * k
 		var foot := Parts.around(0.66, degrees, top)
 		m.box_chamfered(Vector3(0.14, 0.82, 0.18), 0.04, foot, SHELL_MID, Vector3(0, 90.0 - degrees, 0))
-		m.box_chamfered(Vector3(0.1, 0.08, 0.12), 0.02, foot + Vector3(0, 0.82, 0), PLASMA_BLINK.phased(_chase(k, 3)),
+		m.box_chamfered(Vector3(0.1, 0.08, 0.12), 0.02, foot + Vector3(0, 0.82, 0), PLASMA_BLINK.phased(Parts.chase(k, 3)),
 			Vector3(0, 90.0 - degrees, 0))
 	m.orb(0.17, 12, 6, core, CORE)
 	# The gyro rings tumble about the core: each lies across the axis it turns about.
@@ -471,7 +468,7 @@ static func build_emp_tower(p: Parts, level: int) -> void:
 	for k: int in 3:
 		var from := Parts.around(0.4, 337.5 + 45.0 * k, cage.y + (0.18 if k % 2 == 0 else 0.52))
 		var to := Parts.around(0.4, 22.5 + 45.0 * k, cage.y + (0.52 if k % 2 == 0 else 0.18))
-		_arc(m, from, to, 3, 0.03, EMP_ARC.phased(k / 3.0))
+		Parts.arc(m, from, to, 3, 0.03, EMP_ARC.phased(k / 3.0))
 	Parts.torus(m, 0.4, 0.05, 16, 10, cage + Vector3(0, 0.62, 0), GOLD if level >= 3 else Parts.GUNMETAL)
 	m.dome(0.22, 0.12, 16, 6, cage + Vector3(0, 0.67, 0), SHELL_MID)
 	Parts.mast(m, cage + Vector3(0, 0.78, 0), 0.22, 0.05, EMP_BLINK.phased(0.5))
@@ -481,7 +478,7 @@ static func build_emp_tower(p: Parts, level: int) -> void:
 		cans = [45.0, 135.0, 225.0, 315.0]
 	for k: int in cans.size():
 		var degrees := cans[k]
-		var band := EMP_BLINK.phased(_chase(k, cans.size()))
+		var band := EMP_BLINK.phased(Parts.chase(k, cans.size()))
 		var can_top := _capacitor(m, Parts.around(0.94, degrees, top), 0.5, level < 3, band)
 		if level >= 3:
 			can_top = _capacitor(m, can_top, 0.36, true, band)
@@ -521,7 +518,7 @@ static func build_railgun(p: Parts, level: int) -> void:
 	# each pair of the banks, a BLINK step (0.2 s) apart.
 	if level >= 3:
 		for k: int in 3:
-			_cell(m, _at(deck, Vector3(-0.28 + 0.28 * k, 0, -1.18), heading), 0.4, ION_BLINK.phased(_chase(0, 6)), 0.12)
+			_cell(m, _at(deck, Vector3(-0.28 + 0.28 * k, 0, -1.18), heading), 0.4, ION_BLINK.phased(Parts.chase(0, 6)), 0.12)
 
 
 static func build_ion_beam(p: Parts, level: int) -> void:
@@ -604,7 +601,8 @@ static func build_orbital_cannon(p: Parts, level: int) -> void:
 	var coils := 2 + level
 	for i: int in coils:
 		var at := 0.5 + (length - 0.7) * i / (coils - 1)
-		Parts.torus(gun, 0.315, 0.04, 24, 10, _at(barrel, Vector3(0, at, 0), aim), ION_PULSE.phased(_chase(i, coils)), aim)
+		Parts.torus(gun, 0.315, 0.04, 24, 10, _at(barrel, Vector3(0, at, 0), aim), ION_PULSE.phased(Parts.chase(i, coils)),
+			aim)
 	if level >= 2:
 		Parts.torus(m, 1.0, 0.04, 24, 10, Vector3(0, deck - 0.04, 0), GOLD)
 	var mast := Parts.around(1.3, 135.0, top + 0.24)
@@ -620,7 +618,7 @@ static func build_orbital_cannon(p: Parts, level: int) -> void:
 	radar.orb(0.06, 12, 6, horn, ION_PULSE)
 	# Lights round the bunker's lower tier blink in a chase.
 	for k: int in 8:
-		m.orb(0.07, 8, 3, Parts.around(1.2, 22.5 + 45.0 * k, bunker + 0.01), ION_BLINK.phased(_chase(k, 8)))
+		m.orb(0.07, 8, 3, Parts.around(1.2, 22.5 + 45.0 * k, bunker + 0.01), ION_BLINK.phased(Parts.chase(k, 8)))
 	for degrees: float in [45.0, 315.0]:
 		m.box_chamfered(Vector3(0.5, 0.18, 0.04), 0.01, Parts.around(1.3, degrees, top + 0.05), VENT,
 			Vector3(0, 90.0 - degrees, 0))
@@ -671,7 +669,8 @@ static func _capacitor(m: LowPolyMesh, pos: Vector3, height: float, top: bool, b
 ## caps blinking in turn from the breech towards the muzzle.
 static func _bank(m: LowPolyMesh, deck: Vector3, heading: Vector3, side: float) -> void:
 	for k: int in 3:
-		_cell(m, _at(deck, Vector3(side * 0.66, 0, -0.62 + 0.3 * k), heading), 0.4, ION_BLINK.phased(_chase(k + 1, 6)), 0.12)
+		_cell(m, _at(deck, Vector3(side * 0.66, 0, -0.62 + 0.3 * k), heading), 0.4,
+			ION_BLINK.phased(Parts.chase(k + 1, 6)), 0.12)
 
 
 ## The cloaked sentry's gun: a low head on the lid with a short barrel and a red sight.
@@ -720,36 +719,6 @@ static func _gyro(m: LowPolyMesh, centre: Vector3, major: float, minor: float, r
 	Parts.torus(m, major, minor, 16, 10, centre - LowPolyMesh.turn(Vector3(0, minor, 0), rot), surf, rot)
 
 
-## A crackling arc from `from` to `to`: `segments` struts, the corners between them kinked
-## `kink` to either side of the straight line in turn, so JITTER has corners to shake. Give each
-## arc its own phase of the surface, so the arcs flicker apart.
-static func _arc(m: LowPolyMesh, from: Vector3, to: Vector3, segments: int, kink: float, surf: Surf) -> void:
-	var along := (to - from).normalized()
-	var side := along.cross(Vector3.UP)
-	if side.length() < 0.1:
-		side = along.cross(Vector3.RIGHT)
-	side = side.normalized()
-	var last := from
-	for k: int in range(1, segments + 1):
-		var point := from.lerp(to, float(k) / segments)
-		if k < segments:
-			point += side * kink * (1.0 if k % 2 == 1 else -1.0)
-		m.strut(last, point, ARC_WIDTH, surf)
-		last = point
-
-
-## A point `radius` from a sphere's centre, at Parts.around() angle `at.x` and elevation `at.y`
-## (degrees).
-static func _on_sphere(radius: float, at: Vector2) -> Vector3:
-	var elevation := deg_to_rad(at.y)
-	return Parts.around(radius * cos(elevation), at.x, radius * sin(elevation))
-
-
-## The BLINK phase of lamp `k` of `count` lit in turn, lamp 0 first: a chase.
-static func _chase(k: int, count: int) -> float:
-	return fposmod(-float(k) / count, 1.0)
-
-
 ## `origin` plus `local` turned by `rot`: a point on a turned part.
 static func _at(origin: Vector3, local: Vector3, rot: Vector3) -> Vector3:
 	return origin + LowPolyMesh.turn(local, rot)
@@ -757,14 +726,3 @@ static func _at(origin: Vector3, local: Vector3, rot: Vector3) -> Vector3:
 
 static func _glow(tint: Color, flags: int = 0) -> Surf:
 	return Surf.make(MaterialKit.Layer.GLOW, tint, 1.0, Surf.UNLIT | flags, true)
-
-
-## A crackling arc's surface: a glow that flickers and shakes.
-static func _spark(tint: Color) -> Surf:
-	return Surf.make(MaterialKit.Layer.GLOW, tint, 1.0, Surf.UNLIT | Surf.FLICKER | Surf.JITTER)
-
-
-## A current: the pipe layer's ribbed bands glowing in `tint` and flowing at the FLOW speed
-## `phase` (above 0.5 along V: towards a pipe's far end, a box's +Z on its top).
-static func _current(tint: Color, phase: float) -> Surf:
-	return Surf.make(MaterialKit.Layer.PIPE, tint, 3.0, Surf.UNLIT | Surf.FLOW, true, true, phase)
