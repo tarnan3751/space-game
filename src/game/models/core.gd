@@ -10,8 +10,23 @@ static var STEP := Surf.make(MaterialKit.Layer.PLATE, MaterialKit.HULL_MID)
 static var WINDOW := Surf.make(MaterialKit.Layer.GLOW, MaterialKit.CORE_GLASS, 1.0, Surf.UNLIT)
 static var GLOW := Surf.make(MaterialKit.Layer.GLOW, MaterialKit.CORE_GLASS, 1.0, Surf.UNLIT, true)
 static var GOLD_GLOW := Surf.make(MaterialKit.Layer.GLOW, MaterialKit.CORE_GOLD, 1.0, Surf.UNLIT, true)
-static var CONTAINMENT := Surf.make(MaterialKit.Layer.GLOW, MaterialKit.ANTIMATTER, 1.0, Surf.UNLIT, true)
-static var SCREENS := Surf.make(MaterialKit.Layer.SCREEN, MaterialKit.CORE_GLASS, 2.0, Surf.LIT, true)
+## The containment ring's current runs round it: the crystal layer's inked facets, which vary
+## along U (the glow layer's faint stripes do not), carried by FLOW_U. Its clamps' nodes pulse.
+static var CONTAINMENT := Surf.make(MaterialKit.Layer.CRYSTAL, MaterialKit.ANTIMATTER, 2.0, Surf.UNLIT | Surf.FLOW_U, true, true, 0.75)
+static var CONTAINMENT_NODE := Surf.make(MaterialKit.Layer.GLOW, MaterialKit.ANTIMATTER, 1.0, Surf.UNLIT | Surf.PULSE, true)
+## The screens' rows scroll.
+static var SCREENS := Surf.make(MaterialKit.Layer.SCREEN, MaterialKit.CORE_GLASS, 2.0, Surf.FLOW, true, true, 0.6)
+## The sensor masts' bulbs blink, each on its own phase; the L5 beacon pulses.
+static var MAST_LAMP := Surf.make(MaterialKit.Layer.GLOW, MaterialKit.CORE_GLASS, 1.0, Surf.UNLIT | Surf.BLINK, true)
+static var GOLD_MAST_LAMP := Surf.make(MaterialKit.Layer.GLOW, MaterialKit.CORE_GOLD, 1.0, Surf.UNLIT | Surf.BLINK, true)
+static var BEACON := Surf.make(MaterialKit.Layer.GLOW, MaterialKit.CORE_GOLD, 1.0, Surf.UNLIT | Surf.PULSE, true)
+## The hangar door's warning lamps, which chase across its lintel.
+static var DOOR_LAMP := Surf.make(MaterialKit.Layer.GLOW, MaterialKit.HAZARD, 1.0, Surf.UNLIT | Surf.BLINK)
+## The hologram of the base's own planet over the dome (L3+): the globe in the planet's violet,
+## so it stands off the cyan dome, its ring and its projector in core glass.
+static var HOLO_GLOBE := Surf.make(MaterialKit.Layer.GLOW, MaterialKit.ANTIMATTER, 1.0, Surf.HOLO | Surf.BOB, true)
+static var HOLO_RING := Surf.make(MaterialKit.Layer.GLOW, MaterialKit.CORE_GLASS, 1.0, Surf.HOLO | Surf.BOB, true)
+static var PROJECTOR := Surf.make(MaterialKit.Layer.GLOW, MaterialKit.CORE_GLASS, 1.0, Surf.UNLIT | Surf.PULSE)
 static var DOOR := Surf.make(MaterialKit.Layer.VENT, MaterialKit.HULL_DARK, 2.0)
 static var ROOF_VENT := Surf.make(MaterialKit.Layer.VENT, MaterialKit.HULL_MID, 2.0)
 
@@ -34,14 +49,21 @@ const PILASTERS := [0.0, 90.0, 180.0, 270.0]
 ## dish pylon on the deck behind the dome's right, so the dish never hides the L5 spire.
 const MASTS := [170.0, 280.0]
 const DISH_CORNER := 250.0
+## The hologram's centre above the dome's apex, its globe's radius, and its ring's tilt.
+const HOLO_LIFT := 0.42
+const HOLO_RADIUS := 0.28
+const HOLO_TILT := Vector3(20, 0, 0)
 
 
 ## A broad two-tier stepped foundation under a tall hull-light drum with pilasters and two
 ## rows of windows, crowned by a core glass dome ringed in gold; a hangar door with hazard
-## stripes facing the camera, two sensor masts and a spinning comms dish behind. Each level
-## adds to it: L2 two wing modules flanking the drum, L3 a ring of rooms with screens round
-## the drum's foot, L4 a glowing antimatter containment ring round the drum and two more
-## masts, L5 gold trim and a beacon spire up to 3.2, the tallest building on the base.
+## stripes and a chase of warning lamps facing the camera, two sensor masts with blinking
+## bulbs and a spinning comms dish behind. Each level adds to it: L2 two wing modules flanking
+## the drum, their screens scrolling, L3 a ring of rooms with scrolling screens round the
+## drum's foot and the hologram of the base's planet floating over the dome, its ring turning,
+## L4 a glowing antimatter containment ring round the drum, its current flowing, and two more
+## masts, L5 gold trim and a beacon spire up to 3.2, the tallest building on the base, its
+## beacon pulsing.
 static func build_command_center(p: Parts, level: int) -> void:
 	var m := p.body
 	var gold := level >= 5
@@ -92,21 +114,23 @@ static func build_command_center(p: Parts, level: int) -> void:
 		for degrees: float in PILASTERS:
 			var yaw := Vector3(0, 90.0 - degrees, 0)
 			m.box_chamfered(Vector3(0.16, 0.24, 0.3), 0.03, Parts.around(DRUM_RADIUS + 0.16, degrees, ring_y - 0.12), Parts.HULL_DARK, yaw)
-			m.box_chamfered(Vector3(0.12, 0.08, 0.12), 0.03, Parts.around(DRUM_RADIUS + 0.2, degrees, ring_y + 0.1), CONTAINMENT, yaw)
+			m.box_chamfered(Vector3(0.12, 0.08, 0.12), 0.03, Parts.around(DRUM_RADIUS + 0.2, degrees, ring_y + 0.1),
+				CONTAINMENT_NODE.phased(degrees / 360.0), yaw)
 	if gold:
-		# The beacon spire: a tapered gold mast 0.8 above the dome's apex, two collars, a glowing
-		# orb at 3.2.
+		# The beacon spire: a tapered gold mast 0.8 above the dome's apex, a collar at its foot,
+		# a pulsing orb at 3.2; it runs up through the hologram's globe as its axis.
 		m.prism(0.075, 0.03, 0.66, 16, Vector3(0, apex + 0.05, 0), Parts.GOLD_ROUND)
-		Parts.torus(m, 0.08, 0.03, 16, 6, Vector3(0, apex + 0.1, 0), Parts.GOLD_ROUND)
-		m.prism(0.055, 0.045, 0.05, 16, Vector3(0, apex + 0.4, 0), Parts.GOLD_ROUND)
-		m.orb(0.09, 12, 6, Vector3(0, apex + 0.69, 0), GOLD_GLOW)
+		Parts.torus(m, 0.08, 0.03, 12, 6, Vector3(0, apex + 0.1, 0), Parts.GOLD_ROUND)
+		m.orb(0.09, 12, 6, Vector3(0, apex + 0.69, 0), BEACON)
+	if level >= 3:
+		_hologram(p, m, apex)
 
 	# Two sensor masts on the deck and the dish's pylon, behind the dome.
 	for k: int in MASTS.size():
 		var degrees: float = MASTS[k]
 		var foot := Parts.around(1.47, degrees, DECK)
 		m.box_chamfered(Vector3(0.18, 0.14, 0.18), 0.04, foot, Parts.HULL_DARK, Vector3(0, 90.0 - degrees, 0))
-		Parts.mast(m, foot + Vector3(0, 0.14, 0), apex - 0.56 + 0.12 * k, 0.08, GOLD_GLOW if gold else GLOW)
+		Parts.mast(m, foot + Vector3(0, 0.14, 0), apex - 0.56 + 0.12 * k, 0.08, (GOLD_MAST_LAMP if gold else MAST_LAMP).phased(0.5 * k))
 	var pylon := Parts.around(1.5, DISH_CORNER, DECK)
 	var pylon_height := DRUM_HEIGHT + 0.2
 	m.box_chamfered(Vector3(0.34, 0.16, 0.34), 0.05, pylon, Parts.HULL_DARK, Vector3(0, 45, 0))
@@ -126,7 +150,23 @@ static func _hangar_door(m: LowPolyMesh, gold: bool) -> void:
 	for side: float in [-1.0, 1.0]:
 		m.box(Vector3(0.1, 0.56, 0.06), front + LowPolyMesh.turn(Vector3(side * 0.31, 0, 0), yaw), Parts.HAZARD, yaw)
 	m.box(Vector3(0.72, 0.08, 0.06), front + Vector3(0, 0.52, 0), Parts.HAZARD, yaw)
+	# Four warning lamps over the lintel, chasing across it.
+	for k: int in 4:
+		m.box(Vector3(0.09, 0.06, 0.05), front + LowPolyMesh.turn(Vector3(-0.24 + 0.16 * k, 0.62, 0.0), yaw),
+			DOOR_LAMP.phased(k / 4.0), yaw)
 	m.box(Vector3(0.7, 0.012, 0.26), Parts.around(1.8, DOOR_FACING, DECK), Parts.HAZARD, yaw)
+
+
+## The hologram over the dome from L3: a projector lens on the apex cap, a globe of the base's
+## own planet floating over it, and a ring round the globe, tilted, turning as a moving part,
+## both bobbing together. At L5 the beacon spire runs up through the globe as its axis.
+static func _hologram(p: Parts, m: LowPolyMesh, apex: float) -> void:
+	m.disc(0.15, 16, Vector3(0, apex + 0.051, 0), PROJECTOR)
+	var centre := Vector3(0, apex + HOLO_LIFT, 0)
+	m.orb(HOLO_RADIUS, 16, 5, centre, HOLO_GLOBE)
+	var ring := p.moving(centre, Motion.spin(Vector3.UP, 0.35))
+	ring.lathe(PackedVector2Array([Vector2(HOLO_RADIUS + 0.16, 0), Vector2(HOLO_RADIUS + 0.08, 0)]), 24, Vector3.ZERO,
+		HOLO_RING, HOLO_TILT)
 
 
 ## A wing module flanking the drum: a chamfered block 1.2 long, its long side to the camera
@@ -144,7 +184,7 @@ static func _wing(m: LowPolyMesh, degrees: float, level: int, gold: bool) -> voi
 	if level >= 4:
 		var foot := Parts.around(1.62, degrees, roof.y)
 		m.box_chamfered(Vector3(0.16, 0.1, 0.16), 0.03, foot, Parts.HULL_DARK, yaw)
-		Parts.mast(m, foot + Vector3(0, 0.1, 0), 1.0, 0.07, GOLD_GLOW if gold else GLOW)
+		Parts.mast(m, foot + Vector3(0, 0.1, 0), 1.0, 0.07, (GOLD_MAST_LAMP if gold else MAST_LAMP).phased(fposmod(0.25 + degrees / 360.0, 1.0)))
 
 
 ## The ring of rooms round the drum's foot: a low round wall with a band of screens and a

@@ -346,7 +346,7 @@ triangles as the gallery counts them.
 
 | Type | Signature element | Animation | Top level, body triangles |
 | --- | --- | --- | --- |
-| `command_center` | glass dome ringed in gold on a tall drum over a stepped foundation, a hazard-striped hangar door; wings, a ring of rooms, a violet containment ring and a gold beacon spire as it grows | spin: the comms dish on its pylon | 4,830 |
+| `command_center` | glass dome ringed in gold on a tall drum over a stepped foundation, a hazard-striped hangar door; wings, a ring of rooms, a hologram of the base's planet over the dome, a violet containment ring and a gold beacon spire as it grows | spin: the comms dish on its pylon; from L3 spin: the hologram's tilted HOLO ring round its violet HOLO + BOB globe (no outline). BLINK: the door's four lamps (a chase), the masts' bulbs; FLOW: the wing and room screens; PULSE: the hologram's projector lens; L4 FLOW_U on the containment ring (crystal layer), PULSE on its clamp nodes; L5 PULSE on the beacon | 4,966 |
 | `drone_bay` | landing deck in a hazard ring of cyan lights, a parked drone, a control booth with a gold roof; the drone's body, 0.42 across at 12 sides, is the one exception to the small-part side counts | spin: the beacon on the booth | 1,968 |
 | `metal_extractor` | tripod derrick over a drill, conveyors carrying glowing ore into hoppers, exhaust stacks | spin: the drill string and its top drive | 2,610 |
 | `crystal_harvester` | laser gantry over a cluster of glowing crystal shards | spin: the focusing emitter and its beam | 1,800 |
