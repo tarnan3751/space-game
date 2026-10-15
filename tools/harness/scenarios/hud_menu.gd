@@ -1,6 +1,7 @@
 extends HarnessScenario
 ## The HUD on a fresh base: the meters and drone ring, the Build button and the panel it slides
-## up (tabs, cards, close button), a card picked into the place bar, a purchase, a wide window.
+## up (tabs, cards, the selected tab pressed again, close button), a card picked into the place
+## bar, a purchase, a wide window.
 ## Touches are real input events (Input.parse_input_event), so they take a finger's path.
 
 var _world_taps: int = 0
@@ -34,6 +35,24 @@ func run(main: MainScript) -> void:
 				shown.append(type)
 		check(shown == expected, "the %s tab shows %s" % [category, ", ".join(shown)])
 		await screenshot("open-" + category)
+
+	# A press on the selected tab scrolls its strip back to the start, animated.
+	var first: String = catalog.categories[0]
+	await _tap(main, hud.tab_button(first).get_global_rect().get_center())
+	var strip := hud.entry_strip()
+	strip.scroll_horizontal = 300
+	await frames(2)
+	var scrolled := strip.scroll_horizontal
+	check(scrolled > 0, "the %s strip scrolled to %d" % [first, scrolled])
+	_touch(main, hud.tab_button(first).get_global_rect().get_center(), true)
+	await frames(1)
+	_touch(main, hud.tab_button(first).get_global_rect().get_center(), false)
+	await frames(2)
+	check(strip.scroll_horizontal > 0 and strip.scroll_horizontal < scrolled,
+		"the strip is on its way back (%d of %d)" % [strip.scroll_horizontal, scrolled])
+	await _wait(main, Hud.STRIP_RETURN_SECONDS)
+	check(strip.scroll_horizontal == 0 and hud.tab_button(first).button_pressed,
+		"pressing the selected tab scrolled its strip back to %d, still selected" % strip.scroll_horizontal)
 
 	# A locked card is disabled and says what it needs. Taps on the panel's empty top row, on a
 	# meter and on the drone ring stop there; the close button closes the panel.

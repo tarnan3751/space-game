@@ -189,7 +189,10 @@ ink outline (`TabButton`); the selected one is cyan with ink text and no outline
 (`TabSelected`). The first is selected when the HUD is built; the selection is remembered while
 the game runs (not saved). Selecting a tab shows the cards of the `catalog.menu_order` types
 whose `catalog.category_of(type)` is that tab, in `menu_order` order, scrolls the strip back to
-its start, and refreshes those cards from the last state `refresh` was given.
+its start, and refreshes those cards from the last state `refresh` was given. Pressing the tab
+that is already selected scrolls its strip back to the start, a tween of `scroll_horizontal` over
+0.2 s (`STRIP_RETURN_SECONDS`, cubic ease out), which selecting another tab stops; the tab stays
+selected.
 
 **Cards.** Under the tabs, a horizontal `ScrollContainer` of cards, scrolled by a drag, with a
 thin scroll bar under it; to its right a column as wide as the Build button stays clear, since
@@ -288,7 +291,8 @@ Read-only, so a scenario never reads a private member (`tools/harness/README.md`
 `build_button()` is the Build button; `is_menu_open()` whether the build panel is open or opening;
 `build_panel()` the panel itself; `close_button()` the panel's close button;
 `tab_button(category)` and `entry_button(type)` return the tab's and the card's `Button`;
-`entry_status(type)` is a card's status line; `resource_panel(res)` is the top bar's meter for a
+`entry_status(type)` is a card's status line; `entry_strip()` the `ScrollContainer` the cards
+scroll in; `resource_panel(res)` is the top bar's meter for a
 resource and `resource_fill(res)` its fill, whose parent is the track it grows across;
 `place_button()` is the place bar's `Place` (or `Done`); `drones_panel()` is the `DroneRing`,
 whose `free_count()` and `total_count()` are the counts it shows; `reset_button()` and

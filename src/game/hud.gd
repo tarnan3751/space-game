@@ -99,6 +99,8 @@ const MENU_HEIGHT := 300.0
 const MENU_MAX_SHARE := 0.4
 const MENU_OPEN_SECONDS := 0.18
 const MENU_CLOSE_SECONDS := 0.14
+## Pressing the selected tab again scrolls its strip back to the start over this long.
+const STRIP_RETURN_SECONDS := 0.2
 
 ## The dev cheats are on (main.gd): every meter shows, full, reading "∞" instead of amount / cap.
 var cheats: bool = false
@@ -126,6 +128,7 @@ var _menu_tween: Tween
 var _close_button: Button
 var _tab_buttons: Dictionary[String, Button] = {}
 var _entry_scroll: ScrollContainer
+var _strip_tween: Tween
 var _entries: Dictionary[String, Button] = {}
 ## Each card's name and cost, dimmed while it cannot be built.
 var _entry_heading: Dictionary[String, Control] = {}
@@ -313,6 +316,11 @@ func entry_status(type: String) -> String:
 	return _entry_status[type].text
 
 
+## The horizontal strip the cards scroll in.
+func entry_strip() -> ScrollContainer:
+	return _entry_scroll
+
+
 ## The top bar's meter for one resource; hidden while the base cannot store it.
 func resource_panel(res: String) -> Control:
 	return _meters[res]
@@ -424,9 +432,24 @@ func _select_tab(category: String) -> void:
 	_tab_buttons[category].button_pressed = true
 	for type: String in _entries:
 		_entries[type].visible = _catalog.category_of(type) == category
+	# A return still under way on the last tab would go on scrolling this one.
+	if _strip_tween != null:
+		_strip_tween.kill()
 	_entry_scroll.scroll_horizontal = 0
 	if _state != null and _menu_open:
 		_refresh_entries(_state)
+
+
+## A press on the selected tab scrolls its strip back to the start; on another, selects it.
+func _on_tab_pressed(category: String) -> void:
+	if category != _tab:
+		_select_tab(category)
+		return
+	if _strip_tween != null:
+		_strip_tween.kill()
+	_strip_tween = create_tween()
+	_strip_tween.tween_property(_entry_scroll, "scroll_horizontal", 0, STRIP_RETURN_SECONDS) \
+		.set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_OUT)
 
 
 func _refresh_info(state: BaseState, building: BuildingState) -> void:
@@ -655,7 +678,7 @@ func _build_menu() -> void:
 		var tab := _button(_catalog.category_name(category), TAB_SIZE, &"TabButton")
 		tab.toggle_mode = true
 		tab.button_group = group
-		tab.pressed.connect(func() -> void: _select_tab(category))
+		tab.pressed.connect(_on_tab_pressed.bind(category))
 		tabs.add_child(tab)
 		_tab_buttons[category] = tab
 	var gap := Control.new()
