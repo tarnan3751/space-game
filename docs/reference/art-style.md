@@ -2,7 +2,7 @@
 
 The comic style every model, the ground and the scenery are drawn in: the look, the light, the
 colours, the material kit, how `LowPolyMesh` paints a part, the ink outline, the modelling
-vocabulary and budgets, and the view states. Every model brief points here. The scene, the
+vocabulary and budgets, the animation, and the view states. Every model brief points here. The scene, the
 camera and the views' wiring are in `input-camera.md`.
 
 | File | What |
@@ -11,7 +11,10 @@ camera and the views' wiring are in `input-camera.md`.
 | `src/game/surf.gd` | `Surf`: how a part is painted |
 | `src/game/low_poly_mesh.gd` | `LowPolyMesh`: parts, UVs, smoothing, the body and outline meshes |
 | `src/game/toon.gdshader`, `toon_common.gdshaderinc` | the body shader and the light it shares with the ground |
+| `src/game/effects.gdshaderinc` | the surface flags and their time-driven effects, shared by the toon, ink and holo shaders (**Animation**) |
 | `src/game/ink.gdshader` | the outline shader |
+| `src/game/holo.gdshader` | the hologram surface (**Animation**) |
+| `src/game/motion.gd` | `Motion`: how a moving part moves (**Animation**) |
 | `src/game/ground.gdshader` | the buildable field: its ground, its marks, the grid |
 | `src/game/base_view.gd` | builds the ground, the curb, the terrain ring, the rocks and the outcrops (**Environment**) |
 | `src/game/building_models.gd`, `src/game/models/` | the dispatcher and one model file per category, `Parts` in `models/parts.gd` |
@@ -100,6 +103,14 @@ that normal and draws the back faces in ink (`INK`, `1B1A2E`, never black):
   shadow-casting instance also draws into the shadow map.
 - Very thin parts (rods under 0.06 units, antenna wires) take `outline = false`; end them in a
   bulb or a plate that is outlined instead.
+- Parts flagged FLICKER, JITTER or HOLO (`Surf.NO_OUTLINE`) are never outlined, whatever their
+  `outline` says: a spark or an arc is too small and too quick for a line, and a hologram is
+  see-through.
+- The outline mesh carries each part's UV2 (its flags) and colour (its phase in the alpha), and
+  `ink.gdshader` moves each vertex as the body's shader does (BOB, JITTER, from
+  `effects.gdshaderinc`) before the push, so an outline never comes off a bobbing part. It takes
+  the instance's scale from the length of its basis's X axis, so a part tilted by a swing keeps
+  its line width.
 - Interior lines (panel seams, hatches, plate edges) come from the textures. A part sitting on
   another gets an ink contact line where its outline shows against the part below.
 
@@ -214,11 +225,15 @@ past the last.
 
 ## Surfaces: `Surf`
 
-`Surf.make(layer, tint, uv_scale = 1.0, flags = Surf.LIT, smooth = false, outline = true)` says
-how a part is painted: a `MaterialKit.Layer`, an sRGB tint, texture repeats per world unit, the
-flags (`Surf.LIT`, `Surf.UNLIT` emissive, `Surf.GLOSSY` with the cel specular), whether the part
-is smooth shaded, and whether it is outlined. A `Surf` is shared and never changed once made: make
-one per look, keep it in a `static var`, and pass it to every part that looks so.
+`Surf.make(layer, tint, uv_scale = 1.0, flags = Surf.LIT, smooth = false, outline = true,
+phase = 0.0)` says how a part is painted: a `MaterialKit.Layer`, an sRGB tint, texture repeats
+per world unit, the flags, whether the part is smooth shaded, whether it is outlined, and the
+phase of its animation. The flags are bits, combined with `|`: `Surf.LIT` (0), `Surf.UNLIT` (1,
+emissive), `Surf.GLOSSY` (2, with the cel specular), and the effects in **Animation** (`PULSE`,
+`BLINK`, `FLICKER`, `FLOW`, `FLOW_U`, `BOB`, `JITTER`, `HOLO`). A `Surf` is shared and never
+changed once made: make one per look, keep it in a `static var`, and pass it to every part that
+looks so; `surf.phased(phase)` returns a copy with another phase, for lamps that chase or sparks
+that flicker apart. A phase is stored at 1/254 steps (**Animation**).
 
 `Parts` (`models/parts.gd`) names the common ones: `CONCRETE_PAD`, `HULL_LIGHT`, `HULL_MID`,
 `HULL_DARK`, `GUNMETAL` (smooth), `HAZARD`, `GOLD_TRIM` (glossy), `GLASS` (glossy, smooth),
@@ -252,17 +267,19 @@ faces are left out of boxes and lathes, since the camera always looks down.
 | `turn(offset, rot)` | an offset turned like a part, to place a part on a turned one |
 
 `sides` goes up to 24 and `rings` to 8 anywhere. `to_mesh()` is the body (VERTEX, NORMAL, UV,
-UV2, COLOR) on `MaterialKit.toon()`, `to_outline_mesh()` the outline on `MaterialKit.ink()` (null
-when nothing is outlined), and `triangle_count()` the body's triangles. Both meshes are unindexed
-triangle lists. `to_arrays()` and `to_outline_arrays()` are the same as surface arrays (the
-outline's empty when nothing is outlined), for a caller that merges meshes itself, as `WallMesh`
-does.
+UV2, COLOR): its opaque parts on `MaterialKit.toon()` and, when there are any, its HOLO parts in
+a surface of their own on `MaterialKit.holo()` (with no opaque part, the holograms are surface
+0). `to_outline_mesh()` is the outline (VERTEX, NORMAL, UV2, COLOR) on `MaterialKit.ink()`, null
+when nothing is outlined, and `triangle_count()` the body's triangles, both surfaces. Both meshes
+are unindexed triangle lists. `to_arrays()` (the opaque parts only) and `to_outline_arrays()` are
+the same as surface arrays (the outline's empty when nothing is outlined), for a caller that
+merges meshes itself, as `WallMesh` does.
 
 - **UVs**: a face's corners in the part's own space, before `pos` and `rot`, projected along the
   dominant axis of its normal, times `uv_scale`. Round parts take U from the angle around their
   axis, a whole number of repeats around (about one per world unit at their widest radius), so
   bands wrap without a seam, and V from the distance along the profile; caps and discs are polar
-  (V the radius). UV2 is (layer, flags); the vertex colour is the tint.
+  (V the radius). UV2 is (layer, flags); the vertex colour is the tint, its alpha the phase.
 - **Smoothing**: a smooth part's faces that meet at under 40° share normals, averaged by position
   within the part and weighted by corner angle; caps, discs and sharper edges (chamfers, 45°;
   box corners, 90°) stay hard. A 16- to 24-sided cylinder shades as a curve; an 8-sided one
@@ -273,18 +290,22 @@ does.
 `BuildingModels.create(type, level, size)` dispatches to one static `build_<type>(p: Parts,
 level: int)` in its category's file under `src/game/models/` (`core.gd`, `resources.gd`,
 `army.gd`, `defense.gd`, `traps.gd`, `walls.gd`); `MODELS` gives each type the footprint its
-models are built for and its level count. `Parts` holds the model while it is built: `body` and
-`spin` (two `LowPolyMesh`), the spin `pivot` and `speed`, and the shared helpers. A model is a
-`Node3D` with the body's `MeshInstance3D` and its outline's beside it, and at most one spinning
-part: a `Node3D` at the pivot carrying `SPIN_META`, with the spin mesh and its outline under it.
-That is at most four `MeshInstance3D`, two of them outlines (`OUTLINE_META`, no shadow). Meshes
-are built once per type and level and cached. The contract any model keeps, built or imported:
+models are built for and its level count. `Parts` holds the model while it is built: `body` (a
+`LowPolyMesh`), up to three moving parts (`moving(pivot, motion)`, **Animation**), and the shared
+helpers. A model is a `Node3D` with the body's `MeshInstance3D` and its outline's beside it, and
+a `Node3D` per moving part at its pivot carrying `MOVE_META` (its `Motion`), with the part's mesh
+and its outline under it. That is at most **eight** `MeshInstance3D`: the body and up to three
+moving parts, each with an outline (`OUTLINE_META`, no shadow); a moving part made only of
+parts that are never outlined has no outline instance. Meshes are built once per type and level
+and cached; `BuildingModels.instantiate(parts)` assembles an uncached model from parts a caller
+built itself (the `effects` rig). The contract any model keeps, built or imported:
 origin at the footprint centre on the ground, +Y up, fitting inside `size × size` cells.
 
-The `model_gallery` harness scenario lays out every type and level and checks each: one or two
-body instances, each with its outline instance on the ink material casting no shadow, every layer
-within the kit, and the body triangles and the extent within the budgets below. Its detail shots at the closest
-zoom are where a model is judged.
+The `model_gallery` harness scenario lays out every type and level and checks each: one to four
+body instances, each with its outline instance on the ink material casting no shadow unless all
+its parts are never outlined, every layer within the kit, and the body triangles (both surfaces)
+and the extent over every moving part's whole motion within the budgets below. Its detail shots
+at the closest zoom are where a model is judged.
 
 ### Shared shapes
 
@@ -312,33 +333,34 @@ job; a helper is added, never renamed or removed.
 ### Model table
 
 One line per type, in roster order: the signature element that names it from across the base,
-its spinning part, and its top level's body triangles as the gallery counts them.
+its animation (moving parts and surface effects, **Animation**), and its top level's body
+triangles as the gallery counts them.
 
-| Type | Signature element | Spin | Top level, body triangles |
+| Type | Signature element | Animation | Top level, body triangles |
 | --- | --- | --- | --- |
-| `command_center` | glass dome ringed in gold on a tall drum over a stepped foundation, a hazard-striped hangar door; wings, a ring of rooms, a violet containment ring and a gold beacon spire as it grows | the comms dish on its pylon | 4,830 |
-| `drone_bay` | landing deck in a hazard ring of cyan lights, a parked drone, a control booth with a gold roof; the drone's body, 0.42 across at 12 sides, is the one exception to the small-part side counts | the beacon on the booth | 1,968 |
-| `metal_extractor` | tripod derrick over a drill, conveyors carrying glowing ore into hoppers, exhaust stacks | the drill string and its top drive | 2,610 |
-| `crystal_harvester` | laser gantry over a cluster of glowing crystal shards | the focusing emitter and its beam | 1,800 |
-| `antimatter_siphon` | coiled torus round a glowing violet core, field pylons leaning in | the torus and its coils | 2,968 |
+| `command_center` | glass dome ringed in gold on a tall drum over a stepped foundation, a hazard-striped hangar door; wings, a ring of rooms, a violet containment ring and a gold beacon spire as it grows | spin: the comms dish on its pylon | 4,830 |
+| `drone_bay` | landing deck in a hazard ring of cyan lights, a parked drone, a control booth with a gold roof; the drone's body, 0.42 across at 12 sides, is the one exception to the small-part side counts | spin: the beacon on the booth | 1,968 |
+| `metal_extractor` | tripod derrick over a drill, conveyors carrying glowing ore into hoppers, exhaust stacks | spin: the drill string and its top drive | 2,610 |
+| `crystal_harvester` | laser gantry over a cluster of glowing crystal shards | spin: the focusing emitter and its beam | 1,800 |
+| `antimatter_siphon` | coiled torus round a glowing violet core, field pylons leaning in | spin: the torus and its coils | 2,968 |
 | `metal_silo` | squat banded tank with a glowing fill gauge and a ladder; twin tanks from L4 | none | 2,346 |
 | `crystal_silo` | tall hexagonal tank of crystal-lit glass panels under a chamfered lid and a crystal finial | none | 838 |
 | `antimatter_vault` | armoured chamfered cube with a round vault door, violet seams and a containment pylon on each corner | none | 2,824 |
 | `hangar` | barrel-vaulted bays with orange ribs and hazard-striped doors, a glass-cabbed control tower | none | 4,362 |
 | `fabricator` | sawtooth-roofed factory, an orange gantry crane over a loading dock, smokestacks | none | 1,950 |
 | `heavy_fabricator` | armoured hall with orange press arms hammering anvils, a glowing furnace mouth | none | 2,024 |
-| `research_lab` | observatory dome with a telescope, in a ring of screens | the radar dish on its mast | 2,704 |
+| `research_lab` | observatory dome with a telescope, in a ring of screens | spin: the radar dish on its mast | 2,704 |
 | `nanite_foundry` | vats with bands of glowing nanite-green goo, piped with ball elbows | none | 2,870 |
 | `drydock` | half-built ship in a cradle under orange gantries, welders throwing sparks | none | 2,946 |
 | `alliance_beacon` | braced transmitter tower with rings of light, a big dish and an emitter orb | none | 2,096 |
-| `laser_turret` | domed head on the red-belted plinth, twin barrels ending in red emitters | the head | 2,722 |
+| `laser_turret` | domed head on the red-belted plinth, twin barrels ending in red emitters | spin: the head | 2,722 |
 | `missile_battery` | tilted box launcher of red-tipped tubes (4, 6 at L3, 9 at L4) with a hazard band | none | 2,174 |
 | `plasma_mortar` | fat short barrel rising from a caged violet plasma chamber on a heavy ring | none | 2,782 |
 | `shield_generator` | cyan energy orb held over an emitter dome by three coil arms | none | 2,914 |
-| `flak_cannon` | barrels angled at the sky on a tall bell mount | the radar dish on its mast | 2,900 |
+| `flak_cannon` | barrels angled at the sky on a tall bell mount | spin: the radar dish on its mast | 2,900 |
 | `arc_tower` | tesla coil of white insulator skirts under an arc-blue sphere; twin coils at L4 | none | 2,794 |
 | `cloaked_sentry` | low dark hexagonal pod with a lid gun and a dim cyan shimmer ring | none | 854 |
-| `gravity_well` | dark core floating over a violet well, ringed by gyro rings | the rotor over the core | 1,978 |
+| `gravity_well` | dark core floating over a violet well, ringed by gyro rings | spin: the rotor over the core | 1,978 |
 | `emp_tower` | yellow core in a bar cage atop a stepped tower ringed by capacitor cans | none | 2,854 |
 | `railgun` | two long rails across the screen with a cyan strip between them, capacitor banks | none | 2,088 |
 | `ion_beam` | big crystal lens and focusing rings on a tripod | none | 1,964 |
@@ -348,14 +370,103 @@ its spinning part, and its top level's body triangles as the gallery counts them
 | `flak_mine` | hazard-banded pod, upward barrels with glowing bores round a lens | none | 574 |
 | `mega_mine` | big armoured dome on a hazard band ringed with red lights | none | 1,214 |
 
+## Animation
+
+Two ways for a model to move: **surface effects**, which the shaders animate from `TIME` per
+part, and **moving parts**, nodes `BuildingView` moves. What each costs in draws:
+
+- The shader effects (PULSE, BLINK, FLICKER, FLOW, FLOW_U, BOB, JITTER) add no draw: they are
+  flags on parts of meshes that are drawn anyway.
+- A moving part is two more instances, its body and its outline: two draws, plus the body's draw
+  into the shadow map.
+- A HOLO part puts one more surface on its mesh: one more draw, in the transparent pass, for each
+  mesh (the body or a moving part) that has holograms.
+
+While a building is busy (constructing an upgrade) its moving parts stop and resume where they
+stopped; its surface effects keep running, since they come from `TIME` with no per-instance
+state. That is intended.
+
+### Surface effects
+
+A part's flags (UV2.y, `Surf.flags`) are bits; `effects.gdshaderinc` holds the effects and their
+constants, shared by `toon.gdshader`, `ink.gdshader` and `holo.gdshader`, so an outline follows
+its part and a hologram moves like any other part. A part's phase (`Surf.phase`, 0 to 1) offsets
+its cycle by phase times the period. It is stored in the vertex colour's alpha, 8 bits, in 1/254
+steps: `LowPolyMesh` writes (round(phase × 254) + 0.25) / 255, the same byte whether the store
+rounds or truncates, and `surf_phase()` in `effects.gdshaderinc` reads round(alpha × 255) / 254,
+so 0.5 (a FLOW part standing still) is exact. There are no per-instance uniforms: every instance
+of a mesh animates alike.
+
+| Flag | Bit | Effect |
+| --- | --- | --- |
+| `UNLIT` | 1 | pure emission (**Surfaces**) |
+| `GLOSSY` | 2 | the cel specular disc |
+| `PULSE` | 4 | the colour, emission included, swells between 0.55 and 1.0 on a sine of period 1.6 s: cores, lenses, beacons |
+| `BLINK` | 8 | lit 0.2 s of every 1.2 s, at 0.35 the rest; lamps with phases k/n chase round a ring |
+| `FLICKER` | 16 | on or off at random 24 times a second (a hash of the time step and the phase), on about 40 % of the time; while off the vertex shader collapses the part to a point, so it draws nothing (no `discard`, which would cost the shared toon material its early depth test): sparks, welding arcs |
+| `FLOW` | 32 | the texture scrolls along V at (phase - 0.5) × 4 repeats a second: 0.5 still, 0.75 one repeat a second forward, 0.25 back. Liquids in pipes (the pipe layer's bands), currents (the glow layer's stripes), conveyors (grating), screens |
+| `FLOW_U` | 64 | the same along U: discs, rings. It shows only on a layer that varies along U: not the glow layer, whose stripes run along it |
+| `BOB` | 128 | the part rises and falls 0.08 along world Y on a sine of period 2.4 s: floating cores, holograms |
+| `JITTER` | 256 | each vertex jumps up to 0.04 in a pseudo-random direction (a hash of its position and the time step), 20 times a second; corners shared by faces move together. With UNLIT and FLICKER, a crackling arc: build it of short segments so there are corners to shake |
+| `HOLO` | 512 | a hologram (below) |
+
+Effects compose: UNLIT + PULSE, UNLIT + FLICKER + JITTER, FLOW + PULSE. `TIME` wraps every hour
+(the project's `time_rollover_secs`); BLINK, PULSE and BOB cycle evenly into the hour, FLOW and
+the hologram's dip jump once an hour.
+
+**Holograms.** A HOLO part is transparent, so `LowPolyMesh.to_mesh()` puts it in a surface of its
+own on `MaterialKit.holo()` (`holo.gdshader`: unshaded, alpha-blended, no depth writes, back faces
+culled): the kit layer times the tint at alpha 0.45; scan bands, a sawtooth 0.5 units long in
+world Y drifting up at 0.4 units a second, brightening by up to 0.4; a rim where the view grazes
+the surface, up to 0.3 brighter; and a dip of the alpha to 0.2 for 0.1 s every 2.6 s, offset by
+the phase. A near-white layer (glow) shows the tint best. A hologram is never outlined, never in a
+wall piece (**Walls**), and keeps its look on a placement ghost (**View states**).
+
+### Moving parts
+
+`Parts.moving(pivot, motion) -> LowPolyMesh` makes a moving part: build it in its own space,
+the pivot at its origin, as the parts of the body are built. A model has at most three
+(`Parts.MAX_MOVING`, asserted). `Motion` (`src/game/motion.gd`) says how it moves:
+
+| Constructor | Motion |
+| --- | --- |
+| `Motion.spin(axis, rate)` | continuous rotation about `axis` through the pivot, `rate` radians a second |
+| `Motion.swing(axis, amplitude, period, phase = 0.0, ease = SMOOTH)` | rotation about `axis` between -`amplitude` and +`amplitude` degrees |
+| `Motion.slide(axis, amplitude, period, phase = 0.0, ease = SMOOTH)` | translation along `axis` between -`amplitude` and +`amplitude` units |
+
+A swing or a slide follows a wave from -1 to 1 over each `period` seconds, offset by `phase`
+(0 to 1), shaped by its ease (`Motion.Ease`, the `easing` field): `LINEAR` a triangle wave,
+`SMOOTH` a sine, `HAMMER` a slow rise over 70 % of the period, a fast fall over 10 % and a hold of
+20 %, `RECOIL` its mirror: a fast rise over 10 %, a slow fall over 70 % and a hold of 20 %. At -1
+the part sits at its rest moved by -amplitude along (or turned -amplitude about) the axis, so a
+hammer strikes and rests at -amplitude and is lifted at +amplitude, and a recoiling barrel rests
+at -amplitude and kicks out to +amplitude: point the axis the way the part kicks.
+
+`BuildingView` collects the moving nodes once and sets each one's transform every frame from
+`Motion.transform_at(time, rest)`, with no allocation, on a clock that runs only while the
+building is finished and idle, so a part stops while the building is busy and resumes where it
+stopped. A view with no moving part does no work per frame.
+
+### Budget and checks
+
+A building is at most eight instances: the body, its outline, and up to three moving parts with
+their outlines. The `model_gallery` scenario checks every model against it (**Models**), and a
+moving part's reach over its whole motion against the extent (**Modelling vocabulary and
+budgets**): a spin's circle about its axis, a swing's bounds every 5 degrees from -amplitude to
++amplitude, both ends included, a slide's at both ends.
+
+The `effects` harness scenario (`tools/harness/README.md`) is the rig: a part for every effect and
+every kind of motion, in two rows on the field, checked headless and screenshotted at 0.0, 0.3 and
+0.9 seconds rendered. Try a new effect combination there first.
+
 ## Modelling vocabulary and budgets
 
 - **Budgets**, body triangles (outlines repeat them and are not counted): 4×4 and 5×5 up to
   5,000; 3×3 up to 3,000; 2×2 up to 2,000; 1×1 traps up to 600; one wall piece up to 250. They are
   mobile ceilings, not targets: spend triangles where a silhouette or a curve needs them.
 - **Extent**: in x and z a model stays within its footprint plus 0.15 units: the static body's
-  bounds, and a spinning part's whole sweep around its pivot (a turning head or dish must clear
-  the footprint at every angle). Height is free. The gallery checks it on every type and level.
+  bounds, and every moving part's reach over its whole motion (a turning head or dish must clear
+  the footprint at every angle, a swinging arm at both ends of its swing). Height is free. The gallery checks it on every type and level.
 - Every box edge gets a chamfer (0.04 to 0.08 units). Cylinders have 16 to 24 sides, domes 16
   sides and 6 to 8 rings, rings and dishes 24 segments, all smooth. Parts under about 0.3 across
   may use 10 to 12 sides when smooth, and under 0.15 as few as 8; small light domes 3 rings.
@@ -368,7 +479,8 @@ its spinning part, and its top level's body triangles as the gallery counts them
 - Levels: each adds mass or height within the footprint, more armour (the plate layer), one more
   greeble and a stronger emissive; the top level adds core gold trim. Levels 1 to 5 of a type
   read as one building growing, never as five buildings.
-- Spinning parts (radar dishes, turbines, gyros): one per building at most.
+- Moving parts (radar dishes, turbines, gyros, press arms, recoiling barrels): three per
+  building at most (**Animation**).
 - Scale: a size-2 building stands 1.2 to 2.0 units tall, a 4×4 Command Center up to 3.2.
 - Walls connect: a post plus a half-segment towards each orthogonal neighbour that is also a
   wall, meeting at the cell boundary, so neighbours of different levels each draw their own
@@ -417,11 +529,17 @@ taller segment's end shows as a step without an ink edge, and every level's curb
 all 80). `build_barrier_wall`, which `BuildingModels.create("barrier_wall", level, 1)` dispatches
 to, is the lone post (mask 0): the paint brush, a lifted wall and the gallery show it.
 
+The merged mesh keeps each piece's UV2 and colour, so PULSE, BLINK and FLOW work on wall pieces.
+It takes a piece's opaque surface only, so a HOLO part is not allowed in a wall piece, and its
+merged outline carries no flags (`WallMesh` copies UV2 and colour only with UV), so BOB and
+JITTER are not for walls either.
+
 ## View states
 
 A view never makes a material: a state overrides an instance's surface 0 with a shared one from
 `MaterialKit` through `set_surface_override_material`, and clears it with `null` when the state
-ends (`BuildingView`).
+ends (`BuildingView`). A hologram surface is never overridden: a ghost tints a body's surface 0
+only when it is the toon surface, so its holograms keep their look.
 
 | State | What changes |
 | --- | --- |
@@ -604,5 +722,7 @@ environment, 294 and 157 before the kit; the research lab's spinning dish adds 1
 and the render thread's CPU time is about 0.5 ms a frame either way. The kit's texture array,
 sixteen 256×256 RGBA8 layers, is about 5.3 MB with its mipmaps; the field texture, one 1024×1024
 RGBA8 image, is about 5.3 MB with its mipmaps too. Keep `_process` free of allocation, and keep
-every building to its four instances. The finished walls are one merged
-mesh, a fixed handful of draws however many there are (`input-camera.md`, **Walls**).
+every building to its eight instances (**Animation**). The shader effects cost a few integer
+tests and a sine or two a vertex and a fragment, and no draw; a moving part costs two draws (its
+body and its outline) plus the body's shadow draw, and a mesh with HOLO parts one more draw in the
+transparent pass. The finished walls are one merged mesh, a fixed handful of draws however many there are (`input-camera.md`, **Walls**).

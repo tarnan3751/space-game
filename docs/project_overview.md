@@ -56,8 +56,9 @@ an attack log, revenge and shields.
   server will load too; rebalancing is a data change, never a code change. Tests use their own
   fixture catalog so rebalancing never breaks them.
 - **Light on the phone.** Fixed orthographic camera, models built in code from one generated
-  material kit (at most four mesh instances a building, two of them outlines that cast no
-  shadow), the GL Compatibility renderer, no addons, no per-frame allocation.
+  material kit (at most eight mesh instances a building: a body and up to three moving parts,
+  each with an outline that casts no shadow; surface effects animated in the shaders), the GL
+  Compatibility renderer, no addons, no per-frame allocation.
 - **One code path for desktop and phone.** Mouse clicks arrive as touches, so every gesture is
   written once and tested on a Mac before it reaches a device.
 - **Agent-editable.** Scenes are built in code and the project is text, so an agent can read and

@@ -232,15 +232,19 @@ finishes. `show_status(level, busy, target_level, seconds_left)` is what `BaseVi
 each tick. `set_lifted(true)` raises the model by 0.35 while it is dragged or is the ghost. A
 selected or dragged view's outlines turn gold; the placement ghost keeps plain ink outlines, and
 its body takes the valid or invalid tint through `set_ghost(valid)` (`art-style.md`, **View
-states**). The node carrying `BuildingModels.SPIN_META` spins in `_process` while the building
-is finished and idle; a view with nothing to spin turns processing off in `_ready`, so walls and
+states**). The nodes carrying `BuildingModels.MOVE_META` (a `Motion` each) are collected once
+in `setup`; `_process` sets each one's transform from `Motion.transform_at` on a clock that runs
+only while the building is finished and idle, without allocating, so they stop during an
+upgrade and resume where they stopped (the surface effects keep running: they come from the
+shaders' `TIME`); a view with nothing to move turns processing off in `_ready`, so walls and
 traps cost nothing per frame.
 
 `BuildingModels.create(type, level, size)` returns a `Node3D` holding the static body and its
-ink outline, and at most one spinning part (the radar, the drone, the drill, the harvester arm,
-the siphon and gravity well rings, the laser head, the flak radar) with its outline, under a
-pivot node carrying `SPIN_META`: at most four `MeshInstance3D`, two of them outlines that cast no
-shadow.
+ink outline, and up to three moving parts (today one each: the comms dish, the drone bay's
+beacon, the drill, the harvester's emitter, the siphon and gravity well rings, the research and
+flak radars, the laser head) with their outlines, each under a pivot node carrying `MOVE_META`:
+at most eight `MeshInstance3D`, half of them at most outlines that cast no shadow
+(`art-style.md`, **Animation**).
 The models are built in code, one per type and level of the 32-type roster, each type's in its
 category's file under `src/game/models/`; `MODELS` gives each type the footprint its models are
 built for and its level count. A level above that shows the top model, a catalog size other than
