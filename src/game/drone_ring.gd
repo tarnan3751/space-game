@@ -1,6 +1,6 @@
 class_name DroneRing
 extends Control
-## The top bar's drones (docs/reference/hud.md, **Top bar**): the quad-rotor inside a ring of
+## The top bar's drones (docs/reference/hud.md, **Top bar**): the drone icon inside a ring of
 ## one sector per drone, laid out symmetrically round the whole circle from the top, clockwise,
 ## with a gap between neighbours. The first `free` sectors are filled in the accent colour with
 ## a highlight along their outer third; the busy ones take the card-disabled tone. Every sector

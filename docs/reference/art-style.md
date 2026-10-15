@@ -757,8 +757,9 @@ for its loudest labels and Lilita One for the rest; a UI palette of the same ink
 violet panels and cards, a near-white text, the energy cyan for the selected and the confirming
 and a build gold; every shape a flat fill with a 3 px ink border, round corners and a flat ink
 shadow offset down and right; text on a bright fill or over the world outlined in ink. Its
-icons (the resource meters' ingot, shards and orb, the drone ring's quad-rotor) are vector
-shapes drawn in code, flat fills with a lighter facet and an ink outline, with no asset file.
+icons (the resource meters' ingot, shards and orb, the drone ring's drone, seen from an angle)
+are vector shapes drawn in code, flat fills with a lighter facet and an ink outline, with no
+asset file.
 The build cards carry their category's accent from **Colour** as a stripe.
 
 ## Cost

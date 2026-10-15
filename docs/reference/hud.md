@@ -112,9 +112,14 @@ and a 2.5 px ink outline, over a 2 px ink offset shadow under the whole icon, la
 40-unit box scaled to its rect: **metal** an ingot (a trapezoid bar with a lighter top face and a
 darker end), **crystal** a pair of shards (a tall kite and a smaller one leaning on it, each with
 a lighter left face), **antimatter** an orb with an orbit ring tilted across it, **drones** a
-quad-rotor seen from above (a rounded body on crossed arms with four rotor discs). Any other
-resource gets a plain cut gem. `HudIcon.paint(pen, kind, rect, color)` adds one to a
-`HudIcon.Pen`.
+drone in three-quarter view from the front-left and above, about 35 degrees up: a saucer body,
+about 55 % of the box wide and the icon's mass, with a darker underside band, a lighter top
+facet, a canopy dome inked along its crown only and an ink eye at its front, and four small
+rotors on short arms, each a light ellipse with a highlight and a thinner 1.5 px outline
+(`ROTOR_OUTLINE`), the front two larger (about a quarter of the box) and lower, the rear two
+smaller, higher and partly behind the body. It keeps few
+inner lines, so at the ring's 26 px it reads as a saucer with four little rotors. Any other
+resource gets a plain cut gem. `HudIcon.paint(pen, kind, rect, color)` adds one to a `HudIcon.Pen`.
 
 **One draw call each.** The renderer draws every `draw_colored_polygon` and `draw_polyline` on
 its own, so an icon drawn with them would cost a draw call per part. `HudIcon.Pen` builds a whole
@@ -132,7 +137,7 @@ degrees of a longer one, with a 2.5 px ink outline, over a 2 px ink offset shado
 ring, all one triangle array with the icon (**One draw call each**). The first
 `state.builders_free()` sectors clockwise from the top are filled in the accent cyan with a thin
 highlight arc (white at 35 %) in their outer third; the busy ones take the card-disabled fill. The
-quad-rotor icon, 26 across, sits in the middle; with no drones the icon shows alone. It is redrawn
+drone icon, 26 across, sits in the middle; with no drones the icon shows alone. It is redrawn
 only when `refresh` changes a count (`set_counts`), never per frame, and shows no text: the "All
 drones are busy" toast and the cards' "No free drone" name the drones.
 
