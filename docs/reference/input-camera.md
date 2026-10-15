@@ -215,9 +215,8 @@ same landscape. How each looks is in `art-style.md`, **Environment**:
   between them (`art-style.md`, **Environment**); its body casts a shadow.
 - **The terrain**: one smooth-shaded, indexed `ArrayMesh` from the field's edge out to
   ±`TERRAIN_EXTENT` (100), on a lattice of 1 unit within `TERRAIN_FINE_REACH` (50) of the centre
-  and of `TERRAIN_COARSE` (2) beyond, cut to half a unit within `TERRAIN_MESA_REACH` (3) of a
-  mesa's outline, drawn by `terrain.gdshader` (`MaterialKit.terrain()`, given the ground's field
-  texture), whose inner edge lies on the field's at y = 0, so the two
+  and of `TERRAIN_COARSE` (2) beyond, drawn by `terrain.gdshader` (`MaterialKit.terrain()`,
+  given the ground's field texture), whose inner edge lies on the field's at y = 0, so the two
   meet with no seam; it is flat out to `TERRAIN_FLAT` (2.4), past the kerb, reaches its relief
   between 4 and 11 units out, wandering along the edge, and is roughened by a low rubble from 2.4
   out.

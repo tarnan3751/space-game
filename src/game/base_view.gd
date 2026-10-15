@@ -22,13 +22,10 @@ const SCENERY_SEED := 7
 const GRID_LINES := 0.1
 const GRID_LINES_PLACING := 0.45
 ## The terrain reaches TERRAIN_EXTENT from the centre in x and z, on a lattice of 1 unit within
-## TERRAIN_FINE_REACH of the centre and of TERRAIN_COARSE beyond, cut to half a unit within
-## TERRAIN_MESA_REACH of a mesa's outline, so its steep wall meets the level ground over several
-## points.
+## TERRAIN_FINE_REACH of the centre and of TERRAIN_COARSE beyond.
 const TERRAIN_EXTENT := 100.0
 const TERRAIN_FINE_REACH := 50.0
 const TERRAIN_COARSE := 2
-const TERRAIN_MESA_REACH := 3.0
 ## Outside the field the ground stays flat out to TERRAIN_FLAT, about a unit past the kerb's outer
 ## face (CURB_GAP + CURB_WIDTH), so the kerb and the corner footings stand on flat ground, and
 ## reaches its full relief between TERRAIN_BLEND_NEAR and TERRAIN_BLEND_FAR out, wandering along
@@ -497,7 +494,7 @@ func _add_mesh(mesh: Mesh, casts_shadow: bool) -> MeshInstance3D:
 
 ## The land around the field: a smooth-shaded ring out to TERRAIN_EXTENT whose inner edge lies on
 ## the field's at y = 0, built as one indexed mesh from a lattice of points (TERRAIN_FINE_REACH,
-## TERRAIN_COARSE, TERRAIN_MESA_REACH). Where larger cells meet smaller ones, a larger cell fans
+## TERRAIN_COARSE). Where larger cells meet smaller ones, a larger cell fans
 ## out from the point in the middle of its edge, so no point lies on another cell's edge. Each
 ## point's normal comes from its lattice neighbours' heights, once, and the ink outline (one more
 ## mesh, on the same points and normals) inks the ridges and crater rims the camera sees over. The
@@ -516,8 +513,7 @@ func _build_terrain(rng: SeededRng) -> void:
 	# The lattice is in half units: point (i, j) is world (i / 2 - half.x, j / 2 - half.y), so the
 	# field spans [0, 2 grid_size]. Fine cells, 1 unit square, fill [fine_low, fine_high] but the
 	# field's inside, and coarse ones, TERRAIN_COARSE square, fill the rest out to [low, high]; both
-	# ranges are multiples of the coarse cell, so the lattices meet. Fine cells within the mesas'
-	# reach (_refined) are cut into four.
+	# ranges are multiples of the coarse cell, so the lattices meet.
 	var half := Vector2(grid_size) * 0.5
 	var coarse := 2 * TERRAIN_COARSE
 	var fine_low := -2 * Vector2i(ceili(TERRAIN_FINE_REACH - half.x), ceili(TERRAIN_FINE_REACH - half.y))
@@ -528,7 +524,7 @@ func _build_terrain(rng: SeededRng) -> void:
 	var columns := high.x - low.x + 1
 	var rows := high.y - low.y + 1
 
-	# The cells, each as its first corner and its size in half units (1 a refined one); the points,
+	# The cells, each as its first corner and its size in half units; the points,
 	# each one's size, the smallest of the cells it is a corner of (0 off the lattice); and their
 	# places on the lattice, in order.
 	var cells: Array[Vector3i] = []
@@ -543,18 +539,11 @@ func _build_terrain(rng: SeededRng) -> void:
 		for i: int in range(fine_low.x, fine_high.x, 2):
 			if (i < 0 or i >= 2 * grid_size.x or j < 0 or j >= 2 * grid_size.y) \
 					and not _under_mesa(i * 0.5 - half.x, j * 0.5 - half.y, 1.0):
-				# A refined cell keeps a fine cell's width from the coarse ones, so a coarse cell's
-				# edge holds at most one point between its corners.
-				var inside := i > fine_low.x and i < fine_high.x - 2 and j > fine_low.y and j < fine_high.y - 2
-				var refined := inside and _refined((i + 1) * 0.5 - half.x, (j + 1) * 0.5 - half.y)
-				cells.append(Vector3i(i, j, 1 if refined else 2))
+				cells.append(Vector3i(i, j, 2))
 	for cell: Vector3i in cells:
 		var first := (cell.y - low.y) * columns + cell.x - low.x
-		var span := 2 if cell.z == 1 else cell.z
+		var span := cell.z
 		var corners := PackedInt32Array([first, first + span, first + span * columns, first + span * columns + span])
-		if cell.z == 1:
-			corners.append_array(PackedInt32Array([first + 1, first + columns, first + columns + 1,
-				first + columns + 2, first + 2 * columns + 1]))
 		for place: int in corners:
 			if spans[place] == 0:
 				places.append(place)
@@ -620,7 +609,7 @@ func _build_terrain(rng: SeededRng) -> void:
 		colors.append(_tint(normal, _crater_floor(at.x, at.z) if step < coarse else 0.0))
 
 	# Each cell's triangles, going round as (i, j), (i + span, j), (i + span, j + span),
-	# (i, j + span), which faces up; a refined cell's four quarters each the same. A cell with no
+	# (i, j + span), which faces up. A cell with no
 	# point in the middle of an edge is two triangles whose diagonals alternate, so the faces do not
 	# all lean one way; one beside smaller cells fans out from the first such point, so no point
 	# lies on another cell's edge.
@@ -628,12 +617,6 @@ func _build_terrain(rng: SeededRng) -> void:
 	for cell: Vector3i in cells:
 		var span := cell.z
 		var place := (cell.y - low.y) * columns + cell.x - low.x
-		if span == 1:
-			for quarter: int in 4:
-				var at := place + quarter % 2 + quarter / 2 * columns
-				indices.append_array(_cell_quad(ids[at], ids[at + 1], ids[at + columns + 1], ids[at + columns],
-					(cell.x + quarter % 2 - low.x + cell.y + quarter / 2 - low.y) % 2 == 0))
-			continue
 		var middle := span / 2
 		# Going round: each corner, then the point in the middle of the edge after it, or -1.
 		var loop := PackedInt32Array([ids[place], ids[place + middle], ids[place + span],
@@ -1097,18 +1080,6 @@ func _height(x: float, z: float, with_mesas: bool) -> float:
 			var top := clampf((edge + MESA_FOOT - sqrt(dx * dx + dz * dz)) / (MESA_FOOT + MESA_WALL), 0.0, 1.0)
 			height = lerpf(height, mesa.w, top)
 	return height
-
-
-## Whether a point lies within TERRAIN_MESA_REACH of a mesa's outline (_mesa_edge), where the
-## terrain's lattice is cut to half a unit.
-func _refined(x: float, z: float) -> bool:
-	for k: int in mesas.size():
-		var dx := x - mesas[k].x
-		var dz := z - mesas[k].y
-		if dx * dx + dz * dz < (mesas[k].z * 1.2 + TERRAIN_MESA_REACH) * (mesas[k].z * 1.2 + TERRAIN_MESA_REACH) \
-				and sqrt(dx * dx + dz * dz) < _mesa_edge(k, dx, dz) + TERRAIN_MESA_REACH:
-			return true
-	return false
 
 
 ## How far across the dry channel's meandering course a point `distance` from the centre lies, in

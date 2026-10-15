@@ -809,10 +809,8 @@ and its outline. The body casts a shadow (the pylons are real masses; the transp
 none); the outline does not.
 
 **The terrain ring**: one indexed mesh from the field's edge to ±100, on a lattice of points 1
-unit apart within 50 of the centre and 2 apart beyond, cut to half a unit within 3 units of a
-mesa's outline (`TERRAIN_MESA_REACH`, measured from `_mesa_edge`; a half-unit cell keeps a
-one-unit cell from the coarse ones). A cell beside smaller ones fans out from the point in the
-middle of its edge, so no point lies on another cell's edge. Its
+unit apart within 50 of the centre and 2 apart beyond. A cell beside smaller ones fans out from
+the point in the middle of its edge, so no point lies on another cell's edge. Its
 height function is flat out to 2.4 (`TERRAIN_FLAT`), about a unit past the kerb's outer face (1.45
 out), so the ground under the kerb and the corner footings is flat. From there
 the relief rises to its full height by a distance out that wanders along the edge between 4 and
@@ -924,10 +922,12 @@ where the rays pass under the ring's raised outer edge.
 
 **Budgets**: the field 1 draw; the perimeter, the terrain, the rocks and the outcrops a body and an
 outline each, the perimeter's body two surfaces (its fence a hologram) and drawn into the shadow
-map. The terrain is 34,492 triangles on 17,990 points, its outline 35,452 with the mesas' fins (the
-`environment` scenario allows the body 38,000), the rocks about 3,900 (about 1,100 of them the rubble) and the outcrops about 900. It is
+map. The terrain is 32,208 triangles on 16,796 points, its outline 33,168 with the mesas' fins
+(the `environment` scenario allows the body 38,000), the rocks about 3,900 (about 1,100 of them
+the rubble) and the outcrops about 900. It is
 all built once, in about 110 ms on the development Mac (88 to 97 warm before the perimeter's
-pylons and fence added about 22, and 74 to 79 before the half-unit lattice and the rock texture,
+pylons and fence added about 22, and 74 to 79 before a half-unit lattice round the mesas, since
+gone, and the rock texture,
 each measured side by side; the kit's build and the field and rock textures' loads and mipmaps
 included), the terrain 59 to 66 ms of it (45 to 49 before), the perimeter about 25 and the rubble
 about 5; phones are unmeasured. Nothing runs per frame beyond the shaders.
