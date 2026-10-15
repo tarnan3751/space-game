@@ -661,13 +661,13 @@ func _scatter_rubble(mesh: LowPolyMesh, taken: Array[Vector3], rng: SeededRng) -
 			var out := lerpf(RUBBLE_ROCK_OUT.x, RUBBLE_ROCK_OUT.y, rng.range_int(0, 1000) / 1000.0)
 			var t := (k / 4 + rng.range_int(0, 1000) / 1000.0) / stretches * 2.0 - 1.0
 			var at := normal * (absf(normal.dot(half)) + out) + along * t * absf(along.dot(half))
-			var clear := _clear(at, radius) and _off_channel(at, radius)
+			var fits := _clear(at, radius) and _off_channel(at, radius)
 			for spot: Vector3 in taken:
-				clear = clear and at.distance_to(Vector2(spot.x, spot.y)) > spot.z + radius + 0.2
+				fits = fits and at.distance_to(Vector2(spot.x, spot.y)) > spot.z + radius + 0.2
 			# No part of an outcrop reaches 3 from its centre.
 			for spot: Vector3 in outcrop_spots:
-				clear = clear and at.distance_to(Vector2(spot.x, spot.z)) > radius + 3.0
-			if clear:
+				fits = fits and at.distance_to(Vector2(spot.x, spot.z)) > radius + 3.0
+			if fits:
 				taken.append(Vector3(at.x, at.y, radius * 1.05))
 				_rock(mesh, Vector3(at.x, _lowest_ground(at.x, at.y, radius) - 0.2 * radius, at.y), radius, rng)
 				break
