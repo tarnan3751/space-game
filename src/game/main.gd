@@ -75,6 +75,7 @@ func _ready() -> void:
 	hud.upgrade_pressed.connect(placement.upgrade_selected)
 	hud.close_pressed.connect(func() -> void: placement.select(0))
 	hud.reset_pressed.connect(_reset_base)
+	hud.template_pressed.connect(_template_base)
 	placement.selection_changed.connect(_refresh_hud)
 	placement.placing_changed.connect(_on_placing_changed)
 	placement.command_failed.connect(hud.show_error)
@@ -144,6 +145,14 @@ func _reset_base() -> void:
 	_set_state(BaseState.create_new(catalog, _now()))
 	_save()
 	hud.show_message("Base reset")
+
+
+## Debug builds only, like the reset: the base becomes the template, every type at its top
+## level grouped by category (TemplateBase), and is saved at once.
+func _template_base() -> void:
+	_set_state(BaseState.from_dict(catalog, TemplateBase.build(catalog, catalog.grid_size, _now())))
+	_save()
+	hud.show_message("Template base")
 
 
 func _load_or_create() -> BaseState:

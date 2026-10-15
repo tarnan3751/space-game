@@ -21,6 +21,7 @@ signal cancel_pressed
 signal upgrade_pressed
 signal close_pressed
 signal reset_pressed
+signal template_pressed
 
 const ERROR_TEXT := {
 	BaseState.ERR_BLOCKED: "That spot is taken",
@@ -147,6 +148,7 @@ var _toast: Control
 var _toast_label: Label
 var _toast_tween: Tween
 var _reset_button: Button
+var _template_button: Button
 
 
 func setup(catalog: Catalog) -> void:
@@ -332,6 +334,11 @@ func drones_panel() -> DroneRing:
 ## The debug Reset base button; null in a release build.
 func reset_button() -> Button:
 	return _reset_button
+
+
+## The debug Template base button; null in a release build.
+func template_button() -> Button:
+	return _template_button
 
 
 # --- The build panel -------------------------------------------------------------
@@ -812,13 +819,19 @@ func _build_toast() -> void:
 	_toast.add_child(_toast_label)
 
 
-## Debug builds only: start over without digging through user:// for the save file. On a
-## row of its own under the top bar, right-aligned, so a long top bar never runs under it.
+## Debug builds only: start over without digging through user:// for the save file, or swap
+## the base for the template, every type at its top level (TemplateBase). On a row of its own
+## under the top bar, right-aligned, so a long top bar never runs under it.
 func _build_debug_buttons() -> void:
 	var row := HBoxContainer.new()
 	row.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	row.alignment = BoxContainer.ALIGNMENT_END
+	row.add_theme_constant_override("separation", 16)
 	_top.add_child(row)
+	var template := _button("Template base", Vector2(150, 48), &"DebugButton")
+	template.pressed.connect(func() -> void: template_pressed.emit())
+	row.add_child(template)
+	_template_button = template
 	var reset := _button("Reset base", Vector2(150, 48), &"DebugButton")
 	reset.pressed.connect(func() -> void: reset_pressed.emit())
 	row.add_child(reset)
