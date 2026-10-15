@@ -77,10 +77,11 @@ probes unless the diff gives you a reason.
    - **Touch routing.** `WorldInput` works through `_unhandled_input`; any HUD `Control` that is
      not `MOUSE_FILTER_IGNORE` blocks touches to the world, so a new layout container must be
      IGNORE and a new button must not sit over empty screen space it does not need.
-   - **Mobile cost.** Draw calls (a building is a body and its ink outline plus at most one
-     spinning part with its own outline, the finished walls one merged pair, the ground one
-     draw, the terrain, curb, rocks and outcrops a body and an outline each; a change should
-     not multiply that),
+   - **Mobile cost.** Draw calls (a building is a body and its ink outline plus at most three
+     moving parts, each with its own outline, and one transparent hologram surface per mesh
+     that has holograms; the finished walls one merged pair, the ground one draw, the terrain,
+     curb, rocks and outcrops a body and an outline each; a change should not multiply that;
+     the shader effects of `docs/reference/art-style.md`, **Animation**, add no draw),
      allocations in `_process` (no `new()`, no string formatting, no array building per frame),
      work per tick that scales with the base.
 2. **Conformance to the plan and the brief.** Anything the change does that was not asked for —
