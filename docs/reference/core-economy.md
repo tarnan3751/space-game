@@ -121,9 +121,10 @@ difference. `cc_level()` is the Command Center's level, at least 1, and 1 when t
 
 The checks allocate nothing per call, measured with a malloc counter on the development Mac:
 the HUD runs them every frame while a ghost is dragged, and the server will run them per
-command. So the queries above iterate `for id: int in buildings` (not `buildings.values()`,
-which builds an Array), and the lookups these checks make default to shared read-only
-constants instead of a `{}` or `[]` literal.
+command. Neither does `advance_to`, and `apply` allocates only the building a place adds. So
+the queries above iterate `for id: int in buildings` (not `buildings.values()`, which builds
+an Array), and the lookups on these paths default to shared read-only constants instead of a
+`{}` or `[]` literal.
 
 ### Time and production
 

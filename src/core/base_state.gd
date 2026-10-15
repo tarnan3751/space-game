@@ -170,9 +170,14 @@ func seconds_left(id: int) -> int:
 
 # --- Queries -------------------------------------------------------------------
 
+# The queries iterate the ids rather than buildings.values(), which builds an Array per
+# call: the HUD runs the placement checks every frame while a ghost is dragged, and the
+# server will run the checks and the tick per command.
+
 func capacity(res: String) -> int:
 	var total := 0
-	for building: BuildingState in buildings.values():
+	for id: int in buildings:
+		var building: BuildingState = buildings[id]
 		if building.level >= 1:
 			total += _amount(_stats(building), "storage", res)
 	return total
@@ -181,14 +186,13 @@ func capacity(res: String) -> int:
 ## Busy buildings (constructing or upgrading) don't produce.
 func production_per_hour(res: String) -> int:
 	var total := 0
-	for building: BuildingState in buildings.values():
+	for id: int in buildings:
+		var building: BuildingState = buildings[id]
 		if building.level >= 1 and not building.is_busy():
 			total += _amount(_stats(building), "produces", res)
 	return total
 
 
-## The checks below iterate the ids rather than buildings.values(), which builds an Array
-## per call: the HUD runs the placement checks every frame while a ghost is dragged.
 func builders_total() -> int:
 	var total := 0
 	for id: int in buildings:
@@ -293,7 +297,7 @@ func _place(type: String, cell: Vector2i) -> String:
 	var error := check_place(type, cell)
 	if error != "":
 		return error
-	_pay(catalog.level_stats(type, 1).get("cost", {}))
+	_pay(catalog.level_stats(type, 1).get("cost", _EMPTY))
 	var building := _add_building(type, cell)
 	_start_work(building, 1)
 	return ""
@@ -316,7 +320,7 @@ func _upgrade(id: int) -> String:
 	if error != "":
 		return error
 	var building: BuildingState = buildings[id]
-	_pay(catalog.level_stats(building.type, building.level + 1).get("cost", {}))
+	_pay(catalog.level_stats(building.type, building.level + 1).get("cost", _EMPTY))
 	_start_work(building, building.level + 1)
 	return ""
 
@@ -360,7 +364,8 @@ func _complete(building: BuildingState) -> void:
 ## order is identical on every device and on the server.
 func _next_completion(limit: int) -> BuildingState:
 	var best: BuildingState = null
-	for building: BuildingState in buildings.values():
+	for id: int in buildings:
+		var building: BuildingState = buildings[id]
 		if not building.is_busy() or building.finish_at > limit:
 			continue
 		if best == null:
@@ -406,7 +411,7 @@ func _stats(building: BuildingState) -> Dictionary:
 
 
 static func _amount(stats: Dictionary, field: String, res: String) -> int:
-	var amounts: Dictionary = stats.get(field, {})
+	var amounts: Dictionary = stats.get(field, _EMPTY)
 	return int(amounts.get(res, 0))
 
 
