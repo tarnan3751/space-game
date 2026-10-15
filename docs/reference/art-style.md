@@ -198,8 +198,8 @@ The rendered column is the average over flat ground at the widest zoom (the `env
 scenario's widest shot, measured in HSL): the field as a whole, ground, marks and grid together,
 over each quarter of it clear of the HUD and the buildings; and the ring's flat dust. The field
 renders in the ring's shade, within 0.01 in L and 0.02 in S (the `environment` scenario checks it,
-rendered): it reads as a plain of its own by its marks and its grid, and the kerb and the field's
-ink line are its border, not its tone. The buildings' hulls are the lightest things on screen.
+rendered): it reads as a plain of its own by its marks and its grid, and the kerb is its border,
+not its tone. The buildings' hulls are the lightest things on screen.
 
 | Role | Constant | Value | Rendered | Where |
 | --- | --- | --- | --- | --- |
@@ -715,9 +715,10 @@ at 60 % by the dust, with a fine grain drawn by the shader in world space, so it
 across the field: two octaves of value noise at 6 and 12 repeats a cell, each 3.5 % either way, each
 fading out as its lattice falls under a pixel so it does not shimmer at the widest zooms. A value
 noise twelve cells across varies the plain 6 % either way, and it darkens by 10 % from half way out
-to its edge. An ink line 3 px wide runs along the field's edge, at a 720 px viewport height and
-scaled with it, like the ink outline; the 1-cell grid stays in holographic cyan (`line_strength`
-0.1, 0.45 while placing). There is no other line, seam or square on it. The lighting is `light()`
+to its edge. The 1-cell grid is drawn in holographic cyan (`line_strength` 0.1, 0.45 while
+placing), and its outermost line,
+along the field's edge, is drawn like the inner ones, at the same width (the plane ends there, so
+it lies just inside). There is no other line, seam or square on it. The lighting is `light()`
 from `toon_common`, as on the buildings. The hash, the noise, the grain and the tiles' sampling and
 lighting live in `field_marks.gdshaderinc`, which the terrain shader shares.
 
@@ -777,18 +778,17 @@ their own, and no made thing (patch, bolt or joint) among the marks.
 language, with no gate.
 
 - **The kerb**: a concrete band (`CONCRETE_PAD`) 0.25 high and 0.35 wide, 1.1 outside the field's
-  edge (`CURB_GAP`), its top edges chamfered 0.05 and its corners cut at 45 degrees. The ink line
-  along the field's edge (`ground.gdshader`) stays where it is. The kerb stands that far out so
-  that from the camera no pylon covers a field cell at any zoom. The camera looks down 35 degrees
-  along the view's diagonal, so a point h up hides the ground 1.43 h (h / tan 35) beyond it along
-  the diagonal, 1.01 h across a side. A side pylon's cap, 0.98 up and 0.23 from the pylon's middle
-  to its edge, reaches 0.23 + 1.01 × 0.98 = 1.22 inwards, 1.25 with its ink line at the closest
-  zoom, which the pylons' middle line (`CURB_GAP` + half the kerb's width, 1.275) clears. At the
-  corner nearest the camera the reach is along the diagonal: the corner beacon, 1.44 up and 0.12
-  in radius, reaches 0.12 + 1.43 × 1.44 + 0.03 = 2.21 (the corner cap 2.09), while the middle of
-  the kerb's corner cut lies 1.31 from the field's corner, so each corner pylon stands 0.9 further
-  out along the diagonal (`CORNER_PYLON_OUT`) on a chamfered concrete footing, 0.6 wide, that runs
-  out to it from the cut.
+  edge (`CURB_GAP`), its top edges chamfered 0.05 and its corners cut at 45 degrees. The kerb stands
+  that far out so that from the camera no pylon covers a field cell at any zoom. The camera looks
+  down 35 degrees along the view's diagonal, so a point h up hides the ground 1.43 h (h / tan 35)
+  beyond it along the diagonal, 1.01 h across a side. A side pylon's cap, 0.98 up and 0.23 from the
+  pylon's middle to its edge, reaches 0.23 + 1.01 × 0.98 = 1.22 inwards, 1.25 with its ink line at
+  the closest zoom, which the pylons' middle line (`CURB_GAP` + half the kerb's width, 1.275)
+  clears. At the corner nearest the camera the reach is along the diagonal: the corner beacon, 1.44
+  up and 0.12 in radius, reaches 0.12 + 1.43 × 1.44 + 0.03 = 2.21 (the corner cap 2.09), while the
+  middle of the kerb's corner cut lies 1.31 from the field's corner, so each corner pylon stands 0.9
+  further out along the diagonal (`CORNER_PYLON_OUT`) on a chamfered concrete footing, 0.6 wide,
+  that runs out to it from the cut.
 - **Pylons**: on the kerb's middle line, one every four cells along each side (where the field
   texture's tiles meet) and one at each corner, on its footing out from the middle of the cut, 40
   on the 40×40 field: a

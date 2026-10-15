@@ -2,8 +2,8 @@ shader_type spatial;
 render_mode ambient_light_disabled;
 
 // The buildable field (docs/reference/art-style.md, **The field**): one seamless levelled plain
-// of regolith with scattered marks, an ink line along the field's edge, and the cell grid in
-// holographic cyan, faint by default and brighter while placing (BaseView.set_grid_highlight sets
+// of regolith with scattered marks, and the cell grid in holographic cyan, its outermost line along
+// the field's edge, faint by default and brighter while placing (BaseView.set_grid_highlight sets
 // line_strength); all under the comic style's light (toon_common): the three bands, the halftone
 // in the shadow band. Cells are 1 world unit; the plane is centred on 0.
 //
@@ -19,8 +19,8 @@ render_mode ambient_light_disabled;
 // the dark. The tone mixes towards the dark tint below 0.5 and towards the light above it.
 // Everywhere the ground is the plate tint dusted at DUST_SHOWS with the field's base tint, with a
 // fine grain in world space, so it runs on across the tiles, under the marks; a large value noise
-// and a darkening towards the edge vary the plain further. The edge line is a fixed width in pixels
-// at a 720 px viewport height, scaled with it, like the ink outline.
+// and a darkening towards the edge vary the plain further. The plane ends at the field's edge, so
+// the edge line is drawn inside it at the full width of an inner line.
 
 #include "res://src/game/toon_common.gdshaderinc"
 #include "res://src/game/field_marks.gdshaderinc"
@@ -50,8 +50,6 @@ const float DUST_SHOWS = 0.6;
 const float MACRO_CELLS = 12.0;
 const float MACRO = 0.06;
 const float EDGE_DARKEN = 0.1;
-// The ink line's width along the field's edge, in pixels at a 720 px viewport height.
-const float EDGE_PX = 3.0;
 
 varying vec3 world_pos;
 
@@ -61,8 +59,7 @@ void vertex() {
 
 void fragment() {
 	vec2 cell = world_pos.xz + grid_size * 0.5;
-	// Cells per pixel along each axis, for the grain's fade and the lines drawn a fixed width on
-	// screen.
+	// Cells per pixel along each axis, for the grain's fade.
 	vec2 cells_per_px = vec2(length(vec2(dFdx(cell.x), dFdy(cell.x))), length(vec2(dFdx(cell.y), dFdy(cell.y))));
 
 	mat2 turn;
@@ -74,12 +71,10 @@ void fragment() {
 	vec2 out_from_centre = abs(cell / grid_size - 0.5) * 2.0;
 	albedo *= 1.0 - EDGE_DARKEN * smoothstep(0.5, 1.0, max(out_from_centre.x, out_from_centre.y));
 
-	float px_scale = VIEWPORT_SIZE.y / 720.0;
-	vec2 to_edge = min(cell, grid_size - cell) / cells_per_px;
-	albedo = mix(albedo, ink_color.rgb, ink_line(min(to_edge.x, to_edge.y), 2.0 * EDGE_PX * px_scale));
-
 	vec2 to_line = abs(fract(cell - 0.5) - 0.5);
+	vec2 to_edge = min(cell, grid_size - cell);
 	float line = 1.0 - smoothstep(0.0, line_width, min(to_line.x, to_line.y));
+	line = max(line, 1.0 - smoothstep(0.0, 2.0 * line_width, min(to_edge.x, to_edge.y)));
 	ALBEDO = mix(albedo, line_color.rgb, line * line_strength);
 	SPECULAR = 0.0;
 	ROUGHNESS = 1.0;
