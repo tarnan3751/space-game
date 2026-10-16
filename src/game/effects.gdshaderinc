@@ -22,6 +22,7 @@ const int FLAG_BOB = 128;
 const int FLAG_JITTER = 256;
 const int FLAG_HOLO = 512;
 const int FLAG_LIGHTNING = 1024;
+const int FLAG_RISE = 2048;
 
 // PULSE: the colour swells between PULSE_LOW and 1 on a sine of PULSE_PERIOD seconds.
 const float PULSE_PERIOD = 1.6;
@@ -47,6 +48,12 @@ const float JITTER_REACH = 0.04;
 const float LIGHTNING_FLICKER_RATE = 7.0;
 const float LIGHTNING_ON = 0.6;
 const float LIGHTNING_JITTER_RATE = 5.0;
+// RISE: a climb of RISE_HEIGHT along world Y over RISE_PERIOD seconds, from the part's phase,
+// drifting RISE_DRIFT world units sideways by the top, then a restart (holo.gdshader fades it in
+// at the start and out by the top, so the restart does not show).
+const float RISE_PERIOD = 3.0;
+const float RISE_HEIGHT = 0.7;
+const vec3 RISE_DRIFT = vec3(0.12, 0.0, 0.08);
 
 int surf_flags(vec2 uv2) {
 	return int(uv2.y + 0.5);
@@ -69,11 +76,17 @@ float effect_hash(vec3 p) {
 	return fract((p.x + p.y) * p.z);
 }
 
-// Where a vertex of a part goes, in the mesh's own space: BOB lifts it along world Y, JITTER shakes
-// it, and FLICKER collapses the whole part to the origin while it is off, so it draws nothing (a
-// discard would cost every fragment of the shared material its early depth test); LIGHTNING slows
-// FLICKER and JITTER to the lightning rates. `model` turns only about axes and scales uniformly, so
-// its inverse is its transpose over the scale squared.
+// How far through its climb a RISE part is now, 0 to 1.
+float rise_progress(float phase) {
+	return fract(anim_time / RISE_PERIOD + phase);
+}
+
+// Where a vertex of a part goes, in the mesh's own space: BOB lifts it along world Y, RISE climbs
+// it and drifts it in world space, JITTER shakes it, and FLICKER collapses the whole part to the
+// origin while it is off, so it draws nothing (a discard would cost every fragment of the shared
+// material its early depth test); LIGHTNING slows FLICKER and JITTER to the lightning rates.
+// `model` turns only about axes and scales uniformly, so its inverse is its transpose over the
+// scale squared.
 vec3 effect_vertex(vec3 vertex, int flags, float phase, mat4 model) {
 	bool lightning = has_flag(flags, FLAG_LIGHTNING);
 	float flicker_rate = lightning ? LIGHTNING_FLICKER_RATE : FLICKER_RATE;
@@ -86,6 +99,11 @@ vec3 effect_vertex(vec3 vertex, int flags, float phase, mat4 model) {
 	if (has_flag(flags, FLAG_BOB)) {
 		float lift = BOB_HEIGHT * sin(TAU * (anim_time / BOB_PERIOD + phase));
 		moved += transpose(mat3(model)) * vec3(0.0, lift, 0.0) / dot(model[0].xyz, model[0].xyz);
+	}
+	if (has_flag(flags, FLAG_RISE)) {
+		float t = rise_progress(phase);
+		vec3 climb = vec3(0.0, t * RISE_HEIGHT, 0.0) + t * RISE_DRIFT;
+		moved += transpose(mat3(model)) * climb / dot(model[0].xyz, model[0].xyz);
 	}
 	if (has_flag(flags, FLAG_JITTER)) {
 		vec3 cell = floor(vertex * 1000.0) + floor(anim_time * (lightning ? LIGHTNING_JITTER_RATE : JITTER_RATE));

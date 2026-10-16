@@ -7,7 +7,7 @@ extends HarnessScenario
 ## rows a 3x3 pad with the three escorts (Parts.escort_drone, escort_skiff, escort_troopers)
 ## orbiting it. Left of the pad, the shared effects: a lightning arc between two posts on
 ## Parts.spark (the slow LIGHTNING crackle) beside a cluster of point sparks on plain FLICKER (the
-## fast one).
+## fast one); right of it, a stack with Parts.puffs rising from its mouth.
 ##
 ## It logs each swatch by index with its layer and flags, and checks that every swatch's layer is
 ## within the kit, that each escort is at most ESCORT_TRIANGLES body triangles and stays within
@@ -93,6 +93,15 @@ func run(main: MainScript) -> void:
 	var sparks_node := BuildingModels.instantiate(sparks)
 	sparks_node.position = down * PAD_AHEAD - across * SIDE_ACROSS
 	root.add_child(sparks_node)
+
+	var stack := Parts.new()
+	Parts.drum(stack.body, 0.22, 0.25, 0.05, 16, Vector3.ZERO, Parts.HULL_DARK_ROUND)
+	stack.body.prism(0.12, 0.1, 0.9, 16, Vector3(0, 0.25, 0), Parts.GUNMETAL)
+	stack.body.ring(0.07, 0.13, 0.06, 16, Vector3(0, 1.15, 0), Parts.GOLD_ROUND)
+	Parts.puffs(stack.body, Vector3(0, 1.21, 0), 0.0)
+	var stack_node := BuildingModels.instantiate(stack)
+	stack_node.position = down * PAD_AHEAD + across * SIDE_ACROSS
+	root.add_child(stack_node)
 
 	var update := _update_movers
 	main.get_tree().process_frame.connect(update)

@@ -264,8 +264,9 @@ static func ladder(m: LowPolyMesh, foot: Vector3, height: float, width: float, y
 ## A crackling arc's radius: its segments are three-sided tubes about 0.03 across.
 const ARC_RADIUS := 0.02
 
-## Smoke puffs: pale hologram smoke, bobbing; HULL_MID is too faint against the violet ground.
-static var SMOKE := Surf.make(MaterialKit.Layer.GLOW, MaterialKit.HULL_LIGHT, 1.0, Surf.HOLO | Surf.BOB, true)
+## Smoke puffs: pale hologram smoke, rising and fading; HULL_MID is too faint against the violet
+## ground.
+static var SMOKE := Surf.make(MaterialKit.Layer.GLOW, MaterialKit.HULL_LIGHT, 1.0, Surf.HOLO | Surf.RISE, true)
 
 
 ## A crackling arc's surface: a glow in `tint` that flickers and shakes at the LIGHTNING rates,
@@ -328,13 +329,17 @@ static func dome_seam(m: LowPolyMesh, radius: float, height: float, pos: Vector3
 		from = at
 
 
-## Smoke over a stack's `mouth`: `count` SMOKE puffs, orbs of `sides` and `rings`, growing as
-## they rise and drifting a little, each bobbing out of step from `phase`.
-static func puffs(m: LowPolyMesh, mouth: Vector3, phase: float, count: int = 3, sides: int = 10,
-		rings: int = 4) -> void:
+## Smoke rising from a stack's `mouth`: `count` puffs, orbs of `sides` and `rings` of mixed sizes
+## (radii from 0.07, 0.017 more a puff), all starting just above the mouth on `surface` with RISE
+## added, their phases spread evenly from `phase` so the column is always full: each climbs,
+## drifts and fades (on a hologram surface) and starts again.
+static func puffs(m: LowPolyMesh, mouth: Vector3, phase: float, count: int = 4, sides: int = 8,
+		rings: int = 3, surface: Surf = SMOKE) -> void:
+	var rising := Surf.make(surface.layer, surface.tint, surface.uv_scale, surface.flags | Surf.RISE, surface.smooth,
+		surface.outline)
 	for k: int in count:
-		m.orb(0.06 + 0.025 * k, sides, rings, mouth + Vector3(0.02 * k, 0.12 + 0.17 * k, 0),
-			SMOKE.phased(fposmod(phase + 0.3 * k, 1.0)))
+		m.orb(0.07 + 0.017 * k, sides, rings, mouth + Vector3(0, 0.08, 0),
+			rising.phased(fposmod(phase + float(k) / count, 1.0)))
 
 
 # --- Escorts: the Crown tier's fourth moving part (docs/reference/art-style.md, **Tiers**) ---

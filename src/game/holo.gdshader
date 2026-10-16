@@ -5,9 +5,10 @@ render_mode blend_mix, depth_draw_never, cull_back, unshaded;
 // which LowPolyMesh.to_mesh puts in a surface of its own, since it is transparent. Unlit: the
 // kit layer times the tint at HOLO_ALPHA, scan bands drifting up through it, a rim where the
 // view grazes the surface, and a "phase out" every HOLO_DIP_PERIOD seconds, when it fades to
-// HOLO_DIP_ALPHA for HOLO_DIP_SECONDS, offset by the part's phase (surf_phase). The other effects
-// (effects.gdshaderinc) apply as on any part. Holograms are never outlined, so the rim is a
-// fresnel term here, unlike the toon shader.
+// HOLO_DIP_ALPHA for HOLO_DIP_SECONDS, offset by the part's phase (surf_phase). A RISE part fades
+// in just above its start and out over the top half of its climb, so it is gone when it restarts.
+// The other effects (effects.gdshaderinc) apply as on any part. Holograms are never outlined, so
+// the rim is a fresnel term here, unlike the toon shader.
 
 #include "res://src/game/effects.gdshaderinc"
 
@@ -40,5 +41,10 @@ void fragment() {
 	vec3 colour = texel.rgb * COLOR.rgb * effect_light(flags, phase);
 	ALBEDO = colour * (1.0 + BAND_BRIGHTEN * band + RIM_BRIGHTEN * rim);
 	bool dipped = fract(anim_time / HOLO_DIP_PERIOD + phase) < HOLO_DIP_SECONDS / HOLO_DIP_PERIOD;
-	ALPHA = dipped ? HOLO_DIP_ALPHA : HOLO_ALPHA;
+	float alpha = dipped ? HOLO_DIP_ALPHA : HOLO_ALPHA;
+	if (has_flag(flags, FLAG_RISE)) {
+		float t = rise_progress(phase);
+		alpha *= smoothstep(0.0, 0.12, t) * (1.0 - smoothstep(0.5, 1.0, t));
+	}
+	ALPHA = alpha;
 }

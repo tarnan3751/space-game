@@ -34,6 +34,10 @@ const HOLO := 512
 ## With FLICKER and JITTER: a lightning arc's slow crackle, at the LIGHTNING rates instead of a
 ## spark's fast ones.
 const LIGHTNING := 1024
+## The part climbs world Y by RISE_HEIGHT over RISE_PERIOD seconds from its phase, drifting
+## RISE_DRIFT sideways, then starts again; on the hologram surface it fades out as it climbs, so
+## smoke puffs rise from a stack's mouth (on an opaque surface the restart shows).
+const RISE := 2048
 ## The flags whose parts are never outlined, whatever `outline` says.
 const NO_OUTLINE := FLICKER | JITTER | HOLO
 

@@ -300,10 +300,10 @@ phase = 0.0)` says how a part is painted: a `MaterialKit.Layer`, an sRGB tint, t
 per world unit, the flags, whether the part is smooth shaded, whether it is outlined, and the
 phase of its animation. The flags are bits, combined with `|`: `Surf.LIT` (0), `Surf.UNLIT` (1,
 emissive), `Surf.GLOSSY` (2, with the cel specular), and the effects in **Animation** (`PULSE`,
-`BLINK`, `FLICKER`, `FLOW`, `FLOW_U`, `BOB`, `JITTER`, `HOLO`, `LIGHTNING`). A `Surf` is shared and
-never changed once made: make one per look, keep it in a `static var`, and pass it to every part
-that looks so; `surf.phased(phase)` returns a copy with another phase, for lamps that chase or
-sparks that flicker apart. A phase is stored at 1/254 steps (**Animation**).
+`BLINK`, `FLICKER`, `FLOW`, `FLOW_U`, `BOB`, `JITTER`, `HOLO`, `LIGHTNING`, `RISE`). A `Surf` is
+shared and never changed once made: make one per look, keep it in a `static var`, and pass it to
+every part that looks so; `surf.phased(phase)` returns a copy with another phase, for lamps that
+chase or sparks that flicker apart. A phase is stored at 1/254 steps (**Animation**).
 
 `Parts` (`models/parts.gd`) names the common ones: `CONCRETE_PAD`, `HULL_LIGHT`, `HULL_MID`,
 `HULL_DARK`, `GUNMETAL` (smooth), `HAZARD`, `GOLD_TRIM` (glossy), `GLASS` (glossy, smooth),
@@ -475,7 +475,7 @@ job; a helper is added, never renamed or removed.
 | `chase(k, count)` | the BLINK phase of lamp `k` of `count` lit in turn, lamp 0 first: a chase |
 | `spark(tint)`, `current(tint, phase)` | new surfaces: a crackling arc's (unlit glow, FLICKER and JITTER at the LIGHTNING rates, so never inked) and a current's (the pipe layer's bands, unlit, FLOW at `phase`: above 0.5 towards a pipe's far end) |
 | `arc(m, from, to, segments, kink, surf)` | a crackling arc on a `spark` surface: `segments` three-sided tubes of `ARC_RADIUS` (0.02), the corners between them kinked `kink` to either side in turn, so JITTER has corners to shake; give each arc its own phase |
-| `puffs(m, mouth, phase, count = 3, sides = 10, rings = 4)`, `SMOKE` | `count` hologram smoke puffs (`SMOKE`: HOLO and BOB, pale `HULL_LIGHT` smoke, as HULL_MID is too faint on the violet ground), orbs of `sides` and `rings`, over a stack's `mouth`, growing as they rise, each bobbing out of step from `phase` |
+| `puffs(m, mouth, phase, count = 4, sides = 8, rings = 3, surface = SMOKE)`, `SMOKE` | rising smoke over a stack's `mouth`: `count` orbs of `sides` and `rings`, radii 0.07 up by 0.017 a puff, all starting 0.08 above the mouth on `surface` with RISE added, phased `phase + k / count`, so the column is always full and each puff climbs 0.7, drifts and fades before it starts again (**Surface effects**). `SMOKE` is HOLO and RISE, pale `HULL_LIGHT` smoke, as HULL_MID is too faint on the violet ground; another `surface` should be a hologram too, or the restart shows |
 
 ### Model table
 
@@ -584,8 +584,8 @@ While a building is constructed or upgraded, a builder drone works over it
 Two ways for a model to move: **surface effects**, which the shaders animate from `anim_time` per
 part, and **moving parts**, nodes `BuildingView` moves. What each costs in draws:
 
-- The shader effects (PULSE, BLINK, FLICKER, FLOW, FLOW_U, BOB, JITTER) add no draw: they are
-  flags on parts of meshes that are drawn anyway.
+- The shader effects (PULSE, BLINK, FLICKER, FLOW, FLOW_U, BOB, JITTER, LIGHTNING, RISE) add no
+  draw: they are flags on parts of meshes that are drawn anyway.
 - A moving part is two more instances, its body and its outline: two draws, plus the body's draw
   into the shadow map.
 - A HOLO part puts one more surface on its mesh: one more draw, in the transparent pass, for each
@@ -631,9 +631,10 @@ of a mesh animates alike.
 | `JITTER` | 256 | each vertex jumps up to 0.04 in a pseudo-random direction (a hash of its position and the time step), 20 times a second; corners shared by faces move together. With UNLIT and FLICKER, a crackling arc: build it of short segments so there are corners to shake |
 | `HOLO` | 512 | a hologram (below) |
 | `LIGHTNING` | 1024 | with FLICKER and JITTER, a lightning arc's slow crackle, one speed on every arc: on or off 7 times a second (`LIGHTNING_FLICKER_RATE`), on about 60 % of the time (`LIGHTNING_ON`), and a new shake 5 times a second (`LIGHTNING_JITTER_RATE`) instead of a spark's 24 and 20. `Parts.spark()` carries it, so every arc built on it crackles alike; point sparks (welding, cutting, flares, grids, the construction drone's) are made without it and keep the fast rates |
+| `RISE` | 2048 | the part climbs 0.7 along world Y (`RISE_HEIGHT`) over 3 s (`RISE_PERIOD`) from its phase, drifting (0.12, 0, 0.08) world units sideways by the top (`RISE_DRIFT`), then starts again. A hologram-surface effect: on HOLO, `holo.gdshader` fades the part in over the first 12 % of the climb and out over its top half, so the restart never shows; the toon shader has no transparency, so on an opaque part the snap back shows. Rising smoke (`Parts.puffs`) |
 
 Effects compose: UNLIT + PULSE, UNLIT + FLICKER + JITTER, FLOW + PULSE. `anim_time` wraps every
-hour (**One clock**, above); BLINK, PULSE and BOB cycle evenly into the hour, FLOW and the
+hour (**One clock**, above); BLINK, PULSE, BOB and RISE cycle evenly into the hour, FLOW and the
 hologram's dip jump once an hour, and so does a spin or a swing whose period does not divide it.
 
 **Holograms.** A HOLO part is transparent, so `LowPolyMesh.to_mesh()` puts it in a surface of its
@@ -641,8 +642,9 @@ own on `MaterialKit.holo()` (`holo.gdshader`: unshaded, alpha-blended, no depth 
 culled): the kit layer times the tint at alpha 0.45; scan bands, a sawtooth 0.5 units long in
 world Y drifting up at 0.4 units a second, brightening by up to 0.4; a rim where the view grazes
 the surface, up to 0.3 brighter; and a dip of the alpha to 0.2 for 0.1 s every 2.6 s, offset by
-the phase. A near-white layer (glow) shows the tint best. A hologram is never outlined, never in a
-wall piece (**Walls**), and keeps its look on a placement ghost (**View states**).
+the phase. A RISE part fades in and out over its climb (above). A near-white layer (glow) shows the
+tint best. A hologram is never outlined, never in a wall piece (**Walls**), and keeps its look on a
+placement ghost (**View states**).
 
 ### Moving parts
 
