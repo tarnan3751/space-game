@@ -58,7 +58,7 @@ const MODELS := {
 	"research_lab": [3, 10],
 	"nanite_foundry": [3, 8],
 	"drydock": [4, 7],
-	"alliance_beacon": [3, 3],
+	"alliance_beacon": [3, 7],
 	"laser_turret": [3, 10],
 	"missile_battery": [3, 10],
 	"plasma_mortar": [3, 8],
