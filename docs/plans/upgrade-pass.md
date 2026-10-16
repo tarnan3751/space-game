@@ -43,6 +43,25 @@ the two trap tops that were gold at Command Center 4 (Proximity Mine 3, Gravity 
 become Base; their next levels (Command Center 6 and 7) are Chrome, so those two types have no
 gold tier.
 
+## 2a. The style, at every tier
+
+Every new level is drawn in the project's pulp sci-fi comic style, as the existing models are
+(`docs/reference/art-style.md`): chunky, readable masses with exaggerated proportions, a few
+big shapes before many small ones, bold saturated accents against light hulls, ink outlines,
+the three-band toon light with halftoned shadows, glows that pop. The owner asked for this
+explicitly on 2026-10-16: the new models must fit the vibrant, comic-like style of the whole
+game. The tiers change the palette, never the style:
+
+- **Chrome** is bright white with a cool cyan cast and cyan light strips, never grey or dull.
+- **Obsidian** is ink-black glass that stays vibrant through saturated violet veins, bright
+  glints and gold or cyan accents; at least a third of a model's visible surface stays bright
+  or glowing, and the dark plating never reads as a muddy or realistic metal.
+- **Crown** is the loudest tier: gold filigree, a violet core, a crown and an escort, drawn
+  bigger and bolder than anything below it.
+
+A level that reads as grim, grey, realistic or cluttered with small detail fails its review,
+whatever its budgets say. Each batch's rendered gallery shots are judged for this first.
+
 ## 3. The level map
 
 For each type: its maximum level at Command Center 1…10 (0 = locked) and how many a base may
