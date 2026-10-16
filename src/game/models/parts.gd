@@ -399,31 +399,37 @@ static func escort_skiff(p: Parts, radius: float, height: float, rate: float,
 
 ## Two troopers in the cadets' proportions, army plating over their limbs, marching a round about
 ## the footprint's centre (or `centre` on the ground) `radius` out at `height` (their feet) at
-## `rate` radians a second, the second a pace behind the first, `scale` times their own size.
-## About 0.1 times `scale` across from each one's centre: keep their round within the extent.
-## Returns the moving part.
+## `rate` radians a second, the second a pace behind the first. Each stands TROOPER_HEIGHT tall
+## times `scale`, its arms about 0.26 times `scale` from its centre: keep their round within the
+## extent. Returns the moving part.
 static func escort_troopers(p: Parts, radius: float, height: float, rate: float,
 		centre: Vector3 = Vector3.ZERO, scale: float = 1.0) -> LowPolyMesh:
 	var s := p.moving(centre + Vector3(0, height, 0), Motion.spin(Vector3.UP, rate))
 	for k: int in 2:
-		# The second trooper walks a pace (0.3 units times `scale`) behind the first along the round.
-		var behind := 0.3 * scale / radius * k * (1.0 if rate > 0.0 else -1.0)
+		# The second trooper walks a pace (0.5 units times `scale`) behind the first along the round.
+		var behind := 0.5 * scale / radius * k * (1.0 if rate > 0.0 else -1.0)
 		var at := around(radius, rad_to_deg(behind), 0.0)
 		var heading := Vector3(0, rad_to_deg(-behind) + (180.0 if rate > 0.0 else 0.0), 0)
 		_trooper(s, at, heading, scale)
 	return s
 
 
-## One solid trooper standing at `foot`, facing `heading`, `scale` times its own size: legs, an
-## armoured torso, arms, a helmet with a glowing visor and a rifle carried across the chest.
+## How tall an escort trooper stands, its helmet's top: big enough to read as a soldier at the
+## gameplay zoom.
+const TROOPER_HEIGHT := 0.8
+
+
+## One solid trooper standing at `foot`, facing `heading`: legs, an armoured torso, arms, a helmet
+## with a glowing visor and a rifle carried across the chest, in the cadets' proportions (half a
+## unit tall) scaled to TROOPER_HEIGHT times `scale`.
 static func _trooper(s: LowPolyMesh, foot: Vector3, heading: Vector3, scale: float) -> void:
-	var K := 0.9 * scale
+	var K := TROOPER_HEIGHT / 0.5 * scale
 	for side: float in [-1.0, 1.0]:
 		s.box(Vector3(0.07, 0.2, 0.08) * K, foot + LowPolyMesh.turn(Vector3(side * 0.045, 0, 0) * K, heading), TROOPER_LIMB,
 			heading)
 		s.box(Vector3(0.055, 0.18, 0.065) * K, foot + LowPolyMesh.turn(Vector3(side * 0.135, 0.2, 0) * K, heading),
 			TROOPER_LIMB, heading)
-	s.box_chamfered(Vector3(0.2, 0.2, 0.12) * K, 0.02 * scale, foot + Vector3(0, 0.2, 0) * K, TROOPER_PLATE, heading)
+	s.box_chamfered(Vector3(0.2, 0.2, 0.12) * K, 0.035 * scale, foot + Vector3(0, 0.2, 0) * K, TROOPER_PLATE, heading)
 	s.dome(0.075 * K, 0.1 * K, 8, 3, foot + Vector3(0, 0.4, 0) * K, TROOPER_HELMET)
 	s.box(Vector3(0.1, 0.025, 0.02) * K, foot + LowPolyMesh.turn(Vector3(0, 0.44, 0.07) * K, heading), ESCORT_EYE, heading)
 	s.box(Vector3(0.22, 0.03, 0.03) * K, foot + LowPolyMesh.turn(Vector3(0, 0.3, 0.08) * K, heading), GUNMETAL,

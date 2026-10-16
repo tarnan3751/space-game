@@ -436,7 +436,7 @@ The shared elements are named once on `Parts`, for every model batch:
 | Crown | `CORE_GLOW` | the glow layer in `CORE_GLOW_TINT` (`9B5CFF`, a saturated violet), unlit, PULSE: the antimatter core |
 | Crown | `escort_drone(p, radius, height, rate, centre = Vector3.ZERO, scale = 1.0)` | a small quadrotor guard drone, a third the size of the drone bay's (about 0.12 across from its centre), its rotors unlit screen-layer blurs (FLOW_U, no hologram surface): 166 body triangles |
 | Crown | `escort_skiff(p, radius, height, rate, centre = Vector3.ZERO, scale = 1.0)` | a hover skiff: a chamfered hull, a glass canopy, two engine pods and a glowing underside (PULSE), every part bobbing together (about 0.3 from its centre to its engines' ends): 170 |
-| Crown | `escort_troopers(p, radius, height, rate, centre = Vector3.ZERO, scale = 1.0)` | two solid troopers in the cadets' proportions, army orange plating, a hull-light helmet with an `ENERGY` visor and a rifle, one 0.3 behind the other on the round (each about 0.1 across from its centre): 260 |
+| Crown | `escort_troopers(p, radius, height, rate, centre = Vector3.ZERO, scale = 1.0)` | two solid troopers in the cadets' proportions, army orange plating, a hull-light helmet with an `ENERGY` visor and a rifle, each `TROOPER_HEIGHT` (0.8) tall so it reads as a soldier at the gameplay zoom, one 0.5 behind the other on the round (each about 0.26 from its centre to its arms): 260 |
 
 Each escort is a moving part built in its own space, the Crown tier's fourth: it spins about +Y
 through the footprint's centre (or through `centre`, an optional point on the ground, where the
