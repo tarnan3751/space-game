@@ -175,13 +175,14 @@ const MORTAR_LOADER_CLEAR := 0.4
 const MORTAR_CHARGE_OFF := 0.38
 const MORTAR_CHARGE_INNER := 0.52
 const MORTAR_CHARGE_OUTER := 0.68
-## The L8 balcony on the near corner, level with the plinth's top, where the loader arm stands and
-## the troopers march round it in the camera's view: its distance out and its radius, and the
-## troopers' round and size (as large as the round allows within the extent).
+## The L8 ammunition rack on the near corner: an octagonal pedestal level with the plinth's top,
+## where the loader arm stands, its distance out and its radius; the plasma canisters racked
+## beside the arm on the camera's side, their distance from the arm, radius and height.
 const MORTAR_BALCONY := 1.5
 const MORTAR_BALCONY_RADIUS := 0.56
-const MORTAR_ESCORT_RADIUS := 0.32
-const MORTAR_ESCORT_SCALE := 0.85
+const MORTAR_RACK := 0.34
+const MORTAR_CANISTER := 0.13
+const MORTAR_CANISTER_HEIGHT := 0.52
 ## The flak cannon: how much higher its radar stands from L6, and the L7 targeting ring's height
 ## over the deck.
 const FLAK_RADAR_RAISE := 0.25
@@ -544,9 +545,9 @@ static func _pod(s: LowPolyMesh, trunnion: Vector3, aim: Vector3, x: float, colu
 ## and barrel obsidian veined violet, the coils violet, a violet plasma pool glowing on the bowl
 ## round the chamber, and a glowing charge ring hovering well past the muzzle, turning about the
 ## barrel. L8 (Crown): gold filigree round the plinth and the pedestal, the pool the antimatter core
-## with a core ring round the chamber's foot, a gold crown round the bowl's rim, and a gold-topped
-## balcony on the near corner where the loader arm stands and two troopers march round it as the
-## loaders (the escort).
+## with a core ring round the chamber's foot, a gold crown round the bowl's rim, and an ammunition
+## rack on the near corner: an obsidian octagonal pedestal, gold-topped, where the loader arm
+## stands, three upright plasma canisters banded gold in a gunmetal cradle beside it.
 static func build_plasma_mortar(p: Parts, level: int) -> void:
 	var m := p.body
 	var plinth := 0.3 if level < 5 else float(MORTAR_PLINTHS[level - 5])
@@ -669,17 +670,29 @@ static func build_plasma_mortar(p: Parts, level: int) -> void:
 		Parts.torus(m, 0.86, 0.04, 24, 8, Vector3(0, seat - 0.06, 0), Parts.GOLD_ROUND)
 		for k: int in 8:
 			m.cone(0.05, 0.16, 8, Parts.around(0.86, 22.5 + 45.0 * k, seat), Parts.GOLD_ROUND)
-		# The balcony on the near corner: the loader arm stands on it, taller, and the troopers march
-		# round it there.
+		# The ammunition rack on the near corner: the loader arm stands on its pedestal, taller, and
+		# feeds the mortar from the canisters racked beside it on the camera's side.
 		var balcony := Parts.around(MORTAR_BALCONY, 45.0, Parts.PAD_HEIGHT)
-		Parts.drum(m, MORTAR_BALCONY_RADIUS, top - Parts.PAD_HEIGHT, 0.04, 24, balcony, Parts.OBSIDIAN_ROUND)
-		m.ring(MORTAR_BALCONY_RADIUS - 0.01, MORTAR_BALCONY_RADIUS + 0.025, 0.06, 24, Vector3(balcony.x, top - 0.1, balcony.z),
-			Parts.FILIGREE)
-		m.disc(MORTAR_BALCONY_RADIUS - 0.04, 24, Vector3(balcony.x, top + 0.002, balcony.z), Parts.GOLD_ROUND)
+		Parts.drum(m, MORTAR_BALCONY_RADIUS, top - Parts.PAD_HEIGHT, 0.04, 8, balcony, Parts.OBSIDIAN_ROUND, Parts.OCTAGON)
+		m.ring(MORTAR_BALCONY_RADIUS - 0.01, MORTAR_BALCONY_RADIUS + 0.025, 0.06, 8, Vector3(balcony.x, top - 0.1, balcony.z),
+			Parts.FILIGREE, Parts.OCTAGON)
+		m.disc(MORTAR_BALCONY_RADIUS - 0.04, 8, Vector3(balcony.x, top + 0.002, balcony.z), Parts.GOLD_ROUND, Parts.OCTAGON)
+		var deck := Vector3(balcony.x, top, balcony.z)
+		# The cradle: a gunmetal tray under the canisters and a cup round each one's foot.
+		m.ring(MORTAR_RACK - MORTAR_CANISTER - 0.04, MORTAR_RACK + MORTAR_CANISTER + 0.04, 0.05, 16, deck, Parts.GUNMETAL,
+			Vector3.ZERO, -45.0, 135.0)
+		for k: int in 3:
+			var stand := deck + Parts.around(MORTAR_RACK, 60.0 * k - 15.0, 0.05)
+			m.ring(MORTAR_CANISTER - 0.005, MORTAR_CANISTER + 0.03, 0.1, 12, stand, Parts.GUNMETAL)
+			m.lathe(PackedVector2Array([
+				Vector2(MORTAR_CANISTER, 0), Vector2(MORTAR_CANISTER, MORTAR_CANISTER_HEIGHT - 0.06),
+				Vector2(MORTAR_CANISTER * 0.7, MORTAR_CANISTER_HEIGHT - 0.01), Vector2(0, MORTAR_CANISTER_HEIGHT),
+			]), 12, stand, PLASMA_PULSE.phased(k / 3.0))
+			m.ring(MORTAR_CANISTER - 0.005, MORTAR_CANISTER + 0.02, 0.05, 12, stand + Vector3(0, MORTAR_CANISTER_HEIGHT * 0.55, 0),
+				Parts.GOLD_ROUND)
 		# The canister clears the crown's spikes.
 		_loader_arm(p, Vector3(balcony.x, top, balcony.z), Parts.around(0.95, 108.0, 0.0), p.tier,
 			seat + MORTAR_LOADER_CLEAR + 0.16 - top, false)
-		Parts.escort_troopers(p, MORTAR_ESCORT_RADIUS, top, 0.9, Vector3(balcony.x, 0, balcony.z), MORTAR_ESCORT_SCALE)
 
 
 ## The plasma mortar's L6 loader arm standing on `foot`, a moving part swinging about its column: a
@@ -697,7 +710,7 @@ static func _loader_arm(p: Parts, foot: Vector3, reach: Vector3, tier: int, shou
 	var start := 0.14 if base else 0.0
 	if base:
 		Parts.drum(arm, 0.17, 0.14, 0.03, 12, Vector3.ZERO, Parts.GUNMETAL)
-	# On the balcony (no base) the column is slimmer, so the troopers clear it.
+	# On the rack's pedestal (no base) the column is slimmer, clear of the canisters.
 	var column := 0.11 if base else 0.08
 	arm.prism(column, column - 0.02, shoulder_y - 0.06 - start, 12, Vector3(0, start, 0), plate)
 	arm.ring(column - 0.01, column + 0.01, 0.06, 12, Vector3(0, shoulder_y - 0.6, 0), glow)
