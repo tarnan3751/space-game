@@ -232,7 +232,7 @@ static func build_hangar(p: Parts, level: int) -> void:
 	var big := 1.45 if level >= 6 else 1.0
 	var stub := cab + Vector3(-0.14, 0.6, 0.12)
 	m.prism(0.05, 0.04, 0.12, 12, stub, Parts.GUNMETAL)
-	var radar := p.moving(stub + Vector3(0, 0.12, 0), Motion.spin(Vector3.UP, 1.2))
+	var radar := p.moving(stub + Vector3(0, 0.12, 0), Motion.spin(Vector3.UP, Parts.DISH_RATE))
 	radar.box_chamfered(Vector3(0.08, 0.08, 0.08), 0.02, Vector3.ZERO, Parts.GUNMETAL)
 	var tilt := Vector3(60, 90, 0)
 	var hub := Vector3(0, 0.08, 0)
@@ -1185,7 +1185,7 @@ static func _lab_corners(p: Parts, level: int) -> void:
 	m.prism(0.12, 0.11, 0.14, 16, mast, _plating(p.tier, ARMOUR_ROUND, true))
 	var height := 1.25 + 0.08 * level
 	m.prism(0.08, 0.06, height, 16, mast + Vector3(0, 0.14, 0), Parts.GUNMETAL)
-	var radar := p.moving(mast + Vector3(0, 0.14 + height, 0), Motion.spin(Vector3.UP, 0.9))
+	var radar := p.moving(mast + Vector3(0, 0.14 + height, 0), Motion.spin(Vector3.UP, Parts.DISH_RATE))
 	radar.box_chamfered(Vector3(0.12, 0.16, 0.12), 0.03, Vector3.ZERO, Parts.GUNMETAL)
 	var tilt := Vector3(60, 90, 0)
 	var hub := Vector3(0, 0.14, 0)
