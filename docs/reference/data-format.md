@@ -148,7 +148,7 @@ slowly, spent only on top-tier levels). A 40×40 grid, the Command Center with f
 | resources | `antimatter_vault` | Antimatter Vault | 3 | 4 | 3 | 0,0,0,1,2 | stores antimatter |
 | army | `hangar` | Hangar | 5 | 1 | 5 | 1,1,2,2,3 | capacity 20–45 |
 | army | `cadet_academy` | Cadet Academy | 3 | 1 | 5 | 1,2,2,3,4 | |
-| army | `fabricator` | Fabricator | 3 | 1 | 5 | 1,2,2,3,3 | |
+| army | `fabricator` | Fabricator | 3 | 2 | 5 | 0,1,2,2,2 | |
 | army | `heavy_fabricator` | Heavy Fabricator | 3 | 4 | 3 | 0,0,0,1,2 | |
 | army | `research_lab` | Research Lab | 3 | 2 | 5 | 0,1,1,1,1 | |
 | army | `nanite_foundry` | Nanite Foundry | 3 | 3 | 4 | 0,0,1,1,1 | |

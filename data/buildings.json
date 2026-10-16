@@ -158,9 +158,9 @@
     "name": "Fabricator",
     "size": 3,
     "category": "army",
-    "max_count": [1, 2, 2, 3, 3],
+    "max_count": [0, 1, 2, 2, 2],
     "levels": [
-      { "cost": { "metal": 150, "crystal": 40 }, "build_seconds": 20, "hp": 300 },
+      { "cost": { "metal": 150, "crystal": 40 }, "build_seconds": 20, "hp": 300, "requires_cc": 2 },
       { "cost": { "metal": 400, "crystal": 100 }, "build_seconds": 60, "hp": 360,
         "requires_cc": 2 },
       { "cost": { "metal": 1000, "crystal": 250 }, "build_seconds": 180, "hp": 420,
