@@ -24,7 +24,7 @@ A non-whole number stays a float and fails validation wherever an int is require
   ],
   "grid": { "width": 40, "height": 40 },
   "menu_order": ["drone_bay", "metal_extractor", "crystal_harvester", "antimatter_siphon",
-                 "metal_silo", "crystal_silo", "antimatter_vault", "hangar", "fabricator",
+                 "metal_silo", "crystal_silo", "antimatter_vault", "hangar", "cadet_academy",
                  "...", "mega_mine", "barrier_wall"],
   "start": {
     "resources": { "metal": 750, "crystal": 750, "antimatter": 0 },
@@ -134,7 +134,7 @@ curve goes down from one level to the next (`testing-tools.md`).
 
 Three resources: metal, crystal, and antimatter (rare: unlocked at Command Center 4, produced
 slowly, spent only on top-tier levels). A 40×40 grid, the Command Center with five levels, and
-31 types in four build-menu categories. The ids are final.
+32 types in four build-menu categories. The ids are final.
 
 | Category | Type | Name | Size | Unlock (CC) | Levels | `max_count` at CC 1–5 | Notes |
 | --- | --- | --- | --- | --- | --- | --- | --- |
@@ -147,6 +147,7 @@ slowly, spent only on top-tier levels). A 40×40 grid, the Command Center with f
 | resources | `crystal_silo` | Crystal Silo | 3 | 1 | 5 | 1,2,3,4,4 | stores crystal |
 | resources | `antimatter_vault` | Antimatter Vault | 3 | 4 | 3 | 0,0,0,1,2 | stores antimatter |
 | army | `hangar` | Hangar | 5 | 1 | 5 | 1,1,2,2,3 | capacity 20–45 |
+| army | `cadet_academy` | Cadet Academy | 3 | 1 | 5 | 1,2,2,3,4 | |
 | army | `fabricator` | Fabricator | 3 | 1 | 5 | 1,2,2,3,3 | |
 | army | `heavy_fabricator` | Heavy Fabricator | 3 | 4 | 3 | 0,0,0,1,2 | |
 | army | `research_lab` | Research Lab | 3 | 2 | 5 | 0,1,1,1,1 | |

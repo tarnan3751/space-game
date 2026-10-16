@@ -138,6 +138,22 @@
         "hp": 450, "requires_cc": 5, "capacity": 45 }
     ]
   },
+  "cadet_academy": {
+    "name": "Cadet Academy",
+    "size": 3,
+    "category": "army",
+    "max_count": [1, 2, 2, 3, 4],
+    "levels": [
+      { "cost": { "metal": 100, "crystal": 25 }, "build_seconds": 15, "hp": 250 },
+      { "cost": { "metal": 300, "crystal": 75 }, "build_seconds": 45, "hp": 300, "requires_cc": 2 },
+      { "cost": { "metal": 800, "crystal": 200 }, "build_seconds": 150, "hp": 350,
+        "requires_cc": 3 },
+      { "cost": { "metal": 2000, "crystal": 500 }, "build_seconds": 400, "hp": 400,
+        "requires_cc": 4 },
+      { "cost": { "metal": 5000, "crystal": 1250, "antimatter": 30 }, "build_seconds": 900,
+        "hp": 450, "requires_cc": 5 }
+    ]
+  },
   "fabricator": {
     "name": "Fabricator",
     "size": 3,

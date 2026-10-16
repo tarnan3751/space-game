@@ -291,7 +291,7 @@ type's: dishes, radars and gyro rings that spin, heads and launchers that scan, 
 doors and cranes that slide) with their outlines, each under a pivot node carrying `MOVE_META`:
 at most eight `MeshInstance3D`, half of them at most outlines that cast no shadow
 (`art-style.md`, **Animation**).
-The models are built in code, one per type and level of the 32-type roster, each type's in its
+The models are built in code, one per type and level of the 33-type roster, each type's in its
 category's file under `src/game/models/` but the wall's, which has a file of its own
 (`walls.gd`) although the wall is a defence type; `MODELS` gives each type the footprint its
 models are built for and its level count. A level above that shows the top model, a catalog size

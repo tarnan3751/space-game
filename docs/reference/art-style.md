@@ -420,6 +420,7 @@ triangles as the gallery counts them.
 | `crystal_silo` | tall hexagonal tank of crystal-lit glass panels under a chamfered lid and a crystal finial | spin: the finial, 0.5 rad/s. PULSE: the finial and every glass panel, each on its own phase | 910 |
 | `antimatter_vault` | armoured chamfered cube with a round vault door, violet seams and a containment pylon on each corner | none moving. FLOW: the corner seams, FLOW_U: the seam band (screen layer); PULSE: the pylons' cells; BLINK: their tips (a chase); L3 UNLIT + FLICKER + JITTER: arcs between adjacent tips | 2,944 |
 | `hangar` | barrel-vaulted bays with orange ribs and hazard-striped doors, a glass-cabbed control tower | slide: the main bay's door, up under a hood over its lit inside (FLOW); spin: a radar on the cab's roof; swing, from L4: the big roof dish. The apron lights BLINK in a chase, the cab's glass PULSEs | 4,704 |
+| `cadet_academy` | a training ground for human cadets: a barracks hall of orange bunk windows behind a drill yard, a hologram cadet standing to attention on an octagonal parade plinth, holographic target posts and a flagpole with a stiff orange pennant; a gimballed flight-simulator pod, a lecture room on the hall and a watchtower as it grows | spin: the HOLO cadet, slowly about the vertical over the plinth (a part with no outline); spin, from L2: the simulator's two gimbal rings about a tilted axis; swing, from L4: the tower's searchlight, ±25° (6 s), its HOLO beam over the yard. The bunk windows PULSE each on its own phase, the HOLO target silhouettes BLINK on in turn, the cadet BOBs over the plinth's PULSE lens, the finial lamp BLINKs; L3 FLOW on the lecture room's board and FLICKER on the drill grid's lines; L5 the cadet salutes under a HOLO halo bobbing out of step, and the pennant's crest PULSEs. Its hologram boxes go unchamfered (never inked) to keep it in budget | 2,980 |
 | `fabricator` | sawtooth-roofed factory, an orange gantry crane over a loading dock, smokestacks | slide: the crane's trolley and hook along its bridge. The roof windows PULSE orange, the dock lamp BLINKs, HOLO smoke puffs BOB over every stack | 2,798 |
 | `heavy_fabricator` | armoured hall with orange press arms hammering anvils, a glowing furnace mouth | slide (HAMMER, out of step): each press arm's head and piston onto its anvil. FLICKER sparks off the anvils, the furnace mouth PULSEs, the molten pour FLOWs | 2,088 |
 | `research_lab` | observatory dome with a telescope, in a ring of screens | spin: the radar dish on its mast; swing: the telescope along the slit. The screens FLOW at their own speeds, the slit glows and PULSEs; from L3 a HOLO orb in two rings BOBs over the dome | 2,904 |
@@ -1009,24 +1010,25 @@ and 91 on traps, the cards' pictures included (110, 94 and 73 on a walls tab whi
 tabs; 100, 86 and 68 before the pictures). The pictures cost one 160×160 render per type, one a
 frame, the first time the panel opens, each read back into a 100 KB texture (about 3 MB for
 today's menu), and nothing per frame once every type is cached and the preview's viewport is
-freed (`hud.md`, **Pictures**). The model gallery's overview is 565
-draw calls on page 1 and 217 on page 2 with every type animated (362 and 158 before the
-animation pass, when nine types had one spinner each; 381 and 177 with the build bar, 375 and
-171 before the environment, 294 and 157 before the kit): every moving part is two more draws
-and a shadow draw, and every mesh with holograms one more. The render thread's CPU time on
-the development Mac is about 1.2 to 1.5 ms a frame on page 1 (118 models at once) and 0.4 to
-0.7 ms on page 2, measured with the gallery's own line; it does not move with the shadow's
-filter (0, 2 or 4 measure the same within that noise), since PCF costs on the GPU: 13 shadow
-taps a fragment near a shadow edge (fewer where the first taps agree), and the penumbra's dot
-screen a few more instructions in `light()`. The shadow map, 1024² at 16 bits, is 2 MB. The
-kit's texture array, seventeen 256×256 RGBA8 layers, is about 5.7 MB with its mipmaps; the field
-texture, one 1024×1024 RGBA8 image, is about 5.3 MB with its mipmaps too, and the ground and the
-terrain share it; the terrain's rock texture, one 512×512 RGBA8 image, is about 1.4 MB with its
-mipmaps. The terrain's shader has two samplers (the field texture and the rock texture) and takes
-three texture reads a fragment (the field's marks and the rock texture along x and along z), with
-five value noises. Keep `_process` free of allocation, and keep every building to its eight
-instances (**Animation**); a busy building adds its construction drone's four. The shader effects
-cost a few integer tests and a sine or two a vertex and a fragment, and no draw; a moving part costs
-two draws (its body and its outline) plus the body's shadow draw, and a mesh with HOLO parts one
-more draw in the transparent pass. The finished walls are one merged mesh, a fixed handful of draws
-however many there are (`input-camera.md`, **Walls**).
+freed (`hud.md`, **Pictures**). The model gallery's overview is 552 draw calls on page 1 and 275
+on page 2 with every type animated (565 and 217 before the Cadet Academy's levels moved rows
+between the pages; 362 and 158 before the animation pass, when nine types had one spinner each;
+381 and 177 with the build bar, 375 and 171 before the environment, 294 and 157 before the kit):
+every moving part is two more draws and a shadow draw, and every mesh with holograms one more.
+The render thread's CPU time on the development Mac is about 1.2 to 1.5 ms a frame on page 1 (74
+of the 121 models at once) and 0.4 to 0.7 ms on page 2, measured with the gallery's own line; it
+does not move with the shadow's filter (0, 2 or 4 measure the same within that noise), since PCF
+costs on the GPU: 13 shadow taps a fragment near a shadow edge (fewer where the first taps
+agree), and the penumbra's dot screen a few more instructions in `light()`. The shadow map,
+1024² at 16 bits, is 2 MB. The kit's texture array, seventeen 256×256 RGBA8 layers, is about 5.7
+MB with its mipmaps; the field texture, one 1024×1024 RGBA8 image, is about 5.3 MB with its
+mipmaps too, and the ground and the terrain share it; the terrain's rock texture, one 512×512
+RGBA8 image, is about 1.4 MB with its mipmaps. The terrain's shader has two samplers (the field
+texture and the rock texture) and takes three texture reads a fragment (the field's marks and
+the rock texture along x and along z), with five value noises. Keep `_process` free of
+allocation, and keep every building to its eight instances (**Animation**); a busy building adds
+its construction drone's four. The shader effects cost a few integer tests and a sine or two a
+vertex and a fragment, and no draw; a moving part costs two draws (its body and its outline)
+plus the body's shadow draw, and a mesh with HOLO parts one more draw in the transparent pass.
+The finished walls are one merged mesh, a fixed handful of draws however many there are
+(`input-camera.md`, **Walls**).

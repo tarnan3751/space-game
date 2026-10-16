@@ -47,6 +47,7 @@ const MODELS := {
 	"crystal_silo": [3, 5],
 	"antimatter_vault": [3, 3],
 	"hangar": [5, 5],
+	"cadet_academy": [3, 5],
 	"fabricator": [3, 5],
 	"heavy_fabricator": [3, 3],
 	"research_lab": [3, 5],
@@ -241,6 +242,8 @@ static func _build(p: Parts, type: String, level: int) -> void:
 			ResourceModels.build_antimatter_vault(p, level)
 		"hangar":
 			ArmyModels.build_hangar(p, level)
+		"cadet_academy":
+			ArmyModels.build_cadet_academy(p, level)
 		"fabricator":
 			ArmyModels.build_fabricator(p, level)
 		"heavy_fabricator":

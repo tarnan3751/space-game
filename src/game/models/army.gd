@@ -3,8 +3,8 @@ extends RefCounted
 ## halls and towers on concrete pads, army orange on one or two surfaces and in one glow,
 ## gunmetal machinery, gold trim at the top level. They move (docs/reference/art-style.md,
 ## **Animation**): surface effects on the lamps, glows, screens, goo, sparks and smoke, and moving
-## parts (Parts.moving) for the hangar door, the cranes, the press arms, the dishes, the telescope
-## and the stirrer.
+## parts (Parts.moving) for the hangar door, the cranes, the press arms, the dishes, the telescope,
+## the stirrer, the hologram cadet, the simulator's gimbal rings and the searchlight.
 ##
 ## BuildingModels calls one static build_<type>(p: Parts, level: int) per type. Each builds
 ## its level as a run of additions (`if level >= 3:` adds the second bay), so the levels of a
@@ -75,6 +75,12 @@ static var ORB_BOB := Surf.make(MaterialKit.Layer.GLOW, MaterialKit.ARMY, 1.0,
 static var GOLD_BOB := Surf.make(MaterialKit.Layer.FLAT, MaterialKit.CORE_GOLD, 1.0, Surf.GLOSSY | Surf.BOB,
 	true)
 static var GUNMETAL_BOB := Surf.make(MaterialKit.Layer.PLATE, MaterialKit.GUNMETAL, 1.0, Surf.BOB, true)
+## The academy's target silhouettes, blinking on in turn; its drill grid, flickering; its
+## searchlight's lens and beam.
+static var TARGET := Surf.make(MaterialKit.Layer.GLOW, MaterialKit.ENERGY, 1.0, Surf.HOLO | Surf.BLINK)
+static var DRILL_GRID := Surf.make(MaterialKit.Layer.GLOW, MaterialKit.ENERGY, 1.0, Surf.UNLIT | Surf.FLICKER)
+static var SEARCH_LENS := Surf.make(MaterialKit.Layer.GLOW, MaterialKit.HAZARD, 1.0, Surf.UNLIT | Surf.PULSE, true)
+static var SEARCH_BEAM := Surf.make(MaterialKit.Layer.GLOW, MaterialKit.HAZARD, 1.0, Surf.HOLO, true)
 
 
 ## A long vaulted hangar: the main bay with its striped door, the control tower in the back
@@ -202,6 +208,210 @@ static func _vault(p: Parts, back: Vector3, width: float, length: float, wall: f
 	m.box_chamfered(Vector3(door + 0.32, 0.14, 0.18), 0.04, Vector3(back.x, back.y + height, z + 0.09),
 		Parts.GOLD_TRIM if level >= 5 else ORANGE)
 	m.box(Vector3(door * 0.6, 0.06, 0.04), Vector3(back.x, strip, z + (0.15 if opens else 0.0)), GLOW)
+
+
+## A training ground for human cadets: a barracks hall along the back of a drill yard, a parade
+## plinth in the yard with a hologram cadet standing to attention over it, a flagpole flying a
+## stiff orange pennant, holographic target posts down one side. A taller hall with a second row
+## of windows and a gimballed flight-simulator pod at 2, a lecture room with an armour skirt on
+## the hall's roof and a drill grid on the yard at 3, a watchtower, corner armour and a fourth
+## target at 4, an armour plate on the lecture room's end and gold at 5. The bunk windows pulse
+## on their own phases, the targets blink on in turn, the cadet bobs and turns slowly over the
+## plinth's pulsing lens and the finial lamp blinks; from 2 the pod's gimbal rings spin, from 3
+## the lecture room's board scrolls and the drill grid flickers, from 4 the tower's searchlight
+## sweeps the yard. At 5 the cadet salutes under a hologram halo and the pennant's crest glows.
+static func build_cadet_academy(p: Parts, level: int) -> void:
+	var m := p.body
+	var g := Parts.PAD_HEIGHT
+	var gold := level >= 5
+	Parts.foundation(m, 3)
+	# The hall along the back, its front face at z = front.
+	var height := 0.75 if level < 2 else 1.0
+	var front := -0.62
+	m.box_chamfered(Vector3(2.6, height, 0.7), 0.06, Vector3(0, g, front - 0.35), Parts.HULL_LIGHT)
+	var roof := g + height
+	m.box_chamfered(Vector3(2.62, 0.08, 0.1), 0.02, Vector3(0, roof - 0.08, front),
+		Parts.GOLD_TRIM if gold else DARK_PLATE)
+	# The orange roller door between hazard posts, a glow strip over it.
+	m.box_chamfered(Vector3(0.5, 0.5, 0.06), 0.02, Vector3(0, g, front), ROLLER)
+	m.box(Vector3(0.5, 0.05, 0.04), Vector3(0, g + 0.53, front + 0.01), GLOW)
+	for side: float in [-1.0, 1.0]:
+		m.box_chamfered(Vector3(0.08, 0.6, 0.08), 0.02, Vector3(side * 0.3, g, front + 0.02), Parts.HAZARD)
+	# The bunk windows, a row more at 2.
+	var rows: Array[float] = [0.3]
+	if level >= 2:
+		rows.append(0.6)
+	var k := 0
+	for y: float in rows:
+		for x: float in [-1.05, -0.75, -0.45, 0.45, 0.75, 1.05]:
+			m.box(Vector3(0.18, 0.12, 0.02), Vector3(x, g + y, front + 0.005),
+				WINDOW_GLOW.phased(fposmod(0.37 * k, 1.0)))
+			k += 1
+	if level >= 4:
+		# Armour plates round the hall's front corners.
+		for side: float in [-1.0, 1.0]:
+			m.box_chamfered(Vector3(0.1, height - 0.12, 0.4), 0.03, Vector3(side * 1.3, g, front - 0.16), ARMOUR)
+	# The roof: a vent (on the lecture room from 3) and the loudspeaker horn facing the yard.
+	var horn := Vector3(0.55, roof, -0.85)
+	m.prism(0.03, 0.025, 0.26, 8, horn, Parts.GUNMETAL)
+	var blare := Vector3(0, -0.25, 1).normalized()
+	m.prism(0.025, 0.08, 0.14, 10, horn + Vector3(0, 0.24, 0), Parts.GUNMETAL, Parts.facing(blare))
+	m.disc(0.07, 10, horn + Vector3(0, 0.24, 0) + blare * 0.142, DARK_PLATE, Parts.facing(blare))
+	if level >= 3:
+		# The lecture room: a glass band and a scrolling screen board on its front, antennas on top.
+		var room := Vector3(-0.45, roof, -1.02)
+		m.box_chamfered(Vector3(1.5, 0.45, 0.52), 0.05, room, Parts.HULL_LIGHT)
+		m.box_chamfered(Vector3(0.8, 0.12, 0.03), 0.01, room + Vector3(-0.28, 0.24, 0.26), Parts.GLASS)
+		m.box_chamfered(Vector3(0.42, 0.26, 0.04), 0.015, room + Vector3(0.42, 0.1, 0.27), SCREEN_FLOW.phased(0.7))
+		m.box_chamfered(Vector3(0.36, 0.12, 0.26), 0.04, room + Vector3(-0.4, 0.45, -0.03), VENT)
+		# An armour skirt along its front, and at 5 a plate over its end.
+		m.box_chamfered(Vector3(1.54, 0.09, 0.06), 0.02, room + Vector3(0, 0, 0.27), ARMOUR)
+		if level >= 5:
+			m.box_chamfered(Vector3(0.06, 0.36, 0.42), 0.02, room + Vector3(0.77, 0, 0), ARMOUR)
+		_whip(m, room + Vector3(0.45, 0.45, -0.08), 0.5, GLOW)
+		_whip(m, room + Vector3(-0.05, 0.45, 0.06), 0.35, GLOW)
+	else:
+		m.box_chamfered(Vector3(0.36, 0.12, 0.26), 0.04, Vector3(-0.6, roof, -1.05), VENT)
+	# The drill yard: a dark floor with a hazard kerb along its front.
+	m.box_chamfered(Vector3(2.5, 0.03, 1.82), 0.015, Vector3(0, g, 0.3), DARK_PLATE)
+	var yard := g + 0.03
+	m.box_chamfered(Vector3(2.6, 0.08, 0.1), 0.02, Vector3(0, g, 1.27), Parts.HAZARD)
+	if level >= 3:
+		# The drill grid flickering on the yard's floor.
+		for i: int in 4:
+			_line(m, Vector2(1.4, 0.03), Vector3(-0.15, yard + 0.003, -0.35 + 0.4 * i), DRILL_GRID.phased(i / 8.0))
+			_line(m, Vector2(0.03, 1.2), Vector3(-0.85 + 0.47 * i, yard + 0.003, 0.25),
+				DRILL_GRID.phased((i + 4) / 8.0))
+	# The target posts down the left side, their silhouettes blinking on in turn.
+	var posts := 3 if level < 4 else 4
+	for i: int in posts:
+		var foot := Vector3(-1.12, yard, -0.42 + 0.38 * i)
+		m.box_chamfered(Vector3(0.16, 0.06, 0.16), 0.02, foot, Parts.GUNMETAL)
+		m.prism(0.025, 0.02, 0.3, 8, foot + Vector3(0, 0.06, 0), Parts.ROD)
+		var lit := TARGET.phased(Parts.chase(i, posts))
+		m.box(Vector3(0.02, 0.22, 0.18), foot + Vector3(0, 0.36, 0), lit)
+		m.box(Vector3(0.02, 0.09, 0.09), foot + Vector3(0, 0.6, 0), lit)
+	# The parade plinth: an armoured octagon with a rim and a projector lens, the cadet over it.
+	var plinth := Vector3(0, yard, 0.3)
+	Parts.drum(m, 0.32, 0.2, 0.05, 8, plinth, ARMOUR, Parts.OCTAGON)
+	var top := plinth + Vector3(0, 0.2, 0)
+	Parts.drum(m, 0.34, 0.05, 0.02, 8, top - Vector3(0, 0.04, 0), Parts.GOLD_TRIM if gold else Parts.HULL_LIGHT,
+		Parts.OCTAGON)
+	m.dome(0.1, 0.05, 10, 3, top + Vector3(0, 0.01, 0), GLOW_PULSE)
+	_cadet(p, top + Vector3(0, 0.14, 0), level)
+	# The flagpole in the front corner, its finial lamp blinking, the pennant flying over the yard.
+	var pole := Vector3(-1.15, yard, 1.08)
+	m.box_chamfered(Vector3(0.18, 0.08, 0.18), 0.03, pole, ARMOUR)
+	var rise := 1.25 + 0.07 * level
+	_whip(m, pole + Vector3(0, 0.08, 0), rise, LAMP)
+	var head := pole + Vector3(0, 0.08 + rise, 0)
+	m.prism(0.045, 0.035, 0.05, 8, head - Vector3(0, 0.1, 0), GOLD_ROUND if gold else Parts.GUNMETAL)
+	_pennant(m, head + Vector3(0.02, -0.12, 0), 0.5, 0.26, level)
+	if level >= 2:
+		_simulator(p, Vector3(0.92, yard, -0.05))
+	if level >= 4:
+		_watchtower(p, Vector3(1.0, roof, -1.0), level)
+
+
+## The hologram cadet standing to attention, its feet on `foot`, built facing +Z: boots and legs,
+## a chunky torso, arms at its sides, a round head under a peaked cap, all bobbing together. A
+## moving part, it turns slowly about the vertical through its feet, a hologram's showcase turn.
+## At the top level its right arm salutes and a halo floats over it out of step. A hologram is
+## never inked, so its boxes go without chamfers, and the part has no outline.
+static func _cadet(p: Parts, foot: Vector3, level: int) -> void:
+	const K := 1.3
+	var m := p.moving(foot, Motion.spin(Vector3.UP, 0.5))
+	for side: float in [-1.0, 1.0]:
+		m.box(Vector3(0.08, 0.2, 0.09) * K, Vector3(side * 0.05, 0, 0) * K, HOLOGRAM)
+	m.box(Vector3(0.22, 0.2, 0.13) * K, Vector3(0, 0.2, 0) * K, HOLOGRAM)
+	m.box(Vector3(0.06, 0.19, 0.07) * K, Vector3(0.145, 0.2, 0) * K, HOLOGRAM)
+	if level >= 5:
+		var elbow := Vector3(-0.24, 0.38, 0.05) * K
+		m.strut(Vector3(-0.12, 0.37, 0) * K, elbow, 0.06 * K, HOLOGRAM)
+		m.strut(elbow, Vector3(-0.06, 0.5, 0.07) * K, 0.055 * K, HOLOGRAM)
+		m.ring(0.09 * K, 0.12 * K, 0.02, 12, Vector3(0, 0.64, 0) * K, HOLOGRAM.phased(0.5))
+	else:
+		m.box(Vector3(0.06, 0.19, 0.07) * K, Vector3(-0.145, 0.2, 0) * K, HOLOGRAM)
+	m.orb(0.07 * K, 12, 4, Vector3(0, 0.47, 0) * K, HOLOGRAM)
+	Parts.drum(m, 0.078 * K, 0.04 * K, 0.01, 12, Vector3(0, 0.5, 0) * K, HOLOGRAM)
+	m.box(Vector3(0.1, 0.015, 0.05) * K, Vector3(0, 0.5, 0.07) * K, HOLOGRAM)
+
+
+## A stiff pennant flying from `root` on its pole towards +X: a triangle `length` long, its
+## top edge level with the root and `depth` deep at the pole, its tip drooping a little. Its
+## crest glows on both faces at the top level.
+static func _pennant(m: LowPolyMesh, root: Vector3, length: float, depth: float, level: int) -> void:
+	var t := Vector3(0, 0, 0.012)
+	var a := root
+	var b := root - Vector3(0, depth, 0)
+	var c := root + Vector3(length, -depth * 0.4, 0)
+	m.polygon(PackedVector3Array([a + t, b + t, c + t]), ORANGE)
+	m.polygon(PackedVector3Array([a - t, c - t, b - t]), ORANGE)
+	m.polygon(PackedVector3Array([a + t, c + t, c - t, a - t]), ORANGE)
+	m.polygon(PackedVector3Array([b - t, c - t, c + t, b + t]), ORANGE)
+	if level >= 5:
+		var crest := root + Vector3(length * 0.3, -depth * 0.45, 0)
+		m.disc(0.05, 12, crest + Vector3(0, 0, 0.015), GLOW_PULSE, Vector3(90, 0, 0))
+		m.disc(0.05, 12, crest - Vector3(0, 0, 0.015), GLOW_PULSE, Vector3(-90, 0, 0))
+
+
+## A whip antenna on a little foot at `foot`: a thin rod `height` tall ending in a small bulb on
+## `bulb`, which carries the outline the rod is too thin for. Lighter than Parts.mast's bulb.
+static func _whip(m: LowPolyMesh, foot: Vector3, height: float, bulb: Surf) -> void:
+	m.prism(0.03, 0.022, height, 8, foot, Parts.ROD)
+	m.orb(0.05, 10, 4, foot + Vector3(0, height, 0), bulb)
+
+
+## A flat strip `size` across facing up at `pos`: a line of the drill grid, two triangles.
+static func _line(m: LowPolyMesh, size: Vector2, pos: Vector3, surface: Surf) -> void:
+	var h := size * 0.5
+	m.polygon(PackedVector3Array([
+		pos + Vector3(-h.x, 0, -h.y), pos + Vector3(-h.x, 0, h.y), pos + Vector3(h.x, 0, h.y),
+		pos + Vector3(h.x, 0, -h.y),
+	]), surface)
+
+
+## The flight simulator standing on `foot`: a dark pod with a pulsing canopy on a stub, held in
+## two gimbal rings that spin about a tilted axis. Tilted 45 degrees, the rings never come within
+## 0.19 of the stub.
+static func _simulator(p: Parts, foot: Vector3) -> void:
+	var m := p.body
+	Parts.drum(m, 0.2, 0.1, 0.03, 16, foot, ARMOUR_ROUND)
+	m.prism(0.06, 0.05, 0.26, 8, foot + Vector3(0, 0.1, 0), Parts.GUNMETAL)
+	var centre := foot + Vector3(0, 0.54, 0)
+	m.orb(0.22, 16, 6, centre, Parts.HULL_DARK_ROUND)
+	var view := Vector3(0.5, 0.25, 0.85).normalized()
+	m.dome(0.12, 0.05, 16, 3, centre + view * 0.205, CAB_GLASS, Parts.facing(view))
+	var rings := p.moving(centre, Motion.spin(Vector3(0.2, 1, 0.1), 0.9))
+	for spec: Array in [[0.36, Vector3(45, 0, 0)], [0.3, Vector3(0, 0, -45)]]:
+		var radius: float = spec[0]
+		var tilt: Vector3 = spec[1]
+		rings.tube(radius - 0.035, radius, 0.04, 24, -LowPolyMesh.turn(Vector3(0, 0.02, 0), tilt),
+			ARMOUR_ROUND, tilt)
+
+
+## The watchtower on the hall's roof at `foot`: an armoured base, a round shaft, a cab with
+## pulsing glass under a crown (gold at the top level), a small dish on its flank, and the
+## searchlight on the crown sweeping the yard, its lens pulsing and a hologram beam out of it.
+static func _watchtower(p: Parts, foot: Vector3, level: int) -> void:
+	var m := p.body
+	m.box_chamfered(Vector3(0.36, 0.08, 0.36), 0.03, foot, ARMOUR)
+	m.prism(0.13, 0.11, 0.6, 16, foot + Vector3(0, 0.08, 0), MID_ROUND)
+	var cab := foot + Vector3(0, 0.68, 0)
+	m.box_chamfered(Vector3(0.36, 0.2, 0.36), 0.04, cab, ARMOUR)
+	m.box_chamfered(Vector3(0.28, 0.08, 0.02), 0.01, cab + Vector3(0, 0.07, 0.18), CAB_GLASS)
+	m.box_chamfered(Vector3(0.02, 0.08, 0.28), 0.01, cab + Vector3(0.18, 0.07, 0), CAB_GLASS)
+	m.box_chamfered(Vector3(0.4, 0.05, 0.4), 0.02, cab + Vector3(0, 0.2, 0),
+		Parts.GOLD_TRIM if level >= 5 else DARK_PLATE)
+	var aim := Vector3(-0.6, 0.75, 0.2)
+	Parts.dish(m, 0.13, 0.05, cab + Vector3(-0.2, 0.08, 0), HULL_ROUND, Parts.facing(aim))
+	var light := p.moving(cab + Vector3(0, 0.25, 0), Motion.swing(Vector3.UP, 25.0, 6.0))
+	light.prism(0.05, 0.05, 0.06, 8, Vector3.ZERO, Parts.GUNMETAL)
+	var beam := Vector3(-1.0, -1.9, 1.3).normalized()
+	var lamp := Vector3(0, 0.12, 0)
+	Parts.drum(light, 0.08, 0.14, 0.02, 12, lamp - beam * 0.06, Parts.GUNMETAL, Parts.facing(beam))
+	light.disc(0.065, 16, lamp + beam * 0.085, SEARCH_LENS, Parts.facing(beam))
+	light.prism(0.06, 0.16, 1.4, 12, lamp + beam * 0.09, SEARCH_BEAM, Parts.facing(beam))
 
 
 ## A factory block under a sawtooth roof, smokestacks on a furnace box behind it, a conveyor
