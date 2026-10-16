@@ -134,23 +134,7 @@ static func build_command_center(p: Parts, level: int) -> void:
 			m.prism(0.06, 0.05, 0.05, 8, Parts.around(out, degrees, 0.32), MAST_LAMP.phased(Parts.chase(7 - k, 8)),
 				Parts.OCTAGON)
 
-	# The drum: a flared skirt, a wall with a band and two rows of windows between pilasters,
-	# a lip.
-	m.lathe(PackedVector2Array([
-		Vector2(DRUM_RADIUS + 0.12, 0), Vector2(DRUM_RADIUS + 0.05, 0.14), Vector2(DRUM_RADIUS, 0.17),
-		Vector2(DRUM_RADIUS, DRUM_HEIGHT - 0.06), Vector2(DRUM_RADIUS + 0.05, DRUM_HEIGHT - 0.04),
-		Vector2(DRUM_RADIUS + 0.05, DRUM_HEIGHT), Vector2(0, DRUM_HEIGHT),
-	]), 24, Vector3(0, DECK, 0), Parts.HULL_LIGHT_ROUND)
-	m.lathe(PackedVector2Array([Vector2(DRUM_RADIUS + 0.03, 0), Vector2(DRUM_RADIUS + 0.03, 0.07)]), 24,
-		Vector3(0, DECK + 0.62, 0), Parts.GOLD_ROUND if gold else Parts.HULL_MID_ROUND)
-	for degrees: float in PILASTERS:
-		m.box_chamfered(Vector3(0.2, DRUM_HEIGHT - 0.12, 0.16), 0.04, Parts.around(DRUM_RADIUS + 0.02, degrees, DECK + 0.06),
-			Parts.HULL_MID, Vector3(0, 90.0 - degrees, 0))
-	for row: int in 2:
-		for k: int in 8:
-			var degrees := 22.5 + 45.0 * k
-			m.box(Vector3(0.2, 0.16, 0.04), Parts.around(DRUM_RADIUS - 0.01, degrees, DECK + 0.36 + 0.46 * row),
-				WINDOW, Vector3(0, 90.0 - degrees, 0))
+	_drum(m, DRUM_RADIUS, DECK, DRUM_HEIGHT, 0.0, gold)
 	# The tower the dome rides from L6: the core's band at L10, then the storeys.
 	var dome_base := DECK + DRUM_HEIGHT
 	if level >= 10:
@@ -160,7 +144,7 @@ static func build_command_center(p: Parts, level: int) -> void:
 		var from_level: int = STOREY_LEVELS[i]
 		if level >= from_level:
 			var height: float = STOREY_HEIGHTS[i]
-			_storey(m, i, dome_base, height, level, p.tier)
+			_storey(m, dome_base, height, STOREY_RADIUS, STOREY_RADIUS - 0.08, i == 1, level, p.tier)
 			dome_base += height
 	if level >= 7:
 		# Cyan conduits up the tower from the drum's lip into the dome's gold ring.
@@ -177,7 +161,7 @@ static func build_command_center(p: Parts, level: int) -> void:
 		for degrees: float in WINGS:
 			_wing(m, degrees, level, p.tier)
 	if level >= 3:
-		_rooms(m, gold)
+		_rooms(m, gold, ROOMS_RADIUS, DRUM_RADIUS)
 	if level >= 4:
 		# The antimatter containment ring round the drum's upper half, clamped to the pilasters,
 		# a glowing node on each clamp.
@@ -320,24 +304,44 @@ static func _spire(m: LowPolyMesh, apex: float, level: int, tier: int) -> void:
 	m.prism(0.08, 0.16, 0.8, 16, Vector3(0, top + 0.25, 0), BEAM)
 
 
-## A storey of the tower the dome rides from L6, `index` from the drum up, `height` tall on `y`:
-## a drum of the tier's armour (chrome, obsidian from the Obsidian tier) with a flared foot and a
-## gold lip, eight light strips up it (cyan, violet veins from the Obsidian tier), between them a
-## band of windows, the second storey's a lit observation band instead; at L10 a band of gold
-## filigree round its foot. Its top is left open inside the lip, under the dome or the next storey.
-static func _storey(m: LowPolyMesh, index: int, y: float, height: float, level: int, tier: int) -> void:
-	var r := STOREY_RADIUS
+## The drum, `radius` round and `height` tall on `y`: a flared skirt, a wall with a band and two
+## rows of windows between pilasters, a lip, its roof closed in to `inner` (what stands on it).
+static func _drum(m: LowPolyMesh, radius: float, y: float, height: float, inner: float, gold: bool) -> void:
+	m.lathe(PackedVector2Array([
+		Vector2(radius + 0.12, 0), Vector2(radius + 0.05, 0.14), Vector2(radius, 0.17),
+		Vector2(radius, height - 0.06), Vector2(radius + 0.05, height - 0.04),
+		Vector2(radius + 0.05, height), Vector2(inner, height),
+	]), 24, Vector3(0, y, 0), Parts.HULL_LIGHT_ROUND)
+	m.lathe(PackedVector2Array([Vector2(radius + 0.03, 0), Vector2(radius + 0.03, 0.07)]), 24,
+		Vector3(0, y + 0.62, 0), Parts.GOLD_ROUND if gold else Parts.HULL_MID_ROUND)
+	for degrees: float in PILASTERS:
+		m.box_chamfered(Vector3(0.2, height - 0.12, 0.16), 0.04, Parts.around(radius + 0.02, degrees, y + 0.06),
+			Parts.HULL_MID, Vector3(0, 90.0 - degrees, 0))
+	for row: float in [0.36, 0.82]:
+		for k: int in 8:
+			var degrees := 22.5 + 45.0 * k
+			m.box(Vector3(0.2, 0.16, 0.04), Parts.around(radius - 0.01, degrees, y + row), WINDOW, Vector3(0, 90.0 - degrees, 0))
+
+
+## A storey `height` tall on `y`, `radius` round, of the tower the dome rides from L6: a drum of
+## the tier's armour (chrome, obsidian from the Obsidian tier) with a flared foot and a gold lip,
+## eight light strips up it (cyan, violet veins from the Obsidian tier), between them a band of
+## windows, or a lit observation band where `lit`; at L10 a band of gold filigree round its foot.
+## Its roof runs in from the lip to `inner`, under the dome or what stands on it.
+static func _storey(m: LowPolyMesh, y: float, height: float, radius: float, inner: float, lit: bool, level: int,
+		tier: int) -> void:
+	var r := radius
 	m.lathe(PackedVector2Array([Vector2(r + 0.04, 0), Vector2(r, 0.06), Vector2(r, height - 0.08)]), 24, Vector3(0, y, 0),
 		_armour(tier, true))
 	m.lathe(PackedVector2Array([
-		Vector2(r, height - 0.08), Vector2(r + 0.06, height - 0.06), Vector2(r + 0.06, height), Vector2(0.9, height),
+		Vector2(r, height - 0.08), Vector2(r + 0.06, height - 0.06), Vector2(r + 0.06, height), Vector2(inner, height),
 	]), 24, Vector3(0, y, 0), Parts.GOLD_ROUND if tier >= Parts.Tier.GOLD else Parts.HULL_MID_ROUND)
 	for k: int in 8:
 		var degrees := 45.0 * k
 		m.box(Vector3(0.14, height - 0.2, 0.05), Parts.around(r + 0.005, degrees, y + 0.08), _strip(tier),
 			Vector3(0, 90.0 - degrees, 0))
 	var middle := y + height * 0.5
-	if index == 1:
+	if lit:
 		m.lathe(PackedVector2Array([Vector2(r + 0.015, 0), Vector2(r + 0.015, 0.16)]), 24, Vector3(0, middle - 0.08, 0), GLOW)
 	else:
 		for k: int in 8:
@@ -443,16 +447,17 @@ static func _wing_dish(p: Parts, gold: bool) -> void:
 	_comms_dish(p.moving(foot + Vector3(0, 0.08 + height, 0), Motion.spin(Vector3.UP, -0.6)), gold, 0.65)
 
 
-## The ring of rooms round the drum's foot: a low round wall with a band of screens and a
-## chamfered roof edge, the door, wings, masts and pylon rising through it.
-static func _rooms(m: LowPolyMesh, gold: bool) -> void:
+## The ring of rooms round the drum's foot, `radius` round: a low round wall with a band of
+## screens and a chamfered roof edge, its roof closed in to `inner`, the door, wings, masts and
+## pylon rising through it.
+static func _rooms(m: LowPolyMesh, gold: bool, radius: float, inner: float) -> void:
 	m.lathe(PackedVector2Array([
-		Vector2(ROOMS_RADIUS, 0), Vector2(ROOMS_RADIUS, ROOMS_HEIGHT - 0.06),
-		Vector2(ROOMS_RADIUS - 0.06, ROOMS_HEIGHT), Vector2(DRUM_RADIUS, ROOMS_HEIGHT),
+		Vector2(radius, 0), Vector2(radius, ROOMS_HEIGHT - 0.06),
+		Vector2(radius - 0.06, ROOMS_HEIGHT), Vector2(inner, ROOMS_HEIGHT),
 	]), 24, Vector3(0, DECK, 0), Parts.HULL_LIGHT_ROUND)
-	m.lathe(PackedVector2Array([Vector2(ROOMS_RADIUS + 0.01, 0), Vector2(ROOMS_RADIUS + 0.01, 0.18)]), 24,
+	m.lathe(PackedVector2Array([Vector2(radius + 0.01, 0), Vector2(radius + 0.01, 0.18)]), 24,
 		Vector3(0, DECK + 0.2, 0), SCREENS)
-	m.lathe(PackedVector2Array([Vector2(ROOMS_RADIUS + 0.03, 0), Vector2(ROOMS_RADIUS + 0.03, 0.05)]), 24,
+	m.lathe(PackedVector2Array([Vector2(radius + 0.03, 0), Vector2(radius + 0.03, 0.05)]), 24,
 		Vector3(0, DECK + ROOMS_HEIGHT - 0.11, 0), Parts.GOLD_ROUND if gold else Parts.HULL_MID_ROUND)
 
 
