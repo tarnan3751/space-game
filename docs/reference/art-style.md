@@ -845,7 +845,7 @@ from its rim, three pits and eight pebbles; 3 *pebbly*: a cluster of ten to four
 three angular shards among them, a crater of 45, a crack and two pits. Each crater lies at a spot
 of its own (96, 214; 269, 328; 155, 387 pixels into its tile), off the tile's diagonals and no turn
 or mirror of another's, so that, turned eight ways, the field's craters line up neither in the
-view's columns and rows nor along the grid: none of the field's 75 lies within 0.2 cells of a
+view's columns and rows nor along the grid: none of the field's 107 lies within 0.2 cells of a
 diagonal through the tiles' corners. Every mark is a hard-edged, inked shape (sizes in pixels of
 the tile):
 
@@ -864,9 +864,19 @@ the tile):
 Marks never overlap.
 
 Each tile of the field, four cells square, takes one of the four (its variant, 0 to 3) and an
-orientation (0 to 7: a quarter turn count 0 to 3, mirrored from 4 on) from its cell hash at two
-offsets: 32 looks, and the hash offsets are picked so that no two tiles of the 40×40 field that
-touch, along a side or at a corner, share both (checked on the development Mac's GPU). The shader
+orientation (0 to 7: a quarter turn count 0 to 3, mirrored from 4 on): 32 looks. The variant and
+the mirror come from its cell hash (offsets 30 and 88), the quarter turn from its place, as on the
+terrain ring: (column mod 2) + 2 × (row mod 2) − variant, mod 4 (`field_marks`' `turn_by_place`).
+Tiles touching along a side or at a corner differ in (column mod 2, row mod 2), so two with the
+same variant never share a turn, and no two touching tiles look the same at any field size: over
+the 48×48 field's 12×12 tiles none of the 506 touching pairs does (checked on the development
+Mac's GPU). The field once took its orientation from the hash too, at offsets picked so that no
+touching tiles of the 40×40 field matched; at 12×12 those offsets left 4 matching pairs, and with
+506 pairs each alike one time in 32, offsets that leave none come about once in seven million, so
+that scheme was abandoned. The mirror's offset, 88, is the one of those tried (27, 11, 41, 63,
+71, 88) whose tiles leave the least step where the field meets the ring along its far sides
+(under 3/255, the check below): turned by place, the tiles along an edge show it only some of
+their sides. The shader
 turns the tile's own coordinates into the variant's about its middle and samples the atlas with
 the gradients of the unturned coordinates, so the mipmap does not jump where tiles meet. It turns
 the stored lean back into the field's axes (the turn's transpose) and lights it from `sun_across`
@@ -1002,8 +1012,7 @@ space, by the slope of the smooth normal:
   square (the field's are 4), in `TERRAIN_LIGHT` and `TERRAIN_DARK`, lit by its lean against
   `sun_across` exactly as on the field. A tile's variant and whether it is mirrored come from its
   cell hash (offsets 95 and 79), but its quarter-turn count from its place: (column mod 2) +
-  2 × (row mod 2) − variant, mod 4 (`field_marks`' `turn_by_place`; the field keeps its own hash
-  picks). Tiles touching along a side or at a corner differ in (column mod 2, row mod 2), so two
+  2 × (row mod 2) − variant, mod 4 (`field_marks`' `turn_by_place`, as on the field). Tiles touching along a side or at a corner differ in (column mod 2, row mod 2), so two
   with the same variant never share a turn: over the ring's 35×35 tiles, none of the 4,692
   touching pairs shares variant and orientation (checked on the development Mac's GPU, as the
   field's were; hash picks alone, at the best offsets, left 101).

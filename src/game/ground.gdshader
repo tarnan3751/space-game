@@ -13,7 +13,9 @@ render_mode ambient_light_disabled;
 // tone (0.5 neutral). Every channel is flat along a tile's edges, so nothing shows where one tile
 // meets the next. The tints are MaterialKit roles, set by BaseView. The field is laid with tiles
 // TILE cells square, each one of the four (its variant) in one of eight orientations (a quarter
-// turn count, mirrored from 4 on), both from its cell hash, so the plain does not repeat. The lean
+// turn count, mirrored from 4 on): the variant and the mirror from its cell hash, the turn from its
+// place (field_marks' turn_by_place), so the plain does not repeat and no two touching tiles look
+// the same, whatever the field's size. The lean
 // is turned back into the field's axes and lit from sun_across, so however a tile lies its marks
 // are lit from the sun: the side leaning towards it takes the light tint, the side leaning away
 // the dark. The tone mixes towards the dark tint below 0.5 and towards the light above it.
@@ -41,9 +43,9 @@ uniform vec2 sun_across = vec2(-0.5, 0.866);
 
 // Cells a tile of the field texture spans.
 const float TILE = 4.0;
-// The offsets of the cell hash that picks a tile's variant and its orientation.
+// The offsets of the cell hash that picks a tile's variant and whether it is mirrored.
 const float VARIANT_HASH = 30.0;
-const float ORIENTATION_HASH = 27.0;
+const float MIRROR_HASH = 88.0;
 // How much of the field's base tint dusts the plate tint.
 const float DUST_SHOWS = 0.6;
 // The macro value noise: its period in cells and its strength either way.
@@ -62,7 +64,7 @@ void fragment() {
 	vec2 cells_per_px = vec2(length(vec2(dFdx(cell.x), dFdy(cell.x))), length(vec2(dFdx(cell.y), dFdy(cell.y))));
 
 	mat2 turn;
-	vec4 marks = field_marks(field, cell, TILE, vec2(VARIANT_HASH, ORIENTATION_HASH), false, turn);
+	vec4 marks = field_marks(field, cell, TILE, vec2(VARIANT_HASH, MIRROR_HASH), true, turn);
 	vec3 albedo = mix(plate_color.rgb, field_color.rgb, DUST_SHOWS) * grain(cell, cells_per_px);
 	albedo = shade_marks(albedo, marks, turn, sun_across, field_light.rgb, field_dark.rgb, ink_color.rgb);
 
