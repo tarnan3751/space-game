@@ -16,8 +16,9 @@ of the modules involved. A section named in bold is a heading of this file or of
 
 **Milestone 1 (offline base) is built**: placement, timers, builders, economy, save with offline
 progress, models built in code. So is step 2, base polish, and the comic-style kit (toon light,
-ink outlines, a generated material kit) with every model rebuilt onto it; everything after it
-is planned. `docs/project_overview.md` holds the roadmap (§2.2), the known limitations (§2.3) and
+ink outlines, a generated material kit) with every model rebuilt onto it, and the upgrade pass to
+Command Center 10: ten levels, every one modelled, in five tiers, on the 48×48 field, with save
+version 2 (`docs/plans/upgrade-pass.md` is its record). Everything after it is planned. `docs/project_overview.md` holds the roadmap (§2.2), the known limitations (§2.3) and
 the decisions (§3). Balance numbers in `data/` are fast dev values, not tuned.
 
 ## Stack (pinned)

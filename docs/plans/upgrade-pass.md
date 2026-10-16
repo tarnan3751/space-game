@@ -3,8 +3,9 @@
 The plan for the pass the owner asked for on 2026-10-16: the Command Center goes to level 10,
 every type gains levels, the maxed base shares a look, and upgrades at the high tiers are
 bigger, taller and flashier. Every brief of the pass points here for its decisions; the
-reference files are updated as each slice lands. Status: **approved** by the owner on
-2026-10-16, with the field at 48×48 (§6, §7).
+reference files are updated as each slice lands. Status: **built**, 2026-10-16: approved by the
+owner on 2026-10-16 with the field at 48×48 (§6, §7), and every slice below landed. The document
+stays as the record of the pass.
 
 ## 1. Constraints (the owner's)
 
@@ -219,16 +220,27 @@ model-table rows and proves budgets, reach and motion in the gallery, rendered):
 | M9 Heavy guns | Railgun, Ion Beam, Orbital Cannon (landed) | 11 |
 | M10 Traps | the four traps (landed) | 11 |
 
-**Phase 3, the maxed base**: the template base at Command Center 10 counts (fit proven,
-screenshots of every band), the full base measured (draw calls, triangles, frame time on the
-Mac; phones still unmeasured), the overview's status and the roadmap updated.
+**Phase 3, the maxed base** (landed):
+
+- The template base at Command Center 10 counts: the fit proven, screenshots of every band
+  (`template_base`). Landed.
+- The full base measured on the Mac (draw calls, primitives, render CPU and frame rate, checked
+  against ceilings by `template_base`; `art-style.md`, **Cost**); phones still unmeasured. Landed.
+- The visibility and clash rules in the contract, the clash rule checked by `model_clash`.
+  Landed.
+- The overview's status and the roadmap updated. Landed.
 
 ## 9. Risks
 
 - **Draw calls.** A maxed base is about 130 buildings; at up to ten instances each it can
   reach 1,200 draw calls at the widest zoom, before the merged walls and the scenery. The
   fourth moving part is rationed, and the full base is measured in phase 3; a phone
-  measurement is the parked item that decides whether the crown escorts stay.
+  measurement is the parked item that decides whether the crown escorts stay. Measured in
+  phase 3 (`art-style.md`, **Cost**): the template base at the Command Center 10 counts, 112
+  buildings and 250 walls with 301 moving parts, is 1,318 draw calls at the widest zoom with the
+  merged walls and the scenery (a fresh base is 48), 1,065 at the start zoom, and 1.72 million
+  primitives; the render thread's CPU time 1.3 to 1.5 ms a frame on the development Mac, quiet
+  (up to 3.5 loaded). Phones are still unmeasured.
 - **Scale.** 138 models at the pace of the Cadet Academy is days of lane time; the batches
   land one by one, so the game stays playable at every landing.
 - **Sources.** The Clash reference came from a current fan tracker, cross-checked; the wiki
