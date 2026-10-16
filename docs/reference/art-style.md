@@ -1205,18 +1205,18 @@ frame on page 1 and 1.4 to 1.5 ms on page 2, measured with the gallery's own lin
 (on three pages, 0.7 to 0.9, 0.9 to 1.3 and 0.9 to 1.1 ms; with two pages and 121 models, 1.2 to
 1.5 ms on page 1, 74 of the 121 models, and 0.4 to 0.7 ms on page 2).
 
-**The maxed base**, the template base at the Command Center 10 counts (112 buildings and 250
-walls, 301 moving parts), measured by the `template_base` scenario in a 1600×900 window on the
-development Mac (`tools/harness/README.md`): 1,318 draw calls and 1.72 million primitives a frame
-at the widest zoom (camera size 44), 1,065 and 1.49 million at the start zoom (24), against a
-fresh base's 48 draw calls and 0.13 million; the render thread's CPU time 1.5 ms a frame at
-the widest zoom and 1.3 ms at the start on a quiet machine, up to 3.5 and 2.1 with it loaded, over
-four runs; 231 fps at the widest and 263 at the start on the quiet machine (45 to 82 and 91 to
-153 with it loaded: the frame rate is only as good as the machine is quiet). The scenario checks
+**The maxed base**, the template base at the Command Center 10 counts (113 buildings and 250
+walls, 240 moving parts), measured by the `template_base` scenario in a 1600×900 window on the
+development Mac (`tools/harness/README.md`): 1,140 draw calls and 1.71 million primitives a frame
+at the widest zoom (camera size 44), 935 and 1.48 million at the start zoom (24), against a
+fresh base's 48 draw calls and 0.13 million; the render thread's CPU time 2.3 ms a frame at the
+widest zoom and 3.0 ms at the start, at 63 and 88 fps, on a machine loaded with other runs (an
+earlier count of 112 buildings measured 1.5 and 1.3 ms, 231 and 263 fps, on a quiet one: the
+frame rate is only as good as the machine is quiet). The scenario checks
 each zoom against ceilings set well over these (1,600 draw calls, 2.1 million primitives, 6 ms of
 render CPU, with room for a loaded machine), so a regression shows. The upgrade plan estimated
 about 1,200 draw calls at the widest zoom before the merged walls and the scenery
-(`docs/plans/upgrade-pass.md`, §9); measured with both, it is 1,318. The primitives count every
+(`docs/plans/upgrade-pass.md`, §9); measured with both, it is 1,140. The primitives count every
 pass, the outlines and the shadow map's included. Phones are unmeasured for the maxed base: that
 measurement, still parked, decides whether the Crown robots stay.
 

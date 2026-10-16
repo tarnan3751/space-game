@@ -144,7 +144,7 @@ slowly, spent only on top-tier levels). A 48×48 grid, the Command Center with t
 | resources | `drone_bay` | Drone Bay | 2 | 1 | 3 | 2,3,4,5,5,5,5,5,5,5 | one builder; instant |
 | resources | `metal_extractor` | Metal Extractor | 3 | 1 | 10 | 2,3,4,5,6,6,6,7,7,7 | produces metal |
 | resources | `crystal_harvester` | Crystal Harvester | 3 | 1 | 10 | 2,3,4,5,6,6,6,7,7,7 | produces crystal |
-| resources | `antimatter_siphon` | Antimatter Siphon | 3 | 4 | 8 | 0,0,0,1,2,2,3,3,3,3 | produces antimatter |
+| resources | `antimatter_siphon` | Antimatter Siphon | 3 | 4 | 8 | 0,0,0,1,2,2,3,3,3,4 | produces antimatter |
 | resources | `metal_silo` | Metal Silo | 3 | 1 | 10 | 1,2,3,4,4,4,4,4,4,4 | stores metal |
 | resources | `crystal_silo` | Crystal Silo | 3 | 1 | 10 | 1,2,3,4,4,4,4,4,4,4 | stores crystal |
 | resources | `antimatter_vault` | Antimatter Vault | 3 | 4 | 8 | 0,0,0,1,2,2,2,2,2,2 | stores antimatter |

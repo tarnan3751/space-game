@@ -99,7 +99,7 @@
     "name": "Antimatter Siphon",
     "size": 3,
     "category": "resources",
-    "max_count": [0, 0, 0, 1, 2, 2, 3, 3, 3, 3],
+    "max_count": [0, 0, 0, 1, 2, 2, 3, 3, 3, 4],
     "levels": [
       { "cost": { "crystal": 10000 }, "build_seconds": 240, "hp": 600, "requires_cc": 4,
         "produces": { "antimatter": 20 } },

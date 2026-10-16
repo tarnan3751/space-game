@@ -118,7 +118,7 @@ for the real numbers).
   grown field); the server will hold the base
   later and nothing below `main.gd` changes.
 - **Phones are unmeasured for the maxed base.** At the Command Center 10 counts the template
-  base is 1,318 draw calls and 1.7 million primitives a frame at the widest zoom on the
+  base is 1,140 draw calls and 1.7 million primitives a frame at the widest zoom on the
   development Mac (`docs/reference/art-style.md`, **Cost**); no phone has run it, and that
   measurement decides whether the Crown robots stay.
 - **Build times are on the development scale**: 27 to 40 minutes at the top levels (the walls
