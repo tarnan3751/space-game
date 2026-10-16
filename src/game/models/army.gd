@@ -112,6 +112,9 @@ static var DRONE_GLASS := Surf.make(MaterialKit.Layer.GLASS, MaterialKit.CORE_GL
 static var DRONE_EYE := Surf.make(MaterialKit.Layer.GLOW, MaterialKit.ENERGY, 1.0, Surf.UNLIT | Surf.BOB, true, true, 0.6)
 ## The Crown cadet's halo: BRIGHT_CORE's light violet, solid, bobbing out of step with the cadet.
 static var BRIGHT_HALO := Surf.make(MaterialKit.Layer.GLOW, Color("c9a2ff"), 1.0, Surf.UNLIT | Surf.BOB, true, true, 0.5)
+## The fabricator's: chrome roller doors, crystal-lit smoke.
+static var CHROME_ROLLER := Surf.make(MaterialKit.Layer.VENT, Parts.CHROME_TINT, 2.0, Surf.GLOSSY)
+static var CRYSTAL_SMOKE := Surf.make(MaterialKit.Layer.GLOW, MaterialKit.CRYSTAL, 1.0, Surf.HOLO | Surf.BOB, true)
 
 
 ## The L10 escort skiff's round: its centre on the ground, towards the apron, and its radius, so
@@ -736,37 +739,76 @@ static func _drill_drone(m: LowPolyMesh, at: Vector3) -> void:
 ## out to a loading dock under an orange gantry crane. More stacks at 3 and 5, a second storey
 ## at 4. The roof windows pulse orange, the crane's trolley runs to and fro along its bridge
 ## with the hook, the dock's lamp blinks and the stacks puff smoke.
+##
+## From 6 the stacks stand taller with chrome collars: L6 a chrome block, storey and sawtooth
+## roof, chrome roller doors and cyan lamps chasing along the conveyor; L7 a second gantry crane
+## over crates in the front yard, its trolley running too; L8 an obsidian sawtooth roof and
+## storey, violet panels glowing on the storey, obsidian armour on the block's side and along its
+## front's top, the furnace box obsidian with violet veins on its faces and a violet band round
+## its top, the smoke crystal-lit; L9 crystal inlays on the armour and an assembler ring
+## hovering over the dock, obsidian rimmed in violet; L10 gold filigree over the sawtooth roof and
+## the cranes' bridges, the antimatter core glowing as a bright orb between gold prongs on the
+## storey's roofline, and a guard drone, the factory's product, half again the helpers' size,
+## circling wide over the dock above the smoke as its escort.
 static func build_fabricator(p: Parts, level: int) -> void:
 	var m := p.body
 	var g := Parts.PAD_HEIGHT
+	var chrome := p.tier >= Parts.Tier.CHROME
+	var obsidian := p.tier >= Parts.Tier.OBSIDIAN
 	Parts.foundation(m, 3)
 	var roof := g + 0.8
-	m.box_chamfered(Vector3(1.7, 0.8, 1.6), 0.06, Vector3(-0.45, g, -0.5), Parts.HULL_LIGHT)
+	var hull := Parts.CHROME if chrome else Parts.HULL_LIGHT
+	m.box_chamfered(Vector3(1.7, 0.8, 1.6), 0.06, Vector3(-0.45, g, -0.5), hull)
+	var saw := MID_ROUND
+	if p.tier >= Parts.Tier.CROWN:
+		saw = Parts.FILIGREE
+	elif obsidian:
+		saw = Parts.OBSIDIAN_ROUND
+	elif chrome:
+		saw = Parts.CHROME_ROUND
 	for k: int in 2:
 		var z := -0.6 + 0.45 * k
-		m.wedge(Vector3(1.6, 0.3, 0.45), Vector3(-0.45, roof, z + 0.225), MID_ROUND, Vector3(0, 180, 0))
+		m.wedge(Vector3(1.6, 0.3, 0.45), Vector3(-0.45, roof, z + 0.225), saw, Vector3(0, 180, 0))
 		m.box(Vector3(1.45, 0.2, 0.03), Vector3(-0.45, roof + 0.04, z + 0.465), WINDOW_GLOW.phased(0.5 * k))
 	if level >= 4:
 		var storey := Vector3(-0.45, roof, -0.95)
-		m.box_chamfered(Vector3(1.6, 0.5, 0.65), 0.06, storey, Parts.HULL_LIGHT)
+		m.box_chamfered(Vector3(1.6, 0.5, 0.65), 0.06, storey, Parts.OBSIDIAN if obsidian else hull)
 		m.box(Vector3(1.3, 0.14, 0.03), storey + Vector3(0, 0.22, 0.33), GLOW)
+		if obsidian:
+			m.box(Vector3(1.3, 0.08, 0.03), storey + Vector3(0, 0.08, 0.33), VIOLET_PANEL)
+			m.box(Vector3(0.03, 0.3, 0.5), storey + Vector3(0.8, 0.1, 0), VIOLET_PANEL)
 		m.box_chamfered(Vector3(0.4, 0.14, 0.3), 0.04, storey + Vector3(-0.35, 0.5, 0), VENT)
 	else:
 		m.box_chamfered(Vector3(0.4, 0.14, 0.3), 0.04, Vector3(-0.8, roof, -0.95), VENT)
 	# The front: an orange roller door and windows.
-	m.box_chamfered(Vector3(0.62, 0.56, 0.06), 0.02, Vector3(-0.8, g, 0.32), ROLLER)
+	m.box_chamfered(Vector3(0.62, 0.56, 0.06), 0.02, Vector3(-0.8, g, 0.32), CHROME_ROLLER if chrome else ROLLER)
 	m.box(Vector3(0.7, 0.05, 0.04), Vector3(-0.8, g + 0.62, 0.32), GLOW)
 	for x: float in [-0.2, 0.17]:
 		m.box_chamfered(Vector3(0.26, 0.24, 0.04), 0.02, Vector3(x, g + 0.32, 0.31), Parts.GLASS)
 	if level >= 2:
 		for x: float in [-1.26, 0.36]:
 			m.box_chamfered(Vector3(0.1, 0.7, 0.1), 0.03, Vector3(x, g, 0.3), ARMOUR)
+	if level >= 8:
+		# Obsidian armour: plates down the block's side either side of a vein strip, a parapet
+		# along its front's top over a violet band; crystal inlays on the plates from 9.
+		for z: float in [-1.0, -0.62]:
+			m.box_chamfered(Vector3(0.06, 0.62, 0.3), 0.02, Vector3(0.43, g + 0.1, z), Parts.OBSIDIAN)
+			if level >= 9:
+				m.prism(0.07, 0.07, 0.03, 4, Vector3(0.46, g + 0.5, z), INLAY.phased(0.5 + z), Vector3(90, 90, 0))
+		m.box(Vector3(0.02, 0.62, 0.06), Vector3(0.425, g + 0.1, -0.81), Parts.VEINS)
+		m.box_chamfered(Vector3(1.74, 0.1, 0.08), 0.02, Vector3(-0.45, roof - 0.1, 0.32), Parts.OBSIDIAN)
+		m.box(Vector3(1.4, 0.04, 0.02), Vector3(-0.45, roof - 0.15, 0.34), VIOLET_RIB)
 	# The conveyor from a hatch in the side wall out over the dock.
 	m.box_chamfered(Vector3(0.06, 0.34, 0.4), 0.02, Vector3(0.42, g + 0.12, -0.15), DARK_PLATE)
 	m.box_chamfered(Vector3(0.9, 0.08, 0.28), 0.02, Vector3(0.85, g + 0.3, -0.15), BELT)
 	for x: float in [0.65, 1.15]:
 		m.box_chamfered(Vector3(0.08, 0.3, 0.2), 0.02, Vector3(x, g, -0.15), Parts.GUNMETAL)
 	m.box_chamfered(Vector3(0.18, 0.16, 0.18), 0.03, Vector3(0.75, g + 0.38, -0.15), ORANGE)
+	if level >= 6:
+		# Cyan lamps chasing out along the belt's side.
+		for i: int in 5:
+			m.box_chamfered(Vector3(0.08, 0.05, 0.03), 0.01, Vector3(0.5 + 0.17 * i, g + 0.32, 0.005),
+				CYAN_LAMP.phased(Parts.chase(i, 5)))
 	# The loading dock and its crates.
 	m.box_chamfered(Vector3(0.8, 0.2, 0.95), 0.04, Vector3(0.9, g, 0.8), ARMOUR)
 	m.box(Vector3(0.8, 0.04, 0.12), Vector3(0.9, g + 0.2, 1.21), Parts.HAZARD)
@@ -781,33 +823,96 @@ static func build_fabricator(p: Parts, level: int) -> void:
 			m.box_chamfered(Vector3(0.08, top - g - 0.2, 0.08), 0.02, Vector3(x, g + 0.2, z), ORANGE)
 		Parts.beam(m, Vector3(x, top, 0.33), Vector3(x, top, 1.27), 0.1, ORANGE)
 	var bridge := 0.85
-	Parts.beam(m, Vector3(0.5, top + 0.1, bridge), Vector3(1.3, top + 0.1, bridge), 0.1,
-		Parts.GOLD_TRIM if p.tier >= Parts.Tier.GOLD else Parts.HULL_DARK)
+	Parts.beam(m, Vector3(0.5, top + 0.1, bridge), Vector3(1.3, top + 0.1, bridge), 0.1, _trim(p.tier, Parts.HULL_DARK))
 	# The trolley rides on the bridge, its hook hanging through it, from rail to rail.
 	var trolley := p.moving(Vector3(0.9, top, bridge), Motion.slide(Vector3.RIGHT, 0.25, 5.0))
 	trolley.box_chamfered(Vector3(0.2, 0.12, 0.18), 0.03, Vector3(0, 0.15, 0), Parts.GUNMETAL)
 	trolley.prism(0.012, 0.012, 0.52, 8, Vector3(0, -0.37, 0), Parts.ROD)
 	trolley.box_chamfered(Vector3(0.1, 0.06, 0.1), 0.02, Vector3(0, -0.43, 0), Parts.HAZARD)
+	if level >= 7:
+		_yard_crane(p)
+	if level >= 9:
+		# The assembler ring hovering over the dock, between the crates and the hook.
+		var ring := Vector3(0.9, g + 0.62, 0.8)
+		m.ring(0.26, 0.36, 0.06, 24, ring, HOVER)
+		m.lathe(PackedVector2Array([Vector2(0.365, 0.01), Vector2(0.365, 0.05)]), 24, ring, HOVER_RIM)
+		m.lathe(PackedVector2Array([Vector2(0.34, 0.062), Vector2(0.28, 0.062)]), 24, ring, HOVER_RIM)
 	# Smokestacks on the furnace box.
-	m.box_chamfered(Vector3(0.75, 0.35, 0.7), 0.05, Vector3(0.92, g, -0.92), DARK_PLATE)
+	var furnace := Vector3(0.92, g, -0.92)
+	m.box_chamfered(Vector3(0.75, 0.35, 0.7), 0.05, furnace, Parts.OBSIDIAN if obsidian else DARK_PLATE)
+	if obsidian:
+		# Violet veins on the faces the camera sees, a violet band round the top.
+		m.box(Vector3(0.6, 0.24, 0.02), furnace + Vector3(0, 0.05, 0.355), Parts.VEINS)
+		m.box(Vector3(0.02, 0.24, 0.55), furnace + Vector3(0.38, 0.05, 0), Parts.VEINS)
+		m.lathe(PackedVector2Array([Vector2(0.52, 0), Vector2(0.52, 0.05)]), 4, furnace + Vector3(0, 0.27, 0), VIOLET_RIB,
+			Vector3(0, 45, 0))
 	var stacks: Array[Vector3] = [
 		Vector3(0.75, 0, -1.08), Vector3(1.1, 0, -0.78), Vector3(1.1, 0, -1.12), Vector3(0.72, 0, -0.72),
 	]
 	var counts: Array[int] = [2, 2, 3, 3, 4]
-	for i: int in counts[level - 1]:
-		var height := 1.2 - 0.18 * i + 0.05 * level
+	for i: int in counts[mini(level, 5) - 1]:
+		var height := 1.2 - 0.18 * i + 0.05 * level + (0.25 if level >= 6 else 0.0)
 		var foot := stacks[i] + Vector3(0, g + 0.35, 0)
-		_stack(m, foot, 0.13, height, p.tier >= Parts.Tier.GOLD)
-		Parts.puffs(m, foot + Vector3(0, height, 0), 0.29 * i)
+		_stack(m, foot, 0.13, height, p.tier >= Parts.Tier.GOLD, Parts.CHROME_ROUND if level >= 6 else null)
+		if obsidian:
+			_crystal_puffs(m, foot + Vector3(0, height, 0), 0.29 * i)
+		else:
+			Parts.puffs(m, foot + Vector3(0, height, 0), 0.29 * i)
+	if level >= 10:
+		# The core furnace on the storey's roofline: the core, a bright orb, on a gold mount
+		# between four gold prongs, a violet ring pulsing round its middle.
+		var core := Vector3(0.0, roof + 0.5, -0.88)
+		m.prism(0.3, 0.26, 0.08, 16, core, GOLD_ROUND)
+		m.orb(0.26, 16, 6, core + Vector3(0, 0.34, 0), BRIGHT_CORE)
+		Parts.torus(m, 0.3, 0.035, 24, 6, core + Vector3(0, 0.3, 0), Parts.CORE_GLOW)
+		for k: int in 4:
+			var degrees := 45.0 + 90.0 * k
+			m.cone(0.035, 0.42, 8, core + Parts.around(0.27, degrees, 0.06), GOLD_ROUND,
+				Parts.facing(Parts.around(0.25, degrees, 1.0)))
+		# The guard drone, half again the helpers' size, circles wide over the stacks' smoke.
+		Parts.escort_drone(p, 1.45, 3.2, 0.7, Vector3.ZERO, 1.5)
 
 
-## A smokestack standing on `foot`: a ribbed pipe with an orange band and a glowing mouth.
-static func _stack(m: LowPolyMesh, foot: Vector3, radius: float, height: float, gold: bool) -> void:
+## A smokestack standing on `foot`: a ribbed pipe with an orange band and a glowing mouth, and
+## with a `collar` surface two collars, at its foot and under its mouth.
+static func _stack(m: LowPolyMesh, foot: Vector3, radius: float, height: float, gold: bool,
+		collar: Surf = null) -> void:
 	m.prism(radius, radius * 0.8, height, 16, foot, PIPE)
 	m.ring(radius * 0.8, radius * 1.12, 0.07, 16, foot + Vector3(0, height * 0.55, 0), ORANGE_ROUND)
+	if collar != null:
+		m.ring(radius * 0.95, radius * 1.3, 0.1, 16, foot, collar)
+		m.ring(radius * 0.8, radius * 1.15, 0.08, 16, foot + Vector3(0, height * 0.82, 0), collar)
 	var mouth := foot + Vector3(0, height, 0)
 	m.ring(radius * 0.55, radius * 0.95, 0.06, 16, mouth, GOLD_ROUND if gold else Parts.GUNMETAL)
 	m.disc(radius * 0.56, 16, mouth + Vector3(0, 0.03, 0), GLOW)
+
+
+## Crystal-lit smoke over a stack's `mouth`, as Parts.puffs but on CRYSTAL_SMOKE.
+static func _crystal_puffs(m: LowPolyMesh, mouth: Vector3, phase: float) -> void:
+	for k: int in 3:
+		m.orb(0.06 + 0.025 * k, 10, 4, mouth + Vector3(0.02 * k, 0.12 + 0.17 * k, 0),
+			CRYSTAL_SMOKE.phased(fposmod(phase + 0.3 * k, 1.0)))
+
+
+## The second gantry crane from 7, over the front yard: orange posts on rails along z, a bridge
+## across them (gold filigree at Crown), crates under it, and its trolley running to and fro
+## out of step with the first's.
+static func _yard_crane(p: Parts) -> void:
+	var m := p.body
+	var g := Parts.PAD_HEIGHT
+	var top := g + 1.0
+	for x: float in [-1.22, -0.38]:
+		for z: float in [0.55, 1.25]:
+			m.box_chamfered(Vector3(0.08, top - g, 0.08), 0.02, Vector3(x, g, z), ORANGE)
+		Parts.beam(m, Vector3(x, top, 0.48), Vector3(x, top, 1.32), 0.1, ORANGE)
+	var bridge := 0.9
+	Parts.beam(m, Vector3(-1.3, top + 0.1, bridge), Vector3(-0.3, top + 0.1, bridge), 0.1, _trim(p.tier, Parts.HULL_DARK))
+	for spec: Vector3 in [Vector3(-1.0, 0, 0.72), Vector3(-0.62, 0, 1.08), Vector3(-0.66, 0.2, 1.06)]:
+		m.box_chamfered(Vector3(0.22, 0.2, 0.22), 0.03, spec + Vector3(0, g, 0), ORANGE)
+	var trolley := p.moving(Vector3(-0.8, top, bridge), Motion.slide(Vector3.RIGHT, 0.3, 6.0, 0.5))
+	trolley.box_chamfered(Vector3(0.2, 0.12, 0.18), 0.03, Vector3(0, 0.15, 0), Parts.GUNMETAL)
+	trolley.prism(0.012, 0.012, 0.4, 8, Vector3(0, -0.25, 0), Parts.ROD)
+	trolley.box_chamfered(Vector3(0.1, 0.06, 0.1), 0.02, Vector3(0, -0.31, 0), Parts.HAZARD)
 
 
 ## The bulky fabricator: an armoured hall with a furnace in its front, an orange press arm
