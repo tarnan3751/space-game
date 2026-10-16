@@ -33,9 +33,6 @@ const BAY_DECK_TOP := 0.26
 const BAY_PAD := Vector3(0.52, 0.0, -0.56)
 const BAY_PAD_TOP := 0.86
 const BAY_PAD_LEGS := 0.3
-## The L3 escort's round about the footprint's centre, over the booth's beacon.
-const BAY_ESCORT_RADIUS := 0.95
-const BAY_ESCORT_HEIGHT := 1.95
 
 ## The high levels' own: the L2 landing strips' lamps chasing round the deck (cyan; violet at the
 ## Crown tier, between gold ones); the L3 gold trim on each parked drone's saucer, bobbing with
@@ -56,8 +53,8 @@ static var CORE_BEACON := Surf.make(MaterialKit.Layer.GLOW, Parts.CORE_GLOW_TINT
 ## round its rim with two cyan strips across it, a raised chrome pad over the crates carrying a
 ## second cradle and a second parked drone (builders stay one: it is for show), and the booth clad
 ## in chrome under a chrome roof. L3 (Crown): the deck edged in gold filigree, the strips violet
-## and gold, both drones gold-trimmed, a violet core pulsing on a gold mount over the booth's
-## beacon, whose lenses turn violet, and a guard drone circling the deck as the escort.
+## and gold, both drones gold-trimmed, and a violet core pulsing on a gold mount over the booth's
+## beacon, whose lenses turn violet. It has no escort: its own drones are its life.
 static func build_drone_bay(p: Parts, level: int) -> void:
 	var m := p.body
 	var crown := p.tier >= Parts.Tier.CROWN
@@ -131,8 +128,6 @@ static func build_drone_bay(p: Parts, level: int) -> void:
 	m.tube(0, 0.13, 0.5, 12, tank + Vector3(0, 0.2, -0.25), Parts.HULL_LIGHT_ROUND, Vector3(90, 0, 0))
 	m.box_chamfered(Vector3(0.3, 0.26, 0.3), 0.04, Vector3(0.55, Parts.PAD_HEIGHT, -0.55), CRATE, Vector3(0, 20, 0))
 	m.box_chamfered(Vector3(0.22, 0.2, 0.22), 0.04, Vector3(0.6, Parts.PAD_HEIGHT + 0.26, -0.52), CRATE, Vector3(0, -10, 0))
-	if level >= 3:
-		Parts.escort_drone(p, BAY_ESCORT_RADIUS, BAY_ESCORT_HEIGHT, 0.9)
 
 
 ## The docking cradle on a deck whose top is `top`: two rails under the drone, either side of its
