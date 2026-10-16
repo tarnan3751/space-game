@@ -11,10 +11,10 @@ extends RefCounted
 ## The Hangar, the Cadet Academy, the Fabricator and the Research Lab have ten levels, the Heavy
 ## Fabricator and the Nanite Foundry eight, the Drydock and the Alliance Beacon seven, through the
 ## higher tiers (docs/reference/art-style.md, **Tiers**): chrome with cyan strips, then obsidian
-## veined violet with crystal inlays and a hovering ring, drone or platform, then gold filigree
-## over the obsidian and the antimatter core glowing, with, on the hangar, the academy and the
-## drydock, an escort as the fourth moving part. The army's orange stays its accent through them, and the foundry's goo stays
-## green. The surfaces follow the tier (_plating, _strip, _glow, _trim), the parts the level.
+## veined violet with crystal inlays and a hovering ring, then gold filigree over the obsidian and
+## the antimatter core glowing, with, on the hangar and the academy, a robot of the building's own
+## as the fourth moving part. The army's orange stays its accent through them, and the foundry's
+## goo stays green. The surfaces follow the tier (_plating, _strip, _glow, _trim), the parts the level.
 ##
 ## BuildingModels calls one static build_<type>(p: Parts, level: int) per type. Each builds
 ## its level as a run of additions (`if level >= 3:` adds the second bay), so the levels of a
@@ -119,7 +119,6 @@ static var VIOLET_PANEL := Surf.make(MaterialKit.Layer.GLOW, Parts.CORE_GLOW_TIN
 static var CYAN_LENS := Surf.make(MaterialKit.Layer.GLOW, MaterialKit.ENERGY, 1.0, Surf.UNLIT | Surf.PULSE, true)
 static var CYAN_BEAM := Surf.make(MaterialKit.Layer.GLOW, MaterialKit.ENERGY, 1.0, Surf.HOLO, true)
 static var GLAZING := Surf.make(MaterialKit.Layer.GLASS, Color("c9a2ff"), 1.0, Surf.UNLIT)
-static var DRONE_EYE := Surf.make(MaterialKit.Layer.GLOW, MaterialKit.ENERGY, 1.0, Surf.UNLIT | Surf.BOB, true, true, 0.6)
 ## The Crown cadet's halo: BRIGHT_CORE's light violet, solid, bobbing out of step with the cadet.
 static var BRIGHT_HALO := Surf.make(MaterialKit.Layer.GLOW, Color("c9a2ff"), 1.0, Surf.UNLIT | Surf.BOB, true, true, 0.5)
 ## The fabricator's: chrome roller doors, crystal-lit smoke.
@@ -142,12 +141,9 @@ static var GOO_BRIGHT_SWIRL := Surf.make(MaterialKit.Layer.GLASS, MaterialKit.NA
 	Surf.UNLIT | Surf.FLOW_U, false, true, 0.65)
 static var HOVER_CRYSTAL := Surf.make(MaterialKit.Layer.CRYSTAL, MaterialKit.CRYSTAL, 1.0, Surf.UNLIT | Surf.PULSE | Surf.BOB,
 	false, true, 0.6)
-## The drydock's: the welders' sparks cyan, then crystal (and the crystal arcs off them); the
-## hovering crane platform's deck and cab, bobbing with its rim (HOVER's phase).
+## The drydock's: the welders' sparks cyan, then crystal (and the crystal arcs off them).
 static var CYAN_SPARK_ARC := Parts.spark(MaterialKit.ENERGY)
 static var CRYSTAL_SPARK_ARC := Parts.spark(MaterialKit.CRYSTAL)
-static var HOVER_PLATE := Surf.make(MaterialKit.Layer.OBSIDIAN, Parts.OBSIDIAN_TINT, 1.0, Surf.GLOSSY | Surf.BOB, false, true, 0.6)
-static var HOVER_CHROME := Surf.make(MaterialKit.Layer.CHROME, Parts.CHROME_TINT, 1.0, Surf.GLOSSY | Surf.BOB, false, true, 0.6)
 ## Filigree for thin parts at Crown (the drydock's gantry posts, the beacon's legs): Parts.FILIGREE's
 ## bands at about a third the repeats, so a thin part reads as banded gold, not as dashes.
 static var FILIGREE_LEG := Surf.make(MaterialKit.Layer.BANDS, MaterialKit.CORE_GOLD, 0.7, Surf.GLOSSY)
@@ -1505,11 +1501,9 @@ static func _vat(m: LowPolyMesh, foot: Vector3, radius: float, height: float, ti
 ## welders' sparks cyan, the reactor glowing through a port on the near flank; L4 a fourth gantry;
 ## L5 obsidian plates veined violet along the hull's spine and a broad violet band glowing on the
 ## chrome flank the camera sees, an obsidian cradle, crystal arcs crackling from the welders onto
-## the hull; L6 a crane platform hovering over the hull between the gantries, obsidian rimmed in
-## violet, a violet tractor beam down to it; L7 the ship complete, gold filigree gantries, the
-## antimatter reactor's light violet in its port, along the near flank, in a band round the stern
-## and under a gold-ringed blister, gold fins, and a launch skiff circling above the gantries as
-## its escort.
+## the hull; L6 the gantries taller and the plating further aft again; L7 the ship complete, gold
+## filigree gantries, the antimatter reactor's light violet in its port, along the near flank, in
+## a band round the stern and under a gold-ringed blister, and gold fins.
 static func build_drydock(p: Parts, level: int) -> void:
 	var m := p.body
 	var g := Parts.PAD_HEIGHT
@@ -1653,11 +1647,6 @@ static func build_drydock(p: Parts, level: int) -> void:
 	m.box_chamfered(Vector3(0.5, 0.45, 0.4), 0.05, booth, _plating(p.tier, Parts.HULL_LIGHT))
 	m.box_chamfered(Vector3(0.4, 0.16, 0.03), 0.01, booth + Vector3(0, 0.24, 0.2), Parts.GLASS)
 	Parts.mast(m, booth + Vector3(0.12, 0.45, -0.08), 0.35, 0.05, GLOW)
-	if level >= 6:
-		_crane_platform(m, Vector3(0.475, top + 0.45, 0), axis_y + _hull_radius(profile, 0.475 - stern) * scale)
-	if level >= 7:
-		# The launch skiff circles above the gantries and the platform.
-		Parts.escort_skiff(p, 1.55, top + 1.0, 0.5, Vector3.ZERO, 1.5)
 
 
 ## The engine bank on the drydock's stern from 3 (_drydock's), `stern` the hull's aft end on its
@@ -1721,22 +1710,6 @@ static func _hull_strip(m: LowPolyMesh, profile: PackedVector2Array, stern: Vect
 		var at := lerpf(along.x, along.y, k / 3.0)
 		section.append(Vector2(_hull_radius(profile, at) * scale + proud, at - along.x))
 	m.lathe(section, 24, stern + Vector3(along.x, 0, 0), surface, Vector3(0, 0, -90), degrees.x, degrees.y)
-
-
-## The crane platform hovering over the hull from 6, `at` its middle, above the gantries' beams
-## between two of them: an obsidian deck rimmed in violet, a violet grid glowing on its top, a
-## chrome crane cab on it, crystal lamps on its corners and a violet hologram tractor beam down to
-## the hull's top at `hull_top`, every part bobbing with it (HOVER's phase).
-static func _crane_platform(m: LowPolyMesh, at: Vector3, hull_top: float) -> void:
-	m.box_chamfered(Vector3(0.6, 0.12, 1.3), 0.04, at, HOVER_PLATE)
-	m.box(Vector3(0.62, 0.05, 1.32), at + Vector3(0, 0.03, 0), HOVER_RIM)
-	m.box(Vector3(0.44, 0.01, 1.1), at + Vector3(0, 0.12, 0), HOVER_RIM)
-	m.box_chamfered(Vector3(0.3, 0.2, 0.36), 0.04, at + Vector3(0, 0.12, -0.3), HOVER_CHROME)
-	m.box(Vector3(0.24, 0.08, 0.01), at + Vector3(0, 0.2, -0.115), DRONE_EYE)
-	for corner: Vector2 in [Vector2(-1, -1), Vector2(1, -1), Vector2(1, 1), Vector2(-1, 1)]:
-		m.cone(0.05, 0.18, 8, at + Vector3(corner.x * 0.24, 0.12, corner.y * 0.58), HOVER_CRYSTAL)
-	var drop := at.y - hull_top - 0.04
-	m.prism(0.2, 0.1, drop, 12, at - Vector3(0, drop, 0), HOLO_VIOLET.phased(0.6))
 
 
 ## A welding point on the hull: a glowing arc flashing, `phase` into its blink, with hot sparks
