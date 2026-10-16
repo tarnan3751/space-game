@@ -127,6 +127,8 @@ static var VIOLET_HOLO := Surf.make(MaterialKit.Layer.GLOW, Parts.CORE_GLOW_TINT
 static var HALO_GOLD := Surf.make(MaterialKit.Layer.FLAT, MaterialKit.CORE_GOLD, 1.0, Surf.GLOSSY | Surf.BOB, true)
 static var CHROME_RIBBED := Surf.make(MaterialKit.Layer.PIPE, Parts.CHROME_TINT, 2.0, Surf.GLOSSY, true)
 static var OBSIDIAN_RIBBED := Surf.make(MaterialKit.Layer.PIPE, Parts.OBSIDIAN_TINT, 2.0, Surf.GLOSSY, true)
+## The ion beam's lens from L3: cyan crystal glowing unlit, swelling.
+static var ION_LENS := Surf.make(MaterialKit.Layer.CRYSTAL, MaterialKit.ENERGY, 2.0, Surf.UNLIT | Surf.PULSE, true)
 
 ## The horizontal direction towards the camera (IsoCamera's yaw): vein panels go on the faces
 ## turned to it.
@@ -251,6 +253,15 @@ const RAIL_ROW := 0.98
 const RAIL_RING_LIFT := 1.05
 const RAIL_ESCORT_RADIUS := 1.2
 const RAIL_ESCORT_LIFT := 0.5
+## The ion beam from L3, by level from L3: the plinth's height and how much higher the emitter
+## stands; the L3 power cell's distance out on the near corner; the L5 focus ring's distance up
+## the beam from the lens; the L6 guard drone's round and its height over the emitter.
+const ION_PLINTHS := [0.24, 0.44, 0.46, 0.5]
+const ION_RISES := [0.3, 0.45, 0.55, 0.65]
+const ION_CELL := 1.06
+const ION_FOCUS_OFF := 1.0
+const ION_ESCORT_RADIUS := 0.85
+const ION_ESCORT_LIFT := 1.6
 
 
 ## From L6 the head rides a mount that lifts it a little more each level, on a taller plinth.
@@ -1392,23 +1403,44 @@ static func build_railgun(p: Parts, level: int) -> void:
 	Parts.escort_drone(p, RAIL_ESCORT_RADIUS, ring_y + RAIL_ESCORT_LIFT, 0.8, Vector3.ZERO, ESCORT_SCALE)
 
 
+## From L3 the emitter stands higher each level on a taller tripod. L3 (Chrome): chrome plinth,
+## feet, housing and focusing rings, a chrome cowl behind the housing banded in cyan, the lens
+## glowing cyan, the conduits brighter, and a ribbed chrome power cell on the near corner. L4
+## (Obsidian): a taller plinth with glowing violet vein panels on its faces the camera sees, the
+## housing, cowl, cell, feet and rings obsidian, the cowl's band violet, veins round the plinth's
+## top, the conduits violet, crystal inlays on the feet, a crystal focusing array of three violet
+## points round the lens and violet crystal studs on the rings. L5 a focus ring hovering round the
+## beam, turning about it. L6 (Crown): gold filigree round the plinth and on the cowl, the
+## antimatter core glowing light violet in the lens, in a gold crown, and in a broad band round the
+## cowl, where the camera sees it, and a guard drone circling above (the escort).
 static func build_ion_beam(p: Parts, level: int) -> void:
 	var m := p.body
-	var top := _plinth(m, 2, 0.78, 0.2)
-	var head := Vector3(0, top + 0.85, 0)
+	var plinth := 0.2 if level < 3 else float(ION_PLINTHS[level - 3])
+	var rise := 0.0 if level < 3 else float(ION_RISES[level - 3])
+	var top := _plinth(m, 2, 0.78, plinth, ARMOUR, _by_tier(p.tier, Parts.GUNMETAL, Parts.CHROME_ROUND, Parts.OBSIDIAN_ROUND))
+	var head := Vector3(0, top + 0.85 + rise, 0)
+	var conduit := CONDUIT if level < 3 else (VIOLET_CURRENT if p.tier >= Parts.Tier.OBSIDIAN else ION_CURRENT)
 	for k: int in 3:
 		var degrees := 105.0 + 120.0 * k
 		var foot := Parts.around(0.6, degrees, top)
-		m.box_chamfered(Vector3(0.18, 0.08, 0.18), 0.03, foot, Parts.GUNMETAL, Vector3(0, -degrees, 0))
-		Parts.pipe_run(m, PackedVector3Array([foot, Parts.around(0.18, degrees, head.y - 0.12)]), 0.05, CONDUIT)
+		m.box_chamfered(Vector3(0.18, 0.08, 0.18), 0.03, foot, _by_tier(p.tier, Parts.GUNMETAL, Parts.CHROME, Parts.OBSIDIAN),
+			Vector3(0, -degrees, 0))
+		Parts.pipe_run(m, PackedVector3Array([foot, Parts.around(0.18, degrees, head.y - 0.12)]), 0.05, conduit)
+		if level >= 4:
+			m.prism(0.06, 0.06, 0.04, 4, foot + Vector3(0, 0.08, 0), INLAY.phased(k / 3.0), Vector3(0, 45.0 - degrees, 0))
 	var aim := Vector3(40, 100, 0)
 	var housing := head - LowPolyMesh.turn(Vector3(0, 0.2, 0), aim)
-	Parts.drum(m, 0.3, 0.34, 0.05, 20, housing, SHELL, aim)
+	Parts.drum(m, 0.3, 0.34, 0.05, 20, housing, _by_tier(p.tier, SHELL, Parts.CHROME_ROUND, Parts.OBSIDIAN_ROUND), aim)
 	m.tube(0.26, 0.34, 0.06, 20, _at(housing, Vector3(0, 0.08, 0), aim), ARMOUR_ROUND, aim)
 	var lens := _at(housing, Vector3(0, 0.3, 0), aim)
+	var lens_surf := LENS_PULSE
+	if p.tier >= Parts.Tier.CROWN:
+		lens_surf = BRIGHT_CORE
+	elif level >= 3:
+		lens_surf = ION_LENS
 	m.lathe(PackedVector2Array([
 		Vector2(0, 0), Vector2(0.18, 0.04), Vector2(0.3, 0.1), Vector2(0.18, 0.17), Vector2(0, 0.21),
-	]), 20, lens, LENS_PULSE, aim)
+	]), 20, lens, lens_surf, aim)
 	# The focusing rings turn about the beam, alternate rings the other way, each with two glowing
 	# studs that show it turning. The studs stand out from the ring's outer edge, beyond the
 	# spokes, which run inside the rings.
@@ -1416,22 +1448,55 @@ static func build_ion_beam(p: Parts, level: int) -> void:
 	var turning: Array[LowPolyMesh] = [p.moving(lens, Motion.spin(along, 1.6)), p.moving(lens, Motion.spin(along, -1.1))]
 	var rings := 2 if level < 2 else 4
 	var reach := 0.0
+	var stud := FOCUS if p.tier >= Parts.Tier.OBSIDIAN else ION
 	for i: int in rings:
 		reach = 0.32 + 0.15 * i
 		var major := 0.26 - 0.035 * i
 		var ring := turning[i % 2]
 		Parts.torus(ring, major, 0.035, 16 - 2 * i, 8, LowPolyMesh.turn(Vector3(0, reach, 0), aim),
-			GOLD if p.tier >= Parts.Tier.GOLD and i == 0 else SHELL_MID, aim)
+			GOLD if p.tier >= Parts.Tier.GOLD and i == 0 else _by_tier(p.tier, SHELL_MID, Parts.CHROME_ROUND, Parts.OBSIDIAN_ROUND),
+			aim)
 		for k: int in 2:
 			var degrees := 60.0 * i + 180.0 * k
 			ring.strut(LowPolyMesh.turn(Parts.around(major + 0.03, degrees, reach + 0.035), aim),
-				LowPolyMesh.turn(Parts.around(major + 0.08, degrees, reach + 0.035), aim), 0.05, ION)
+				LowPolyMesh.turn(Parts.around(major + 0.08, degrees, reach + 0.035), aim), 0.05, stud)
 	m.prism(0.07, 0.05, 1.0, 10, _at(lens, Vector3(0, 0.21, 0), aim), ION_HOLO, aim)
 	for k: int in 3:
 		var spoke := _at(lens, Parts.around(0.27, 120.0 * k, 0.1), aim)
 		var spoke_end := _at(lens, Parts.around(0.26 - 0.035 * (rings - 1), 120.0 * k, reach + 0.03), aim)
 		m.prism(0.02, 0.02, spoke.distance_to(spoke_end), 8, spoke, Parts.ROD, Parts.facing(spoke_end - spoke))
 	m.orb(0.07, 12, 6, _at(lens, Vector3(0, reach + 0.12, 0), aim), ION_PULSE.phased(0.5))
+	if level < 3:
+		return
+	# A cowl behind the housing banded in the tier's glow, and a power cell on the near corner.
+	var glow := Parts.CORE_GLOW if p.tier >= Parts.Tier.OBSIDIAN else Parts.CYAN_STRIP
+	Parts.drum(m, 0.36, 0.14, 0.04, 20, _at(housing, Vector3(0, -0.12, 0), aim),
+		Parts.FILIGREE if p.tier >= Parts.Tier.CROWN else _by_tier(p.tier, SHELL, Parts.CHROME_ROUND, Parts.OBSIDIAN_ROUND), aim)
+	# At the Crown the band is the antimatter core, broad and glowing light violet where it shows.
+	if p.tier >= Parts.Tier.CROWN:
+		m.ring(0.355, 0.395, 0.18, 20, _at(housing, Vector3(0, -0.14, 0), aim), BRIGHT_CORE, aim)
+	else:
+		m.ring(0.355, 0.375, 0.06, 20, _at(housing, Vector3(0, -0.08, 0), aim), glow, aim)
+	var cell := Parts.around(ION_CELL, 45.0, Parts.PAD_HEIGHT)
+	Parts.drum(m, 0.13, 0.42, 0.03, 16, cell, _by_tier(p.tier, RIBBED, CHROME_RIBBED, OBSIDIAN_RIBBED))
+	m.ring(0.125, 0.145, 0.06, 16, cell + Vector3(0, 0.26, 0), glow)
+	Parts.drum(m, 0.08, 0.06, 0.02, 16, cell + Vector3(0, 0.42, 0), glow)
+	if level < 4:
+		return
+	_plinth_panels(m, 0.78, plinth)
+	m.ring(0.5, 0.68, 0.012, 8, Vector3(0, top, 0), Parts.VEINS, Parts.OCTAGON)
+	# The focusing array: three violet crystal points round the lens's rim, along the beam, between
+	# the spokes.
+	for k: int in 3:
+		m.cone(0.05, 0.2, 8, _at(lens, Parts.around(0.28, 60.0 + 120.0 * k, 0.06), aim), FOCUS.phased(k / 3.0), aim)
+	if level >= 5:
+		var focus := p.moving(_at(lens, Vector3(0, ION_FOCUS_OFF, 0), aim), Motion.spin(along, 0.7))
+		_ion_focus(focus, 0.22, 0.32, aim, p.tier)
+	if level < 6:
+		return
+	_plinth_filigree(m, 0.78, plinth)
+	_ion_crown(m, _at(lens, Vector3(0, 0.02, 0), aim), 0.36, 5, 0.24, aim)
+	Parts.escort_drone(p, ION_ESCORT_RADIUS, head.y + ION_ESCORT_LIFT, 0.9, Vector3.ZERO, ESCORT_SCALE)
 
 
 static func build_orbital_cannon(p: Parts, level: int) -> void:
@@ -1613,6 +1678,26 @@ static func _rail_cell(m: LowPolyMesh, pos: Vector3, height: float, step: int, t
 		Parts.drum(m, 0.075, 0.07, 0.02, 12, pos + Vector3(0, height, 0), ION_BLINK.phased(phase))
 	else:
 		m.cone(0.08, 0.2, 8, pos + Vector3(0, height, 0), FOCUS.phased(phase))
+
+## The ion beam's focus ring from L5, built about its own centre and turned by `rot` so it rings
+## the beam: _hover_ring's obsidian, its glowing violet face, its veined rim (gold at the Crown)
+## and four red sights round its inner edge, bobbing together.
+static func _ion_focus(s: LowPolyMesh, inner: float, outer: float, rot: Vector3, tier: int) -> void:
+	s.ring(inner, outer, 0.07, 24, Vector3.ZERO, HOVER, rot)
+	s.lathe(PackedVector2Array([Vector2(outer - 0.02, 0.072), Vector2(inner + 0.02, 0.072)]), 24, Vector3.ZERO, HOVER_RIM, rot)
+	s.lathe(PackedVector2Array([Vector2(outer + 0.006, 0.006), Vector2(outer + 0.006, 0.064)]), 24, Vector3.ZERO,
+		HOVER_GOLD if tier >= Parts.Tier.CROWN else HOVER_VEINS, rot)
+	for k: int in 4:
+		s.orb(0.035, 8, 4, LowPolyMesh.turn(Parts.around(inner - 0.01, 90.0 * k, 0.035), rot), HOVER_SIGHT)
+
+
+## A gold crown like _crown, turned by `rot`: its band round the turned +Y through `pos`, its
+## spikes along it. The ion beam's round its lens, the orbital cannon's round its muzzle.
+static func _ion_crown(m: LowPolyMesh, pos: Vector3, radius: float, points: int, spike: float, rot: Vector3) -> void:
+	m.ring(radius - 0.035, radius, 0.06, 16, pos, Parts.GOLD_ROUND, rot)
+	for k: int in points:
+		m.cone(spike * 0.35, spike, 8, pos + LowPolyMesh.turn(Parts.around(radius - 0.0175, 360.0 * k / points + 90.0, 0.06), rot),
+			Parts.GOLD_ROUND, rot)
 
 
 ## The cloaked sentry's gun: a low head on the lid with a short barrel and a red sight. From L4 a
