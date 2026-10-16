@@ -131,6 +131,8 @@ static var HOT_CRYSTAL_POUR := Surf.make(MaterialKit.Layer.GLOW, MaterialKit.CRY
 static var VIOLET_SPARK := Surf.make(MaterialKit.Layer.GLOW, Parts.CORE_GLOW_TINT, 1.0, Surf.UNLIT | Surf.FLICKER)
 static var HAUL_PLATE := Surf.make(MaterialKit.Layer.CHROME, Parts.CHROME_TINT, 1.0, Surf.GLOSSY | Surf.BOB, false, true, 0.3)
 static var SLING := Surf.make(MaterialKit.Layer.FLAT, MaterialKit.GUNMETAL, 1.0, Surf.BOB, true, false, 0.3)
+## The research lab's: screens glowing cyan, their rows scrolling (phased() sets the speed).
+static var CYAN_SCREEN := Surf.make(MaterialKit.Layer.SCREEN, MaterialKit.ENERGY, 1.0, Surf.UNLIT | Surf.FLOW)
 
 
 ## The L10 escort skiff's round: its centre on the ground, towards the apron, and its radius, so
@@ -1067,29 +1069,73 @@ static func _press_arm(p: Parts, shoulder: Vector3, anvil: Vector3, phase: float
 ## and a radar dish spinning on a mast in the corner. Antennas at 2 and 4, a second ring at 3.
 ## The screens scroll, each at its own speed, the slit pulses, the telescope nods along it, and
 ## from 3 a hologram of the lab's subject, an orb in two rings, floats over the dome.
+##
+## From 6 the observatory rises as a tower, a wider storey on its drum taller at each level under a
+## bigger dome, its telescope longer and turned out of the slit towards the camera, away from the
+## radar's sweep: L6 a chrome tower and dome, cyan screens all round the ring and a band of light
+## round its lip, chrome antennas, taller, with cyan lamps; L7 a third ring storey under a broad
+## band of light; L8 the rings obsidian, violet vein panels between the screens, a crystal lens in
+## the telescope and the hologram violet; L9 a ring of rings hovering round the hologram, raised
+## clear of the telescope's nod, turning; L10 gold filigree bands on the rings and the dome's
+## seams, a violet core beacon on the dome's crown, the hologram's rings gold, and a probe drone
+## circling above the dome as its escort.
 static func build_research_lab(p: Parts, level: int) -> void:
 	var m := p.body
 	var g := Parts.PAD_HEIGHT
+	var chrome := p.tier >= Parts.Tier.CHROME
+	var obsidian := p.tier >= Parts.Tier.OBSIDIAN
+	var crown := p.tier >= Parts.Tier.CROWN
+	var screen := CYAN_SCREEN if chrome else SCREEN_FLOW
 	Parts.foundation(m, 3)
 	m.ring(1.08, 1.13, 0.1, 24, Vector3(0, g, 0), ORANGE_ROUND)
 	m.lathe(PackedVector2Array([
 		Vector2(1.08, 0), Vector2(1.08, 0.42), Vector2(1.0, 0.5), Vector2(0.66, 0.5), Vector2(0.66, 0),
-	]), 24, Vector3(0, g, 0), HULL_ROUND)
-	_screen(m, 1.085, 5.0, g + 0.15, 0.36, 0.22, 0.6)
-	_screen(m, 1.085, 45.0, g + 0.15, 0.36, 0.22, 0.7)
+	]), 24, Vector3(0, g, 0), _plating(p.tier, HULL_ROUND, true))
+	_screen(m, 1.085, 5.0, g + 0.15, 0.36, 0.22, 0.6, screen)
+	_screen(m, 1.085, 45.0, g + 0.15, 0.36, 0.22, 0.7, screen)
 	m.box_chamfered(Vector3(0.28, 0.34, 0.08), 0.03, Parts.around(1.07, 92, g), DARK_PLATE, Vector3(0, -2, 0))
 	m.box(Vector3(0.34, 0.05, 0.04), Parts.around(1.1, 92, g + 0.38), GLOW, Vector3(0, -2, 0))
+	if level >= 6:
+		# Screens all round the ring, violet vein panels in their place from the Obsidian tier,
+		# and a band of light round the ring's lip.
+		var slots: Array[float] = [-75.0, -35.0, 25.0, 130.0, 170.0, 210.0]
+		for k: int in slots.size():
+			if obsidian:
+				m.box(Vector3(0.3, 0.26, 0.03), Parts.around(1.09, slots[k], g + 0.13), VIOLET_PANEL,
+					Vector3(0, 90 - slots[k], 0))
+			else:
+				_screen(m, 1.085, slots[k], g + 0.15, 0.3, 0.22, 0.55 + 0.05 * k, screen)
+		m.lathe(PackedVector2Array([Vector2(1.084, 0), Vector2(1.084, 0.05)]), 24, Vector3(0, g + 0.36, 0),
+			_lab_band(p.tier))
 	var drum := 0.75
 	if level >= 3:
 		m.lathe(PackedVector2Array([
 			Vector2(0.95, 0), Vector2(0.95, 0.24), Vector2(0.88, 0.3), Vector2(0.66, 0.3), Vector2(0.66, 0),
-		]), 24, Vector3(0, g + 0.5, 0), MID_ROUND)
-		_screen(m, 0.955, 25.0, g + 0.56, 0.3, 0.16, 0.65)
-		_screen(m, 0.955, 65.0, g + 0.56, 0.3, 0.16, 0.8)
+		]), 24, Vector3(0, g + 0.5, 0), _plating(p.tier, MID_ROUND, true))
+		_screen(m, 0.955, 25.0, g + 0.56, 0.3, 0.16, 0.65, screen)
+		_screen(m, 0.955, 65.0, g + 0.56, 0.3, 0.16, 0.8, screen)
 		drum = 1.05
+	if level >= 6:
+		var upper: Array[float] = [-15.0, 105.0, 145.0]
+		for k: int in upper.size():
+			_screen(m, 0.955, upper[k], g + 0.56, 0.26, 0.16, 0.6 + 0.1 * k, screen)
+		if crown:
+			m.lathe(PackedVector2Array([Vector2(0.955, 0), Vector2(0.955, 0.04)]), 24, Vector3(0, g + 0.5, 0),
+				FILIGREE_ROUND)
+	if level >= 7:
+		# The third ring storey, a broad band of light all round it.
+		m.lathe(PackedVector2Array([
+			Vector2(0.84, 0), Vector2(0.84, 0.2), Vector2(0.78, 0.25), Vector2(0.66, 0.25), Vector2(0.66, 0),
+		]), 24, Vector3(0, g + 0.8, 0), _plating(p.tier, MID_ROUND, true))
+		m.lathe(PackedVector2Array([Vector2(0.848, 0), Vector2(0.848, 0.18)]), 24, Vector3(0, g + 0.81, 0), _glow(p.tier))
+		m.lathe(PackedVector2Array([Vector2(0.845, 0), Vector2(0.845, 0.035)]), 24, Vector3(0, g + 0.8, 0),
+			_lab_band(p.tier))
 	# The observatory: a drum, a dome with a dark slit and the telescope out of it.
-	m.prism(0.63, 0.63, drum, 24, Vector3(0, g, 0), MID_ROUND)
+	m.prism(0.63, 0.63, drum, 24, Vector3(0, g, 0), Parts.CHROME_ROUND if chrome else MID_ROUND)
 	var centre := Vector3(0, g + drum, 0)
+	if level >= 6:
+		_lab_tower(p, centre, level)
+		return
 	m.ring(0.62, 0.69, 0.05, 24, centre, GLOW)
 	if level >= 5:
 		m.ring(0.62, 0.68, 0.05, 24, centre - Vector3(0, 0.08, 0), GOLD_ROUND if p.tier >= Parts.Tier.GOLD else MID_ROUND)
@@ -1111,15 +1157,34 @@ static func build_research_lab(p: Parts, level: int) -> void:
 		for tilt: Vector3 in [Vector3(35, 0, 0), Vector3(0, 0, -35)]:
 			m.lathe(PackedVector2Array([Vector2(0.26, 0), Vector2(0.26, 0.025), Vector2(0.22, 0.025)]), 16,
 				subject, HOLOGRAM, tilt)
+	_lab_corners(p, level)
+
+
+## The research lab's corners (_research_lab's): antennas at 2 and 4, and the radar mast against
+## the ring, near enough the middle that the spinning dish's sweep stays inside the footprint
+## and clear of the tower; the dish spins. From 6 the antennas stand taller each level on feet
+## in the tier's plating, their bulbs lamps blinking in the tier's light.
+static func _lab_corners(p: Parts, level: int) -> void:
+	var m := p.body
+	var g := Parts.PAD_HEIGHT
 	# Antennas on the corners.
-	if level >= 2:
-		_antenna(m, Vector3(-0.98, g, -0.98), 1.3)
-	if level >= 4:
-		_antenna(m, Vector3(-1.0, g, 0.98), 1.0)
-	# The radar mast against the ring, near enough the middle that the spinning dish's sweep
-	# stays inside the footprint; the dish spins.
+	if level >= 6:
+		var taller := 0.25 * (level - 5)
+		var lamp := INLAY if p.tier >= Parts.Tier.OBSIDIAN else CYAN_LAMP
+		if p.tier >= Parts.Tier.CROWN:
+			lamp = BRIGHT_CORE
+		var foot := _plating(p.tier, Parts.GUNMETAL)
+		if p.tier >= Parts.Tier.CROWN:
+			foot = Parts.GOLD_TRIM
+		_antenna(m, Vector3(-0.98, g, -0.98), 1.3 + taller, foot, lamp)
+		_antenna(m, Vector3(-1.0, g, 0.98), 1.0 + taller * 0.8, foot, lamp.phased(0.5))
+	else:
+		if level >= 2:
+			_antenna(m, Vector3(-0.98, g, -0.98), 1.3)
+		if level >= 4:
+			_antenna(m, Vector3(-1.0, g, 0.98), 1.0)
 	var mast := Vector3(0.85, g, -0.85)
-	m.prism(0.12, 0.11, 0.14, 16, mast, ARMOUR_ROUND)
+	m.prism(0.12, 0.11, 0.14, 16, mast, _plating(p.tier, ARMOUR_ROUND, true))
 	var height := 1.25 + 0.08 * level
 	m.prism(0.08, 0.06, height, 16, mast + Vector3(0, 0.14, 0), Parts.GUNMETAL)
 	var radar := p.moving(mast + Vector3(0, 0.14 + height, 0), Motion.spin(Vector3.UP, 0.9))
@@ -1129,21 +1194,110 @@ static func build_research_lab(p: Parts, level: int) -> void:
 	Parts.dish(radar, 0.38, 0.14, hub, GOLD_ROUND if p.tier >= Parts.Tier.GOLD else HULL_ROUND, tilt)
 	var axis := LowPolyMesh.turn(Vector3.UP, tilt)
 	Parts.pipe(radar, hub + axis * 0.05, hub + axis * 0.32, 0.02, Parts.ROD)
-	radar.orb(0.045, 16, 6, hub + axis * 0.32, GLOW)
+	radar.orb(0.045, 16, 6, hub + axis * 0.32, CYAN_LAMP if p.tier >= Parts.Tier.CHROME else GLOW)
+
+
+## The research lab's observatory tower from 6 (_research_lab's), on its drum's top at `foot`: a
+## wider chrome storey, taller each level, with a band of light at its foot and window slits
+## round it, under a bigger dome (chrome, with filigree seams at Crown) cut by the glowing slit;
+## the longer telescope nodding along it, a crystal lens in it from the Obsidian tier; the
+## hologram over the dome, violet from the Obsidian tier; from 9 a ring of rings hovering round
+## it, turning, gold at Crown; at 10 a violet core beacon on the dome's crown under the hologram,
+## and a probe drone circling above the dome.
+static func _lab_tower(p: Parts, foot: Vector3, level: int) -> void:
+	var m := p.body
+	var obsidian := p.tier >= Parts.Tier.OBSIDIAN
+	var crown := p.tier >= Parts.Tier.CROWN
+	var storeys: Array[float] = [0.45, 0.6, 0.95, 1.2, 1.5]
+	var tall := storeys[mini(level, 10) - 6]
+	m.lathe(PackedVector2Array([
+		Vector2(0.63, 0), Vector2(0.7, 0.06), Vector2(0.7, tall), Vector2(0, tall),
+	]), 24, foot, Parts.CHROME_ROUND)
+	m.lathe(PackedVector2Array([Vector2(0.705, 0.08), Vector2(0.705, 0.14)]), 24, foot, _lab_band(p.tier))
+	# Window slits round the storey's front, lit in the tier's light.
+	for k: int in 5:
+		var degrees := -35.0 + 40.0 * k
+		m.box(Vector3(0.1, tall - 0.3, 0.03), Parts.around(0.7, degrees, foot.y + 0.2), _glow(p.tier).phased(k / 5.0),
+			Vector3(0, 90 - degrees, 0))
+	var centre := foot + Vector3(0, tall, 0)
+	const R := 0.74
+	m.ring(R - 0.02, R + 0.06, 0.06, 24, centre, GLOW)
+	m.ring(R - 0.02, R + 0.05, 0.06, 24, centre - Vector3(0, 0.09, 0), GOLD_ROUND)
+	m.dome(R, R, 16, 7, centre, Parts.CHROME_ROUND)
+	if crown:
+		for k: int in 8:
+			Parts.dome_seam(m, R, R, centre, 22.5 + 45.0 * k, Parts.FILIGREE)
+		m.lathe(PackedVector2Array([Vector2(R + 0.065, 0), Vector2(R + 0.065, 0.06)]), 24, centre, FILIGREE_ROUND)
+	var across := Vector3(0.7071, 0, 0.7071)
+	m.ring(R - 0.02, R + 0.04, 0.22, 24, centre - across * 0.11, GLOW_PULSE, Parts.facing(across))
+	# The longer telescope, nodding along the slit, out of the slit's other side from the radar
+	# mast, towards the camera, so it never meets the dish's sweep.
+	var telescope := p.moving(centre, Motion.swing(across, 10.0, 8.0))
+	var aim := Vector3(-0.42, 0.8, 0.42).normalized()
+	Parts.pipe(telescope, aim * 0.35, aim * 1.25, 0.12, Parts.CHROME_ROUND)
+	telescope.ring(0.09, 0.16, 0.12, 16, aim * 1.1, ORANGE_ROUND, Parts.facing(aim))
+	if obsidian:
+		telescope.dome(0.11, 0.07, 16, 3, aim * 1.25, INLAY, Parts.facing(aim))
+	else:
+		telescope.disc(0.105, 16, aim * 1.255, Parts.GLASS, Parts.facing(aim))
+	# The hologram over the dome, higher from 9 so its ring of rings clears the telescope's nod,
+	# and at 10 over the core beacon.
+	var lifts: Array[float] = [0.45, 0.45, 0.45, 0.8, 0.95]
+	var subject := centre + Vector3(0, R + lifts[mini(level, 10) - 6], 0)
+	if level >= 10:
+		# The core beacon on the dome's crown: a bright orb on a gold mount between gold prongs,
+		# a violet ring round it; filigree bands round the storey.
+		var core := centre + Vector3(0, R - 0.02, 0)
+		m.prism(0.24, 0.2, 0.08, 16, core, GOLD_ROUND)
+		m.orb(0.23, 16, 6, core + Vector3(0, 0.3, 0), BRIGHT_CORE)
+		Parts.torus(m, 0.25, 0.035, 16, 6, core + Vector3(0, 0.25, 0), Parts.CORE_GLOW)
+		for k: int in 4:
+			var degrees := 45.0 + 90.0 * k
+			m.cone(0.035, 0.38, 8, core + Parts.around(0.22, degrees, 0.05), GOLD_ROUND,
+				Parts.facing(Parts.around(0.3, degrees, 1.0)))
+		for y: float in [0.3, tall - 0.12]:
+			m.lathe(PackedVector2Array([Vector2(0.71, 0), Vector2(0.71, 0.07)]), 24, foot + Vector3(0, y, 0), FILIGREE_ROUND)
+	else:
+		m.orb(0.08, 16, 6, centre + Vector3(0, R + 0.04, 0), GOLD_ROUND)
+	var holo := HOLO_VIOLET if obsidian else HOLOGRAM
+	m.orb(0.17, 12, 4, subject, holo)
+	for tilt: Vector3 in [Vector3(35, 0, 0), Vector3(0, 0, -35)]:
+		m.lathe(PackedVector2Array([Vector2(0.32, 0), Vector2(0.32, 0.03), Vector2(0.27, 0.03)]), 16,
+			subject, GOLD_BOB if crown else holo, tilt)
+	if level >= 9:
+		# The ring of rings hovering round the hologram, turning: a ring with six upright rings
+		# standing round it, obsidian rimmed in violet, gold at Crown.
+		var gyro := p.moving(subject - Vector3(0, 0.05, 0), Motion.spin(Vector3.UP, -0.6))
+		gyro.ring(0.44, 0.52, 0.05, 24, Vector3.ZERO, GOLD_BOB.phased(0.6) if crown else HOVER)
+		for k: int in 6:
+			var degrees := 60.0 * k
+			Parts.torus(gyro, 0.075, 0.022, 8, 6, Parts.around(0.48, degrees, -0.045), HOVER_RIM,
+				Vector3(90, 90 - degrees, 0))
+	_lab_corners(p, level)
+	if level >= 10:
+		Parts.escort_drone(p, 1.2, subject.y, 0.6, Vector3.ZERO, 2.0)
+
+
+## The lab's band of light round a ring's lip: cyan at the Chrome tier, violet veins from the
+## Obsidian tier, gold filigree at Crown.
+static func _lab_band(tier: int) -> Surf:
+	return FILIGREE_ROUND if tier >= Parts.Tier.CROWN else _strip(tier)
 
 
 ## A flat screen on a round wall of `radius`, at `degrees` around it, its bottom at `y`, its
-## rows scrolling at the FLOW speed `speed`.
+## rows scrolling at the FLOW speed `speed`, on `surface` (SCREEN_FLOW unless given).
 static func _screen(m: LowPolyMesh, radius: float, degrees: float, y: float, width: float,
-		height: float, speed: float) -> void:
+		height: float, speed: float, surface: Surf = SCREEN_FLOW) -> void:
 	m.box_chamfered(Vector3(width, height, 0.04), 0.015, Parts.around(radius, degrees, y),
-		SCREEN_FLOW.phased(speed), Vector3(0, 90 - degrees, 0))
+		surface.phased(speed), Vector3(0, 90 - degrees, 0))
 
 
-## A sensor mast on a little foot: a thin rod with an orange bulb.
-static func _antenna(m: LowPolyMesh, foot: Vector3, height: float) -> void:
-	m.box_chamfered(Vector3(0.18, 0.1, 0.18), 0.03, foot, Parts.GUNMETAL)
-	Parts.mast(m, foot + Vector3(0, 0.1, 0), height, 0.06, GLOW)
+## A sensor mast on a little foot (gunmetal unless `foot_surf`): a thin rod with a bulb (orange
+## unless `bulb`).
+static func _antenna(m: LowPolyMesh, foot: Vector3, height: float, foot_surf: Surf = Parts.GUNMETAL,
+		bulb: Surf = GLOW) -> void:
+	m.box_chamfered(Vector3(0.18, 0.1, 0.18), 0.03, foot, foot_surf)
+	Parts.mast(m, foot + Vector3(0, 0.1, 0), height, 0.06, bulb)
 
 
 ## Vats of glowing green nanite goo seen through glass bands, round a pump block, with pipes

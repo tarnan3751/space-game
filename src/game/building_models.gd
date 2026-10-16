@@ -55,7 +55,7 @@ const MODELS := {
 	"cadet_academy": [3, 10],
 	"fabricator": [3, 10],
 	"heavy_fabricator": [3, 8],
-	"research_lab": [3, 5],
+	"research_lab": [3, 10],
 	"nanite_foundry": [3, 4],
 	"drydock": [4, 2],
 	"alliance_beacon": [3, 3],
