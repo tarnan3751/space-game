@@ -72,7 +72,7 @@ const MODELS := {
 	"ion_beam": [2, 2],
 	"orbital_cannon": [4, 2],
 	"proximity_mine": [1, 6],
-	"grav_trap": [1, 2],
+	"grav_trap": [1, 5],
 	"flak_mine": [1, 3],
 	"mega_mine": [2, 2],
 	"barrier_wall": [1, 10],

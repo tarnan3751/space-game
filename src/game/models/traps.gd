@@ -52,6 +52,13 @@ static var HOVER_GLOW := Surf.make(MaterialKit.Layer.GLOW, Parts.CORE_GLOW_TINT,
 	true, 0.7)
 const CORE_LIGHT := Color("c9a2ff")
 static var BRIGHT_CORE := Surf.make(MaterialKit.Layer.GLOW, CORE_LIGHT, 1.0, Surf.UNLIT | Surf.PULSE, true)
+## The Chrome tier's vortex, cyan, streaming inward as the violet one does; the Obsidian tier's
+## hovering crystal ring and its Crown tier's gold one, bobbing with the violet ring's phase.
+static var CYAN_INFLOW := Surf.make(MaterialKit.Layer.GLOW, MaterialKit.ENERGY, 0.4, Surf.UNLIT | Surf.FLOW, true, true, 0.3)
+static var CYAN_SWIRL := Surf.make(MaterialKit.Layer.GLOW, MaterialKit.ENERGY, 0.4, Surf.UNLIT | Surf.FLOW, true, false, 0.3)
+static var HOVER_CRYSTAL := Surf.make(MaterialKit.Layer.CRYSTAL, MaterialKit.CRYSTAL, 1.0, Surf.UNLIT | Surf.PULSE | Surf.BOB,
+	false, true, 0.7)
+static var HOVER_GOLD := Surf.make(MaterialKit.Layer.FLAT, MaterialKit.CORE_GOLD, 1.0, Surf.GLOSSY | Surf.BOB, true, true, 0.7)
 ## The horizontal directions towards the camera (IsoCamera's yaw, 45 degrees round from +X):
 ## the vein panels go round them.
 const CAMERA_SIDE: Array[float] = [5.0, 45.0, 85.0]
@@ -158,6 +165,9 @@ static func build_grav_trap(p: Parts, level: int) -> void:
 	var m := p.body
 	var base := Vector3(0, Parts.PAD_HEIGHT, 0)
 	Parts.foundation(m, 1)
+	if level >= 3:
+		_grown_grav_trap(p, level)
+		return
 	m.lathe(PackedVector2Array([
 		Vector2(0.32, 0), Vector2(0.34, 0.05), Vector2(0.32, 0.11), Vector2(0.26, 0.135),
 	]), 16, base, CASING_MID)
@@ -181,6 +191,63 @@ static func build_grav_trap(p: Parts, level: int) -> void:
 				Parts.ROD)
 		m.ring(0.15, 0.23, 0.05, 16, hover, GOLD_ROUND if p.tier >= Parts.Tier.GOLD else CASING_MID)
 		m.ring(0.13, 0.15, 0.03, 16, hover + Vector3(0, 0.01, 0), VIOLET_PULSE.phased(0.5))
+
+
+## Levels 3 to 5, the trap grown: a wider, taller emitter round a deeper funnel, six swirl
+## strips, round coils banded in light, the strut ring higher. L3 (Chrome): a chrome emitter and
+## strut ring, the lip and the vortex cyan, chrome coils. L4 (Obsidian): an obsidian funnel with
+## glowing violet vein panels on the faces the camera sees, the vortex violet, crystals glowing on
+## the coils, and a crystal ring hovering round the emitter, turning, crystal shards on it. L5
+## (Crown): a gold filigree rim, a violet core glowing at the funnel's bottom, the coils banded
+## in the core's violet, the hovering ring gold with violet shards.
+static func _grown_grav_trap(p: Parts, level: int) -> void:
+	var m := p.body
+	var base := Vector3(0, Parts.PAD_HEIGHT, 0)
+	var obsidian := p.tier >= Parts.Tier.OBSIDIAN
+	var crown := p.tier >= Parts.Tier.CROWN
+	var k := 1.0 + 0.05 * (level - 3)
+	m.lathe(PackedVector2Array([
+		Vector2(0.36 * k, 0), Vector2(0.385 * k, 0.06), Vector2(0.36 * k, 0.13), Vector2(0.29 * k, 0.16),
+	]), 16, base, Parts.OBSIDIAN_ROUND if obsidian else Parts.CHROME_ROUND)
+	m.lathe(PackedVector2Array([Vector2(0.29 * k, 0.16), Vector2(0.22 * k, 0.145)]), 16, base,
+		VIOLET_PULSE if obsidian else Parts.CYAN_STRIP)
+	m.lathe(PackedVector2Array([Vector2(0.22 * k, 0.145), Vector2(0.1, 0.06)]), 16, base, VOID)
+	m.lathe(PackedVector2Array([Vector2(0.1, 0.06), Vector2(0.04, 0.035), Vector2(0, 0.035)]), 16, base,
+		VIOLET_INFLOW if obsidian else CYAN_INFLOW)
+	for i: int in 6:
+		var degrees := 60.0 * i
+		m.strut(Parts.around(0.2 * k, degrees, 0.14 - 0.01 * k) + base, Parts.around(0.1, degrees + 70.0, 0.062) + base,
+			0.025, SWIRL if obsidian else CYAN_SWIRL)
+	if level >= 4:
+		_vein_panels(m, PackedVector2Array([
+			Vector2(0.368 * k, 0.005), Vector2(0.393 * k, 0.06), Vector2(0.368 * k, 0.125),
+		]), base, 30.0)
+	if level >= 5:
+		Parts.torus(m, 0.325 * k, 0.03, 16, 6, base + Vector3(0, 0.12, 0), Parts.FILIGREE)
+		m.orb(0.06, 10, 5, base + Vector3(0, 0.08, 0), Parts.CORE_GLOW)
+	for i: int in 3:
+		var foot := Parts.around(0.37 * k, 30.0 + 120.0 * i, 0.0) + base
+		Parts.drum(m, 0.06, 0.17, 0.02, 8, foot, Parts.OBSIDIAN_ROUND if obsidian else Parts.CHROME_ROUND)
+		var band := Parts.CYAN_STRIP
+		if crown:
+			band = Parts.CORE_GLOW
+		elif obsidian:
+			band = VIOLET_PULSE
+		m.ring(0.058, 0.072, 0.03, 8, foot + Vector3(0, 0.08, 0), band.phased(i / 3.0))
+		if level >= 4:
+			m.cone(0.04, 0.09, 8, foot + Vector3(0, 0.17, 0), CRYSTAL_GLOW.phased(i / 3.0))
+	var ring := base + Vector3(0, 0.34, 0)
+	for i: int in 3:
+		var degrees := 90.0 + 120.0 * i
+		m.strut(Parts.around(0.27 * k, degrees, 0.15) + base, Parts.around(0.21, degrees, 0.0) + ring, 0.03, Parts.ROD)
+	m.ring(0.16, 0.25, 0.05, 16, ring, Parts.OBSIDIAN_ROUND if obsidian else Parts.CHROME_ROUND)
+	m.ring(0.14, 0.16, 0.03, 16, ring + Vector3(0, 0.01, 0), VIOLET_PULSE.phased(0.5) if obsidian else Parts.CYAN_STRIP)
+	if level >= 4:
+		# The ring hovering round the emitter, outside the coils, turning with its shards.
+		var s := p.moving(base + Vector3(0, 0.2, 0), Motion.spin(Vector3.UP, 0.8))
+		s.ring(0.5, 0.56, 0.04, 24, Vector3.ZERO, HOVER_GOLD if crown else HOVER_CRYSTAL)
+		for i: int in 4:
+			s.cone(0.03, 0.1, 8, Parts.around(0.53, 45.0 + 90.0 * i, 0.04), HOVER_GLOW if crown else HOVER_CRYSTAL)
 
 
 ## A squat pod banded in hazard stripes with upward barrels round a sensor lens, their bores
