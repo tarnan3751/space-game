@@ -71,7 +71,7 @@ const MODELS := {
 	"railgun": [3, 3],
 	"ion_beam": [2, 2],
 	"orbital_cannon": [4, 2],
-	"proximity_mine": [1, 3],
+	"proximity_mine": [1, 6],
 	"grav_trap": [1, 2],
 	"flak_mine": [1, 3],
 	"mega_mine": [2, 2],
