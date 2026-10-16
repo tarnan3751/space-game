@@ -172,7 +172,7 @@ Every value is sRGB; a tint multiplies a near-white layer. The constants are on 
 | Hull dark | `4A5168` | `HULL_DARK` | undersides, mechanical parts |
 | Gunmetal | `353B4D` | `GUNMETAL` | barrels, legs, pipes |
 | Concrete | `8E8A95` | `CONCRETE` | foundation pads |
-| Core gold | `F2B134` | `CORE_GOLD` | Command Center trim, top-level trim on every type, the selected outline |
+| Core gold | `F2B134` | `CORE_GOLD` | Command Center trim, the Gold tier's trim on every type, the selected outline |
 | Core glass | `7FE7FF` | `CORE_GLASS` | domes, windows |
 | Metal (resource) | `3FC9C0` | `METAL` | metal extractor and silo accents |
 | Crystal (resource) | `E2A4FF` | `CRYSTAL` | crystal harvester and silo accents (HUD `e2a4ff`) |
@@ -189,8 +189,8 @@ The field's and the terrain's roles, and rock, are in their own table below.
 
 A building uses hull light or hull mid for its main mass, gunmetal or hull dark for mechanical
 parts, its category accent on one or two surfaces, and one emissive element in its accent colour.
-The top level of every type adds core gold trim (edges, rings, caps), so a maxed building reads as
-maxed from across the base. Under the warm key light every lit colour leans warm.
+From the Gold tier, the levels unlocked at Command Center 5 (**Models**), every type adds core gold
+trim (edges, rings, caps), so a building of that band reads as such from across the base. Under the warm key light every lit colour leans warm.
 
 The field's and the terrain's roles are picked so that, under the warm key light and over their
 textures, they render as the art direction asks: each is bluer and more saturated than it shows.
@@ -353,18 +353,29 @@ merges meshes itself, as `WallMesh` does.
 
 ## Models
 
-`BuildingModels.create(type, level, size)` dispatches to one static `build_<type>(p: Parts,
+`BuildingModels.create(type, level, size, tier)` dispatches to one static `build_<type>(p: Parts,
 level: int)` in its category's file under `src/game/models/` (`core.gd`, `resources.gd`,
 `army.gd`, `defense.gd`, `traps.gd`), but for the wall, a defence type whose builder has a file
 of its own (`walls.gd`); `MODELS` gives each type the footprint its
-models are built for and its level count. `Parts` holds the model while it is built: `body` (a
+models are built for and its level count. `Parts` holds the model while it is built: `tier`, the
+level's theme (`Parts.Tier`: `BASE`, `GOLD`, `CHROME`, `OBSIDIAN`, `CROWN`), set before the
+builder runs from `BuildingModels.tier_of(catalog, type, level)`, which maps the Command Center
+level the level requires (`requires_cc`, 1 when it has none; for the Command Center its own
+level) through `tier_for_cc`: 1 to 4 Base, 5 Gold, 6 and 7 Chrome, 8 and 9 Obsidian, 10 Crown.
+A builder picks the tier's surfaces from it (`p.tier >= Parts.Tier.GOLD` for gold trim) and its
+parts from the level, so a level's geometry never depends on the data. So gold follows the band,
+not the top level: every level unlocked at Command Center 5 wears it (the Drydock's, the EMP
+Tower's, the Railgun's, the Ion Beam's and the Orbital Cannon's from L1, the Flak Cannon's and
+the Arc Tower's from L3, and on the Heavy Fabricator's L3 its stacks' mouths too, as on the
+Fabricator's L5), and the Drone Bay's L1, the Proximity Mine's L3 and the Gravity Trap's L2,
+which require less than Command Center 5, are Base: their gold parts are hull-mid there. `body` (a
 `LowPolyMesh`), up to three moving parts (`moving(pivot, motion)`, **Animation**), and the shared
 helpers. A model is a `Node3D` with the body's `MeshInstance3D` and its outline's beside it, and
 a `Node3D` per moving part at its pivot carrying `MOVE_META` (its `Motion`), with the part's mesh
 and its outline under it. That is at most **eight** `MeshInstance3D`: the body and up to three
 moving parts, each with an outline (`OUTLINE_META`, no shadow); a moving part made only of
-parts that are never outlined has no outline instance. Meshes are built once per type and level
-and cached; `BuildingModels.instantiate(parts)` assembles an uncached model from parts a caller
+parts that are never outlined has no outline instance. Meshes are built once per type, level
+and tier and cached; `BuildingModels.instantiate(parts)` assembles an uncached model from parts a caller
 built itself (the `effects` rig). The contract any model keeps, built or imported:
 origin at the footprint centre on the ground, +Y up, fitting inside `size × size` cells.
 
@@ -412,7 +423,7 @@ triangles as the gallery counts them.
 | Type | Signature element | Animation | Top level, body triangles |
 | --- | --- | --- | --- |
 | `command_center` | glass dome ringed in gold on a tall drum over a stepped foundation, a hazard-striped hangar door; wings, a ring of rooms, a hologram of the base's planet over the dome, a violet containment ring and a gold beacon spire as it grows | spin: the comms dish on its pylon; from L3 spin: the hologram's tilted HOLO ring round its violet HOLO + BOB globe (no outline). BLINK: the door's four lamps (a chase), the masts' bulbs; FLOW: the wing and room screens; PULSE: the hologram's projector lens; L4 FLOW_U on the containment ring (crystal layer), PULSE on its clamp nodes; L5 PULSE on the beacon | 4,966 |
-| `drone_bay` | landing deck in a hazard ring of cyan lights, the builder drone (**Construction drone**) parked over its cradle, a control booth with a gold roof; the drone's body, 0.42 across at 12 sides, is the one exception to the small-part side counts, and the deck lights take them (10 and 8) to keep the bay in its budget | spin: the beacon on the booth. BLINK: the six deck lights (a chase); BOB: the whole drone, idling over its cradle; FLOW_U: its rotor blurs (screen layer, unlit, not holograms); FLOW: the booth's screen | 1,990 |
+| `drone_bay` | landing deck in a hazard ring of cyan lights, the builder drone (**Construction drone**) parked over its cradle, a control booth with a roof rimmed gold from the Gold tier (hull mid at its Base-tier L1); the drone's body, 0.42 across at 12 sides, is the one exception to the small-part side counts, and the deck lights take them (10 and 8) to keep the bay in its budget | spin: the beacon on the booth. BLINK: the six deck lights (a chase); BOB: the whole drone, idling over its cradle; FLOW_U: its rotor blurs (screen layer, unlit, not holograms); FLOW: the booth's screen | 1,990 |
 | `metal_extractor` | tripod derrick over a drill with a walking beam on its crown, conveyors carrying glowing ore into hoppers, exhaust stacks | spin: the drill string and its top drive; swing: the walking beam, ±12° about its pin, 2 s. FLOW: the belts (grating); PULSE: the ore nuggets and the hoppers' ore; HOLO + BOB: two smoke puffs over each stack | 2,972 |
 | `crystal_harvester` | laser gantry over a cluster of glowing crystal shards | swing: the focusing emitter and its beam, ±25° along the gantry, 5 s. FLOW + PULSE: the beam (pipe layer); FLICKER: the sparks at its end; PULSE: every shard, each on its own phase; L4 BLINK: the pylon lamps (a chase) | 1,992 |
 | `antimatter_siphon` | coiled torus round a glowing violet core, field pylons leaning in | spin: the torus and its coils. FLOW: the coils' current (screen layer); PULSE + BOB: the core; UNLIT + FLICKER + JITTER: an arc from each pylon's tip to the core | 2,980 |
@@ -439,8 +450,8 @@ triangles as the gallery counts them.
 | `railgun` | two long rails across the screen with a cyan strip between them, capacitor banks | none. The strip's current races to the muzzle, the capacitors blink in a charging sequence towards it, the muzzle's emitter pulses | 2,098 |
 | `ion_beam` | big crystal lens and focusing rings on a tripod of glowing conduits, a hologram column along the beam | spin: two, the focusing rings turning about the beam in opposite directions, each ring with two glowing studs. The lens and the emitter pulse, current flows up the conduits | 1,866 |
 | `orbital_cannon` | massive gunmetal barrel aimed at the sky with cyan coils, on a two-tier bunker | swing: the gun elevates ±4° about its trunnion (9 s); spin: the radar dish. The coils pulse one after another up the barrel, a hologram ring glows at the muzzle, the bore ripples, the bunker's lights blink in a chase, the cells pulse | 4,896 |
-| `proximity_mine` | spiked domed disc on a hazard rim with a red warning light | blink: the warning light (and the rim light at L3, half a cycle apart) | 542 |
-| `grav_trap` | ring emitter round a dark funnel with a violet swirl | pulse: the emitter's violet lip, and the hovering ring from L2; flow: the vortex's throat and swirl strips stream inward | 580 |
+| `proximity_mine` | spiked domed disc on a hazard rim with a red warning light | blink: the warning light (and the rim light at L3, half a cycle apart). Its L3 requires Command Center 4, so it is Base tier: the ring round the light is hull-mid casing | 542 |
+| `grav_trap` | ring emitter round a dark funnel with a violet swirl | pulse: the emitter's violet lip, and the hovering ring from L2; flow: the vortex's throat and swirl strips stream inward. Its L2 requires Command Center 4, so it is Base tier: the hovering ring's outer band is hull-mid casing | 580 |
 | `flak_mine` | hazard-banded pod, upward barrels with glowing bores round a lens | pulse: the bores, phased in turn; blink: the sensor lens | 574 |
 | `mega_mine` | big armoured dome on a hazard band ringed with red lights, dim red seams up the dome between them | blink: the band's lights in a chase; pulse: the seams, faintly and in turn, and the fuse light | 1,454 |
 
@@ -684,11 +695,12 @@ and phase). The step's ink edge shows where its
 end stands above the lower wall; beside a post nearly as high as the step (an L4 segment next
 to an L2 post) it is a short dark mark over the post's cap.
 
-`piece(level, mask, lower_mask = 0)` builds a piece on first use and keeps its body and outline
-arrays (`to_arrays`, `to_outline_arrays`), cached by level, mask and lower mask (a higher level
-shows level 5's); every piece stays within the 250 body triangles of a wall piece
+`piece(level, tier, mask, lower_mask = 0)` builds a piece on first use for its level's tier (the
+crown is gold from the Gold tier, `CAP` gunmetal below it) and keeps its body and outline arrays
+(`to_arrays`, `to_outline_arrays`), cached by tier, level, mask and lower mask (a higher level
+shows level 5's, built for its own tier); every piece stays within the 250 body triangles of a wall piece
 (`wall_junctions` checks all 80 masks and levels, that each piece's body is the same whatever
-its lower mask, and the merged outline against its pieces' with their steps). `build_barrier_wall`, which `BuildingModels.create("barrier_wall", level, 1)` dispatches
+its lower mask, and the merged outline against its pieces' with their steps). `build_barrier_wall`, which `BuildingModels.create("barrier_wall", level, 1, tier)` dispatches
 to, is the lone post (mask 0): the paint brush, a lifted wall and the gallery show it.
 
 The merged mesh keeps each piece's UV2 and colour, so PULSE, BLINK and FLOW work on wall pieces.

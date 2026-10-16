@@ -257,8 +257,9 @@ the drone reaches (`ConstructionDrone.ceiling()`), so it never overlaps its flig
 `set_lifted` passes the lifted or lowered `site_height()` to a working drone (`set_site_top`) and
 places the label again. A wall drawn
 by the merged wall mesh hides its model (`set_merged(true)`, **Walls**) and keeps the rest; `is_model_visible()` says whether the view
-draws its own model. `setup(id, type, level, size)` builds it for one level (level 1's model
-while the level is 0); `building_level` records it, and `BaseView.sync` replaces the view when
+draws its own model. `setup(id, type, level, size, tier)` builds it for one level (level 1's
+model while the level is 0) and that level's tier (`BuildingModels.tier_of`, which `BaseView` and
+the placement ghost call with the state's catalog); `building_level` records it, and `BaseView.sync` replaces the view when
 the finished level changes, so a building mid-upgrade shows its current level until the upgrade
 finishes. `show_status(level, busy, target_level, seconds_left)` is what `BaseView.sync` pushes
 each tick. `set_lifted(true)` raises the model by 0.35 while it is dragged or is the ghost. A
@@ -285,7 +286,7 @@ dragged), so its climb starts clear
 of the finished model, and it frees itself after its climb. `drone()` returns the view's drone
 (null when none), for the harness. `BaseView.clear()` frees the drones with the views.
 
-`BuildingModels.create(type, level, size)` returns a `Node3D` holding the static body and its
+`BuildingModels.create(type, level, size, tier)` returns a `Node3D` holding the static body and its
 ink outline, and up to three moving parts (the model table in `art-style.md` names each
 type's: dishes, radars and gyro rings that spin, heads and launchers that scan, press arms,
 doors and cranes that slide) with their outlines, each under a pivot node carrying `MOVE_META`:
@@ -296,8 +297,10 @@ category's file under `src/game/models/` but the wall's, which has a file of its
 (`walls.gd`) although the wall is a defence type; `MODELS` gives each type the footprint its
 models are built for and its level count. A level above that shows the top model, a catalog size
 other than the footprint scales the model, and an unknown type gets a hull block with a hazard
-stripe and one warning. Meshes are built once per type and level and cached in a static
-dictionary; the nodes are per view. `create_scaffold(size)` is one cached, outlined model in
+stripe and one warning. `tier_of(catalog, type, level)` is the tier a level is built for
+(`art-style.md`, **Models**), which every caller passes. Meshes are built once per type, level
+and tier and cached in a static dictionary, so a level shown as its type's top model is painted
+for its own tier; the nodes are per view. `create_scaffold(size)` is one cached, outlined model in
 hazard stripes; `create_drone()` and `create_drone_effect(part)` build and cache the
 construction drone and its laser's beam and flare the same way. How a
 model is built and what it must keep (the contract, the budgets, the vocabulary) is in

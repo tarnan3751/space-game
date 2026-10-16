@@ -48,7 +48,7 @@ func run(main: MainScript) -> void:
 	check(not roster.is_empty(), "the catalog has building types")
 	check(main.state.catalog.has_type(WALL_TYPE), "the catalog has the %s type" % WALL_TYPE)
 	for entry: Dictionary in roster:
-		_check_budget(entry)
+		_check_budget(main.state.catalog, entry)
 
 	for view: BuildingView in main.base_view.views.values():
 		view.visible = false
@@ -77,7 +77,7 @@ func run(main: MainScript) -> void:
 				var size: int = model[2]
 				var cell := Vector2i(model[3], row["y"] + (row["depth"] - size) / 2)
 				var view := BuildingView.new()
-				view.setup(0, type, level, size)
+				view.setup(0, type, level, size, BuildingModels.tier_of(main.state.catalog, type, level))
 				view.position = main.base_view.cell_to_world(cell, size)
 				gallery.add_child(view)
 				views.append(view)
@@ -152,12 +152,13 @@ func _categories(main: MainScript) -> PackedStringArray:
 	return categories
 
 
-func _check_budget(entry: Dictionary) -> void:
+func _check_budget(catalog: Catalog, entry: Dictionary) -> void:
 	var type: String = entry["type"]
 	var size: int = entry["size"]
 	var limit: int = WALL_BUDGET if entry["type"] == WALL_TYPE else BUDGETS[mini(size, 5)]
 	for level: int in range(1, int(entry["levels"]) + 1):
-		var model := BuildingModels.create(type, level, size)
+		var tier := BuildingModels.tier_of(catalog, type, level)
+		var model := BuildingModels.create(type, level, size, tier)
 		var bodies := _bodies(model)
 		var reach := _reach(model, bodies)
 		var bound := size * 0.5 + EXTENT_SLACK

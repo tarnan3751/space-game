@@ -264,8 +264,9 @@ func _interrupted_drag(main: MainScript, building: BuildingState, interrupt: Cal
 func _check_merged_line(main: MainScript) -> void:
 	var walls: WallMesh = main.base_view.walls
 	var through := WallModels.PLUS_X | WallModels.MINUS_X
-	var expected := _piece_triangles(1, WallModels.PLUS_X) + _piece_triangles(1, WallModels.MINUS_X) \
-		+ (LINE_LENGTH - 2) * _piece_triangles(1, through)
+	var tier := BuildingModels.tier_of(main.state.catalog, WALL, 1)
+	var expected := _piece_triangles(1, tier, WallModels.PLUS_X) + _piece_triangles(1, tier, WallModels.MINUS_X) \
+		+ (LINE_LENGTH - 2) * _piece_triangles(1, tier, through)
 	var drawn := _triangles(walls.body.mesh)
 	check(drawn == expected, "the row is one merged mesh of its %d pieces (%d triangles, expected %d)" % [
 		LINE_LENGTH, drawn, expected])
@@ -273,8 +274,8 @@ func _check_merged_line(main: MainScript) -> void:
 		"the wall outline casts no shadow")
 
 
-static func _piece_triangles(level: int, mask: int) -> int:
-	var vertices: PackedVector3Array = WallModels.piece(level, mask).body[Mesh.ARRAY_VERTEX]
+static func _piece_triangles(level: int, tier: int, mask: int) -> int:
+	var vertices: PackedVector3Array = WallModels.piece(level, tier, mask).body[Mesh.ARRAY_VERTEX]
 	return vertices.size() / 3
 
 

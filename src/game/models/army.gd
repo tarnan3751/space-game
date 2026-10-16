@@ -1,7 +1,7 @@
 extends RefCounted
 ## Models of the army buildings, in the comic style (docs/reference/art-style.md): hull-light
 ## halls and towers on concrete pads, army orange on one or two surfaces and in one glow,
-## gunmetal machinery, gold trim at the top level. They move (docs/reference/art-style.md,
+## gunmetal machinery, gold trim from the Gold tier (Parts.tier). They move (docs/reference/art-style.md,
 ## **Animation**): surface effects on the lamps, glows, screens, goo, sparks and smoke, and moving
 ## parts (Parts.moving) for the hangar door, the cranes, the press arms, the dishes, the telescope,
 ## the stirrer, the hologram cadet, the simulator's gimbal rings and the searchlight.
@@ -93,9 +93,9 @@ static func build_hangar(p: Parts, level: int) -> void:
 	var g := Parts.PAD_HEIGHT
 	Parts.foundation(m, 5)
 	var doors: Array[float] = [1.3, 1.6, 1.9]
-	_vault(p, Vector3(-1.0, g, -2.25), 2.6, 3.6, 0.75, doors[mini(level, 3) - 1], level, true)
+	_vault(p, Vector3(-1.0, g, -2.25), 2.6, 3.6, 0.75, doors[mini(level, 3) - 1], true)
 	if level >= 3:
-		_vault(p, Vector3(1.35, g, -0.9), 1.8, 2.25, 0.55, 1.2, level, false)
+		_vault(p, Vector3(1.35, g, -0.9), 1.8, 2.25, 0.55, 1.2, false)
 	else:
 		m.disc(0.75, 24, Vector3(1.35, g + 0.002, 0.2), Parts.HAZARD)
 		m.disc(0.6, 24, Vector3(1.35, g + 0.004, 0.2), ARMOUR)
@@ -114,7 +114,7 @@ static func build_hangar(p: Parts, level: int) -> void:
 	m.prism(0.42, 0.5, 0.34, 16, cab + Vector3(0, 0.1, 0), CAB_GLASS)
 	m.lathe(PackedVector2Array([
 		Vector2(0.56, 0), Vector2(0.56, 0.06), Vector2(0.4, 0.16), Vector2(0, 0.16),
-	]), 16, cab + Vector3(0, 0.44, 0), GOLD_ROUND if level >= 5 else HULL_ROUND)
+	]), 16, cab + Vector3(0, 0.44, 0), GOLD_ROUND if p.tier >= Parts.Tier.GOLD else HULL_ROUND)
 	Parts.mast(m, cab + Vector3(0.12, 0.6, -0.1), 0.3 + 0.03 * level, 0.06, GLOW)
 	# The radar turning on the cab's roof, clear of the mast.
 	var stub := cab + Vector3(-0.14, 0.6, 0.12)
@@ -123,7 +123,7 @@ static func build_hangar(p: Parts, level: int) -> void:
 	radar.box_chamfered(Vector3(0.08, 0.08, 0.08), 0.02, Vector3.ZERO, Parts.GUNMETAL)
 	var tilt := Vector3(60, 90, 0)
 	var hub := Vector3(0, 0.08, 0)
-	Parts.dish(radar, 0.18, 0.07, hub, GOLD_ROUND if level >= 5 else HULL_ROUND, tilt)
+	Parts.dish(radar, 0.18, 0.07, hub, GOLD_ROUND if p.tier >= Parts.Tier.GOLD else HULL_ROUND, tilt)
 	var axis := LowPolyMesh.turn(Vector3.UP, tilt)
 	Parts.pipe(radar, hub + axis * 0.03, hub + axis * 0.15, 0.015, Parts.ROD)
 	radar.orb(0.03, 10, 4, hub + axis * 0.15, GLOW)
@@ -132,13 +132,13 @@ static func build_hangar(p: Parts, level: int) -> void:
 		for z: float in [1.68, 1.92]:
 			Parts.tank(m, 0.1, 0.32, Vector3(-2.2, g, z), ORANGE_ROUND, 0.03)
 	if level >= 4:
-		_roof_dish(p, Vector3(-1.0, g + 1.98, -1.5), 0.5, level, true)
-		_roof_dish(p, Vector3(1.35, g + 1.38, -0.4), 0.32, level, false)
+		_roof_dish(p, Vector3(-1.0, g + 1.98, -1.5), 0.5, true)
+		_roof_dish(p, Vector3(1.35, g + 1.38, -0.4), 0.32, false)
 
 
 ## A dish on a stub at `foot`, turned to the right of the view, with a glowing feed. One that
 ## `sweeps` stands on a taller stub, clear of the roof, and swings to and fro about it.
-static func _roof_dish(p: Parts, foot: Vector3, radius: float, level: int, sweeps: bool) -> void:
+static func _roof_dish(p: Parts, foot: Vector3, radius: float, sweeps: bool) -> void:
 	var aim := Vector3(55, 135, 0)
 	var stub := 0.42 if sweeps else 0.22
 	p.body.prism(0.07, 0.06, stub, 16, foot, Parts.GUNMETAL)
@@ -147,7 +147,7 @@ static func _roof_dish(p: Parts, foot: Vector3, radius: float, level: int, sweep
 	if sweeps:
 		m = p.moving(centre, Motion.swing(Vector3.UP, 30.0, 7.0))
 		centre = Vector3.ZERO
-	Parts.dish(m, radius, radius * 0.38, centre, GOLD_ROUND if level >= 5 else HULL_ROUND, aim)
+	Parts.dish(m, radius, radius * 0.38, centre, GOLD_ROUND if p.tier >= Parts.Tier.GOLD else HULL_ROUND, aim)
 	var axis := LowPolyMesh.turn(Vector3.UP, aim)
 	var focus := centre + axis * radius * 0.85
 	Parts.pipe(m, centre + axis * radius * 0.1, focus, 0.025, Parts.ROD)
@@ -159,7 +159,7 @@ static func _roof_dish(p: Parts, foot: Vector3, radius: float, level: int, sweep
 ## part: it rises behind its lintel and a hood over it, as far as the roof leaves room, and the
 ## lit bay shows under it.
 static func _vault(p: Parts, back: Vector3, width: float, length: float, wall: float,
-		door: float, level: int, opens: bool) -> void:
+		door: float, opens: bool) -> void:
 	var m := p.body
 	var radius := width * 0.5 - 0.005
 	var front := back.z + length
@@ -206,7 +206,7 @@ static func _vault(p: Parts, back: Vector3, width: float, length: float, wall: f
 		m.box_chamfered(Vector3(0.16, height + 0.14, 0.16), 0.04, Vector3(back.x + side * post, back.y, z + 0.08),
 			Parts.HAZARD)
 	m.box_chamfered(Vector3(door + 0.32, 0.14, 0.18), 0.04, Vector3(back.x, back.y + height, z + 0.09),
-		Parts.GOLD_TRIM if level >= 5 else ORANGE)
+		Parts.GOLD_TRIM if p.tier >= Parts.Tier.GOLD else ORANGE)
 	m.box(Vector3(door * 0.6, 0.06, 0.04), Vector3(back.x, strip, z + (0.15 if opens else 0.0)), GLOW)
 
 
@@ -223,7 +223,7 @@ static func _vault(p: Parts, back: Vector3, width: float, length: float, wall: f
 static func build_cadet_academy(p: Parts, level: int) -> void:
 	var m := p.body
 	var g := Parts.PAD_HEIGHT
-	var gold := level >= 5
+	var gold := p.tier >= Parts.Tier.GOLD
 	Parts.foundation(m, 3)
 	# The hall along the back, its front face at z = front.
 	var height := 0.75 if level < 2 else 1.0
@@ -310,7 +310,7 @@ static func build_cadet_academy(p: Parts, level: int) -> void:
 	if level >= 2:
 		_simulator(p, Vector3(0.92, yard, -0.05))
 	if level >= 4:
-		_watchtower(p, Vector3(1.0, roof, -1.0), level)
+		_watchtower(p, Vector3(1.0, roof, -1.0))
 
 
 ## The hologram cadet standing to attention, its feet on `foot`, built facing +Z: boots and legs,
@@ -393,7 +393,7 @@ static func _simulator(p: Parts, foot: Vector3) -> void:
 ## The watchtower on the hall's roof at `foot`: an armoured base, a round shaft, a cab with
 ## pulsing glass under a crown (gold at the top level), a small dish on its flank, and the
 ## searchlight on the crown sweeping the yard, its lens pulsing and a hologram beam out of it.
-static func _watchtower(p: Parts, foot: Vector3, level: int) -> void:
+static func _watchtower(p: Parts, foot: Vector3) -> void:
 	var m := p.body
 	m.box_chamfered(Vector3(0.36, 0.08, 0.36), 0.03, foot, ARMOUR)
 	m.prism(0.13, 0.11, 0.6, 16, foot + Vector3(0, 0.08, 0), MID_ROUND)
@@ -402,7 +402,7 @@ static func _watchtower(p: Parts, foot: Vector3, level: int) -> void:
 	m.box_chamfered(Vector3(0.28, 0.08, 0.02), 0.01, cab + Vector3(0, 0.07, 0.18), CAB_GLASS)
 	m.box_chamfered(Vector3(0.02, 0.08, 0.28), 0.01, cab + Vector3(0.18, 0.07, 0), CAB_GLASS)
 	m.box_chamfered(Vector3(0.4, 0.05, 0.4), 0.02, cab + Vector3(0, 0.2, 0),
-		Parts.GOLD_TRIM if level >= 5 else DARK_PLATE)
+		Parts.GOLD_TRIM if p.tier >= Parts.Tier.GOLD else DARK_PLATE)
 	var aim := Vector3(-0.6, 0.75, 0.2)
 	Parts.dish(m, 0.13, 0.05, cab + Vector3(-0.2, 0.08, 0), HULL_ROUND, Parts.facing(aim))
 	var light := p.moving(cab + Vector3(0, 0.25, 0), Motion.swing(Vector3.UP, 25.0, 6.0))
@@ -464,7 +464,7 @@ static func build_fabricator(p: Parts, level: int) -> void:
 		Parts.beam(m, Vector3(x, top, 0.33), Vector3(x, top, 1.27), 0.1, ORANGE)
 	var bridge := 0.85
 	Parts.beam(m, Vector3(0.5, top + 0.1, bridge), Vector3(1.3, top + 0.1, bridge), 0.1,
-		Parts.GOLD_TRIM if level >= 5 else Parts.HULL_DARK)
+		Parts.GOLD_TRIM if p.tier >= Parts.Tier.GOLD else Parts.HULL_DARK)
 	# The trolley rides on the bridge, its hook hanging through it, from rail to rail.
 	var trolley := p.moving(Vector3(0.9, top, bridge), Motion.slide(Vector3.RIGHT, 0.25, 5.0))
 	trolley.box_chamfered(Vector3(0.2, 0.12, 0.18), 0.03, Vector3(0, 0.15, 0), Parts.GUNMETAL)
@@ -479,16 +479,16 @@ static func build_fabricator(p: Parts, level: int) -> void:
 	for i: int in counts[level - 1]:
 		var height := 1.2 - 0.18 * i + 0.05 * level
 		var foot := stacks[i] + Vector3(0, g + 0.35, 0)
-		_stack(m, foot, 0.13, height, level)
+		_stack(m, foot, 0.13, height, p.tier >= Parts.Tier.GOLD)
 		Parts.puffs(m, foot + Vector3(0, height, 0), 0.29 * i)
 
 
 ## A smokestack standing on `foot`: a ribbed pipe with an orange band and a glowing mouth.
-static func _stack(m: LowPolyMesh, foot: Vector3, radius: float, height: float, level: int) -> void:
+static func _stack(m: LowPolyMesh, foot: Vector3, radius: float, height: float, gold: bool) -> void:
 	m.prism(radius, radius * 0.8, height, 16, foot, PIPE)
 	m.ring(radius * 0.8, radius * 1.12, 0.07, 16, foot + Vector3(0, height * 0.55, 0), ORANGE_ROUND)
 	var mouth := foot + Vector3(0, height, 0)
-	m.ring(radius * 0.55, radius * 0.95, 0.06, 16, mouth, GOLD_ROUND if level >= 5 else Parts.GUNMETAL)
+	m.ring(radius * 0.55, radius * 0.95, 0.06, 16, mouth, GOLD_ROUND if gold else Parts.GUNMETAL)
 	m.disc(radius * 0.56, 16, mouth + Vector3(0, 0.03, 0), GLOW)
 
 
@@ -518,26 +518,27 @@ static func build_heavy_fabricator(p: Parts, level: int) -> void:
 	for side: float in [-1.0, 1.0]:
 		m.box_chamfered(Vector3(0.14, 0.62, 0.16), 0.04, mouth + Vector3(side * 0.37, 0, 0.02), DARK_PLATE)
 	m.box_chamfered(Vector3(0.9, 0.16, 0.2), 0.04, mouth + Vector3(0, 0.6, 0.03),
-		Parts.GOLD_TRIM if level >= 3 else DARK_PLATE)
+		Parts.GOLD_TRIM if p.tier >= Parts.Tier.GOLD else DARK_PLATE)
 	m.box_chamfered(Vector3(0.36, 0.06, 0.75), 0.02, mouth + Vector3(0, 0, 0.42), DARK_PLATE)
 	m.box(Vector3(0.2, 0.02, 0.72), mouth + Vector3(0, 0.06, 0.42), POUR)
 	m.box(Vector3(0.08, 0.02, 0.72), mouth + Vector3(0, 0.07, 0.42), HOT_POUR)
 	# The press arms, striking in turn.
-	_press_arm(p, Vector3(-0.15, g + 1.0, 0.1), Vector3(0.88, g, 0.85), level, 0.0)
+	_press_arm(p, Vector3(-0.15, g + 1.0, 0.1), Vector3(0.88, g, 0.85), 0.0)
 	if level >= 2:
-		_press_arm(p, Vector3(-0.15, g + 1.0, -0.95), Vector3(0.88, g, -0.85), level, 0.5)
+		_press_arm(p, Vector3(-0.15, g + 1.0, -0.95), Vector3(0.88, g, -0.85), 0.5)
 	# Exhausts: one stack, a cluster of three at 3.
-	_stack(m, Vector3(-0.95, g + 1.4, -0.95), 0.14, 0.55, level)
+	var gold := p.tier >= Parts.Tier.GOLD
+	_stack(m, Vector3(-0.95, g + 1.4, -0.95), 0.14, 0.55, gold)
 	if level >= 3:
-		_stack(m, Vector3(-0.55, g + 1.4, -1.05), 0.12, 0.75, level)
-		_stack(m, Vector3(-1.02, g + 1.4, -0.55), 0.1, 0.4, level)
+		_stack(m, Vector3(-0.55, g + 1.4, -1.05), 0.12, 0.75, gold)
+		_stack(m, Vector3(-1.02, g + 1.4, -0.55), 0.1, 0.4, gold)
 
 
 ## A press arm: a turret on the hall's roof at `shoulder`, a fat orange boom up to an elbow
 ## over an anvil standing at `anvil`, a hydraulic ram down from the elbow to a heavy head. The
 ## head and its piston are a moving part that hammers down onto the anvil, `phase` into its
 ## cycle, the piston sliding in the ram's cylinder; sparks flicker off the anvil's face.
-static func _press_arm(p: Parts, shoulder: Vector3, anvil: Vector3, level: int, phase: float) -> void:
+static func _press_arm(p: Parts, shoulder: Vector3, anvil: Vector3, phase: float) -> void:
 	var m := p.body
 	m.prism(0.3, 0.27, 0.24, 16, shoulder, Parts.GUNMETAL)
 	var pivot := shoulder + Vector3(0, 0.36, 0)
@@ -552,7 +553,7 @@ static func _press_arm(p: Parts, shoulder: Vector3, anvil: Vector3, level: int, 
 		Motion.slide(Vector3.UP, 0.18, 2.4, phase, Motion.Ease.HAMMER))
 	Parts.pipe(head, Vector3(0, 0.3, 0), Vector3(0, 1.1, 0), 0.07, MID_ROUND, 16, false)
 	head.box_chamfered(Vector3(0.46, 0.32, 0.46), 0.07, Vector3.ZERO, ORANGE)
-	head.box(Vector3(0.48, 0.07, 0.48), Vector3(0, 0.04, 0), Parts.GOLD_TRIM if level >= 3 else Parts.HAZARD)
+	head.box(Vector3(0.48, 0.07, 0.48), Vector3(0, 0.04, 0), Parts.GOLD_TRIM if p.tier >= Parts.Tier.GOLD else Parts.HAZARD)
 	m.box_chamfered(Vector3(0.52, 0.3, 0.52), 0.05, anvil, Parts.GUNMETAL)
 	m.box(Vector3(0.54, 0.06, 0.54), anvil + Vector3(0, 0.2, 0), Parts.HAZARD)
 	for k: int in 6:
@@ -591,7 +592,7 @@ static func build_research_lab(p: Parts, level: int) -> void:
 	var centre := Vector3(0, g + drum, 0)
 	m.ring(0.62, 0.69, 0.05, 24, centre, GLOW)
 	if level >= 5:
-		m.ring(0.62, 0.68, 0.05, 24, centre - Vector3(0, 0.08, 0), GOLD_ROUND)
+		m.ring(0.62, 0.68, 0.05, 24, centre - Vector3(0, 0.08, 0), GOLD_ROUND if p.tier >= Parts.Tier.GOLD else MID_ROUND)
 	m.dome(0.62, 0.62, 16, 7, centre, HULL_ROUND)
 	var across := Vector3(0.7071, 0, 0.7071)
 	m.ring(0.6, 0.65, 0.18, 24, centre - across * 0.09, GLOW_PULSE, Parts.facing(across))
@@ -602,7 +603,7 @@ static func build_research_lab(p: Parts, level: int) -> void:
 	telescope.ring(0.07, 0.13, 0.1, 16, aim * 0.85, ORANGE_ROUND, Parts.facing(aim))
 	telescope.disc(0.085, 16, aim * 0.955, Parts.GLASS, Parts.facing(aim))
 	if level >= 5:
-		m.orb(0.07, 16, 6, centre + Vector3(0, 0.66, 0), GOLD_ROUND)
+		m.orb(0.07, 16, 6, centre + Vector3(0, 0.66, 0), GOLD_ROUND if p.tier >= Parts.Tier.GOLD else MID_ROUND)
 	if level >= 3:
 		# The hologram over the dome: an orb in two tilted rings, floating.
 		var subject := centre + Vector3(0, 1.0, 0)
@@ -625,7 +626,7 @@ static func build_research_lab(p: Parts, level: int) -> void:
 	radar.box_chamfered(Vector3(0.12, 0.16, 0.12), 0.03, Vector3.ZERO, Parts.GUNMETAL)
 	var tilt := Vector3(60, 90, 0)
 	var hub := Vector3(0, 0.14, 0)
-	Parts.dish(radar, 0.38, 0.14, hub, GOLD_ROUND if level >= 5 else HULL_ROUND, tilt)
+	Parts.dish(radar, 0.38, 0.14, hub, GOLD_ROUND if p.tier >= Parts.Tier.GOLD else HULL_ROUND, tilt)
 	var axis := LowPolyMesh.turn(Vector3.UP, tilt)
 	Parts.pipe(radar, hub + axis * 0.05, hub + axis * 0.32, 0.02, Parts.ROD)
 	radar.orb(0.045, 16, 6, hub + axis * 0.32, GLOW)
@@ -682,7 +683,7 @@ static func build_nanite_foundry(p: Parts, level: int) -> void:
 		var spot: Vector3 = vats[i][0]
 		var radius: float = vats[i][1]
 		var height: float = vats[i][2]
-		_vat(m, spot, radius, height, level, i)
+		_vat(m, spot, radius, height, p.tier >= Parts.Tier.GOLD, i)
 		if i < 3:
 			# Out of the vat's upper shell, down to the pad and along it into the pump.
 			var toward := Vector3(pump.x - spot.x, 0, pump.z - spot.z).normalized()
@@ -704,12 +705,11 @@ static func build_nanite_foundry(p: Parts, level: int) -> void:
 ## A vat standing on `foot`, the `index`th of the foundry's: an armoured lower shell, a band of
 ## glowing goo rising behind glass framed by rims, with bubbles blinking on it, and an upper
 ## shell with a chamfered lid and an orange cap. The first vat is open at the top instead, over
-## a swirl of goo for the stirrer to turn in. The rims are gold at the top level.
-static func _vat(m: LowPolyMesh, foot: Vector3, radius: float, height: float, level: int, index: int) -> void:
+## a swirl of goo for the stirrer to turn in. The rims are gold from the Gold tier.
+static func _vat(m: LowPolyMesh, foot: Vector3, radius: float, height: float, gold: bool, index: int) -> void:
 	var band := height * 0.4
 	var glass := height * 0.28
 	var rim := radius + 0.035
-	var gold := level >= 4
 	m.lathe(PackedVector2Array([Vector2(radius, 0), Vector2(radius, band - 0.05)]), 16, foot, ARMOUR_ROUND)
 	# The rim's underside faces the ground, which the camera never sees, so it is left out.
 	m.lathe(PackedVector2Array([
@@ -811,7 +811,7 @@ static func build_drydock(p: Parts, level: int) -> void:
 			crane.box_chamfered(Vector3(0.24, 0.12, 0.24), 0.03, at + Vector3(0, g, z), DARK_PLATE)
 			crane.box_chamfered(Vector3(0.14, top - g - 0.12, 0.14), 0.03, at + Vector3(0, g + 0.12, z), ORANGE)
 		Parts.beam(crane, at + Vector3(0, top, -1.7), at + Vector3(0, top, 1.7), 0.18,
-			Parts.GOLD_TRIM if level >= 2 else ORANGE, 0.04)
+			Parts.GOLD_TRIM if p.tier >= Parts.Tier.GOLD else ORANGE, 0.04)
 		var trolley := at + Vector3(0, top - 0.16, 0.25)
 		crane.box_chamfered(Vector3(0.22, 0.14, 0.26), 0.03, trolley, Parts.GUNMETAL)
 		var surface := axis_y + _hull_radius(profile, gx - stern) * scale
@@ -856,7 +856,7 @@ static func _hull_radius(profile: PackedVector2Array, along: float) -> float:
 static func build_alliance_beacon(p: Parts, level: int) -> void:
 	var m := p.body
 	var g := Parts.PAD_HEIGHT
-	var gold := level >= 3
+	var gold := p.tier >= Parts.Tier.GOLD
 	Parts.foundation(m, 3)
 	m.box_chamfered(Vector3(1.9, 0.22, 1.9), 0.06, Vector3(0, g, 0), ARMOUR)
 	var foot := g + 0.22

@@ -56,7 +56,9 @@ func rebuild(state: BaseState, skip_id: int) -> void:
 	var bodies := Merged.new()
 	var outlines := Merged.new()
 	for cell: Vector2i in _levels:
-		var piece := WallModels.piece(_levels[cell], mask_at(cell), _lower_mask_at(cell))
+		var level := _levels[cell]
+		var tier := BuildingModels.tier_of(state.catalog, PlacementController.PAINT_TYPE, level)
+		var piece := WallModels.piece(level, tier, mask_at(cell), _lower_mask_at(cell))
 		var at := Transform3D(Basis(), _base_view.cell_to_world(cell, 1))
 		bodies.append(piece.body, at)
 		outlines.append(piece.outline, at)

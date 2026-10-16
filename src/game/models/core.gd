@@ -66,13 +66,14 @@ const HOLO_TILT := Vector3(20, 0, 0)
 ## beacon pulsing.
 static func build_command_center(p: Parts, level: int) -> void:
 	var m := p.body
-	var gold := level >= 5
+	var gold := p.tier >= Parts.Tier.GOLD
 	Parts.foundation(m, 4)
 	m.box_chamfered(Vector3(3.7, 0.2, 3.7), 0.08, Vector3(0, Parts.PAD_HEIGHT, 0), STEP)
 	m.box_chamfered(Vector3(3.3, 0.2, 3.3), 0.08, Vector3(0, 0.32, 0), Parts.HULL_MID)
-	if gold:
-		m.box_chamfered(Vector3(3.76, 0.05, 3.76), 0.03, Vector3(0, 0.24, 0), Parts.GOLD_TRIM)
-		m.box_chamfered(Vector3(3.36, 0.05, 3.36), 0.03, Vector3(0, 0.44, 0), Parts.GOLD_TRIM)
+	var trim := Parts.GOLD_TRIM if gold else Parts.HULL_MID
+	if level >= 5:
+		m.box_chamfered(Vector3(3.76, 0.05, 3.76), 0.03, Vector3(0, 0.24, 0), trim)
+		m.box_chamfered(Vector3(3.36, 0.05, 3.36), 0.03, Vector3(0, 0.44, 0), trim)
 	for k: int in 4:
 		# Landing lights on the deck's corners.
 		Parts.landing_light(m, Parts.around(1.46 * sqrt(2.0), 45 + 90 * k, DECK), 0.09, GLOW)
@@ -116,11 +117,13 @@ static func build_command_center(p: Parts, level: int) -> void:
 			m.box_chamfered(Vector3(0.16, 0.24, 0.3), 0.03, Parts.around(DRUM_RADIUS + 0.16, degrees, ring_y - 0.12), Parts.HULL_DARK, yaw)
 			m.box_chamfered(Vector3(0.12, 0.08, 0.12), 0.03, Parts.around(DRUM_RADIUS + 0.2, degrees, ring_y + 0.1),
 				CONTAINMENT_NODE.phased(degrees / 360.0), yaw)
-	if gold:
-		# The beacon spire: a tapered gold mast 0.8 above the dome's apex, a collar at its foot,
-		# a pulsing orb at 3.2; it runs up through the hologram's globe as its axis.
-		m.prism(0.075, 0.03, 0.66, 16, Vector3(0, apex + 0.05, 0), Parts.GOLD_ROUND)
-		Parts.torus(m, 0.08, 0.03, 12, 6, Vector3(0, apex + 0.1, 0), Parts.GOLD_ROUND)
+	if level >= 5:
+		# The beacon spire: a tapered mast 0.8 above the dome's apex, gold from the Gold tier, a
+		# collar at its foot, a pulsing orb at 3.2; it runs up through the hologram's globe as its
+		# axis.
+		var spire := Parts.GOLD_ROUND if gold else Parts.HULL_MID_ROUND
+		m.prism(0.075, 0.03, 0.66, 16, Vector3(0, apex + 0.05, 0), spire)
+		Parts.torus(m, 0.08, 0.03, 12, 6, Vector3(0, apex + 0.1, 0), spire)
 		m.orb(0.09, 12, 6, Vector3(0, apex + 0.69, 0), BEACON)
 	if level >= 3:
 		_hologram(p, m, apex)
@@ -179,8 +182,9 @@ static func _wing(m: LowPolyMesh, degrees: float, level: int, gold: bool) -> voi
 	m.box(Vector3(0.9, 0.06, 0.04), block + LowPolyMesh.turn(Vector3(0, 0.22, 0.35), yaw), SCREENS, yaw)
 	var roof := block + Vector3(0, 0.8, 0)
 	m.box_chamfered(Vector3(0.5, 0.08, 0.4), 0.02, roof, ROOF_VENT, yaw)
-	if gold:
-		m.box_chamfered(Vector3(1.26, 0.05, 0.76), 0.02, block + Vector3(0, 0.1, 0), Parts.GOLD_TRIM, yaw)
+	if level >= 5:
+		m.box_chamfered(Vector3(1.26, 0.05, 0.76), 0.02, block + Vector3(0, 0.1, 0),
+			Parts.GOLD_TRIM if gold else Parts.HULL_MID, yaw)
 	if level >= 4:
 		var foot := Parts.around(1.62, degrees, roof.y)
 		m.box_chamfered(Vector3(0.16, 0.1, 0.16), 0.03, foot, Parts.HULL_DARK, yaw)

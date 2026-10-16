@@ -40,6 +40,8 @@ const STEPS: Array[Array] = [
 	[5, Vector2i(8, 5), true], [5, Vector2i(7, 4), true], [5, Vector2i(8, 4), false],
 ]
 const CLOSE_UP_SIZE := 10.0
+
+var _catalog: Catalog
 ## The art style's budget for one wall piece's body.
 const PIECE_TRIANGLES := 250
 
@@ -47,6 +49,7 @@ const PIECE_TRIANGLES := 250
 func run(main: MainScript) -> void:
 	var state: BaseState = main.state
 	var placement: PlacementController = main.placement
+	_catalog = state.catalog
 	var cc_id := 0
 	for id: int in state.buildings:
 		if state.buildings[id].type == Catalog.HQ_TYPE:
@@ -62,18 +65,18 @@ func run(main: MainScript) -> void:
 	_frame(main, ORIGIN + CENTRE)
 
 	for level: int in range(1, WallModels.LEVELS + 1):
-		var model := BuildingModels.create(WALL, level, 1)
+		var model := BuildingModels.create(WALL, level, 1, _tier(level))
 		var own: PackedVector3Array = _first_mesh(model).surface_get_arrays(0)[Mesh.ARRAY_VERTEX]
-		var post: PackedVector3Array = WallModels.piece(level, 0).body[Mesh.ARRAY_VERTEX]
+		var post: PackedVector3Array = _piece(level, 0).body[Mesh.ARRAY_VERTEX]
 		check(own == post, "a level %d wall's own model is the lone post" % level)
 		model.free()
 		var most := 0
 		var differs := PackedStringArray()
 		for mask: int in 16:
 			most = maxi(most, _piece_triangles(level, mask))
-			var plain: Array = WallModels.piece(level, mask).body
+			var plain: Array = _piece(level, mask).body
 			for lower: int in range(1, 16):
-				if lower & mask == lower and WallModels.piece(level, mask, lower).body != plain:
+				if lower & mask == lower and _piece(level, mask, lower).body != plain:
 					differs.append("%d/%d" % [mask, lower])
 		check(differs.is_empty(), "level %d pieces' bodies are the same whatever the lower mask (%s)" % [
 			level, ", ".join(differs)])
@@ -289,13 +292,23 @@ static func _triangles(mesh: Mesh) -> int:
 	return count
 
 
-static func _piece_triangles(level: int, mask: int) -> int:
-	var vertices: PackedVector3Array = WallModels.piece(level, mask).body[Mesh.ARRAY_VERTEX]
+## A level's Tier, as the game builds its walls for it.
+func _tier(level: int) -> int:
+	return BuildingModels.tier_of(_catalog, WALL, level)
+
+
+## The piece of `level`, built for its tier, and the masks.
+func _piece(level: int, mask: int, lower_mask: int = 0) -> WallModels.Piece:
+	return WallModels.piece(level, _tier(level), mask, lower_mask)
+
+
+func _piece_triangles(level: int, mask: int) -> int:
+	var vertices: PackedVector3Array = _piece(level, mask).body[Mesh.ARRAY_VERTEX]
 	return vertices.size() / 3
 
 
-static func _outline_triangles(level: int, mask: int, lower_mask: int) -> int:
-	var outline := WallModels.piece(level, mask, lower_mask).outline
+func _outline_triangles(level: int, mask: int, lower_mask: int) -> int:
+	var outline := _piece(level, mask, lower_mask).outline
 	if outline.is_empty():
 		return 0
 	var vertices: PackedVector3Array = outline[Mesh.ARRAY_VERTEX]

@@ -100,7 +100,7 @@ func begin_place(type: String) -> void:
 	var size := state.catalog.size_of(type)
 	_painting = type == PAINT_TYPE
 	_ghost = BuildingView.new()
-	_ghost.setup(0, type, 1, size)
+	_ghost.setup(0, type, 1, size, BuildingModels.tier_of(state.catalog, type, 1))
 	_ghost.set_lifted(true)
 	base_view.add_child(_ghost)
 	_show_grid()

@@ -65,14 +65,15 @@ var _merged: bool = false
 var _drone: ConstructionDrone = null
 
 
-## Call once, before adding to the tree. `level` picks the model (level 1's while it is 0).
-func setup(id: int, type: String, level: int, size: int) -> void:
+## Call once, before adding to the tree. `level` picks the model (level 1's while it is 0),
+## built for `tier`, the shown level's (BuildingModels.tier_of).
+func setup(id: int, type: String, level: int, size: int, tier: int) -> void:
 	building_id = id
 	building_type = type
 	building_level = level
 	footprint_size = size
 
-	_model = BuildingModels.create(type, maxi(level, 1), size)
+	_model = BuildingModels.create(type, maxi(level, 1), size, tier)
 	add_child(_model)
 	_collect_movers(_model)
 	_scaffold = BuildingModels.create_scaffold(size)

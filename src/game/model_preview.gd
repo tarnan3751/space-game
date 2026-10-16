@@ -122,7 +122,7 @@ func _build_viewport() -> void:
 ## Puts the type's model in front of the camera, framed, to be drawn this frame.
 func _stage(type: String) -> void:
 	_model_type = type
-	_model = BuildingModels.create(type, 1, _catalog.size_of(type))
+	_model = BuildingModels.create(type, 1, _catalog.size_of(type), BuildingModels.tier_of(_catalog, type, 1))
 	var bounds := AABB()
 	var first := true
 	for child: Node in _model.find_children("*", "MeshInstance3D", true, false):

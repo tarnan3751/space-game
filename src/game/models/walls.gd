@@ -3,8 +3,9 @@ extends RefCounted
 ## and, for each neighbour in its mask, a half-segment from the post to that cell edge, lower
 ## than the post, so two adjacent walls meet on their shared edge and each draws its own
 ## level's style. WallMesh merges the pieces of every finished wall into one mesh;
-## BuildingModels.create("barrier_wall", level, 1) is the lone post (mask 0), which the paint
-## brush, a lifted wall and the gallery show.
+## BuildingModels.create("barrier_wall", level, 1, tier) is the lone post (mask 0), which the
+## paint brush, a lifted wall and the gallery show. A piece is built for its level's tier
+## (BuildingModels.tier_of), which paints the top level's crown gold from the Gold tier.
 ##
 ## The mask has one bit per orthogonal neighbour in cell space, where cell (x, y) is world
 ## (x, z): PLUS_X the cell at x + 1, MINUS_X at x - 1, PLUS_Z at y + 1 (world +z), MINUS_Z at
@@ -16,7 +17,7 @@ extends RefCounted
 ## standing just proud as joints. Each level adds to the same wall: L1 slate plates on a squat
 ## post; L2 riveted armour with a band, and a taller post with a gunmetal cap; L3 ribbed
 ## segments with an energy strip along the top, and a ribbed post; L4 a chamfered pylon post and
-## double-plated segments with a brighter strip; L5 a gold crown on the cap and an energy field
+## double-plated segments with a brighter strip; L5 a crown on the cap and an energy field
 ## above a low plated base. Caps are never wider than their post. Every segment ends on the cell
 ## edge in a cap left out of the ink outline, so two segments that meet there draw one unbroken
 ## outline, except towards a wall whose solid segment is lower (`lower_mask`, the same bits;
@@ -58,7 +59,7 @@ const POSTS := [
 	[0.46, 0.76, 0.08, 0.42, 0.05],
 	[0.46, 0.76, 0.06, 0.42, 0.04],
 ]
-## The top level's gold crown on the cap: width and height.
+## The top level's crown on the cap, gold from the Gold tier: width and height.
 const CROWN := Vector2(0.34, 0.1)
 
 static var CONCRETE := Parts.CONCRETE_PAD
@@ -85,7 +86,7 @@ static var ENERGY_BRIGHT := Surf.make(MaterialKit.Layer.GLOW, MaterialKit.ENERGY
 static var FIELD := Surf.make(MaterialKit.Layer.GLOW, MaterialKit.ENERGY, FLOW_SCALE,
 	Surf.UNLIT | Surf.FLOW | Surf.PULSE, false, false, 0.45)
 
-## Built pieces by (level * 16 + mask) * 16 + lower_mask.
+## Built pieces by ((tier * 16 + level) * 16 + mask) * 16 + lower_mask.
 static var _pieces: Dictionary[int, Piece] = {}
 
 
@@ -96,16 +97,17 @@ class Piece:
 	var outline: Array
 
 
-## The piece for `level` and `mask`, its segments towards the neighbours in `lower_mask` (walls
-## whose solid_top() is lower, a subset of `mask`) ending in an outlined step; built on first use
-## and kept. The body is the same whatever `lower_mask` says: only the outline differs.
-static func piece(level: int, mask: int, lower_mask: int = 0) -> Piece:
+## The piece for `level`, built for its `tier` (BuildingModels.tier_of), and `mask`, its
+## segments towards the neighbours in `lower_mask` (walls whose solid_top() is lower, a subset of
+## `mask`) ending in an outlined step; built on first use and kept, by tier, level and masks. The
+## body is the same whatever `lower_mask` says: only the outline differs.
+static func piece(level: int, tier: int, mask: int, lower_mask: int = 0) -> Piece:
 	var shown := clampi(level, 1, LEVELS)
-	var key := (shown * 16 + mask) * 16 + lower_mask
+	var key := ((tier * 16 + shown) * 16 + mask) * 16 + lower_mask
 	var built: Piece = _pieces.get(key)
 	if built == null:
 		var m := LowPolyMesh.new()
-		_add_piece(m, shown, mask, lower_mask)
+		_add_piece(m, shown, tier, mask, lower_mask)
 		built = Piece.new()
 		built.body = m.to_arrays()
 		built.outline = m.to_outline_arrays()
@@ -115,18 +117,18 @@ static func piece(level: int, mask: int, lower_mask: int = 0) -> Piece:
 
 ## A wall's own model: the lone post.
 static func build_barrier_wall(p: Parts, level: int) -> void:
-	_add_piece(p.body, level, 0)
+	_add_piece(p.body, level, p.tier, 0)
 
 
-static func _add_piece(m: LowPolyMesh, level: int, mask: int, lower_mask: int = 0) -> void:
-	_post(m, level)
+static func _add_piece(m: LowPolyMesh, level: int, tier: int, mask: int, lower_mask: int = 0) -> void:
+	_post(m, level, tier)
 	for bit: int in NEIGHBOURS.size():
 		if mask & (1 << bit) != 0:
 			_segments(m, level, bit, lower_mask & (1 << bit) != 0)
 
 
-## The footing, the post, its cap and, on the top level, the crown.
-static func _post(m: LowPolyMesh, level: int) -> void:
+## The footing, the post, its cap and, on the top level, the crown, gold from the Gold tier.
+static func _post(m: LowPolyMesh, level: int, tier: int) -> void:
 	var spec: Array = POSTS[level - 1]
 	var width: float = spec[0]
 	var top: float = spec[1]
@@ -139,7 +141,8 @@ static func _post(m: LowPolyMesh, level: int) -> void:
 	if cap_width > 0.0:
 		m.box_chamfered(Vector3(cap_width, cap_height, cap_width), 0.02, Vector3(0, top, 0), CAP)
 	if level >= LEVELS:
-		m.box_chamfered(Vector3(CROWN.x, CROWN.y, CROWN.x), 0.03, Vector3(0, top + cap_height, 0), GOLD)
+		m.box_chamfered(Vector3(CROWN.x, CROWN.y, CROWN.x), 0.03, Vector3(0, top + cap_height, 0),
+			GOLD if tier >= Parts.Tier.GOLD else CAP)
 
 
 ## How high the solid part of a level's segment stands: the segment's top, or on the top level

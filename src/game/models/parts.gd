@@ -1,13 +1,17 @@
 class_name Parts
 extends RefCounted
-## A building model while it is built (BuildingModels.create): the static body, up to
-## MAX_MOVING moving parts (moving()), and what the per-category model files
+## A building model while it is built (BuildingModels.create): its tier, the static body, up
+## to MAX_MOVING moving parts (moving()), and what the per-category model files
 ## (src/game/models/) share: the helpers, the common surfaces, and SURFACES, the table that
 ## paints the colour names the models were first written with onto the material kit
 ## (docs/reference/art-style.md).
 
 ## Octagons are turned so their flat sides face along X and Z.
 const OCTAGON := Vector3(0, 22.5, 0)
+
+## A level's theme, set by the Command Center band it is unlocked in
+## (BuildingModels.tier_for_cc; docs/reference/art-style.md, **Tiers**).
+enum Tier { BASE, GOLD, CHROME, OBSIDIAN, CROWN }
 
 ## Each colour name the models use, as a kit surface: [layer, tint, flags, smooth]. Hulls take
 ## the hull layer, metals the plate layer, the glows the glow layer unlit in their category's
@@ -55,6 +59,9 @@ static var _surfs: Dictionary[String, Surf] = {}
 ## Moving parts a model may have.
 const MAX_MOVING := 3
 
+## The level's Tier, set before the builder runs: a builder reads it, never the level, for
+## the tier's surfaces (`p.tier >= Parts.Tier.GOLD` for gold trim).
+var tier: int = Tier.BASE
 var body := LowPolyMesh.new()
 ## The moving parts, each with its pivot and Motion, in the order moving() made them.
 var movers: Array[LowPolyMesh] = []
@@ -82,11 +89,6 @@ static func surf(name: String) -> Surf:
 		var row: Array = SURFACES[name]
 		_surfs[name] = Surf.make(row[0], row[1], 1.0, row[2], row[3])
 	return _surfs[name]
-
-
-## Gold on the top level, `normal` below it.
-static func accent(level: int, top: int, normal: String) -> String:
-	return "gold" if level >= top else normal
 
 
 ## A point on a circle of `radius` around the Y axis, at `degrees` from +X towards +Z.

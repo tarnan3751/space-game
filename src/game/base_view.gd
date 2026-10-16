@@ -303,7 +303,8 @@ func sync(state: BaseState) -> void:
 		var view: BuildingView = views.get(id)
 		if view == null:
 			view = BuildingView.new()
-			view.setup(id, building.type, building.level, state.catalog.size_of(building.type))
+			view.setup(id, building.type, building.level, state.catalog.size_of(building.type),
+				BuildingModels.tier_of(state.catalog, building.type, maxi(building.level, 1)))
 			add_child(view)
 			views[id] = view
 		view.show_status(building.level, building.is_busy(), building.target_level, state.seconds_left(id))

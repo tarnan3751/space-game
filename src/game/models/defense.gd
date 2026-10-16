@@ -3,7 +3,7 @@ extends RefCounted
 ## squat armoured plinth, an octagon of gunmetal plate belted in defence red on its concrete
 ## pad, and glows in its weapon's own colour: laser red, plasma violet, arc electric blue, ion
 ## and railgun cyan, EMP yellow. Levels add barrels, armour, coils or capacitors to the same
-## weapon; the top level adds gold trim.
+## weapon; the Gold tier (Parts.tier) adds gold trim.
 ##
 ## They animate (docs/reference/art-style.md, **Animation**): heads scan and barrels recoil as
 ## moving parts, emitters pulse, lamps blink in chases, currents flow along conduits, and arcs
@@ -107,7 +107,7 @@ static func build_laser_turret(p: Parts, level: int) -> void:
 		var root := LowPolyMesh.turn(Vector3(-0.18 + 0.36 * k, 0.29, 0.5), heading)
 		head.prism(bore, bore, length, 16, root, BARREL, along)
 		head.tube(bore * 0.5, bore + 0.035, 0.12, 16, _at(root, Vector3(0, length - 0.1, 0), along),
-			GOLD if level >= 5 else Parts.GUNMETAL, along)
+			GOLD if p.tier >= Parts.Tier.GOLD else Parts.GUNMETAL, along)
 		head.orb(bore * 0.85, 16, 8, _at(root, Vector3(0, length + 0.03, 0), along), LASER_PULSE.phased(0.5 * k))
 	if level >= 2:
 		for side: float in [-1.0, 1.0]:
@@ -120,7 +120,7 @@ static func build_laser_turret(p: Parts, level: int) -> void:
 		head.box_chamfered(Vector3(0.62, 0.36, 0.34), 0.06, LowPolyMesh.turn(Vector3(0, 0.12, -0.62), heading), DENSE, heading)
 		Parts.mast(head, LowPolyMesh.turn(Vector3(-0.28, 0.5, -0.25), heading), 0.4, 0.05, LASER_BLINK)
 	if level >= 5:
-		Parts.torus(head, 0.63, 0.035, 24, 10, Vector3(0, 0.27, 0), GOLD)
+		Parts.torus(head, 0.63, 0.035, 24, 10, Vector3(0, 0.27, 0), GOLD if p.tier >= Parts.Tier.GOLD else SHELL_MID)
 
 
 static func build_missile_battery(p: Parts, level: int) -> void:
@@ -142,7 +142,7 @@ static func build_missile_battery(p: Parts, level: int) -> void:
 	# The launcher scans on the deck: its arms, the box and its tubes, built about the deck's centre.
 	var launcher := p.moving(Vector3(0, deck, 0), Motion.swing(Vector3.UP, 15.0, 7.0))
 	var trunnion := Vector3(0, 0.62, 0)
-	var trim := GOLD if level >= 5 else Parts.GUNMETAL
+	var trim := GOLD if p.tier >= Parts.Tier.GOLD else Parts.GUNMETAL
 	for side: float in [-1.0, 1.0]:
 		var arm := LowPolyMesh.turn(Vector3(side * (width * 0.5 + 0.1), 0, 0), heading)
 		launcher.box_chamfered(Vector3(0.16, 0.72, 0.46), 0.04, arm, SHELL, heading)
@@ -170,7 +170,8 @@ static func build_missile_battery(p: Parts, level: int) -> void:
 	if level >= 5:
 		_crate(m, Parts.around(1.42, 45.0, Parts.PAD_HEIGHT))
 		launcher.box_chamfered(Vector3(width + 0.05, height + 0.05, 0.08), 0.02,
-			_at(trunnion, Vector3(0, -height * 0.5 - 0.025, -depth * 0.5 + 0.02), aim), GOLD, aim)
+			_at(trunnion, Vector3(0, -height * 0.5 - 0.025, -depth * 0.5 + 0.02), aim),
+			GOLD if p.tier >= Parts.Tier.GOLD else Parts.HULL_MID, aim)
 
 
 static func build_plasma_mortar(p: Parts, level: int) -> void:
@@ -200,7 +201,7 @@ static func build_plasma_mortar(p: Parts, level: int) -> void:
 	var tilt := Vector3(34, SCREEN_RIGHT, 0)
 	var heading := Vector3(0, SCREEN_RIGHT, 0)
 	m.orb(chamber, 16, 8, breech, PLASMA_PULSE)
-	var band := GOLD if level >= 4 else Parts.GUNMETAL
+	var band := GOLD if p.tier >= Parts.Tier.GOLD else Parts.GUNMETAL
 	Parts.torus(m, chamber + 0.01, 0.045, 20, 10, breech - Vector3(0, 0.045, 0), band)
 	# The cage's ribs cross the band at Parts.around() angles 15, 105, 195 and 285; the quarter
 	# between 15 and 105 faces the viewer, the barrel and the cheeks hiding its top and its foot.
@@ -235,7 +236,7 @@ static func build_plasma_mortar(p: Parts, level: int) -> void:
 	m.lathe(PackedVector2Array([
 		Vector2(0.44, muzzle - 0.24), Vector2(0.52, muzzle - 0.18), Vector2(0.52, muzzle), Vector2(0.42, muzzle + 0.04),
 		Vector2(0.32, muzzle - 0.04),
-	]), 20, mouth, GOLD if level >= 4 else SHELL, tilt)
+	]), 20, mouth, GOLD if p.tier >= Parts.Tier.GOLD else SHELL, tilt)
 	# The bore's lining glows, its bands running up and out of the muzzle.
 	m.lathe(PackedVector2Array([Vector2(0.32, muzzle - 0.04), Vector2(0.32, muzzle - 0.3)]), 20, mouth, BORE, tilt)
 	m.disc(0.32, 20, _at(mouth, Vector3(0, muzzle - 0.3, 0), tilt), PLASMA_PULSE.phased(0.5), tilt)
@@ -251,7 +252,7 @@ static func build_shield_generator(p: Parts, level: int) -> void:
 	m.ring(0.8, 0.88, 0.05, 24, Vector3(0, foot, 0), ION)
 	var orb_radius := 0.3 + 0.05 * level
 	var orb := Vector3(0, top + 1.45 + 0.05 * level, 0)
-	var knuckle := GOLD if level >= 4 else ARMOUR_ROUND
+	var knuckle := GOLD if p.tier >= Parts.Tier.GOLD else ARMOUR_ROUND
 	for k: int in 3:
 		var degrees := 75.0 + 120.0 * k
 		var root := Parts.around(0.6, degrees, foot + 0.35)
@@ -276,7 +277,8 @@ static func build_shield_generator(p: Parts, level: int) -> void:
 			m.orb(0.11, 12, 5, short_tip, knuckle)
 	m.orb(orb_radius, 20, 8, orb, ION_ORB)
 	if level >= 4:
-		Parts.torus(m, orb_radius + 0.16, 0.035, 20, 10, orb - Vector3(0, 0.035, 0), GOLD, Vector3(18, 0, 10))
+		Parts.torus(m, orb_radius + 0.16, 0.035, 20, 10, orb - Vector3(0, 0.035, 0),
+			GOLD if p.tier >= Parts.Tier.GOLD else SHELL_MID, Vector3(18, 0, 10))
 	# A hologram band round the orb, tilted off the axis it turns about, so it wobbles as it turns.
 	# The arm tips sit lower round a bigger orb, so the tilt grows with the level and the band's
 	# lowest edge stays above them all the way round.
@@ -306,7 +308,8 @@ static func build_flak_cannon(p: Parts, level: int) -> void:
 	m.box_chamfered(Vector3(0.66, 0.54, 0.8), 0.07, centre + Vector3(0, 0.1, 0), SHELL, heading)
 	m.box(Vector3(0.36, 0.05, 0.02), _at(centre, Vector3(0, 0.5, 0.401), heading), LASER, heading)
 	if level >= 4:
-		m.box_chamfered(Vector3(0.7, 0.07, 0.84), 0.02, centre + Vector3(0, 0.56, 0), GOLD, heading)
+		m.box_chamfered(Vector3(0.7, 0.07, 0.84), 0.02, centre + Vector3(0, 0.56, 0),
+			GOLD if p.tier >= Parts.Tier.GOLD else Parts.HULL_MID, heading)
 	var per_side := 2 if level < 3 else 3
 	var pack := 0.08 + 0.13 * per_side
 	# The barrels recoil together, kicking back `kick` from where they rest and easing out again;
@@ -326,7 +329,7 @@ static func build_flak_cannon(p: Parts, level: int) -> void:
 			var length := 1.05
 			guns.prism(0.06, 0.06, length, 16, root, BARREL, tilt)
 			guns.tube(0.04, 0.085, 0.16, 16, _at(root, Vector3(0, length - 0.12, 0), tilt),
-				GOLD if level >= 4 else Parts.GUNMETAL, tilt)
+				GOLD if p.tier >= Parts.Tier.GOLD else Parts.GUNMETAL, tilt)
 			guns.orb(0.05, 12, 6, _at(root, Vector3(0, length + 0.05, 0), tilt), LASER_BLINK)
 			guns.cone(0.06, 0.16, 8, _at(root, Vector3(0, length + 0.08, 0), tilt), FLARE.phased(flare / 6.0), tilt)
 			flare += 1
@@ -350,7 +353,7 @@ static func build_arc_tower(p: Parts, level: int) -> void:
 	Parts.drum(m, 0.62, 0.24, 0.06, 20, Vector3(0, top, 0), SHELL_MID)
 	var height := 0.85 + 0.2 * mini(level, 3)
 	var foot := Vector3(0, top + 0.24, 0)
-	var crown := _coil(m, foot, height, 0.5, level >= 4)
+	var crown := _coil(m, foot, height, 0.5, p.tier >= Parts.Tier.GOLD)
 	var sphere := 0.28 + 0.03 * level
 	var centre := crown + Vector3(0, sphere * 0.85, 0)
 	m.orb(sphere, 16, 8, centre, ARC_PULSE)
@@ -402,7 +405,7 @@ static func build_cloaked_sentry(p: Parts, level: int) -> void:
 			Vector3(0, 90.0 - degrees, 0))
 	Parts.drum(m, 0.44, 0.05, 0.02, 6, base + Vector3(0, 0.34, 0), Parts.HULL_DARK)
 	if level >= 3:
-		m.ring(0.43, 0.47, 0.06, 6, base + Vector3(0, 0.34, 0), GOLD)
+		m.ring(0.43, 0.47, 0.06, 6, base + Vector3(0, 0.34, 0), GOLD if p.tier >= Parts.Tier.GOLD else Parts.HULL_DARK)
 	# The lid gun scans, turning about the pod's axis.
 	var lid := p.moving(base + Vector3(0, 0.39, 0), Motion.swing(Vector3.UP, 30.0, 5.0))
 	var guns: Array[float] = [0.0]
@@ -438,7 +441,8 @@ static func build_gravity_well(p: Parts, level: int) -> void:
 	if level >= 2:
 		_gyro(p.moving(core, Motion.spin(Vector3.RIGHT, 1.3)), Vector3.ZERO, 0.38, 0.04, Vector3(62, 0, 0), SHELL)
 	if level >= 3:
-		_gyro(p.moving(core, Motion.spin(Vector3.BACK, -0.9)), Vector3.ZERO, 0.29, 0.035, Vector3(0, 0, -35), GOLD)
+		_gyro(p.moving(core, Motion.spin(Vector3.BACK, -0.9)), Vector3.ZERO, 0.29, 0.035, Vector3(0, 0, -35),
+			GOLD if p.tier >= Parts.Tier.GOLD else SHELL)
 	var rotor := p.moving(core + Vector3(0, 0.5, 0), Motion.spin(Vector3.UP, 1.5))
 	Parts.torus(rotor, 0.42, 0.05, 16, 10, Vector3(0, -0.05, 0), SHELL)
 	Parts.drum(rotor, 0.1, 0.1, 0.03, 16, Vector3(0, -0.05, 0), Parts.GUNMETAL)
@@ -469,7 +473,7 @@ static func build_emp_tower(p: Parts, level: int) -> void:
 		var from := Parts.around(0.4, 337.5 + 45.0 * k, cage.y + (0.18 if k % 2 == 0 else 0.52))
 		var to := Parts.around(0.4, 22.5 + 45.0 * k, cage.y + (0.52 if k % 2 == 0 else 0.18))
 		Parts.arc(m, from, to, 3, 0.03, EMP_ARC.phased(k / 3.0))
-	Parts.torus(m, 0.4, 0.05, 16, 10, cage + Vector3(0, 0.62, 0), GOLD if level >= 3 else Parts.GUNMETAL)
+	Parts.torus(m, 0.4, 0.05, 16, 10, cage + Vector3(0, 0.62, 0), GOLD if p.tier >= Parts.Tier.GOLD else Parts.GUNMETAL)
 	m.dome(0.22, 0.12, 16, 6, cage + Vector3(0, 0.67, 0), SHELL_MID)
 	Parts.mast(m, cage + Vector3(0, 0.78, 0), 0.22, 0.05, EMP_BLINK.phased(0.5))
 	# The cans' bands blink in a chase round the ring.
@@ -505,7 +509,7 @@ static func build_railgun(p: Parts, level: int) -> void:
 		m.box_chamfered(Vector3(0.14, 0.26, length), 0.04, _at(root, Vector3(side * 0.16, 0, length * 0.5), aim),
 			Parts.GUNMETAL, aim)
 		m.box_chamfered(Vector3(0.16, 0.28, 0.16), 0.04, _at(root, Vector3(side * 0.16, -0.01, length - 0.08), aim),
-			GOLD if level >= 3 else ARMOUR, aim)
+			GOLD if p.tier >= Parts.Tier.GOLD else ARMOUR, aim)
 	m.box(Vector3(0.14, 0.08, length - 0.5), _at(root, Vector3(0, 0.08, length * 0.5 + 0.15), aim), RAIL_CURRENT, aim)
 	m.box(Vector3(0.16, 0.18, 0.06), _at(root, Vector3(0, 0.03, length - 0.06), aim), ION_PULSE, aim)
 	var collars := int((length - 0.7) / 0.5)
@@ -550,7 +554,7 @@ static func build_ion_beam(p: Parts, level: int) -> void:
 		var major := 0.26 - 0.035 * i
 		var ring := turning[i % 2]
 		Parts.torus(ring, major, 0.035, 16 - 2 * i, 8, LowPolyMesh.turn(Vector3(0, reach, 0), aim),
-			GOLD if level >= 2 and i == 0 else SHELL_MID, aim)
+			GOLD if p.tier >= Parts.Tier.GOLD and i == 0 else SHELL_MID, aim)
 		for k: int in 2:
 			var degrees := 60.0 * i + 180.0 * k
 			ring.strut(LowPolyMesh.turn(Parts.around(major + 0.03, degrees, reach + 0.035), aim),
@@ -579,7 +583,7 @@ static func build_orbital_cannon(p: Parts, level: int) -> void:
 		var cheek := LowPolyMesh.turn(Vector3(side * 0.6, 0, 0), heading)
 		m.box_chamfered(Vector3(0.2, 0.78, 1.15), 0.06, Vector3(cheek.x, deck, cheek.z), ARMOUR, heading)
 		m.prism(0.22, 0.22, 0.1, 20, trunnion + LowPolyMesh.turn(Vector3(side * 0.7, 0, 0), heading),
-			GOLD if level >= 2 else Parts.GUNMETAL, heading + Vector3(0, 0, -90 * side))
+			GOLD if p.tier >= Parts.Tier.GOLD else Parts.GUNMETAL, heading + Vector3(0, 0, -90 * side))
 	# The gun elevates slowly about its trunnion: the breech block, the barrel and what it carries.
 	# The block's foot sits 0.3 down in the deck and the elevation slides it a further 0.06 through
 	# the deck's top, between the cheeks, which hide where it meets the deck: by construction.
@@ -594,7 +598,7 @@ static func build_orbital_cannon(p: Parts, level: int) -> void:
 		Vector2(0.3, 0), Vector2(0.42, 0.06), Vector2(0.42, 0.34), Vector2(0.26, 0.38), Vector2(0.22, 0.3),
 	]), 24, _at(barrel, Vector3(0, length, 0), aim), SHELL, aim)
 	gun.disc(0.22, 20, _at(barrel, Vector3(0, length + 0.3, 0), aim), BORE_ION, aim)
-	gun.tube(0.42, 0.44, 0.08, 24, _at(barrel, Vector3(0, length + 0.12, 0), aim), GOLD if level >= 2 else ARMOUR_ROUND,
+	gun.tube(0.42, 0.44, 0.08, 24, _at(barrel, Vector3(0, length + 0.12, 0), aim), GOLD if p.tier >= Parts.Tier.GOLD else ARMOUR_ROUND,
 		aim)
 	gun.ring(0.5, 0.53, 0.1, 24, _at(barrel, Vector3(0, length + 0.44, 0), aim), ION_HOLO, aim)
 	# The coils swell one after another up the barrel: the current running to the muzzle.
@@ -604,7 +608,7 @@ static func build_orbital_cannon(p: Parts, level: int) -> void:
 		Parts.torus(gun, 0.315, 0.04, 24, 10, _at(barrel, Vector3(0, at, 0), aim), ION_PULSE.phased(Parts.chase(i, coils)),
 			aim)
 	if level >= 2:
-		Parts.torus(m, 1.0, 0.04, 24, 10, Vector3(0, deck - 0.04, 0), GOLD)
+		Parts.torus(m, 1.0, 0.04, 24, 10, Vector3(0, deck - 0.04, 0), GOLD if p.tier >= Parts.Tier.GOLD else SHELL_MID)
 	var mast := Parts.around(1.3, 135.0, top + 0.24)
 	m.prism(0.08, 0.06, 0.9, 16, mast, Parts.GUNMETAL)
 	var radar := p.moving(mast + Vector3(0, 0.9, 0), Motion.spin(Vector3.UP, 0.8))

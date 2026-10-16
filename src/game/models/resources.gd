@@ -26,7 +26,7 @@ const BAY_DECK_TOP := 0.26
 ## An open landing deck with a hazard ring and a chase of landing lights, the builder drone
 ## idling over its docking cradle, its rotors a spinning blur, a raised control booth on the far corner
 ## with a scrolling screen and a rotating beacon on its roof, a fuel tank and a stack of
-## crates. One level, so it is complete at once, gold on the booth's roof.
+## crates. The booth's roof is gold from the Gold tier.
 static func build_drone_bay(p: Parts, _level: int) -> void:
 	var m := p.body
 	Parts.foundation(m, 2)
@@ -54,15 +54,16 @@ static func build_drone_bay(p: Parts, _level: int) -> void:
 	# High enough that at the bottom of its bob its tool arm's lens just clears the deck.
 	DroneModels.add_drone(m, top + Vector3(0, 0.28, 0), true)
 
-	# The control booth on the far corner: a column, a glazed cab, a gold-rimmed roof (its one
-	# level is its top level) and a ladder.
+	# The control booth on the far corner: a column, a glazed cab, a roof rimmed gold from the
+	# Gold tier, and a ladder.
 	var booth := Vector3(-0.5, Parts.PAD_HEIGHT, -0.5)
 	m.box_chamfered(Vector3(0.44, 0.7, 0.44), 0.05, booth, Parts.HULL_LIGHT)
 	var cab := booth + Vector3(0, 0.7, 0)
 	m.box_chamfered(Vector3(0.62, 0.34, 0.62), 0.06, cab, Parts.HULL_LIGHT)
 	m.box(Vector3(0.64, 0.14, 0.64), cab + Vector3(0, 0.12, 0), BAY_WINDOWS)
 	m.box(Vector3(0.28, 0.2, 0.02), booth + Vector3(0, 0.36, 0.22), BAY_SCREEN)
-	m.box_chamfered(Vector3(0.68, 0.06, 0.68), 0.03, cab + Vector3(0, 0.34, 0), Parts.GOLD_TRIM)
+	m.box_chamfered(Vector3(0.68, 0.06, 0.68), 0.03, cab + Vector3(0, 0.34, 0),
+		Parts.GOLD_TRIM if p.tier >= Parts.Tier.GOLD else Parts.HULL_MID)
 	Parts.ladder(m, booth + Vector3(0.24, 0, 0.05), 0.7, 0.2, 90.0, Parts.ROD)
 	_beacon(p.moving(cab + Vector3(0, 0.4, 0), Motion.spin(Vector3.UP, 2.4)))
 
@@ -145,7 +146,7 @@ const ROCKER_AXIS := Vector3(0.70710678, 0, 0.70710678)
 ## L5 gold trim.
 static func build_metal_extractor(p: Parts, level: int) -> void:
 	var m := p.body
-	var gold := level >= 5
+	var gold := p.tier >= Parts.Tier.GOLD
 	var height: float = DERRICK_HEIGHTS[level - 1]
 	Parts.foundation(m, 3)
 	var ground := Parts.PAD_HEIGHT
@@ -174,15 +175,16 @@ static func build_metal_extractor(p: Parts, level: int) -> void:
 			m.strut(a, b, 0.08, LEG)
 	m.box_chamfered(Vector3(0.6, 0.26, 0.6), 0.05, crown, Parts.HULL_LIGHT)
 	m.box(Vector3(0.62, 0.07, 0.62), crown + Vector3(0, 0.07, 0), METAL_ACCENT)
-	if gold:
-		m.box_chamfered(Vector3(0.64, 0.06, 0.64), 0.02, crown + Vector3(0, 0.26, 0), Parts.GOLD_TRIM)
+	if level >= 5:
+		m.box_chamfered(Vector3(0.64, 0.06, 0.64), 0.02, crown + Vector3(0, 0.26, 0),
+			Parts.GOLD_TRIM if gold else Parts.HULL_MID)
 	if level >= 3:
 		# The winch on the crown's back corner, along the rocker's axis, clear of its post.
 		Parts.pipe(m, crown + Vector3(-0.27, 0.36, -0.27), crown + Vector3(-0.1, 0.36, -0.1), 0.08, Parts.GUNMETAL)
 	Parts.landing_light(m, crown + Vector3(0.14, 0.26, 0.14), 0.09, METAL_GLOW)
 	# The walking beam's post: an A-frame along the beam on the crown, a pin through its head.
 	var pin := crown + Vector3(0, ROCKER_PIN, 0)
-	var crown_top := crown.y + (0.32 if gold else 0.26)
+	var crown_top := crown.y + (0.32 if level >= 5 else 0.26)
 	for side: float in [-1.0, 1.0]:
 		Parts.beam(m, Vector3(crown.x, crown_top, crown.z) + ACROSS * 0.2 * side, pin, 0.06, LEG, 0.02)
 	Parts.pipe(m, pin - ROCKER_AXIS * 0.08, pin + ROCKER_AXIS * 0.08, 0.05, Parts.GUNMETAL, 12)
@@ -314,7 +316,7 @@ const GANTRY_HEIGHTS := [1.9, 1.95, 2.0, 2.05, 2.1]
 ## ring round the cluster, L4 pylons on it with lamps chasing round, L5 gold trim.
 static func build_crystal_harvester(p: Parts, level: int) -> void:
 	var m := p.body
-	var gold := level >= 5
+	var gold := p.tier >= Parts.Tier.GOLD
 	Parts.foundation(m, 3)
 	var ground := Parts.PAD_HEIGHT
 	m.dome(0.8, 0.22, 8, 2, Vector3(0, ground, 0), ROCK)
@@ -408,7 +410,7 @@ const SIPHON_COILS := [6, 9, 9]
 ## a second capacitor; L3 a second, larger torus tilted round the first, and gold trim.
 static func build_antimatter_siphon(p: Parts, level: int) -> void:
 	var m := p.body
-	var gold := level >= 3
+	var gold := p.tier >= Parts.Tier.GOLD
 	Parts.foundation(m, 3)
 	var ground := Parts.PAD_HEIGHT
 	m.lathe(PackedVector2Array([
@@ -448,7 +450,8 @@ static func build_antimatter_siphon(p: Parts, level: int) -> void:
 		s.box(Vector3(0.13, 0.06, 0.37), Parts.around(0.72, degrees, 0.04), COIL_CURRENT, yaw)
 	if level >= 3:
 		var tilt := Vector3(12, 0, 0)
-		Parts.torus(s, 1.05, 0.07, 24, 10, -LowPolyMesh.turn(Vector3(0, 0.07, 0), tilt), Parts.GOLD_ROUND, tilt)
+		Parts.torus(s, 1.05, 0.07, 24, 10, -LowPolyMesh.turn(Vector3(0, 0.07, 0), tilt),
+			Parts.GOLD_ROUND if gold else Parts.HULL_MID_ROUND, tilt)
 
 
 ## A field pylon on the pedestal's rim: a column on a foot with an antimatter band, its
@@ -500,7 +503,7 @@ const TWIN_TANKS := [Vector3(-0.56, 0, 0.56), Vector3(0.56, 0, -0.56)]
 ## flowing liquid metal from L4, and wears gold caps at L5.
 static func build_metal_silo(p: Parts, level: int) -> void:
 	var m := p.body
-	var gold := level >= 5
+	var gold := p.tier >= Parts.Tier.GOLD
 	var height: float = METAL_SILO_HEIGHTS[level - 1]
 	Parts.foundation(m, 3)
 	if level < 4:
@@ -590,7 +593,7 @@ const PANEL_ROW := 0.2
 ## lid and the bands.
 static func build_crystal_silo(p: Parts, level: int) -> void:
 	var m := p.body
-	var gold := level >= 5
+	var gold := p.tier >= Parts.Tier.GOLD
 	Parts.foundation(m, 3)
 	var ground := Parts.PAD_HEIGHT
 	var radius := CRYSTAL_SILO_RADIUS
@@ -664,7 +667,7 @@ const VAULT_ROUND := [Vector2(-1, -1), Vector2(1, -1), Vector2(1, 1), Vector2(-1
 ## bigger pylons again, gold trim, and arcs crackling between the pylons' tips.
 static func build_antimatter_vault(p: Parts, level: int) -> void:
 	var m := p.body
-	var gold := level >= 3
+	var gold := p.tier >= Parts.Tier.GOLD
 	Parts.foundation(m, 3)
 	var ground := Parts.PAD_HEIGHT
 	m.box_chamfered(Vector3(2.1, 0.14, 2.1), 0.05, Vector3(0, ground, 0), ARMOUR)
@@ -708,7 +711,7 @@ static func build_antimatter_vault(p: Parts, level: int) -> void:
 		var corner: Vector2 = VAULT_ROUND[k]
 		tips.append(_containment_pylon(m, Vector3(corner.x * 1.06, ground + 0.14, corner.y * 1.06), width, pylon_height,
 			gold, k / 4.0))
-	if gold:
+	if level >= 3:
 		for k: int in tips.size():
 			Parts.arc(m, tips[k], tips[(k + 1) % tips.size()], 5, 0.07, ARC.phased(k / 4.0 + 0.1))
 

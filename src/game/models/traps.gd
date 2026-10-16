@@ -1,7 +1,7 @@
 extends RefCounted
 ## Models of the traps, in the comic style (docs/reference/art-style.md): low, squat devices on
 ## concrete pads, gunmetal casings banded in hazard stripes, one warning glow each, gold trim
-## at the top level, each well inside its footprint and its budget. Each is animated by its
+## from the Gold tier (Parts.tier), each well inside its footprint and its budget. Each is animated by its
 ## surfaces alone (docs/reference/art-style.md, **Animation**): warning lights BLINK, glows PULSE,
 ## the gravity trap's vortex streams inward.
 ##
@@ -38,7 +38,8 @@ static var GOLD_ROUND := Surf.make(MaterialKit.Layer.FLAT, MaterialKit.CORE_GOLD
 
 
 ## A low domed disc on a hazard rim, spikes round its crown and a red warning light. More
-## spikes at 2, a second light at 3. The lights blink in turn.
+## spikes at 2, a second light in a ring at 3, the ring gold from the Gold tier. The lights
+## blink in turn.
 static func build_proximity_mine(p: Parts, level: int) -> void:
 	var m := p.body
 	var base := Vector3(0, Parts.PAD_HEIGHT, 0)
@@ -56,12 +57,13 @@ static func build_proximity_mine(p: Parts, level: int) -> void:
 			CASING_MID, Parts.facing(out * 0.4 + Vector3.UP))
 	m.dome(0.07, 0.07, 16, 3, base + Vector3(0, 0.162, 0), RED_BLINK)
 	if level >= 3:
-		m.ring(0.07, 0.1, 0.03, 16, base + Vector3(0, 0.152, 0), GOLD_ROUND)
+		m.ring(0.07, 0.1, 0.03, 16, base + Vector3(0, 0.152, 0), GOLD_ROUND if p.tier >= Parts.Tier.GOLD else CASING_MID)
 		m.dome(0.04, 0.04, 16, 3, Parts.around(0.31, 45, 0.07) + base, RED_BLINK.phased(0.5))
 
 
 ## A ring emitter round a dark funnel with a violet vortex at its bottom, coils on its rim. A
-## second ring, in gold, hovering over it at 2. The emitter's lip and the hovering ring pulse; the
+## second ring hovering over it at 2, gold from the Gold tier. The emitter's lip and the hovering
+## ring pulse; the
 ## vortex's glow streams inward down the funnel.
 static func build_grav_trap(p: Parts, level: int) -> void:
 	var m := p.body
@@ -88,7 +90,7 @@ static func build_grav_trap(p: Parts, level: int) -> void:
 			var degrees := 90.0 + 120.0 * i
 			m.strut(Parts.around(0.24, degrees, 0.12) + base, Parts.around(0.2, degrees, 0.0) + hover, 0.03,
 				Parts.ROD)
-		m.ring(0.15, 0.23, 0.05, 16, hover, GOLD_ROUND)
+		m.ring(0.15, 0.23, 0.05, 16, hover, GOLD_ROUND if p.tier >= Parts.Tier.GOLD else CASING_MID)
 		m.ring(0.13, 0.15, 0.03, 16, hover + Vector3(0, 0.01, 0), VIOLET_PULSE.phased(0.5))
 
 
@@ -108,7 +110,7 @@ static func build_flak_mine(p: Parts, level: int) -> void:
 		m.disc(0.032, 12, spot + Vector3(0, 0.161, 0), YELLOW_PULSE.phased(float(i) / barrels))
 	m.dome(0.075, 0.07, 16, 3, top, LENS)
 	if level >= 3:
-		m.ring(0.075, 0.1, 0.025, 16, top, GOLD_ROUND)
+		m.ring(0.075, 0.1, 0.025, 16, top, GOLD_ROUND if p.tier >= Parts.Tier.GOLD else CASING_MID)
 
 
 ## A big armoured dome on a hazard band, warning lights round its foot and a fuse cap on its
@@ -123,7 +125,8 @@ static func build_mega_mine(p: Parts, level: int) -> void:
 	var height := 0.42 if level < 2 else 0.54
 	m.dome(radius, height, 24, 6, base + Vector3(0, 0.06, 0), CASING)
 	if level >= 2:
-		m.ring(radius - 0.02, radius + 0.04, 0.05, 24, base + Vector3(0, 0.1, 0), GOLD_ROUND)
+		m.ring(radius - 0.02, radius + 0.04, 0.05, 24, base + Vector3(0, 0.1, 0),
+			GOLD_ROUND if p.tier >= Parts.Tier.GOLD else CASING_MID)
 	var lights := 4 if level < 2 else 6
 	for i: int in lights:
 		var degrees := 45.0 + 360.0 * i / lights

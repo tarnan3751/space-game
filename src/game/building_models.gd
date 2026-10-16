@@ -10,13 +10,17 @@ extends RefCounted
 ## Motion), which BuildingView moves while the building is finished and idle, with the part's
 ## mesh and its outline under it. So a model has at most eight MeshInstance3D, half of them at
 ## most outlines (OUTLINE_META), which cast no shadow; a part with nothing to outline (only
-## hologram, flicker or jitter parts) has none. The meshes are built once per type and level and
-## shared; the nodes are per view. A level above a type's models shows its top model.
+## hologram, flicker or jitter parts) has none. The meshes are built once per type, level and
+## tier and shared; the nodes are per view. A level above a type's models shows its top model.
 ##
 ## Each category shares a look: every building but a wall stands on the concrete foundation pad
 ## (Parts.foundation) in its category's accent colour (docs/reference/art-style.md), and walls
-## are posts that join their neighbours (models/walls.gd). Level 1 is plain, each level adds a
-## part or an accent, the top level carries gold.
+## are posts that join their neighbours (models/walls.gd). Level 1 is plain and each level adds a
+## part or an accent. A level's tier (Parts.Tier) is its theme: tier_of() takes it from the
+## data, the Command Center level the level requires, so every type's levels of one Command
+## Center band share it (gold trim from Command Center 5). The cache is keyed by type, shown
+## level and tier, so a level above a type's models, shown as its top model, is painted for its
+## own tier and never hands that paint to the top level's views.
 ##
 ## This file dispatches: each type's builder is a static build_<type>(p: Parts, level) in its
 ## category's file under src/game/models/ (core, resources, army, defense, traps), but for the
@@ -94,7 +98,30 @@ class Moving:
 	var motion: Motion
 
 
-static func create(type: String, level: int, size: int) -> Node3D:
+## The Tier of the levels unlocked at Command Center `cc`: one mapping, used for every type.
+static func tier_for_cc(cc: int) -> int:
+	if cc >= 10:
+		return Parts.Tier.CROWN
+	if cc >= 8:
+		return Parts.Tier.OBSIDIAN
+	if cc >= 6:
+		return Parts.Tier.CHROME
+	if cc >= 5:
+		return Parts.Tier.GOLD
+	return Parts.Tier.BASE
+
+
+## The Tier of `type` at `level`, from the Command Center level it requires (`requires_cc`, 1
+## when it has none). The Command Center's own level is its band: its level 5 is Gold though
+## it requires Command Center 4.
+static func tier_of(catalog: Catalog, type: String, level: int) -> int:
+	if type == Catalog.HQ_TYPE:
+		return tier_for_cc(level)
+	return tier_for_cc(int(catalog.level_stats(type, level).get("requires_cc", 1)))
+
+
+## The model of `type` at `level`, built for its `tier` (tier_of) and scaled to `size` cells.
+static func create(type: String, level: int, size: int, tier: int) -> Node3D:
 	var root := Node3D.new()
 	var shown := 0
 	var key := "?/%d" % size
@@ -103,7 +130,7 @@ static func create(type: String, level: int, size: int) -> Node3D:
 		var built_for: int = spec[0]
 		var top: int = spec[1]
 		shown = clampi(level, 1, top)
-		key = "%s/%d" % [type, shown]
+		key = "%s/%d/%d" % [type, shown, tier]
 		if built_for != size:
 			root.scale = Vector3.ONE * (float(size) / built_for)
 	elif not _warned.has(type):
@@ -112,6 +139,7 @@ static func create(type: String, level: int, size: int) -> Node3D:
 	var meshes: Meshes = _cache.get(key)
 	if meshes == null:
 		var p := Parts.new()
+		p.tier = tier
 		if shown > 0:
 			_build(p, type, shown)
 		else:
