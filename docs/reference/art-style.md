@@ -1143,19 +1143,36 @@ and 91 on traps, the cards' pictures included (110, 94 and 73 on a walls tab whi
 tabs; 100, 86 and 68 before the pictures). The pictures cost one 160×160 render per type, one a
 frame, the first time the panel opens, each read back into a 100 KB texture (about 3 MB for
 today's menu), and nothing per frame once every type is cached and the preview's viewport is
-freed (`hud.md`, **Pictures**). The model gallery lays out 259 models (every type to its ten-level
-data, a level above a type's modelled top showing its top model) over three pages, whose
-overviews are 527, 680 and 566 draw calls with every type animated (76, 83 and 100 models at
-once); with two pages and 121 models it was 552 and 275 (565 and 217 before the Cadet Academy's
+freed (`hud.md`, **Pictures**). The model gallery lays out the 259 models (every level of every
+type, each modelled) over two pages of the 48×48 field, whose overviews are 1,097 and 946 draw
+calls with every type animated (124 and 135 models at once); on the 40×40 field, over three pages
+and before most of the upgrade pass's batches, it was 527, 680 and 566 (76, 83 and 100 models);
+with two pages and 121 models it was 552 and 275 (565 and 217 before the Cadet Academy's
 levels moved rows between the pages; 362 and 158 before the animation pass, when nine types had
 one spinner each; 381 and 177 with the build bar, 375 and 171 before the environment, 294 and
 157 before the kit): every moving part is two more draws and a shadow draw, and every mesh with
-holograms one more. The render thread's CPU time on the development Mac is about 0.7 to 0.9 ms a
-frame on page 1, 0.9 to 1.3 ms on page 2 and 0.9 to 1.1 ms on page 3, measured with the
-gallery's own line over two runs (with two pages, 1.2 to 1.5 ms on page 1, 74 of the 121 models,
-and 0.4 to 0.7 ms on page 2); it
-does not move with the shadow's filter (0, 2 or 4 measure the same within that noise), since PCF
-costs on the GPU: 13 shadow taps a fragment near a shadow edge (fewer where the first taps
+holograms one more. The render thread's CPU time on the development Mac is about 1.5 to 2.0 ms a
+frame on page 1 and 1.4 to 1.5 ms on page 2, measured with the gallery's own line over two runs
+(on three pages, 0.7 to 0.9, 0.9 to 1.3 and 0.9 to 1.1 ms; with two pages and 121 models, 1.2 to
+1.5 ms on page 1, 74 of the 121 models, and 0.4 to 0.7 ms on page 2).
+
+**The maxed base**, the template base at the Command Center 10 counts (112 buildings and 250
+walls, 301 moving parts), measured by the `template_base` scenario in a 1600×900 window on the
+development Mac (`tools/harness/README.md`): 1,318 draw calls and 1.72 million primitives a frame
+at the widest zoom (camera size 44), 1,065 and 1.49 million at the start zoom (24), against a
+fresh base's 48 draw calls and 0.13 million; the render thread's CPU time 1.5 ms a frame at
+the widest zoom and 1.3 ms at the start on a quiet machine, up to 3.5 and 2.1 with it loaded, over
+four runs; 231 fps at the widest and 263 at the start on the quiet machine (45 to 82 and 91 to
+153 with it loaded: the frame rate is only as good as the machine is quiet). The scenario checks
+each zoom against ceilings set well over these (1,600 draw calls, 2.1 million primitives, 6 ms of
+render CPU, with room for a loaded machine), so a regression shows. The upgrade plan estimated
+about 1,200 draw calls at the widest zoom before the merged walls and the scenery
+(`docs/plans/upgrade-pass.md`, §9); measured with both, it is 1,318. The primitives count every
+pass, the outlines and the shadow map's included. Phones are unmeasured for the maxed base: that
+measurement, still parked, decides whether the Crown escorts stay.
+
+The render thread's CPU time does not move with the shadow's filter (0, 2 or 4 measure the same
+within the gallery's run-to-run noise), since PCF costs on the GPU: 13 shadow taps a fragment near a shadow edge (fewer where the first taps
 agree), and the penumbra's dot screen a few more instructions in `light()`. The shadow map,
 1024² at 16 bits, is 2 MB. The kit's texture array, twenty 256×256 RGBA8 layers, is about 6.7
 MB with its mipmaps (5.7 with seventeen); the field texture, one 1024×1024 RGBA8 image, is about 5.3 MB with its

@@ -372,6 +372,15 @@ modification time stayed the same; and that every moving part of every model (ea
 carrying `BuildingModels.MOVE_META`) moves: sampled every four frames for 1.5 seconds, a part
 passes once any sample differs from its first pose, so a hammer's hold or a period that divides
 the gap cannot hide it. Once the "Template base" toast has faded (2.5 seconds after the press),
+rendered only (headless it logs that it skipped), it measures the whole base in a 1600x900
+window at the widest zoom (camera size 44) and at the start zoom (24), each held 2.1 seconds and
+then sampled every frame for three seconds through `Performance.get_monitor`: the most draw
+calls (`RENDER_TOTAL_DRAW_CALLS_IN_FRAME`) and primitives (`RENDER_TOTAL_PRIMITIVES_IN_FRAME`) in
+a frame and the render thread's CPU time a frame on average (measured on the root viewport, as
+`model_gallery` does), each checked against a ceiling (1,600, 2.1 million, 6 ms) set well over
+the measured figures (`docs/reference/art-style.md`, **Cost**), and the slowest frame's process
+time (`TIME_PROCESS`, the slowest of the last second) and the frame rate (`TIME_FPS`), logged
+only, since they are only as good as the machine is quiet. Then
 it screenshots the whole base at the widest zoom in a 1560x720 window, then each category's
 band with the fence under it (the Command Center's with the first category's; the walls are the
 fences, so they are left out of the Defence band's frame), a band wider than 16 cells in even parts, each part centred and at camera

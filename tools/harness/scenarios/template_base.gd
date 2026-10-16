@@ -11,7 +11,11 @@ extends HarnessScenario
 ## and its models, as tall as the band's tallest, to fill no more than FILL of the screen, so none
 ## runs under the HUD or off the
 ## screen; each again a second later where a part turns. The first shot waits until the
-## "Template base" toast, which covers the Command Center's antenna, has faded.
+## "Template base" toast, which covers the Command Center's antenna, has faded. Before the shots,
+## rendered only, the whole base is measured in a MEASURE window at the widest zoom and at the
+## start zoom (_measure): the draw calls and primitives in a frame, the render thread's CPU time a
+## frame, the slowest frame's process time and the frame rate, the first three checked against the
+## ceilings below.
 
 const WIDE := Vector2i(1560, 720)
 const BAND_ZOOM := 16.0
@@ -24,6 +28,18 @@ const MOVE_SAMPLE_FRAMES := 4
 ## Seconds from the press until the HUD's toast has faded (Hud.show_message: 1.8 s shown, then
 ## 0.6 s fading out).
 const TOAST_SECONDS := 2.5
+## The window the whole base is measured in, how long each zoom is held before the monitors are
+## read (Performance.TIME_FPS counts the last whole second, as in model_gallery), and how long
+## they are sampled.
+const MEASURE := Vector2i(1600, 900)
+const SETTLE_SECONDS := 2.1
+const SAMPLE_SECONDS := 3.0
+## Ceilings for the whole base on the development Mac, set generously over its measured figures
+## (docs/reference/art-style.md, **Cost**), so a regression shows: draw calls and primitives in a
+## frame, and the render thread's CPU time a frame on average, in milliseconds.
+const DRAW_CALL_CEILING := 1600
+const PRIMITIVE_CEILING := 2100000
+const RENDER_CPU_CEILING := 6.0
 
 
 func run(main: MainScript) -> void:
@@ -101,6 +117,12 @@ func run(main: MainScript) -> void:
 
 	if toast.time_left > 0.0:
 		await toast.timeout
+	if harness.headless:
+		say("the whole base's draw calls and frame time skipped (headless)")
+	else:
+		main.get_window().size = MEASURE
+		await _measure(main, "widest", IsoCamera.MAX_ZOOM_SIZE)
+		await _measure(main, "start", IsoCamera.START_ZOOM_SIZE)
 	main.get_window().size = WIDE
 	await _shot(main, "whole", Vector3.ZERO, IsoCamera.MAX_ZOOM_SIZE)
 	for band: String in catalog.categories:
@@ -141,3 +163,36 @@ func _shot(main: MainScript, name: String, at: Vector3, size: float) -> void:
 	main.camera.pan(centre, centre - main.camera.unproject_position(at))
 	await frames(6)
 	await screenshot(name)
+
+
+## Centres the view on the field at camera size `size`, holds it SETTLE_SECONDS, then samples
+## every frame for SAMPLE_SECONDS: the most draw calls and primitives in a frame, the render
+## thread's CPU time a frame on average, the slowest frame's process time (Performance.TIME_PROCESS
+## holds the slowest of the last second) and the frame rate at the end; says them and checks the
+## first three against the ceilings.
+func _measure(main: MainScript, zoom: String, size: float) -> void:
+	var centre := main.get_viewport().get_visible_rect().size * 0.5
+	main.camera.zoom_at(main.camera.size / size, centre)
+	main.camera.pan(centre, centre - main.camera.unproject_position(Vector3.ZERO))
+	var viewport_rid := main.get_viewport().get_viewport_rid()
+	RenderingServer.viewport_set_measure_render_time(viewport_rid, true)
+	await main.get_tree().create_timer(SETTLE_SECONDS).timeout
+	var draws := 0
+	var primitives := 0
+	var process := 0.0
+	var render := 0.0
+	var count := 0
+	var sampling := main.get_tree().create_timer(SAMPLE_SECONDS)
+	while sampling.time_left > 0.0:
+		await frames(1)
+		draws = maxi(draws, int(Performance.get_monitor(Performance.RENDER_TOTAL_DRAW_CALLS_IN_FRAME)))
+		primitives = maxi(primitives, int(Performance.get_monitor(Performance.RENDER_TOTAL_PRIMITIVES_IN_FRAME)))
+		process = maxf(process, Performance.get_monitor(Performance.TIME_PROCESS) * 1000.0)
+		render += RenderingServer.viewport_get_measured_render_time_cpu(viewport_rid)
+		count += 1
+	var fps := Performance.get_monitor(Performance.TIME_FPS)
+	check(draws > 0 and draws <= DRAW_CALL_CEILING and primitives <= PRIMITIVE_CEILING
+		and render / count <= RENDER_CPU_CEILING,
+		"the whole base at the %s zoom (size %.0f) in %dx%d: %d draw calls (ceiling %d), %d primitives (ceiling %d), %.2f ms render CPU (ceiling %.1f), %.2f ms process at the slowest, %d fps over %d frames"
+		% [zoom, size, MEASURE.x, MEASURE.y, draws, DRAW_CALL_CEILING, primitives, PRIMITIVE_CEILING,
+		render / count, RENDER_CPU_CEILING, process, fps, count])
