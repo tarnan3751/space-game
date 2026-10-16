@@ -199,8 +199,10 @@ static var CRYSTAL_PRONG := Surf.make(MaterialKit.Layer.PLATE, MaterialKit.CRYST
 static var CRYSTAL_GLOW := Surf.make(MaterialKit.Layer.GLOW, MaterialKit.CRYSTAL, 1.0, Surf.UNLIT, true)
 ## The shards pulse, each on a phase of its own.
 static var CRYSTAL_SHARD := Surf.make(MaterialKit.Layer.CRYSTAL, MaterialKit.CRYSTAL, 1.5, Surf.GLOSSY | Surf.PULSE)
-## A laser beam, the pipe layer's bands running down it as it pulses: too thin for the outline.
-static var CRYSTAL_BEAM := Surf.make(MaterialKit.Layer.PIPE, MaterialKit.CRYSTAL, 4.0, Surf.UNLIT | Surf.FLOW | Surf.PULSE, true, false, 0.75)
+## A laser beam: a solid, steady glow, white-hot over the crystal pink so it reads against the
+## shards it cuts; no outline, which would darken a part this thin.
+const HOT_CRYSTAL := Color("f6dcff")
+static var CRYSTAL_BEAM := Surf.make(MaterialKit.Layer.GLOW, HOT_CRYSTAL, 1.0, Surf.UNLIT, true, false)
 ## The sparks where the beam cuts, and the L4 pylons' lamps, which blink in a chase.
 static var CUT_SPARK := Surf.make(MaterialKit.Layer.GLOW, MaterialKit.HAZARD, 1.0, Surf.UNLIT | Surf.FLICKER)
 static var CRYSTAL_LAMP := Surf.make(MaterialKit.Layer.GLOW, MaterialKit.CRYSTAL, 1.0, Surf.UNLIT | Surf.BLINK, true)
@@ -615,9 +617,26 @@ const SHARDS := [
 ## height of its beam by level.
 const GANTRY_LEGS := [Vector3(-0.98, 0, 0.98), Vector3(0.98, 0, -0.98)]
 const GANTRY_HEIGHTS := [1.9, 1.95, 2.0, 2.05, 2.1, 2.35, 2.45, 2.85, 2.95, 3.1]
-## The gantry beam's direction, along which the twin emitters (L6) hang either side of its middle.
-const GANTRY_ALONG := Vector3(0.70710678, 0, -0.70710678)
-const TWIN_OFFSET := 0.45
+## The laser ring over the crystal, on struts from a hub under the gantry's carriage, turning about
+## the cluster's axis with the emitters on it: how far under the beam the hub turns, the share of
+## the aimed crystal's height the ring rides at (just over its tip, so each emitter sits above and
+## outside it and its beam angles down into it), its radius by level (one emitter to L5, two
+## opposite from L6; wider as the crystal grows taller, so the beams keep their angle), its
+## section's radius and the struts', and its turn (radians a second).
+const RING_DROP := 0.32
+const RING_SHARE := 1.1
+const RING_RADII := [0.7, 0.7, 0.7, 0.7, 0.7, 0.8, 0.8, 1.0, 1.0, 1.0]
+const RING_THICKNESS := 0.04
+const STRUT_RADIUS := 0.03
+const RING_RATE := 0.35
+## Where the emitters aim on the crystal they cut (the biggest shard, the mega-shard from L8): this
+## share of its height up, on its face towards each emitter, where the beam ends just inside its
+## surface (this share of its radius there); at L10 higher, over the mega-shard's gold collar.
+const AIM_SHARE := 0.62
+const CROWN_AIM_SHARE := 0.77
+const AIM_DEPTH := 0.8
+## A beam's radius: thick enough to read from the emitters to the crystal at the gameplay zoom.
+const BEAM_RADIUS := 0.08
 ## The L8 vein conduits up the legs, this far out from each leg's middle along the gantry.
 const CONDUIT_OUT := 0.18
 ## The mega-shard that crowns the cluster from L8, in place of the first shard: its height at L8
@@ -637,29 +656,33 @@ const HARVESTER_ESCORT_RADIUS := 1.0
 const HARVESTER_ESCORT_HEIGHT := 3.5
 
 ## The high levels' own: the emitters' beams and lenses, cyan at the Chrome tier and violet from the
-## Obsidian tier; the L8 chips hovering round the mega-shard. The L10 mega-shard is BRIGHT_CORE.
-static var CYAN_BEAM := Surf.make(MaterialKit.Layer.PIPE, MaterialKit.ENERGY, 4.0, Surf.UNLIT | Surf.FLOW | Surf.PULSE, true, false, 0.75)
-static var VIOLET_BEAM := Surf.make(MaterialKit.Layer.PIPE, Parts.CORE_GLOW_TINT, 4.0, Surf.UNLIT | Surf.FLOW | Surf.PULSE, true, false,
-	0.75)
+## Obsidian tier, the beams white-hot over their tint so they read against the crystal; the L8 chips
+## hovering round the mega-shard. The L10 mega-shard is BRIGHT_CORE.
+const HOT_VIOLET := Color("e4d2ff")
+const HOT_CYAN := Color("bcf6ff")
+static var CYAN_BEAM := Surf.make(MaterialKit.Layer.GLOW, HOT_CYAN, 1.0, Surf.UNLIT, true, false)
+static var VIOLET_BEAM := Surf.make(MaterialKit.Layer.GLOW, HOT_VIOLET, 1.0, Surf.UNLIT, true, false)
 static var CYAN_LENS := Surf.make(MaterialKit.Layer.GLOW, MaterialKit.ENERGY, 1.0, Surf.UNLIT, true)
 static var VIOLET_LENS := Surf.make(MaterialKit.Layer.GLOW, Parts.CORE_GLOW_TINT, 1.0, Surf.UNLIT, true)
 static var CHIP := Surf.make(MaterialKit.Layer.CRYSTAL, MaterialKit.CRYSTAL, 1.0, Surf.GLOSSY | Surf.PULSE | Surf.BOB)
 
 
-## A laser cutting gantry over a cluster of pulsing crystal shards on a rock bed, its focusing
-## emitter swinging under the beam and sweeping a glowing beam across the cluster's top, sparks
-## flying where it cuts. Every level adds two shards and the shards grow; L3 adds a containment
-## ring round the cluster, L4 pylons on it with lamps chasing round, L5 gold trim.
+## A laser cutting gantry over a cluster of pulsing crystal shards on a rock bed, a laser ring
+## riding just over the crystal's tip under its carriage and turning about the cluster's axis,
+## its focusing emitter aimed down at the biggest shard, so its glowing beam stays on it as the
+## ring turns, sparks flying where it cuts. Every level adds two shards and the shards grow; L3
+## adds a containment ring round the cluster, L4 pylons on it with lamps chasing round, L5 gold
+## trim.
 ##
-## L6 (Chrome): a taller gantry in chrome (the beam chrome over a gold band) with cyan strips up
-## its legs, twin emitters either side of its middle sweeping cyan beams in step, the shards
-## growing faster, the pylons in chrome. L7 taller chrome containment pylons with cyan strips and
-## a second power box. L8 (Obsidian): obsidian containment set with crystal inlays and pylons
-## veined violet, violet beams, a crowning mega-shard in the cluster's middle with three crystal
-## chips hovering round it, and violet vein conduits up the gantry's legs. L9 an obsidian ring
-## hovering over the cluster. L10 (Crown): the gantry's beam in gold filigree, the mega-shard lit
-## violet from within on a gold collar, gold-capped pylons, gold filigree round the containment,
-## and a guard drone circling over the gantry as the escort.
+## L6 (Chrome): a taller gantry in chrome (the beam chrome over a gold band) with cyan strips up its
+## legs, a wider ring carrying two emitters at opposite points with cyan beams, the shards growing
+## faster, the pylons in chrome. L7 taller chrome containment pylons with cyan strips and a second
+## power box. L8 (Obsidian): obsidian containment set with crystal inlays and pylons veined violet,
+## violet beams aimed at a crowning mega-shard in the cluster's middle with three crystal chips
+## hovering round it, and violet vein conduits up the gantry's legs. L9 an obsidian ring hovering
+## over the cluster. L10 (Crown): the gantry's beam in gold filigree, the mega-shard lit violet from
+## within on a gold collar, gold-capped pylons, gold filigree round the containment, and a guard
+## drone circling over the gantry as the escort.
 static func build_crystal_harvester(p: Parts, level: int) -> void:
 	var m := p.body
 	var gold := p.tier >= Parts.Tier.GOLD
@@ -747,20 +770,32 @@ static func build_crystal_harvester(p: Parts, level: int) -> void:
 		var leg_conduit: Vector3 = GANTRY_LEGS[0] + (GANTRY_LEGS[0] as Vector3).normalized() * CONDUIT_OUT
 		Parts.pipe(m, Vector3(-0.7, ground + 0.2, 1.15), leg_conduit + Vector3(0, ground + 0.2, 0), 0.045, Parts.VEINS, 8, false)
 
+	# The laser ring rides on struts from a hub turning on the foot of a post under the carriage.
+	var hub := Vector3(0, beam_y - RING_DROP, 0)
+	m.prism(0.06, 0.06, beam_y - 0.06 - (hub.y - 0.03), 12, hub - Vector3(0, 0.03, 0), Parts.GUNMETAL)
+	var crystal_height := float(SHARDS[0][2]) * growth
+	var crystal_radius := float(SHARDS[0][3]) * girth
+	if level >= 8:
+		crystal_height = MEGA_HEIGHT + MEGA_GROWTH * (level - 8)
+		crystal_radius = MEGA_RADIUS
+	var drop := hub.y - (ground + 0.12 + crystal_height * RING_SHARE)
+	var aim_share := CROWN_AIM_SHARE if crown else AIM_SHARE
+	# The crystal's radius there: full to 0.7 of its height, tapering to its tip above (_shard).
+	var aim_radius := crystal_radius * minf(1.0, (1.0 - aim_share) / 0.3) * AIM_DEPTH
+	var aim := Vector3(aim_radius, ground + 0.12 + crystal_height * aim_share - hub.y, 0)
+	var trim := Parts.HULL_MID_ROUND
+	if crown or p.tier == Parts.Tier.GOLD:
+		trim = Parts.GOLD_ROUND
+	elif obsidian:
+		trim = Parts.OBSIDIAN_ROUND
+	elif chrome:
+		trim = Parts.CHROME_ROUND
+	var laser := p.moving(hub, Motion.spin(Vector3.UP, RING_RATE))
 	if level < 6:
-		var tallest := ground + 0.12 + float(SHARDS[0][2]) * growth
-		var pivot := beam + Vector3(0, -0.06, 0)
-		# It swings along the gantry, across the camera's view, about the axis square to the beam.
-		_emitter(p.moving(pivot, Motion.swing(Vector3(1, 0, 1), 25.0, 5.0)), pivot.y - tallest, gold)
-		return
-	# The twin emitters either side of the carriage, sweeping in step (so their beams never cross)
-	# down to the outer shards' tips.
-	var target := ground + 0.12 + float(SHARDS[1][2]) * growth
-	for k: int in 2:
-		var side := -1.0 if k == 0 else 1.0
-		var pivot := beam + Vector3(0, -0.06, 0) + GANTRY_ALONG * TWIN_OFFSET * side
-		_emitter(p.moving(pivot, Motion.swing(Vector3(1, 0, 1), 25.0, 5.0)), pivot.y - target, gold,
-			VIOLET_BEAM if obsidian else CYAN_BEAM, VIOLET_LENS if obsidian else CYAN_LENS)
+		_laser_ring(laser, RING_RADII[level - 1], drop, 1, aim, trim, gold, CRYSTAL_BEAM, CRYSTAL_GLOW)
+	else:
+		_laser_ring(laser, RING_RADII[level - 1], drop, 2, aim, trim, gold, VIOLET_BEAM if obsidian else CYAN_BEAM,
+			VIOLET_LENS if obsidian else CYAN_LENS)
 	if level >= 9:
 		# The obsidian ring hovering over the cluster, bobbing.
 		var hover := Vector3(0, HOVER_HEIGHT, 0)
@@ -772,8 +807,8 @@ static func build_crystal_harvester(p: Parts, level: int) -> void:
 
 
 ## The mega-shard crowning the cluster from L8, standing where the first shard stood, with three
-## crystal chips hovering round its upper half; at L10 it glows violet from within (BRIGHT_CORE),
-## a pulsing core band and a gold collar round it over the hovering ring.
+## crystal chips hovering round its middle, under the beams; at L10 it glows violet from within
+## (BRIGHT_CORE), a pulsing core band and a gold collar round it over the hovering ring.
 static func _mega_shard(m: LowPolyMesh, level: int, crown: bool) -> void:
 	var foot := Vector3(0, Parts.PAD_HEIGHT + 0.12, 0)
 	var height := MEGA_HEIGHT + MEGA_GROWTH * (level - 8)
@@ -784,7 +819,7 @@ static func _mega_shard(m: LowPolyMesh, level: int, crown: bool) -> void:
 		m.lathe(PackedVector2Array([Vector2(MEGA_RADIUS + 0.015, 0), Vector2(MEGA_RADIUS + 0.015, 0.14)]), 6, band, Parts.CORE_GLOW)
 		m.ring(MEGA_RADIUS - 0.02, MEGA_RADIUS + 0.07, 0.08, 12, band + Vector3(0, 0.14, 0), Parts.FILIGREE)
 	for k: int in 3:
-		m.orb(0.07, 4, 2, foot + Parts.around(MEGA_RADIUS + 0.12, 30.0 + 120.0 * k, height * (0.62 + 0.06 * k)),
+		m.orb(0.07, 4, 2, foot + Parts.around(MEGA_RADIUS + 0.12, 30.0 + 120.0 * k, height * (0.4 + 0.05 * k)),
 			CHIP.phased(k / 3.0))
 
 
@@ -796,20 +831,51 @@ static func _shard(m: LowPolyMesh, foot: Vector3, height: float, radius: float, 
 	]), 6, foot, surface, rot)
 
 
-## The focusing emitter under the gantry: a hub with three prongs round a glowing lens, the
-## beam from the lens `reach` down to the tallest shard's tip, and a cluster of sparks there.
-static func _emitter(s: LowPolyMesh, reach: float, gold: bool, beam: Surf = CRYSTAL_BEAM, lens: Surf = CRYSTAL_GLOW) -> void:
-	s.prism(0.16, 0.12, 0.1, 16, Vector3(0, -0.1, 0), Parts.GOLD_ROUND if gold else Parts.HULL_DARK_ROUND)
-	s.cone(0.12, 0.16, 16, Vector3(0, -0.1, 0), Parts.HULL_MID_ROUND, Vector3(180, 0, 0))
+## The laser ring, in its own space about its hub over the crystal's tip: a ring of `radius` in the
+## tier's `trim` `drop` under the hub (over it where negative), just over the crystal's tip, on
+## three thin struts out from the hub (clear of the crystal and of the emitters' beams), and `count`
+## emitters on its outside at opposite points, each aimed down at `aim` (a point in the hub's space
+## on the crystal's face towards an emitter at +X, turned with the emitter), its beam ending
+## there. The ring turns about the crystal's own axis, so every beam keeps on it.
+static func _laser_ring(s: LowPolyMesh, radius: float, drop: float, count: int, aim: Vector3, trim: Surf, gold: bool,
+		beam: Surf, lens: Surf) -> void:
+	Parts.torus(s, radius, RING_THICKNESS, 24, 8, Vector3(0, -drop - RING_THICKNESS, 0), trim)
+	s.prism(0.11, 0.11, 0.1, 16, Vector3(0, -0.05, 0), Parts.HULL_DARK_ROUND)
 	for k: int in 3:
-		var root := Parts.around(0.12, 120 * k, -0.1)
-		var tip := Parts.around(0.07, 120 * k, -0.36)
-		s.strut(root, Parts.around(0.2, 120 * k, -0.22), 0.05, CRYSTAL_PRONG)
-		s.strut(Parts.around(0.2, 120 * k, -0.22), tip, 0.05, CRYSTAL_PRONG)
-	s.orb(0.07, 12, 6, Vector3(0, -0.3, 0), lens)
-	s.prism(0.035, 0.035, reach - 0.3, 8, Vector3(0, -reach, 0), beam)
+		var degrees := 90.0 + 120.0 * k
+		Parts.pipe(s, Parts.around(0.1, degrees, -0.03), Parts.around(radius - RING_THICKNESS, degrees, -drop), STRUT_RADIUS,
+			trim, 8, false)
+	for k: int in count:
+		var degrees := 180.0 * k
+		s.box_chamfered(Vector3(0.16, 0.14, 0.1), 0.02, Parts.around(radius + 0.05, degrees, -drop - 0.05), trim,
+			Vector3(0, -degrees, 0))
+		var at := Parts.around(radius + 0.1, degrees, -drop + 0.1)
+		var target := Parts.around(aim.x, degrees, aim.y)
+		_emitter(s, at, target, gold, beam, lens)
+
+
+## A focusing emitter hanging at `at`, aimed at `target`: a hub with three prongs round a glowing
+## lens, the beam from the lens to `target`, and a cluster of sparks there. Built along -Y and
+## turned so -Y points at the target.
+static func _emitter(s: LowPolyMesh, at: Vector3, target: Vector3, gold: bool, beam: Surf, lens: Surf) -> void:
+	var turn := Parts.facing(at - target)
+	var reach := at.distance_to(target)
+	var flip := Basis.from_euler(Vector3(deg_to_rad(turn.x), deg_to_rad(turn.y), deg_to_rad(turn.z))) \
+		* Basis.from_euler(Vector3(PI, 0, 0))
+	var flipped := flip.get_euler() * (180.0 / PI)
+	s.prism(0.16, 0.12, 0.1, 16, at + LowPolyMesh.turn(Vector3(0, -0.1, 0), turn), Parts.GOLD_ROUND if gold else Parts.HULL_DARK_ROUND,
+		turn)
+	s.cone(0.12, 0.16, 16, at + LowPolyMesh.turn(Vector3(0, -0.1, 0), turn), Parts.HULL_MID_ROUND, flipped)
+	for k: int in 3:
+		var root := at + LowPolyMesh.turn(Parts.around(0.12, 120 * k, -0.1), turn)
+		var elbow := at + LowPolyMesh.turn(Parts.around(0.2, 120 * k, -0.22), turn)
+		var tip := at + LowPolyMesh.turn(Parts.around(0.07, 120 * k, -0.36), turn)
+		s.strut(root, elbow, 0.05, CRYSTAL_PRONG)
+		s.strut(elbow, tip, 0.05, CRYSTAL_PRONG)
+	s.orb(0.07, 12, 6, at + LowPolyMesh.turn(Vector3(0, -0.3, 0), turn), lens)
+	s.prism(BEAM_RADIUS, BEAM_RADIUS, reach - 0.3, 8, target, beam, turn)
 	for k: int in 6:
-		s.orb(0.035, 8, 3, Vector3(0, -reach, 0) + Parts.around(0.07 + 0.03 * (k % 2), 60.0 * k, 0.03 * (k % 3)),
+		s.orb(0.035, 8, 3, target + LowPolyMesh.turn(Parts.around(0.07 + 0.03 * (k % 2), 60.0 * k, 0.03 * (k % 3)), turn),
 			CUT_SPARK.phased(k / 6.0 + 0.05))
 
 
