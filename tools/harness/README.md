@@ -162,7 +162,8 @@ for 3x3, 5,000 for 4x4 and 5x5, 250 for a wall piece, rising at Chrome, Obsidian
 reach in x and z within half its footprint plus
 0.15 units (`EXTENT_SLACK`): the static body's bounds, and each moving part's reach over its
 whole motion, at the model's scale. A SPIN part's vertices sweep circles about its axis (each
-reaches its circle's centre's offset plus its radius, plus the pivot's offset from the centre);
+reaches its circle's centre's offset plus its radius from the pivot, so the part reaches the
+pivot's x plus that in x and the pivot's z plus that in z);
 a SWING part's bounds are turned every 5 degrees from -amplitude to +amplitude, both ends
 included; a SLIDE part's are shifted to both ends. A failure says by how much it reaches over.
 And its top within its height cap, 7 units for the Command Center and 5 for every other type:

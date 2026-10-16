@@ -673,8 +673,10 @@ A building is at most eight instances, ten at Crown: the body, its outline, and 
 moving parts (four at Crown) with their outlines. The `model_gallery` scenario checks every model
 against it (**Models**), and a
 moving part's reach over its whole motion against the extent (**Modelling vocabulary and
-budgets**): a spin's circle about its axis, a swing's bounds every 5 degrees from -amplitude to
-+amplitude, both ends included, a slide's at both ends.
+budgets**): a spin's circle about its axis, its radius added to the pivot's x and to its z in
+turn (the extent is per axis, so a round off the centre along a diagonal is not over-counted), a
+swing's bounds every 5 degrees from -amplitude to +amplitude, both ends included, a slide's at both
+ends.
 
 The `effects` harness scenario (`tools/harness/README.md`) is the rig: a part for every effect and
 every kind of motion, in two rows on the field, checked headless and screenshotted at 0.0, 0.3 and

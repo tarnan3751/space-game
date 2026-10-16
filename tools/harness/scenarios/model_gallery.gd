@@ -256,8 +256,10 @@ func _reach(model: Node3D, bodies: Array[MeshInstance3D]) -> float:
 
 
 ## A moving part's reach from the model's centre in x or z over its whole motion. SPIN: each
-## vertex sweeps a circle about the axis through the pivot, which reaches no further across than
-## the circle's centre's offset plus its radius, plus the pivot's offset from the model's centre.
+## vertex sweeps a circle about the axis through the pivot, which reaches no further from the
+## pivot than the circle's centre's offset plus its radius (the sweep), so the part reaches the
+## pivot's x plus the sweep in x and the pivot's z plus the sweep in z: per axis, as the extent is,
+## so a round pushed along a diagonal is not over-counted.
 ## SWING: the part's bounds turned every SWING_STEP degrees from -amplitude to +amplitude, both
 ## ends included. SLIDE: its
 ## bounds at both ends of the slide.
@@ -271,7 +273,7 @@ func _moving_reach(mesh: Mesh, motion: Motion, pivot: Vector3) -> float:
 				for vertex: Vector3 in vertices:
 					var centre := motion.axis * vertex.dot(motion.axis)
 					sweep = maxf(sweep, Vector2(centre.x, centre.z).length() + (vertex - centre).length())
-			return Vector2(pivot.x, pivot.z).length() + sweep
+			return maxf(absf(pivot.x), absf(pivot.z)) + sweep
 		Motion.Kind.SWING:
 			var reach := 0.0
 			var steps := maxi(1, ceili(2.0 * absf(motion.amplitude) / SWING_STEP))
