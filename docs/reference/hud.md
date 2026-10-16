@@ -101,7 +101,10 @@ track — a 45-degree white band over a grey 25 % darker, built once in `setup`
 (`_make_stripe`) and tinted by the resource's colour over that grey, so the base reads as the
 colour itself and the band 25 % lighter — and a gloss band (white at 25 %) across its top
 third. The trough's ink border is drawn again over the fill, so the fill's square ends never
-cover its round corners. The amount, `"750 / 1,000"` (`Format.amount`), sits centred on the
+cover its round corners. The amount, `"750 / 1,000"` (`Format.short`: in full below a million,
+then `"1.2M"`, `"4M"`, `"12.5M"` and from a thousand million `"1.2B"`, one decimal cut and its `.0`
+dropped, so the widest text fits the label's 180 px; the cards and the info panel keep full
+numbers), sits centred on the
 part of the trough right of the icon, in Lilita One 18 px white with a 2 px ink outline. The
 resource's icon (a `HudIcon`, 40×40) sits over the trough's left end like a badge. With the dev
 cheats on (`Hud.cheats`, set by `main.gd`) every meter shows, full, reading `∞` (Lilita One has

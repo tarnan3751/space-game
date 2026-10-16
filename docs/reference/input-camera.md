@@ -342,6 +342,8 @@ body's shadow) however many walls there are.
 
 ## Format (`format.gd`)
 
-Display formatting shared by the views and the HUD: `amount(12345)` → `"12,345"`;
+Display formatting shared by the views and the HUD: `amount(12345)` → `"12,345"`; `short`, the
+meters', as `amount` below a million, then `short(1250000)` → `"1.2M"`, `short(4000000)` →
+`"4M"`, `short(1200000000)` → `"1.2B"` (one decimal, cut, its `.0` dropped);
 `duration(75)` → `"1m 15s"`, `duration(4000)` → `"1h 06m"`; `cost({"metal": 150}, catalog)` →
 `"150 Metal"`, each resource named by `catalog.resource_name`, an empty cost → `"Free"`.

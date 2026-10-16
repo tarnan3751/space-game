@@ -223,7 +223,7 @@ func refresh(state: BaseState, selected_id: int, placing: bool, ghost_ok: bool, 
 		if not cheats and _meter_amounts.has(res) and _flashes(res, amount - _meter_amounts[res], elapsed):
 			_meter_shaders[res].set_shader_parameter(&"flash_time", Motion.clock())
 		_meter_amounts[res] = amount
-		_meter_labels[res].text = "∞" if cheats else "%s / %s" % [Format.amount(amount), Format.amount(capacity)]
+		_meter_labels[res].text = "∞" if cheats else "%s / %s" % [Format.short(amount), Format.short(capacity)]
 	_drone_ring.set_counts(state.builders_free(), state.builders_total())
 
 	var has_selection := selected_id != 0 and state.buildings.has(selected_id)

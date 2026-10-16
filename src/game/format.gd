@@ -13,6 +13,19 @@ static func amount(value: int) -> String:
 	return ("-" if value < 0 else "") + digits + grouped
 
 
+## Short, for the meters: as amount() below a million, then millions and thousand millions with
+## one decimal, cut (never rounded up) and its ".0" dropped. 999999 -> "999,999",
+## 1250000 -> "1.2M", 4000000 -> "4M", 12500000 -> "12.5M", 1200000000 -> "1.2B".
+static func short(value: int) -> String:
+	var size := absi(value)
+	if size < 1000000:
+		return amount(value)
+	var unit := "B" if size >= 1000000000 else "M"
+	var tenths := size / (100000000 if unit == "B" else 100000)
+	var text := str(tenths / 10) + ("" if tenths % 10 == 0 else ".%d" % (tenths % 10))
+	return ("-" if value < 0 else "") + text + unit
+
+
 ## 75 -> "1m 15s", 4000 -> "1h 06m"
 static func duration(seconds: int) -> String:
 	var total := maxi(seconds, 0)
