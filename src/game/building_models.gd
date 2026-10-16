@@ -44,7 +44,7 @@ const DroneModels := preload("res://src/game/models/drone.gd")
 ## [the footprint size a model is built for, the levels it has models for] per type.
 const MODELS := {
 	"command_center": [4, 10],
-	"drone_bay": [2, 1],
+	"drone_bay": [2, 3],
 	"metal_extractor": [3, 5],
 	"crystal_harvester": [3, 5],
 	"antimatter_siphon": [3, 3],

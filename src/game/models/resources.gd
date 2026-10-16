@@ -21,14 +21,40 @@ const DroneModels := preload("res://src/game/models/drone.gd")
 ## The drone bay's landing deck: its middle and the height of its top.
 const BAY_DECK := Vector3(0.2, 0.0, 0.2)
 const BAY_DECK_TOP := 0.26
+## The second cradle's raised pad from L2, over the crates: its middle and the height of its top,
+## and how far out its four legs stand from its middle along each axis.
+const BAY_PAD := Vector3(0.52, 0.0, -0.56)
+const BAY_PAD_TOP := 0.86
+const BAY_PAD_LEGS := 0.3
+## The L3 escort's round about the footprint's centre, over the booth's beacon.
+const BAY_ESCORT_RADIUS := 0.95
+const BAY_ESCORT_HEIGHT := 1.95
+
+## The high levels' own: the L2 landing strips' lamps chasing round the deck (cyan; violet at the
+## Crown tier, between gold ones); the L3 gold trim on each parked drone's saucer, bobbing with
+## it on the parked drone's phase; and the L3 beacon's lenses and its core, violet.
+static var BAY_STRIP_LAMP := Surf.make(MaterialKit.Layer.GLOW, MaterialKit.ENERGY, 1.0, Surf.UNLIT | Surf.BLINK)
+static var BAY_CORE_LAMP := Surf.make(MaterialKit.Layer.GLOW, Parts.CORE_GLOW_TINT, 1.0, Surf.UNLIT | Surf.BLINK)
+static var PARKED_GOLD := Surf.make(MaterialKit.Layer.FLAT, MaterialKit.CORE_GOLD, 1.0, Surf.GLOSSY | Surf.BOB, true, true,
+	DroneModels.PARKED_PHASE)
+static var CORE_BEACON := Surf.make(MaterialKit.Layer.GLOW, Parts.CORE_GLOW_TINT, 1.0, Surf.UNLIT, true)
 
 
 ## An open landing deck with a hazard ring and a chase of landing lights, the builder drone
 ## idling over its docking cradle, its rotors a spinning blur, a raised control booth on the far corner
 ## with a scrolling screen and a rotating beacon on its roof, a fuel tank and a stack of
 ## crates. The booth's roof is gold from the Gold tier.
-static func build_drone_bay(p: Parts, _level: int) -> void:
+##
+## L2 (Chrome): the deck plated in chrome, its landing lights become a chase of landing strips
+## round its rim with two cyan strips across it, a raised chrome pad over the crates carrying a
+## second cradle and a second parked drone (builders stay one: it is for show), and the booth clad
+## in chrome under a chrome roof. L3 (Crown): the deck edged in gold filigree, the strips violet
+## and gold, both drones gold-trimmed, a violet core pulsing on a gold mount over the booth's
+## beacon, whose lenses turn violet, and a guard drone circling the deck as the escort.
+static func build_drone_bay(p: Parts, level: int) -> void:
 	var m := p.body
+	var crown := p.tier >= Parts.Tier.CROWN
+	var deck_plating := Parts.CHROME_ROUND if p.tier >= Parts.Tier.CHROME else Parts.HULL_MID_ROUND
 	Parts.foundation(m, 2)
 	# The deck at 16 sides, its hazard ring a flat band, and the landing lights at the small-part
 	# side counts, a housing 10 round and a lens 8 round (Parts.landing_light's 16 are over the
@@ -36,36 +62,60 @@ static func build_drone_bay(p: Parts, _level: int) -> void:
 	m.lathe(PackedVector2Array([
 		Vector2(0.66, 0), Vector2(0.66, 0.1), Vector2(0.62, BAY_DECK_TOP - Parts.PAD_HEIGHT),
 		Vector2(0, BAY_DECK_TOP - Parts.PAD_HEIGHT),
-	]), 16, BAY_DECK + Vector3(0, Parts.PAD_HEIGHT, 0), Parts.HULL_MID_ROUND)
+	]), 16, BAY_DECK + Vector3(0, Parts.PAD_HEIGHT, 0), deck_plating)
 	var top := BAY_DECK + Vector3(0, BAY_DECK_TOP, 0)
 	m.disc(0.5, 16, top + Vector3(0, 0.005, 0), DECK_PLATE)
 	m.lathe(PackedVector2Array([Vector2(0.56, 0.02), Vector2(0.44, 0.02)]), 16, top, HAZARD_RING)
-	for k: int in 6:
-		var light := top + Parts.around(0.6, 30 + 60 * k, 0)
-		m.prism(0.09, 0.0765, 0.045, 10, light, Parts.GUNMETAL)
-		m.dome(0.063, 0.063, 8, 3, light + Vector3(0, 0.045, 0), BAY_LAMP.phased(k / 6.0))
-	# The docking cradle: two rails under the drone, either side of its tool arm, and a clamp past
-	# each end, clear of the arm's lens.
-	for side: float in [-1.0, 1.0]:
-		var rail := top + LowPolyMesh.turn(Vector3(side * 0.13, 0, 0), Vector3(0, 45, 0))
-		m.box_chamfered(Vector3(0.07, 0.06, 0.5), 0.02, rail, Parts.GUNMETAL, Vector3(0, 45, 0))
-		var clamp_pos := top + LowPolyMesh.turn(Vector3(0, 0, side * 0.33), Vector3(0, 45, 0))
-		m.box_chamfered(Vector3(0.16, 0.16, 0.06), 0.02, clamp_pos, Parts.HAZARD, Vector3(0, 45, 0))
+	if level < 2:
+		for k: int in 6:
+			var light := top + Parts.around(0.6, 30 + 60 * k, 0)
+			m.prism(0.09, 0.0765, 0.045, 10, light, Parts.GUNMETAL)
+			m.dome(0.063, 0.063, 8, 3, light + Vector3(0, 0.045, 0), BAY_LAMP.phased(k / 6.0))
+	else:
+		_landing_strips(m, top, crown)
+	if level >= 3:
+		m.lathe(PackedVector2Array([Vector2(0.675, 0.12), Vector2(0.675, 0.2), Vector2(0.63, 0.2)]), 16,
+			BAY_DECK + Vector3(0, Parts.PAD_HEIGHT - 0.06, 0), Parts.FILIGREE)
+	_cradle(m, top)
 	# High enough that at the bottom of its bob its tool arm's lens just clears the deck.
 	DroneModels.add_drone(m, top + Vector3(0, 0.28, 0), true)
+	if level >= 2:
+		_raised_pad(m, level, p.tier)
+	if level >= 3:
+		for at: Vector3 in [top, BAY_PAD + Vector3(0, BAY_PAD_TOP, 0)]:
+			# Over the saucer's top shoulder, round the canopy.
+			m.ring(0.095, 0.16, 0.03, 12, at + Vector3(0, 0.28 + 0.06, 0), PARKED_GOLD)
 
 	# The control booth on the far corner: a column, a glazed cab, a roof rimmed gold from the
-	# Gold tier, and a ladder.
+	# Gold tier, and a ladder. From L2 the column and the cab are clad in chrome under a chrome
+	# roof, gold again at the Crown tier.
+	var cladding := Parts.CHROME if p.tier >= Parts.Tier.CHROME else Parts.HULL_LIGHT
 	var booth := Vector3(-0.5, Parts.PAD_HEIGHT, -0.5)
-	m.box_chamfered(Vector3(0.44, 0.7, 0.44), 0.05, booth, Parts.HULL_LIGHT)
+	m.box_chamfered(Vector3(0.44, 0.7, 0.44), 0.05, booth, cladding)
 	var cab := booth + Vector3(0, 0.7, 0)
-	m.box_chamfered(Vector3(0.62, 0.34, 0.62), 0.06, cab, Parts.HULL_LIGHT)
+	m.box_chamfered(Vector3(0.62, 0.34, 0.62), 0.06, cab, cladding)
 	m.box(Vector3(0.64, 0.14, 0.64), cab + Vector3(0, 0.12, 0), BAY_WINDOWS)
 	m.box(Vector3(0.28, 0.2, 0.02), booth + Vector3(0, 0.36, 0.22), BAY_SCREEN)
-	m.box_chamfered(Vector3(0.68, 0.06, 0.68), 0.03, cab + Vector3(0, 0.34, 0),
-		Parts.GOLD_TRIM if p.tier >= Parts.Tier.GOLD else Parts.HULL_MID)
+	var roof := Parts.HULL_MID
+	if crown or p.tier == Parts.Tier.GOLD:
+		roof = Parts.GOLD_TRIM
+	elif p.tier >= Parts.Tier.CHROME:
+		roof = Parts.CHROME
+	m.box_chamfered(Vector3(0.68, 0.06, 0.68), 0.03, cab + Vector3(0, 0.34, 0), roof)
 	Parts.ladder(m, booth + Vector3(0.24, 0, 0.05), 0.7, 0.2, 90.0, Parts.ROD)
-	_beacon(p.moving(cab + Vector3(0, 0.4, 0), Motion.spin(Vector3.UP, 2.4)))
+	if level >= 2:
+		# A second screen on the cab's front under the windows, and a cyan strip up the column's
+		# corner facing the camera.
+		m.box(Vector3(0.36, 0.06, 0.02), cab + Vector3(0, 0.03, 0.31), BAY_SCREEN.phased(0.7))
+		m.box(Vector3(0.08, 0.56, 0.06), booth + Vector3(0.19, 0.08, 0.19), Parts.CORE_GLOW if crown else Parts.CYAN_STRIP,
+			Vector3(0, 45, 0))
+	var beacon := cab + Vector3(0, 0.4, 0)
+	_beacon(p.moving(beacon, Motion.spin(Vector3.UP, 2.4)), CORE_BEACON if crown else BAY_GLOW)
+	if level >= 3:
+		# The violet core over the beacon, on a gold mount: the bay's crown.
+		m.prism(0.03, 0.02, 0.2, 8, beacon + Vector3(0, 0.24, 0), Parts.ROD)
+		m.ring(0.05, 0.09, 0.04, 12, beacon + Vector3(0, 0.42, 0), Parts.GOLD_ROUND)
+		m.orb(0.09, 12, 6, beacon + Vector3(0, 0.52, 0), Parts.CORE_GLOW)
 
 	# A fuel tank on the left corner, crates on the right.
 	var tank := Vector3(-0.58, Parts.PAD_HEIGHT, 0.5)
@@ -74,14 +124,63 @@ static func build_drone_bay(p: Parts, _level: int) -> void:
 	m.tube(0, 0.13, 0.5, 12, tank + Vector3(0, 0.2, -0.25), Parts.HULL_LIGHT_ROUND, Vector3(90, 0, 0))
 	m.box_chamfered(Vector3(0.3, 0.26, 0.3), 0.04, Vector3(0.55, Parts.PAD_HEIGHT, -0.55), CRATE, Vector3(0, 20, 0))
 	m.box_chamfered(Vector3(0.22, 0.2, 0.22), 0.04, Vector3(0.6, Parts.PAD_HEIGHT + 0.26, -0.52), CRATE, Vector3(0, -10, 0))
+	if level >= 3:
+		Parts.escort_drone(p, BAY_ESCORT_RADIUS, BAY_ESCORT_HEIGHT, 0.9)
 
 
-## The booth's rotating beacon: a dark housing with two glowing lenses back to back under a cap.
-static func _beacon(s: LowPolyMesh) -> void:
-	s.prism(0.1, 0.09, 0.05, 12, Vector3.ZERO, Parts.HULL_DARK_ROUND)
-	s.prism(0.06, 0.06, 0.14, 12, Vector3(0, 0.05, 0), BAY_GLOW)
+## The docking cradle on a deck whose top is `top`: two rails under the drone, either side of its
+## tool arm, and a clamp past each end, clear of the arm's lens.
+static func _cradle(m: LowPolyMesh, top: Vector3) -> void:
 	for side: float in [-1.0, 1.0]:
-		s.box(Vector3(0.09, 0.12, 0.06), Vector3(side * 0.07, 0.06, 0), BAY_GLOW, Vector3(0, 90, 0))
+		var rail := top + LowPolyMesh.turn(Vector3(side * 0.13, 0, 0), Vector3(0, 45, 0))
+		m.box_chamfered(Vector3(0.07, 0.06, 0.5), 0.02, rail, Parts.GUNMETAL, Vector3(0, 45, 0))
+		var clamp_pos := top + LowPolyMesh.turn(Vector3(0, 0, side * 0.33), Vector3(0, 45, 0))
+		m.box_chamfered(Vector3(0.16, 0.16, 0.06), 0.02, clamp_pos, Parts.HAZARD, Vector3(0, 45, 0))
+
+
+## The landing strips from L2 round the deck's rim, lit in turn (a chase), where L1's six lights
+## stood, and two strips across the deck either side of the cradle; at the Crown tier the rim's
+## strips are violet between gold ones and the strips across are gold.
+static func _landing_strips(m: LowPolyMesh, top: Vector3, crown: bool) -> void:
+	for k: int in 12:
+		var degrees := 15.0 + 30.0 * k
+		var yaw := Vector3(0, 90.0 - degrees, 0)
+		var at := top + Parts.around(0.6, degrees, 0)
+		if k % 2 == 0:
+			m.box(Vector3(0.18, 0.03, 0.07), at, (BAY_CORE_LAMP if crown else BAY_STRIP_LAMP).phased(Parts.chase(k / 2, 6)), yaw)
+		elif crown:
+			m.box(Vector3(0.14, 0.025, 0.05), at, Parts.GOLD_TRIM, yaw)
+	for side: float in [-1.0, 1.0]:
+		m.box(Vector3(0.06, 0.012, 0.62), top + LowPolyMesh.turn(Vector3(side * 0.33, 0.005, 0), Vector3(0, 45, 0)),
+			Parts.GOLD_TRIM if crown else Parts.CYAN_STRIP, Vector3(0, 45, 0))
+
+
+## The second cradle's raised pad from L2, over the crates: four chrome legs braced under a round
+## deck with a hazard ring, the cradle and the second parked drone on it.
+static func _raised_pad(m: LowPolyMesh, level: int, tier: int) -> void:
+	var plating := Parts.CHROME_ROUND if tier >= Parts.Tier.CHROME else Parts.HULL_MID_ROUND
+	var legs := Parts.CHROME if tier >= Parts.Tier.CHROME else Parts.HULL_MID
+	var deck := BAY_PAD + Vector3(0, BAY_PAD_TOP - 0.1, 0)
+	for corner: Vector2 in [Vector2(-1, 0), Vector2(1, 0), Vector2(0, -1), Vector2(0, 1)]:
+		var foot := BAY_PAD + Vector3(corner.x * BAY_PAD_LEGS, Parts.PAD_HEIGHT, corner.y * BAY_PAD_LEGS)
+		m.box(Vector3(0.07, deck.y - foot.y, 0.07), foot, legs)
+	m.lathe(PackedVector2Array([
+		Vector2(0.4, 0), Vector2(0.4, 0.06), Vector2(0.37, 0.1), Vector2(0, 0.1),
+	]), 16, deck, plating)
+	var top := BAY_PAD + Vector3(0, BAY_PAD_TOP, 0)
+	m.lathe(PackedVector2Array([Vector2(0.36, 0.008), Vector2(0.28, 0.008)]), 16, top, HAZARD_RING)
+	if level >= 3:
+		m.lathe(PackedVector2Array([Vector2(0.41, 0.0), Vector2(0.41, 0.06)]), 16, deck, Parts.FILIGREE)
+	_cradle(m, top)
+	DroneModels.add_drone(m, top + Vector3(0, 0.28, 0), true)
+
+
+## The booth's rotating beacon: a dark housing with two lenses glowing in `glow` back to back under a cap.
+static func _beacon(s: LowPolyMesh, glow: Surf) -> void:
+	s.prism(0.1, 0.09, 0.05, 12, Vector3.ZERO, Parts.HULL_DARK_ROUND)
+	s.prism(0.06, 0.06, 0.14, 12, Vector3(0, 0.05, 0), glow)
+	for side: float in [-1.0, 1.0]:
+		s.box(Vector3(0.09, 0.12, 0.06), Vector3(side * 0.07, 0.06, 0), glow, Vector3(0, 90, 0))
 	s.prism(0.11, 0.08, 0.05, 12, Vector3(0, 0.19, 0), Parts.HULL_DARK_ROUND)
 
 
