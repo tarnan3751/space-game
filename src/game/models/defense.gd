@@ -97,6 +97,9 @@ static var HOVER_RIM := Surf.make(MaterialKit.Layer.GLOW, Parts.CORE_GLOW_TINT, 
 static var HOVER_SIGHT := Surf.make(MaterialKit.Layer.GLOW, MaterialKit.DEFENCE, 1.0, Surf.UNLIT | Surf.PULSE | Surf.BOB, true, true,
 	0.7)
 static var HOVER_GOLD := Surf.make(MaterialKit.Layer.FLAT, MaterialKit.CORE_GOLD, 1.0, Surf.GLOSSY | Surf.BOB, true, true, 0.7)
+## Lamps blinking violet, and missiles tipped with violet crystals blinking in their chase.
+static var CORE_BLINK := _glow(Parts.CORE_GLOW_TINT, Surf.BLINK)
+static var CRYSTAL_BLINK := Surf.make(MaterialKit.Layer.CRYSTAL, Parts.CORE_GLOW_TINT.lightened(0.3), 1.0, Surf.UNLIT | Surf.BLINK, true)
 
 ## The horizontal direction towards the camera (IsoCamera's yaw): vein panels go on the faces
 ## turned to it.
@@ -116,6 +119,17 @@ const LASER_LIFTS := [0.3, 0.54, 0.62, 0.72, 0.86]
 const LASER_RING_LIFT := 0.3
 const LASER_ESCORT_RADIUS := 1.15
 const LASER_ESCORT_LIFT := 0.85
+## The missile battery from L6: its tubes' spacing, half the slot between its pods where the radar
+## mast stands, the trunnion's height over the deck, and by level from L6 the dish's height over
+## the trunnion; the L10 skiff's round and its height over the dish.
+const MISSILE_SPACING := 0.3
+const MISSILE_SLOT := 0.12
+const MISSILE_TRUNNION := 0.8
+const MISSILE_DISH_LIFTS := [1.0, 1.35, 1.35, 1.55, 1.9]
+const MISSILE_ESCORT_RADIUS := 1.1
+const MISSILE_ESCORT_LIFT := 0.45
+## The skiff's size: larger than the shared one, as far as its round allows.
+const MISSILE_SKIFF_SCALE := 1.75
 
 
 ## From L6 the head rides a mount that lifts it a little more each level, on a taller plinth.
@@ -243,55 +257,154 @@ static func build_laser_turret(p: Parts, level: int) -> void:
 			Parts.escort_drone(p, LASER_ESCORT_RADIUS, pivot.y + 0.62 + LASER_ESCORT_LIFT, 0.8, Vector3.ZERO, ESCORT_SCALE)
 
 
+## From L6 a chrome radar mast rises through the launcher's centre with a dish turning on top, and
+## the launcher's pods stand either side of it, their tubes closer set. L6 (Chrome): chrome plinth,
+## turret ring, arms and pods, one pod of twelve tubes left of the mast, cyan loading lights
+## blinking up the arm the camera sees. L7 a second rack, a pod of eight tubes right of the mast,
+## and the mast much taller with a bigger dish and a second glowing band.
+## L8 (Obsidian): obsidian plinth, ring, arms and pods, glowing violet vein panels on the
+## plinth's and the pods' faces the camera sees, veins round the deck, crystal inlays on it, the
+## missiles tipped with violet crystals. L9 a radar ring hovering round the mast under the dish,
+## turning. L10 (Crown): gold filigree round the plinth, the deck and the pods' faces, a gold mast
+## with a gold crown over the racks holding the antimatter core up clear of the pods, and a hover
+## skiff circling over it all as the loader (the escort).
 static func build_missile_battery(p: Parts, level: int) -> void:
 	var m := p.body
-	var top := _plinth(m, 3, 1.2, 0.36)
-	Parts.drum(m, 0.8, 0.2, 0.05, 24, Vector3(0, top, 0), SHELL_MID)
+	var plinth := 0.36 if level < 8 else (0.56 if level < 10 else 0.62)
+	var top := _plinth(m, 3, 1.2, plinth, ARMOUR, _by_tier(p.tier, Parts.GUNMETAL, Parts.CHROME_ROUND, Parts.OBSIDIAN_ROUND))
+	Parts.drum(m, 0.8, 0.2, 0.05, 24, Vector3(0, top, 0), _by_tier(p.tier, SHELL_MID, Parts.CHROME_ROUND, Parts.OBSIDIAN_ROUND))
 	var deck := top + 0.2
 	_crate(m, Parts.around(1.42, 315.0, Parts.PAD_HEIGHT))
 	if level >= 3:
 		_crate(m, Parts.around(1.42, 135.0, Parts.PAD_HEIGHT))
-	var columns := 2 if level < 3 else 3
-	var rows := 2 if level < 4 else 3
-	var width := columns * 0.34 + 0.2
-	var height := rows * 0.34 + 0.2
-	var depth := 0.9
+	# The pods, each [x across the trunnion, columns, rows], and the tubes' spacing.
+	var pods: Array[Vector3] = []
+	var spacing := 0.34
+	if level < 6:
+		pods.append(Vector3(0, 2 if level < 3 else 3, 2 if level < 4 else 3))
+	else:
+		spacing = MISSILE_SPACING
+		pods.append(Vector3(-MISSILE_SLOT - (3 * spacing + 0.2) * 0.5, 3, 4))
+		if level >= 7:
+			pods.append(Vector3(MISSILE_SLOT + (2 * spacing + 0.2) * 0.5, 2, 4))
+	var left := INF
+	var right := -INF
+	for pod: Vector3 in pods:
+		left = minf(left, pod.x - (pod.y * spacing + 0.2) * 0.5)
+		right = maxf(right, pod.x + (pod.y * spacing + 0.2) * 0.5)
+	if level == 6:
+		# The right arm stands across the slot from the one pod.
+		right = MISSILE_SLOT
 	var yaw := 100.0
 	var heading := Vector3(0, yaw, 0)
 	var aim := Vector3(-32, yaw, 0)
-	# The launcher scans on the deck: its arms, the box and its tubes, built about the deck's centre.
+	# The launcher scans on the deck: its arms, the pods and their tubes, built about the deck's centre.
 	var launcher := p.moving(Vector3(0, deck, 0), Motion.swing(Vector3.UP, 15.0, 7.0))
-	var trunnion := Vector3(0, 0.62, 0)
+	var trunnion := Vector3(0, 0.62 if level < 6 else MISSILE_TRUNNION, 0)
 	var trim := GOLD if p.tier >= Parts.Tier.GOLD else Parts.GUNMETAL
 	for side: float in [-1.0, 1.0]:
-		var arm := LowPolyMesh.turn(Vector3(side * (width * 0.5 + 0.1), 0, 0), heading)
-		launcher.box_chamfered(Vector3(0.16, 0.72, 0.46), 0.04, arm, SHELL, heading)
+		var edge := right if side > 0.0 else -left
+		var arm := LowPolyMesh.turn(Vector3(side * (edge + 0.1), 0, 0), heading)
+		launcher.box_chamfered(Vector3(0.16, trunnion.y + 0.1, 0.46), 0.04, arm, _by_tier(p.tier, SHELL, Parts.CHROME, Parts.OBSIDIAN),
+			heading)
 		launcher.prism(0.12, 0.12, 0.06, 16,
-			trunnion + LowPolyMesh.turn(Vector3(side * (width * 0.5 + 0.17), 0, 0), heading), trim,
+			trunnion + LowPolyMesh.turn(Vector3(side * (edge + 0.17), 0, 0), heading), trim,
 			heading + Vector3(0, 0, -90 * side))
-	launcher.box_chamfered(Vector3(width, height, depth), 0.06, _at(trunnion, Vector3(0, -height * 0.5, 0), aim), SHELL,
-		aim)
-	launcher.box_chamfered(Vector3(width + 0.04, height + 0.04, 0.16), 0.03,
-		_at(trunnion, Vector3(0, -height * 0.5 - 0.02, depth * 0.5 - 0.22), aim), HAZARD_FINE, aim)
-	var tube_aim := aim + Vector3(90, 0, 0)
-	# The tips blink in a chase that snakes along the rows.
-	for row: int in rows:
-		for column: int in columns:
-			var face := Vector3((column - (columns - 1) * 0.5) * 0.34, (row - (rows - 1) * 0.5) * 0.34, depth * 0.5 - 0.04)
-			var mouth := _at(trunnion, face, aim)
-			var turn_order := column if row % 2 == 0 else columns - 1 - column
-			launcher.tube(0.1, 0.14, 0.1, 16, mouth, Parts.GUNMETAL, tube_aim)
-			launcher.cone(0.085, 0.2, 16, mouth, LASER_BLINK.phased(Parts.chase(row * columns + turn_order, rows * columns)),
-				tube_aim)
+		if level >= 6 and LowPolyMesh.turn(Vector3(side, 0, 0), heading).dot(TOWARD_CAMERA) > 0.2:
+			# Loading lights blinking up the arm's outer face, cyan (violet from the Obsidian tier).
+			for k: int in 3:
+				launcher.box(Vector3(0.02, 0.1, 0.24), LowPolyMesh.turn(Vector3(side * (edge + 0.185), 0.2 + 0.24 * k, 0), heading),
+					(CORE_BLINK if p.tier >= Parts.Tier.OBSIDIAN else ION_BLINK).phased(Parts.chase(k, 3)), heading)
+	for pod: Vector3 in pods:
+		_pod(launcher, trunnion, aim, pod.x, int(pod.y), int(pod.z), spacing, level, p.tier)
 	if level >= 2:
-		launcher.box_chamfered(Vector3(width * 0.8, 0.05, depth * 0.45), 0.02,
-			_at(trunnion, Vector3(0, height * 0.5, -0.12), aim), ARMOUR, aim)
 		Parts.mast(m, Parts.around(0.95, 225.0, top), 0.7, 0.06, LASER_PULSE)
 	if level >= 5:
 		_crate(m, Parts.around(1.42, 45.0, Parts.PAD_HEIGHT))
-		launcher.box_chamfered(Vector3(width + 0.05, height + 0.05, 0.08), 0.02,
-			_at(trunnion, Vector3(0, -height * 0.5 - 0.025, -depth * 0.5 + 0.02), aim),
-			GOLD if p.tier >= Parts.Tier.GOLD else Parts.HULL_MID, aim)
+	if level < 6:
+		return
+	if level >= 8:
+		_plinth_panels(m, 1.2, plinth)
+		m.ring(0.86, 1.08, 0.012, 8, Vector3(0, top, 0), Parts.VEINS, Parts.OCTAGON)
+		for degrees: float in [15.0, 45.0, 75.0]:
+			m.prism(0.07, 0.07, 0.05, 4, Parts.around(0.96, degrees, top), INLAY.phased(degrees / 90.0),
+				Vector3(90, 90.0 - degrees, 0))
+	if level >= 10:
+		_plinth_filigree(m, 1.2, plinth)
+		m.ring(0.86, 1.1, 0.02, 8, Vector3(0, top, 0), Parts.FILIGREE, Parts.OCTAGON)
+	# The radar mast up the launcher's centre, through the slot between its pods.
+	var dish_y: float = deck + trunnion.y + float(MISSILE_DISH_LIFTS[level - 6])
+	var mast := Parts.GOLD_ROUND if p.tier >= Parts.Tier.CROWN else _by_tier(p.tier, BARREL, Parts.CHROME_ROUND, Parts.CHROME_ROUND)
+	m.prism(0.065, 0.05, dish_y - deck, 16, Vector3(0, deck, 0), mast)
+	var band_glow := Parts.CORE_GLOW if p.tier >= Parts.Tier.OBSIDIAN else Parts.CYAN_STRIP
+	m.ring(0.05, 0.08, 0.06, 16, Vector3(0, dish_y - 0.25, 0), band_glow)
+	if level >= 7:
+		m.ring(0.05, 0.085, 0.1, 16, Vector3(0, dish_y - 0.5, 0), band_glow)
+	if level >= 10:
+		# A gold crown on the mast over the racks, inside the radar ring, holding the antimatter core up
+		# clear of the pods.
+		_crown(m, Vector3(0, deck + trunnion.y + 1.0, 0), 0.17, 6, 0.14)
+		m.orb(0.19, 16, 6, Vector3(0, deck + trunnion.y + 1.3, 0), Parts.CORE_GLOW)
+	var radar := p.moving(Vector3(0, dish_y, 0), Motion.spin(Vector3.UP, 1.2))
+	var face := Vector3(70, 0, 0)
+	# From L7 a bigger dish.
+	var dish := 1.0 if level < 7 else 1.3
+	radar.lathe(PackedVector2Array([
+		Vector2(0.06, 0) * dish, Vector2(0.34, 0.1) * dish, Vector2(0.32, 0.13) * dish, Vector2(0, 0.04) * dish,
+	]), 24, Vector3(0, 0.12, -0.08), _by_tier(p.tier, SHELL, Parts.CHROME_ROUND, Parts.CHROME_ROUND), face)
+	radar.prism(0.05, 0.05, 0.14, 16, Vector3.ZERO, Parts.GUNMETAL)
+	radar.orb(0.055 * dish, 12, 6, Vector3(0, 0.12, 0) + LowPolyMesh.turn(Vector3(0, 0.27 * dish, 0), face),
+		Parts.CORE_GLOW if p.tier >= Parts.Tier.OBSIDIAN else Parts.CYAN_STRIP)
+	if level >= 9:
+		var ring := p.moving(Vector3(0, deck + trunnion.y + 1.0, 0), Motion.spin(Vector3.UP, -0.5))
+		_hover_ring(ring, 0.3, 0.42, p.tier)
+	if level >= 10:
+		Parts.escort_skiff(p, MISSILE_ESCORT_RADIUS, dish_y + MISSILE_ESCORT_LIFT, 0.6, Vector3.ZERO, MISSILE_SKIFF_SCALE)
+
+
+## A missile pod on the launcher, `columns` by `rows` tubes `spacing` apart, centred `x` across
+## the trunnion: a box (chrome or obsidian at the high tiers) banded with hazard stripes round its
+## face (gold filigree at the Crown), red-tipped tubes whose tips blink in a chase snaking along
+## the rows (violet crystals from L8); from L2 a red armour plate on its top, from L5 a gold plate
+## on its back, from L8 a glowing violet vein panel across its face and on its side the camera
+## sees. From L6 the tubes take fewer sides.
+static func _pod(s: LowPolyMesh, trunnion: Vector3, aim: Vector3, x: float, columns: int, rows: int, spacing: float,
+		level: int, tier: int) -> void:
+	var k := spacing / 0.34
+	var width := columns * spacing + 0.2
+	var height := rows * spacing + 0.2
+	var depth := 0.9
+	var sides := 16 if level < 6 else 12
+	s.box_chamfered(Vector3(width, height, depth), 0.06, _at(trunnion, Vector3(x, -height * 0.5, 0), aim),
+		_by_tier(tier, SHELL, Parts.CHROME, Parts.OBSIDIAN), aim)
+	s.box_chamfered(Vector3(width + 0.04, height + 0.04, 0.16), 0.03,
+		_at(trunnion, Vector3(x, -height * 0.5 - 0.02, depth * 0.5 - 0.22), aim),
+		Parts.FILIGREE if tier >= Parts.Tier.CROWN else HAZARD_FINE, aim)
+	var tube_aim := aim + Vector3(90, 0, 0)
+	var tip := LASER_BLINK if level < 8 else CRYSTAL_BLINK
+	for row: int in rows:
+		for column: int in columns:
+			var face := Vector3(x + (column - (columns - 1) * 0.5) * spacing, (row - (rows - 1) * 0.5) * spacing, depth * 0.5 - 0.04)
+			var mouth := _at(trunnion, face, aim)
+			var turn_order := column if row % 2 == 0 else columns - 1 - column
+			s.tube(0.1 * k, 0.14 * k, 0.1, sides, mouth, Parts.GUNMETAL, tube_aim)
+			s.cone(0.085 * k, 0.2 * k, sides, mouth, tip.phased(Parts.chase(row * columns + turn_order, rows * columns)),
+				tube_aim)
+	if level >= 2:
+		s.box_chamfered(Vector3(width * 0.8, 0.05, depth * 0.45), 0.02,
+			_at(trunnion, Vector3(x, height * 0.5, -0.12), aim), ARMOUR, aim)
+	if level >= 5:
+		s.box_chamfered(Vector3(width + 0.05, height + 0.05, 0.08), 0.02,
+			_at(trunnion, Vector3(x, -height * 0.5 - 0.025, -depth * 0.5 + 0.02), aim),
+			GOLD if tier >= Parts.Tier.GOLD else Parts.HULL_MID, aim)
+	if level >= 8:
+		# The face glows violet round the tubes' mouths.
+		s.box(Vector3(width - 0.1, height - 0.1, 0.02), _at(trunnion, Vector3(x, -(height - 0.1) * 0.5, depth * 0.5 - 0.005), aim),
+			VEIN_PANEL, aim)
+		for side: float in [-1.0, 1.0]:
+			if LowPolyMesh.turn(Vector3(side, 0, 0), aim).dot(TOWARD_CAMERA) > 0.2:
+				s.box(Vector3(0.02, height - 0.24, depth - 0.3),
+					_at(trunnion, Vector3(x + side * (width * 0.5 + 0.01), -(height - 0.24) * 0.5, -0.05), aim), VEIN_PANEL, aim)
 
 
 static func build_plasma_mortar(p: Parts, level: int) -> void:

@@ -60,7 +60,7 @@ const MODELS := {
 	"drydock": [4, 2],
 	"alliance_beacon": [3, 3],
 	"laser_turret": [3, 10],
-	"missile_battery": [3, 5],
+	"missile_battery": [3, 10],
 	"plasma_mortar": [3, 4],
 	"shield_generator": [3, 4],
 	"flak_cannon": [3, 4],
