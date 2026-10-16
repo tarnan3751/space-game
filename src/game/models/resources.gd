@@ -984,29 +984,63 @@ static var GOLD_WHEEL := Surf.make(MaterialKit.Layer.FLAT, MaterialKit.CORE_GOLD
 static var GAUGE := Surf.make(MaterialKit.Layer.GLOW, MaterialKit.METAL, 1.0, Surf.UNLIT | Surf.PULSE, true)
 static var WARNING_LAMP := Surf.make(MaterialKit.Layer.GLOW, MaterialKit.HAZARD, 1.0, Surf.UNLIT | Surf.BLINK, true)
 static var LIQUID_METAL := Surf.make(MaterialKit.Layer.PIPE, MaterialKit.METAL, 2.0, Surf.UNLIT | Surf.FLOW, true, true, 0.75)
+## The high levels' own: the L7 catwalk lamps, chasing along each catwalk; the L8 gauge lenses in
+## crystal pink, pulsing; the L9 gauge ring hovering over the tanks, obsidian with a metal-lit dial
+## and a violet rim (gold at L10), bobbing together (their one phase is also the dial's and the
+## rim's PULSE offset).
+static var CATWALK_LAMP := Surf.make(MaterialKit.Layer.GLOW, MaterialKit.ENERGY, 1.0, Surf.UNLIT | Surf.BLINK, true)
+static var GAUGE_LENS := Surf.make(MaterialKit.Layer.CRYSTAL, MaterialKit.CRYSTAL, 1.0, Surf.UNLIT | Surf.PULSE, true)
+static var GAUGE_RING := Surf.make(MaterialKit.Layer.OBSIDIAN, Parts.OBSIDIAN_TINT, 1.0, Surf.GLOSSY | Surf.BOB, true, true, 0.7)
+static var GAUGE_TICK := Surf.make(MaterialKit.Layer.GLOW, MaterialKit.METAL, 1.0, Surf.UNLIT | Surf.PULSE | Surf.BOB, true, true, 0.7)
+static var GAUGE_RIM := Surf.make(MaterialKit.Layer.GLOW, Parts.CORE_GLOW_TINT, 1.0, Surf.UNLIT | Surf.PULSE | Surf.BOB, true, true,
+	0.7)
+static var GAUGE_GOLD_RIM := Surf.make(MaterialKit.Layer.FLAT, MaterialKit.CORE_GOLD, 1.0, Surf.GLOSSY | Surf.BOB, true, true, 0.7)
 
 ## The metal silo's shell height by level; from L4 it stands as twin tanks.
-const METAL_SILO_HEIGHTS := [0.9, 1.15, 1.4, 1.45, 1.45]
+const METAL_SILO_HEIGHTS := [0.9, 1.15, 1.4, 1.45, 1.45, 1.9, 2.2, 2.5, 2.6, 3.0]
 const TWIN_TANKS := [Vector3(-0.56, 0, 0.56), Vector3(0.56, 0, -0.56)]
+## From L6: the pump's housing on the pipe between the tanks (its middle), and its flywheel's
+## axis, towards the camera.
+const PUMP := Vector3(0.38, 0, 0.38)
+const PUMP_FACING := Vector3(0.70710678, 0, 0.70710678)
+## The L9 gauge ring's lift over the tanks' shells and its radius, over the deck between them;
+## the L10 hover skiff's round over them.
+const GAUGE_RING_LIFT := 0.56
+const GAUGE_RING_RADIUS := 0.5
+## The L7 beacon mast's height over the deck: its beacon clears the L9 gauge ring,
+## which turns round the mast.
+const BEACON_MAST := 0.8
+const SILO_SKIFF_RADIUS := 1.15
+const SILO_SKIFF_HEIGHT := 4.1
 
 
 ## A squat riveted tank in plate bands on a round plinth, with an access ladder up its lit
 ## side and a pulsing metal fill gauge, a hatch, a vent and a blinking warning lamp on its
 ## domed top. It grows taller to L3, stands as twin tanks joined by a catwalk and a pipe of
 ## flowing liquid metal from L4, and wears gold caps at L5.
+##
+## From L6 the tanks grow taller each level, their shells 1.9 to 3.0: L6 chrome shells banded in the
+## metal accent, cyan level gauges up them beside the fill gauges, a chrome catwalk ring round each
+## tank's top, and a chrome pump on the pipe, fed by the valves, cyan-lit, its flywheel spinning (a
+## moving part); L7 lamps chasing along the catwalks and a chrome beacon mast on the deck between
+## the tanks, its cyan beacon pulsing; L8 obsidian armour bands veined violet, veined risers up the
+## tanks, crystal-pink lenses on the gauges and an obsidian pump housing; L9 an obsidian gauge ring
+## hovering over the deck between the tanks, turning; L10 gold filigree bands, gold rims and
+## railings, the violet antimatter core glowing in a gold cage on the pump at the pipe's junction,
+## gold-capped vents, and a hover skiff circling over the tanks as its escort.
 static func build_metal_silo(p: Parts, level: int) -> void:
 	var m := p.body
 	var gold := p.tier >= Parts.Tier.GOLD
 	var height: float = METAL_SILO_HEIGHTS[level - 1]
 	Parts.foundation(m, 3)
 	if level < 4:
-		_metal_tank(m, Vector3(0, Parts.PAD_HEIGHT, 0), 0.95, height, gold, 0.0)
+		_metal_tank(m, Vector3(0, Parts.PAD_HEIGHT, 0), 0.95, height, level, p.tier, 0.0)
 		if level >= 3:
 			_valves(m, Vector3(0.62, Parts.PAD_HEIGHT, 0.62), gold)
 		return
 	for k: int in TWIN_TANKS.size():
 		var spot: Vector3 = TWIN_TANKS[k]
-		_metal_tank(m, spot + Vector3(0, Parts.PAD_HEIGHT, 0), 0.66, height, gold, 0.5 * k)
+		_metal_tank(m, spot + Vector3(0, Parts.PAD_HEIGHT, 0), 0.66, height, level, p.tier, 0.5 * k)
 	# The pipe between the tanks, out of each at its side and looping towards the camera, clear
 	# of the gauges and the ladders.
 	var a: Vector3 = TWIN_TANKS[0]
@@ -1022,21 +1056,45 @@ static func build_metal_silo(p: Parts, level: int) -> void:
 		m.box(Vector3(0.05, 0.12, 1.0), LowPolyMesh.turn(Vector3(side * 0.15, 0, 0), Vector3(0, 135, 0)) + Vector3(0, deck, 0),
 			Parts.ROD, Vector3(0, 135, 0))
 	_valves(m, Vector3(0.66, Parts.PAD_HEIGHT, 0.66), gold)
+	if level >= 6:
+		_metal_pump(p, PUMP + Vector3(0, pipe_y, 0), level)
+	if level >= 7:
+		# A chrome beacon mast on the deck between the tanks, its cyan beacon pulsing.
+		var foot := Vector3(0, deck + 0.04, 0)
+		m.prism(0.06, 0.04, BEACON_MAST, 8, foot, Parts.CHROME_ROUND)
+		m.orb(0.1, 8, 4, foot + Vector3(0, 0.1 + BEACON_MAST, 0), Parts.CYAN_STRIP)
+		m.prism(0.07, 0.03, 0.05, 8, foot + Vector3(0, 0.19 + BEACON_MAST, 0),
+			Parts.GOLD_ROUND if p.tier >= Parts.Tier.CROWN else Parts.CHROME_ROUND)
+	if level >= 9:
+		_gauge_ring(p, Vector3(0, deck + GAUGE_RING_LIFT, 0), GAUGE_RING_RADIUS, p.tier)
+	if level >= 10:
+		Parts.escort_skiff(p, SILO_SKIFF_RADIUS, SILO_SKIFF_HEIGHT, 0.4)
 
 
 ## One metal tank standing at `base`: plinth, banded shell, gauge, ladder, domed top with its
-## lamp; its gauge and lamp on `phase`.
-static func _metal_tank(m: LowPolyMesh, base: Vector3, radius: float, height: float, gold: bool, phase: float) -> void:
+## lamp; its gauge and lamp on `phase`. From L6 its shell is the tier's (chrome) and it gains
+## cyan level gauges and a catwalk ring, and the higher levels' parts (build_metal_silo).
+static func _metal_tank(m: LowPolyMesh, base: Vector3, radius: float, height: float, level: int, tier: int,
+		phase: float) -> void:
+	var gold := tier >= Parts.Tier.GOLD
 	m.lathe(PackedVector2Array([
 		Vector2(radius + 0.14, 0), Vector2(radius + 0.14, 0.08), Vector2(radius + 0.08, 0.12), Vector2(0, 0.12),
 	]), 24, base, Parts.HULL_DARK_ROUND)
+	if level >= 10:
+		m.lathe(PackedVector2Array([Vector2(radius + 0.15, 0.02), Vector2(radius + 0.15, 0.07)]), 24, base, Parts.GOLD_ROUND)
 	var shell := base + Vector3(0, 0.12, 0)
-	m.lathe(PackedVector2Array([Vector2(radius, 0), Vector2(radius, height)]), 24, shell, TANK)
+	m.lathe(PackedVector2Array([Vector2(radius, 0), Vector2(radius, height)]), 24, shell,
+		Parts.CHROME_ROUND if tier >= Parts.Tier.CHROME else TANK)
 	var band_y := 0.0
 	var k := 0
 	while band_y < height - 0.2:
-		_band(m, radius, shell + Vector3(0, band_y, 0), METAL_ACCENT_ROUND if k == 1 else Parts.HULL_MID_ROUND)
-		band_y += 0.4
+		if level >= 8:
+			_armour_band(m, radius, shell + Vector3(0, band_y, 0), tier, k)
+		elif level >= 6:
+			_band(m, radius, shell + Vector3(0, band_y, 0), METAL_ACCENT_ROUND if k % 2 == 1 else Parts.HULL_MID_ROUND)
+		else:
+			_band(m, radius, shell + Vector3(0, band_y, 0), METAL_ACCENT_ROUND if k == 1 else Parts.HULL_MID_ROUND)
+		band_y += 0.6 if level >= 8 else 0.4
 		k += 1
 	_band(m, radius, shell + Vector3(0, height - 0.08, 0), Parts.GOLD_ROUND if gold else Parts.HULL_MID_ROUND)
 	var top := shell + Vector3(0, height, 0)
@@ -1044,6 +1102,8 @@ static func _metal_tank(m: LowPolyMesh, base: Vector3, radius: float, height: fl
 	m.prism(0.15, 0.13, 0.08, 16, top + Vector3(-0.12, radius * 0.3, -0.12), Parts.HULL_MID_ROUND)
 	var vent := top + Vector3(0.2, radius * 0.24, -0.25)
 	Parts.pipe_run(m, PackedVector3Array([vent, vent + Vector3(0, 0.2, 0), vent + Vector3(0.14, 0.2, 0)]), 0.045, Parts.GUNMETAL, 12)
+	if level >= 10:
+		m.prism(0.065, 0.075, 0.07, 12, vent + Vector3(0.13, 0.2, 0), Parts.GOLD_ROUND, Parts.facing(Vector3.RIGHT))
 	# The warning lamp on the lid's front, sunk to sit on the dome's slope.
 	var lamp := radius * 0.33
 	var lamp_y := radius * 0.32 * sqrt(1.0 - 2.0 * lamp * lamp / (radius * radius)) - 0.02
@@ -1054,11 +1114,106 @@ static func _metal_tank(m: LowPolyMesh, base: Vector3, radius: float, height: fl
 	m.box_chamfered(Vector3(0.18, height * 0.74, 0.08), 0.03, gauge, Parts.HULL_DARK, yaw)
 	m.box(Vector3(0.09, height * 0.52, 0.1), gauge + Vector3(0, 0.04, 0), GAUGE.phased(phase), yaw)
 	Parts.ladder(m, Parts.around(radius + 0.06, 118, 0) + shell, height + 0.06, 0.2, 90.0 - 118.0, Parts.ROD)
+	if level < 6:
+		return
+	# Cyan level gauges either side of the fill gauge, each on its own phase.
+	for side: int in [-1, 1]:
+		var degrees := 15.0 + 19.0 * side
+		m.box(Vector3(0.05, height * 0.84, 0.04), Parts.around(radius, degrees, 0.08) + shell,
+			Parts.CYAN_STRIP.phased(fposmod(phase + 0.25 * side, 1.0)), Vector3(0, 90.0 - degrees, 0))
+	if level >= 8:
+		# Crystal-pink lenses over the fill gauge, and a veined riser up the tank's front.
+		for i: int in 2:
+			m.orb(0.05, 8, 3, Parts.around(radius + 0.05, 15, 0.1 + height * (0.6 + 0.08 * i)) + shell,
+				GAUGE_LENS.phased(fposmod(phase + 0.5 * i, 1.0)))
+		var riser := Parts.around(radius + 0.06, 62, 0.0) + shell
+		Parts.pipe(m, riser, riser + Vector3(0, height - 0.1, 0), 0.045, Parts.VEINS, 12)
+	_catwalk(m, shell + Vector3(0, height - 0.3, 0), radius, level, tier, phase)
 
 
 ## A plate band round a tank: its outer wall only, the shell fills it from above.
 static func _band(m: LowPolyMesh, radius: float, pos: Vector3, surf: Surf) -> void:
 	m.lathe(PackedVector2Array([Vector2(radius + 0.04, 0), Vector2(radius + 0.04, 0.08)]), 24, pos, surf)
+
+
+## An armour band round a tank from L8, the `k`th up it (every 0.6): a thick obsidian band with a
+## violet vein running round its middle; at the Crown tier every other band is gold filigree
+## instead.
+static func _armour_band(m: LowPolyMesh, radius: float, pos: Vector3, tier: int, k: int) -> void:
+	var filigree := tier >= Parts.Tier.CROWN and k % 2 == 1
+	m.lathe(PackedVector2Array([
+		Vector2(radius + 0.06, 0), Vector2(radius + 0.06, 0.14), Vector2(radius, 0.14),
+	]), 24, pos, Parts.FILIGREE if filigree else Parts.OBSIDIAN_ROUND)
+	if not filigree:
+		m.lathe(PackedVector2Array([Vector2(radius + 0.065, 0.035), Vector2(radius + 0.065, 0.105)]), 24, pos, Parts.VEINS)
+
+
+## The catwalk ring round a tank's top from L6, its deck at `pos`: a grating deck with a chrome
+## kick rail (gold at the Crown tier) round the tank but for the side facing the other tank, on
+## three brackets; from L7 three lamps chasing along its side to the camera on `phase`.
+static func _catwalk(m: LowPolyMesh, pos: Vector3, radius: float, level: int, tier: int, phase: float) -> void:
+	# The side facing the other tank, which the catwalk leaves open: the tanks stand on a diagonal.
+	var inward := rad_to_deg(atan2(-pos.z, -pos.x))
+	var from := inward + 50.0
+	var to := inward + 310.0
+	m.ring(radius, radius + 0.22, 0.04, 24, pos, DECK_PLATE, Vector3.ZERO, from, to)
+	m.ring(radius + 0.18, radius + 0.22, 0.12, 24, pos + Vector3(0, 0.04, 0),
+		Parts.GOLD_ROUND if tier >= Parts.Tier.CROWN else Parts.CHROME_ROUND, Vector3.ZERO, from, to)
+	for i: int in 3:
+		var degrees := from + 65.0 + 65.0 * i
+		Parts.beam(m, Parts.around(radius, degrees, pos.y - 0.28) + Vector3(pos.x, 0, pos.z),
+			Parts.around(radius + 0.16, degrees, pos.y) + Vector3(pos.x, 0, pos.z), 0.06, Parts.CHROME)
+	if level >= 7:
+		# On the side to the camera (round 45 degrees), which the arc always covers.
+		for i: int in 3:
+			var degrees := 21.0 + 24.0 * i
+			m.box(Vector3(0.08, 0.06, 0.08), Parts.around(radius + 0.2, degrees, pos.y + 0.16) + Vector3(pos.x, 0, pos.z),
+				CATWALK_LAMP.phased(fposmod(phase + Parts.chase(i, 3), 1.0)), Vector3(0, 90.0 - degrees, 0))
+
+
+## The pump on the liquid-metal pipe from L6, its housing's middle at `centre`, standing on a
+## chrome riser the valves feed: a chrome housing (obsidian from the Obsidian tier) with a cyan
+## belt round its top and a flywheel spinning on its face to the camera, chrome (gold at the Crown
+## tier) round a cyan hub; at L10 the violet antimatter core glowing in a gold cage on its top.
+static func _metal_pump(p: Parts, centre: Vector3, level: int) -> void:
+	var m := p.body
+	var crown := p.tier >= Parts.Tier.CROWN
+	var yaw := Vector3(0, 45, 0)
+	var bottom := centre - Vector3(0, 0.22, 0)
+	m.prism(0.11, 0.11, bottom.y - Parts.PAD_HEIGHT, 16, Vector3(centre.x, Parts.PAD_HEIGHT, centre.z), Parts.CHROME_ROUND)
+	m.box_chamfered(Vector3(0.44, 0.44, 0.3), 0.05, bottom, Parts.OBSIDIAN if p.tier >= Parts.Tier.OBSIDIAN else Parts.CHROME, yaw)
+	m.box(Vector3(0.46, 0.06, 0.32), bottom + Vector3(0, 0.32, 0), Parts.CYAN_STRIP, yaw)
+	var face := centre + PUMP_FACING * 0.15
+	var wheel := p.moving(face, Motion.spin(PUMP_FACING, 1.6))
+	var rim := Parts.GOLD_ROUND if crown else Parts.CHROME_ROUND
+	Parts.torus(wheel, 0.15, 0.035, 12, 6, Vector3.ZERO, rim, Parts.facing(PUMP_FACING))
+	var axle := PUMP_FACING * 0.035
+	for spoke: Vector3 in [Vector3(0.70710678, 0, -0.70710678), Vector3.UP]:
+		wheel.strut(axle - spoke * 0.14, axle + spoke * 0.14, 0.04, rim)
+	wheel.orb(0.065, 12, 4, PUMP_FACING * 0.05, Parts.CYAN_STRIP)
+	if level >= 10:
+		var top := centre + Vector3(0, 0.22, 0)
+		m.prism(0.13, 0.11, 0.05, 16, top, Parts.GOLD_ROUND)
+		m.orb(0.12, 16, 6, top + Vector3(0, 0.18, 0), Parts.CORE_GLOW)
+		for k: int in 4:
+			var degrees := 45.0 + 90.0 * k
+			m.strut(top + Parts.around(0.11, degrees, 0.05), top + Parts.around(0.14, degrees, 0.19), 0.035, Parts.GOLD_TRIM)
+			m.strut(top + Parts.around(0.14, degrees, 0.19), top + Parts.around(0.03, degrees, 0.33), 0.035, Parts.GOLD_TRIM)
+		m.prism(0.05, 0.02, 0.06, 12, top + Vector3(0, 0.32, 0), Parts.GOLD_ROUND)
+
+
+## The gauge ring hovering over the deck between the tanks (L9), its middle at `centre`, turning:
+## an obsidian ring of `radius` spanning both domes, a metal-lit dial on its top marked by six
+## obsidian ticks, and a violet rim (gold at the Crown tier), all bobbing together.
+static func _gauge_ring(p: Parts, centre: Vector3, radius: float, tier: int) -> void:
+	var ring := p.moving(centre, Motion.spin(Vector3.UP, 0.3))
+	ring.ring(radius - 0.08, radius + 0.1, 0.05, 24, Vector3.ZERO, GAUGE_RING)
+	ring.lathe(PackedVector2Array([Vector2(radius + 0.105, 0.008), Vector2(radius + 0.105, 0.042)]), 24, Vector3.ZERO,
+		GAUGE_GOLD_RIM if tier >= Parts.Tier.CROWN else GAUGE_RIM)
+	ring.lathe(PackedVector2Array([Vector2(radius + 0.06, 0.052), Vector2(radius - 0.04, 0.052)]), 24, Vector3.ZERO, GAUGE_TICK)
+	for k: int in 6:
+		var degrees := 60.0 * k
+		ring.box(Vector3(0.16, 0.03, 0.05), Parts.around(radius + 0.01, degrees, 0.05), GAUGE_RING, Vector3(0, 90.0 - degrees, 0))
 
 
 ## A valve manifold on the near corner: two pipes from the ground with handwheels.
