@@ -106,6 +106,23 @@ static var CORE_BLINK := _glow(Parts.CORE_GLOW_TINT, Surf.BLINK)
 static var CRYSTAL_BLINK := Surf.make(MaterialKit.Layer.CRYSTAL, Parts.CORE_GLOW_TINT.lightened(0.3), 1.0, Surf.UNLIT | Surf.BLINK, true)
 ## Current running violet along an ammo belt.
 static var VIOLET_CURRENT := Parts.current(Parts.CORE_GLOW_TINT, 0.8)
+## The Crown's antimatter core where it is a weapon's heart (the shield's orb, the arc tower's
+## sphere, the gravity well's core, the EMP's emitter, the sentry's eye): a light violet, unlit
+## and steady, so it is the brightest thing on the model where CORE_GLOW's pulse would dim it (as
+## the collectors' BRIGHT_CORE in resources.gd); BRIGHT_FLOAT floats as the core it replaces did.
+## The Obsidian tier's crystal orb, glowing steady in the crystal inlays' pink (a pulse dims a
+## sphere this big to a dull mauve), floating, and the gravity well's, held still in its gyro rings; violet arcs and holograms; the Crown's gold halo,
+## floating with the orb under it; chrome and obsidian capacitor cans.
+const CORE_LIGHT := Color("c9a2ff")
+static var BRIGHT_CORE := Surf.make(MaterialKit.Layer.GLOW, CORE_LIGHT, 1.0, Surf.UNLIT, true)
+static var BRIGHT_FLOAT := Surf.make(MaterialKit.Layer.GLOW, CORE_LIGHT, 1.0, Surf.UNLIT | Surf.BOB, true)
+static var CRYSTAL_ORB := Surf.make(MaterialKit.Layer.GLOW, MaterialKit.CRYSTAL, 1.0, Surf.UNLIT | Surf.BOB, true)
+static var CRYSTAL_CORE := Surf.make(MaterialKit.Layer.GLOW, MaterialKit.CRYSTAL, 1.0, Surf.UNLIT, true)
+static var VIOLET_ARC := Parts.spark(Parts.CORE_GLOW_TINT.lightened(0.35))
+static var VIOLET_HOLO := Surf.make(MaterialKit.Layer.GLOW, Parts.CORE_GLOW_TINT, 1.0, Surf.HOLO)
+static var HALO_GOLD := Surf.make(MaterialKit.Layer.FLAT, MaterialKit.CORE_GOLD, 1.0, Surf.GLOSSY | Surf.BOB, true)
+static var CHROME_RIBBED := Surf.make(MaterialKit.Layer.PIPE, Parts.CHROME_TINT, 2.0, Surf.GLOSSY, true)
+static var OBSIDIAN_RIBBED := Surf.make(MaterialKit.Layer.PIPE, Parts.OBSIDIAN_TINT, 2.0, Surf.GLOSSY, true)
 
 ## The horizontal direction towards the camera (IsoCamera's yaw): vein panels go on the faces
 ## turned to it.
@@ -165,6 +182,17 @@ const FLAK_ROW := 0.22
 const FLAK_RING_LIFT := 1.6
 const FLAK_ESCORT_LIFT := 2.15
 const FLAK_ESCORT_RADIUS := 1.2
+## The shield generator from L5, by level from L5: the plinth's height, and how much higher the orb
+## floats, the pylons growing with it; the field ring's and the L7 hovering ring's distance out
+## from the orb, the hovering ring's drop under its centre, and the L8 guard drone's round and its
+## height over the orb's centre.
+const SHIELD_PLINTHS := [0.36, 0.55, 0.58, 0.62]
+const SHIELD_LIFTS := [0.5, 0.8, 1.05, 1.3]
+const SHIELD_FIELD := 0.42
+const SHIELD_RING := 0.5
+const SHIELD_RING_DROP := 0.32
+const SHIELD_ESCORT_RADIUS := 1.38
+const SHIELD_ESCORT_LIFT := 0.45
 
 
 ## From L6 the head rides a mount that lifts it a little more each level, on a taller plinth.
@@ -614,39 +642,72 @@ static func _loader_arm(p: Parts, foot: Vector3, reach: Vector3, tier: int, shou
 	Parts.torus(arm, 0.13, 0.03, 12, 6, tip - Vector3(0, 0.29, 0), plate)
 
 
+## From L5 the orb floats higher every level and the arms' lower runs stand as tall emitter
+## pylons, growing with it. L5 (Chrome): chrome plinth, drum, dome and pylons, a cyan strip up each
+## pylon's outer face over a red armour collar, a bigger orb and a cyan field ring round it. L6
+## (Obsidian): a taller plinth with glowing violet vein panels on its faces the camera sees, the
+## dome, drum and pylons obsidian, veins round the deck, up the dome and the pylons, crystal
+## inlays on the deck, a pink crystal orb, the conduits, the field ring and the hologram band violet,
+## violet crystal emitters and arcs. L7 a field ring hovering round the orb's lower half, turning,
+## and a second collar on every pylon. L8 (Crown): gold filigree round the plinth and the
+## pylons, the orb the antimatter core under a gold halo, a gold field ring outside the violet one,
+## and a guard drone circling beside the orb's crown (the escort).
 static func build_shield_generator(p: Parts, level: int) -> void:
 	var m := p.body
-	var top := _plinth(m, 3, 1.15, 0.3)
-	Parts.drum(m, 0.9, 0.16, 0.04, 24, Vector3(0, top, 0), SHELL_MID)
+	var plinth := 0.3 if level < 5 else float(SHIELD_PLINTHS[level - 5])
+	var lift := 0.0 if level < 5 else float(SHIELD_LIFTS[level - 5])
+	var obsidian := p.tier >= Parts.Tier.OBSIDIAN
+	var top := _plinth(m, 3, 1.15, plinth, ARMOUR, _by_tier(p.tier, Parts.GUNMETAL, Parts.CHROME_ROUND, Parts.OBSIDIAN_ROUND))
+	Parts.drum(m, 0.9, 0.16, 0.04, 24, Vector3(0, top, 0), _by_tier(p.tier, SHELL_MID, Parts.CHROME_ROUND, Parts.OBSIDIAN_ROUND))
 	var foot := top + 0.16
-	m.dome(0.84, 0.55, 20, 6, Vector3(0, foot, 0), SHELL)
-	m.ring(0.8, 0.88, 0.05, 24, Vector3(0, foot, 0), ION)
+	m.dome(0.84, 0.55, 20, 6, Vector3(0, foot, 0), _by_tier(p.tier, SHELL, Parts.CHROME_ROUND, Parts.OBSIDIAN_ROUND))
+	m.ring(0.8, 0.88, 0.05, 24, Vector3(0, foot, 0), Parts.CORE_GLOW if obsidian else ION)
 	var orb_radius := 0.3 + 0.05 * level
-	var orb := Vector3(0, top + 1.45 + 0.05 * level, 0)
+	var orb := Vector3(0, top + 1.45 + 0.05 * level + lift, 0)
 	var knuckle := GOLD if p.tier >= Parts.Tier.GOLD else ARMOUR_ROUND
+	var pylon := _by_tier(p.tier, SHELL_DARK, Parts.CHROME_ROUND, Parts.OBSIDIAN_ROUND)
 	for k: int in 3:
 		var degrees := 75.0 + 120.0 * k
 		var root := Parts.around(0.6, degrees, foot + 0.35)
-		var elbow := Parts.around(1.0, degrees, foot + 0.72)
+		var elbow := Parts.around(1.0, degrees, foot + 0.72 + lift)
 		# The tip stands off the orb, its cone's point 0.12 short of it, for an arc to jump.
 		var toward := (Parts.around(0.44, degrees, orb.y - orb_radius * 0.75) - orb).normalized()
 		var tip := orb + toward * (orb_radius + 0.3)
 		# Two straight runs meeting under the knuckle, which hides the bend; current runs up the
 		# second to the tip.
-		Parts.pipe_run(m, PackedVector3Array([root, elbow]), 0.09, SHELL_DARK)
-		Parts.pipe_run(m, PackedVector3Array([elbow, tip]), 0.09, ION_CURRENT)
+		Parts.pipe_run(m, PackedVector3Array([root, elbow]), 0.09 if level < 5 else 0.11, pylon)
+		Parts.pipe_run(m, PackedVector3Array([elbow, tip]), 0.09, VIOLET_CURRENT if obsidian else ION_CURRENT)
 		m.orb(0.15, 12, 5, elbow, knuckle)
-		m.cone(0.11, 0.18, 16, tip, ION, Parts.facing(orb - tip))
-		Parts.arc(m, orb + toward * (orb_radius + 0.12), orb + toward * (orb_radius - 0.02), 3, 0.03, ION_ARC.phased(k / 3.0))
+		m.cone(0.11, 0.18, 16, tip, FOCUS.phased(k / 3.0) if obsidian else ION, Parts.facing(orb - tip))
+		Parts.arc(m, orb + toward * (orb_radius + 0.12), orb + toward * (orb_radius - 0.02), 3, 0.03,
+			(VIOLET_ARC if obsidian else ION_ARC).phased(k / 3.0))
 		if level >= 2:
-			Parts.torus(m, 0.13, 0.04, 12, 6, elbow.lerp(tip, 0.45), ION, Parts.facing(tip - elbow))
+			Parts.torus(m, 0.13, 0.04, 12, 6, elbow.lerp(tip, 0.45), Parts.CORE_GLOW if obsidian else ION, Parts.facing(tip - elbow))
 		if level >= 3:
 			var short_degrees := degrees + 60.0
 			var short_root := Parts.around(0.62, short_degrees, foot + 0.3)
 			var short_tip := Parts.around(0.84, short_degrees, foot + 0.72)
-			Parts.pipe_run(m, PackedVector3Array([short_root, short_tip]), 0.08, SHELL_DARK)
+			Parts.pipe_run(m, PackedVector3Array([short_root, short_tip]), 0.08, pylon)
 			m.orb(0.11, 12, 5, short_tip, knuckle)
-	m.orb(orb_radius, 20, 8, orb, ION_ORB)
+		if level >= 5:
+			# A glowing strip up the pylon's outer face (cyan, violet from the Obsidian tier) over a
+			# red armour collar round its foot; a second collar under the knuckle from L7.
+			var up := Parts.facing(elbow - root)
+			var out := Parts.around(1.0, degrees, 0.0)
+			Parts.beam(m, root.lerp(elbow, 0.2) + out * 0.1, elbow.lerp(root, 0.12) + out * 0.1, 0.05,
+				Parts.CORE_GLOW if obsidian else Parts.CYAN_STRIP, 0.01)
+			m.tube(0.1, 0.145, 0.14, 16, root.lerp(elbow, 0.08), ARMOUR_ROUND, up)
+			if level >= 7:
+				m.tube(0.1, 0.145, 0.12, 16, elbow.lerp(root, 0.2), ARMOUR_ROUND, up)
+			if level >= 8:
+				for at: float in [0.45, 0.6]:
+					m.tube(0.1, 0.13, 0.06, 16, root.lerp(elbow, at), Parts.FILIGREE, up)
+	var core_surf := ION_ORB
+	if level >= 8:
+		core_surf = BRIGHT_FLOAT
+	elif obsidian:
+		core_surf = CRYSTAL_ORB
+	m.orb(orb_radius, 20, 8, orb, core_surf)
 	if level >= 4:
 		Parts.torus(m, orb_radius + 0.16, 0.035, 20, 10, orb - Vector3(0, 0.035, 0),
 			GOLD if p.tier >= Parts.Tier.GOLD else SHELL_MID, Vector3(18, 0, 10))
@@ -655,7 +716,32 @@ static func build_shield_generator(p: Parts, level: int) -> void:
 	# lowest edge stays above them all the way round.
 	var halo := p.moving(orb, Motion.spin(Vector3.UP, 1.1))
 	var lean := Vector3(8.0 + 4.0 * level, 0, 0)
-	halo.ring(orb_radius + 0.28, orb_radius + 0.3, 0.1, 20, LowPolyMesh.turn(Vector3(0, -0.05, 0), lean), ION_HOLO, lean)
+	halo.ring(orb_radius + 0.28, orb_radius + 0.3, 0.1, 20, LowPolyMesh.turn(Vector3(0, -0.05, 0), lean),
+		VIOLET_HOLO if obsidian else ION_HOLO, lean)
+	if level < 5:
+		return
+	# The field ring round the orb's equator, outside the band's sweep: cyan, violet from the
+	# Obsidian tier, a gold one outside it at the Crown.
+	Parts.torus(m, orb_radius + SHIELD_FIELD, 0.035, 24, 8, orb - Vector3(0, 0.035, 0),
+		Parts.CORE_GLOW if obsidian else Parts.CYAN_STRIP)
+	if level >= 6:
+		_plinth_panels(m, 1.15, plinth)
+		m.ring(0.9, 1.06, 0.012, 8, Vector3(0, top, 0), Parts.VEINS, Parts.OCTAGON)
+		for degrees: float in [15.0, 45.0, 135.0, 255.0]:
+			Parts.dome_seam(m, 0.84, 0.55, Vector3(0, foot, 0), degrees, Parts.CORE_GLOW)
+		for degrees: float in [15.0, 45.0, 75.0]:
+			m.prism(0.07, 0.07, 0.05, 4, Parts.around(0.98, degrees + 5.0, top), INLAY.phased(degrees / 90.0),
+				Vector3(90, 85.0 - degrees, 0))
+	if level >= 7:
+		var ring := p.moving(orb - Vector3(0, SHIELD_RING_DROP, 0), Motion.spin(Vector3.UP, 0.5))
+		_hover_ring(ring, orb_radius + SHIELD_RING, orb_radius + SHIELD_RING + 0.14, p.tier)
+	if level >= 8:
+		_plinth_filigree(m, 1.15, plinth)
+		m.ring(0.96, 1.08, 0.02, 8, Vector3(0, top, 0), Parts.FILIGREE, Parts.OCTAGON)
+		Parts.torus(m, orb_radius + SHIELD_FIELD + 0.09, 0.03, 24, 8, orb - Vector3(0, 0.03, 0), Parts.GOLD_ROUND)
+		# The gold halo floating over the orb, bobbing with it.
+		Parts.torus(m, 0.3, 0.05, 20, 8, orb + Vector3(0, orb_radius + 0.1, 0), HALO_GOLD)
+		Parts.escort_drone(p, SHIELD_ESCORT_RADIUS, orb.y + SHIELD_ESCORT_LIFT, 0.8, Vector3.ZERO, ESCORT_SCALE)
 
 
 ## The mount keeps growing taller every level. L5 (Chrome): chrome plinth, mount, carriage and
