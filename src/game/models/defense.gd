@@ -202,6 +202,18 @@ const ARC_TWINS := [0.85, 1.0, 1.1, 1.2]
 const ARC_RING := 0.18
 const ARC_ESCORT_RADIUS := 1.1
 const ARC_ESCORT_LIFT := 0.15
+## The cloaked sentry from L4, by level from L4: how high its armoured hex skirt lifts the pod; the
+## L6 cloak ring's radii and its height over the skirt, its sights clear of the shimmer ring under
+## it all through its bob; the L5 mantlet's size; the L7 crown's distance behind the guns, and the
+## guard drone's round and height (at ESCORT_SCALE, which the 2x2's extent allows).
+const SENTRY_RISES := [0.15, 0.24, 0.38, 0.5]
+const SENTRY_RING_INNER := 0.96
+const SENTRY_RING_OUTER := 1.08
+const SENTRY_RING_LIFT := 0.2
+const SENTRY_MANTLET := Vector3(0.66, 0.08, 0.36)
+const SENTRY_CROWN_BACK := 0.3
+const SENTRY_ESCORT_RADIUS := 0.86
+const SENTRY_ESCORT_LIFT := 1.0
 
 
 ## From L6 the head rides a mount that lifts it a little more each level, on a taller plinth.
@@ -965,19 +977,38 @@ static func build_arc_tower(p: Parts, level: int) -> void:
 		Parts.escort_drone(p, ARC_ESCORT_RADIUS, centre.y + sphere + ARC_ESCORT_LIFT, 0.8, Vector3.ZERO, ESCORT_SCALE)
 
 
+## From L4 an armoured hex skirt lifts the pod higher every level. L4 (Chrome): a chrome skirt
+## banded in defence red, a chrome lid and gun heads with chrome barrels, cyan seams up the pod's
+## corners the camera sees and round its shoulder, and a cyan cloak shimmering over the pod's
+## walls (a hologram). L5 a broad chrome mantlet bridging the gun heads, its front edge and a
+## sensor dome on it glowing cyan, and twin, longer barrels on each gun. L6 (Obsidian): an obsidian pod, skirt, lid, heads and
+## mantlet, glowing violet vein panels on the shoulder and the skirt the camera sees, veins round
+## the lid, violet crystal sights, the cloak and the mantlet's edge and dome violet, and a cloak ring
+## hovering round the pod, turning. L7 (Crown): gold filigree round the lid and the skirt, the
+## antimatter core glowing in the sights, one gold crown on a stem on the lid behind the guns
+## holding the core up where the camera sees it, and a guard drone circling above (the escort).
 static func build_cloaked_sentry(p: Parts, level: int) -> void:
 	var m := p.body
 	Parts.foundation(m, 2)
-	var base := Vector3(0, Parts.PAD_HEIGHT, 0)
+	var rise := 0.0 if level < 4 else float(SENTRY_RISES[level - 4])
+	var obsidian := p.tier >= Parts.Tier.OBSIDIAN
+	var base := Vector3(0, Parts.PAD_HEIGHT + rise, 0)
+	if level >= 4:
+		# The armoured hex skirt the pod stands on, banded in defence red.
+		var ground := Vector3(0, Parts.PAD_HEIGHT, 0)
+		m.lathe(PackedVector2Array([Vector2(0.78, 0), Vector2(0.78, rise - 0.03), Vector2(0.75, rise), Vector2(0, rise)]), 6,
+			ground, _by_tier(p.tier, POD, Parts.CHROME, Parts.OBSIDIAN))
+		m.lathe(PackedVector2Array([Vector2(0.79, 0), Vector2(0.79, 0.05)]), 6, ground + Vector3(0, rise * 0.4 - 0.025, 0), ARMOUR)
 	Parts.torus(m, 0.83, 0.035, 6, 8, base, SHIMMER)
+	var pod := POD if level < 6 else Parts.OBSIDIAN
 	m.lathe(PackedVector2Array([
 		Vector2(0.74, 0), Vector2(0.74, 0.2), Vector2(0.58, 0.34), Vector2(0, 0.34),
-	]), 6, base, POD)
+	]), 6, base, pod)
 	m.ring(0.72, 0.77, 0.06, 6, base + Vector3(0, 0.08, 0), ARMOUR)
 	for degrees: float in [30.0, 90.0]:
-		m.box_chamfered(Vector3(0.36, 0.1, 0.03), 0.01, Parts.around(0.65, degrees, Parts.PAD_HEIGHT + 0.07), VENT,
+		m.box_chamfered(Vector3(0.36, 0.1, 0.03), 0.01, Parts.around(0.65, degrees, base.y + 0.07), VENT,
 			Vector3(0, 90.0 - degrees, 0))
-	Parts.drum(m, 0.44, 0.05, 0.02, 6, base + Vector3(0, 0.34, 0), Parts.HULL_DARK)
+	Parts.drum(m, 0.44, 0.05, 0.02, 6, base + Vector3(0, 0.34, 0), _by_tier(p.tier, Parts.HULL_DARK, Parts.CHROME, Parts.OBSIDIAN))
 	if level >= 3:
 		m.ring(0.43, 0.47, 0.06, 6, base + Vector3(0, 0.34, 0), GOLD if p.tier >= Parts.Tier.GOLD else Parts.HULL_DARK)
 	# The lid gun scans, turning about the pod's axis.
@@ -985,9 +1016,27 @@ static func build_cloaked_sentry(p: Parts, level: int) -> void:
 	var guns: Array[float] = [0.0]
 	if level >= 2:
 		guns = [-0.17, 0.17]
+	var yaw := SCREEN_RIGHT - 30.0
 	for offset: float in guns:
-		var yaw := SCREEN_RIGHT - 30.0
-		_sentry_gun(lid, LowPolyMesh.turn(Vector3(offset, 0, 0), Vector3(0, yaw, 0)), yaw)
+		_sentry_gun(lid, LowPolyMesh.turn(Vector3(offset, 0, 0), Vector3(0, yaw, 0)), yaw, level, p.tier)
+	if level >= 5:
+		# A broad armoured mantlet bridging the two gun heads, its front edge and a sensor dome on it
+		# lit (cyan, violet from the Obsidian tier).
+		var heading := Vector3(0, yaw, 0)
+		lid.box_chamfered(SENTRY_MANTLET, 0.03, Vector3(0, 0.17, 0), _by_tier(p.tier, SHELL_MID, Parts.CHROME, Parts.OBSIDIAN),
+			heading)
+		var lit := Parts.CORE_GLOW if p.tier >= Parts.Tier.OBSIDIAN else Parts.CYAN_STRIP
+		lid.box(Vector3(SENTRY_MANTLET.x - 0.08, 0.04, 0.02), LowPolyMesh.turn(Vector3(0, 0.19, SENTRY_MANTLET.z * 0.5 + 0.005), heading),
+			lit, heading)
+		# A glowing sensor dome on top, the step that reads from across the base.
+		lid.dome(0.13, 0.1, 16, 4, Vector3(0, 0.17 + SENTRY_MANTLET.y, 0), lit)
+	if level >= 7:
+		# One gold crown on a stem behind the guns, holding the antimatter core up where the camera
+		# sees it.
+		var stem := LowPolyMesh.turn(Vector3(0, 0, -SENTRY_CROWN_BACK), Vector3(0, yaw, 0))
+		lid.prism(0.04, 0.035, 0.2, 8, stem, Parts.GOLD_ROUND)
+		_crown(lid, stem + Vector3(0, 0.2, 0), 0.14, 6, 0.14)
+		lid.orb(0.15, 16, 6, stem + Vector3(0, 0.33, 0), BRIGHT_CORE)
 	# The lamp and the mast stand near the lid's rim, outside the guns' sweep: past the heads'
 	# reach (0.35 from the axis) and away from the barrels' arc in front.
 	Parts.drum(m, 0.05, 0.14, 0.02, 16, base + Parts.around(0.525, 225.0, 0.34), Parts.GUNMETAL)
@@ -996,6 +1045,30 @@ static func build_cloaked_sentry(p: Parts, level: int) -> void:
 		m.ring(0.6, 0.64, 0.04, 6, base + Vector3(0, 0.36, 0), SHIMMER.phased(0.5))
 	if level >= 3:
 		Parts.mast(m, base + Parts.around(0.525, 165.0, 0.34), 0.32, 0.045, LASER_BLINK.phased(0.5))
+	if level < 4:
+		return
+	# Glowing seams up the pod's corners the camera sees and round its shoulder (cyan, violet from
+	# the Obsidian tier), and the cloak shimmering over its walls.
+	var seam := Parts.CORE_GLOW if obsidian else Parts.CYAN_STRIP
+	for degrees: float in [0.0, 60.0]:
+		m.box(Vector3(0.03, 0.17, 0.03), Parts.around(0.745, degrees, base.y + 0.02), seam, Vector3(0, 90.0 - degrees, 0))
+	m.lathe(PackedVector2Array([Vector2(0.748, 0), Vector2(0.748, 0.03)]), 6, base + Vector3(0, 0.17, 0), seam)
+	m.lathe(PackedVector2Array([Vector2(0.8, 0.0), Vector2(0.8, 0.22), Vector2(0.63, 0.37)]), 6, base,
+		VIOLET_HOLO if obsidian else SHIMMER.phased(0.25))
+	if level >= 6:
+		# Vein panels on the shoulder's and the skirt's faces the camera sees, veins round the lid.
+		m.lathe(PackedVector2Array([Vector2(0.75, 0.205), Vector2(0.59, 0.345)]), 6, base, VEIN_PANEL, Vector3.ZERO, 0.0, 120.0)
+		for degrees: float in [30.0, 90.0]:
+			m.box(Vector3(0.5, rise * 0.4 - 0.07, 0.02), Parts.around(0.68, degrees, Parts.PAD_HEIGHT + 0.03), VEIN_PANEL,
+				Vector3(0, 90.0 - degrees, 0))
+		m.lathe(PackedVector2Array([Vector2(0.445, 0), Vector2(0.445, 0.03)]), 6, base + Vector3(0, 0.34, 0), Parts.VEINS)
+		var ring := p.moving(base + Vector3(0, SENTRY_RING_LIFT, 0), Motion.spin(Vector3.UP, 0.6))
+		_hover_ring(ring, SENTRY_RING_INNER, SENTRY_RING_OUTER, p.tier)
+	if level >= 7:
+		m.lathe(PackedVector2Array([Vector2(0.475, 0), Vector2(0.475, 0.04)]), 6, base + Vector3(0, 0.345, 0), Parts.FILIGREE)
+		m.lathe(PackedVector2Array([Vector2(0.785, 0), Vector2(0.785, 0.04)]), 6,
+			Vector3(0, Parts.PAD_HEIGHT + rise - 0.08, 0), Parts.FILIGREE)
+		Parts.escort_drone(p, SENTRY_ESCORT_RADIUS, base.y + SENTRY_ESCORT_LIFT, 0.9, Vector3.ZERO, ESCORT_SCALE)
 
 
 static func build_gravity_well(p: Parts, level: int) -> void:
@@ -1306,13 +1379,26 @@ static func _bank(m: LowPolyMesh, deck: Vector3, heading: Vector3, side: float) 
 			ION_BLINK.phased(Parts.chase(k + 1, 6)), 0.12)
 
 
-## The cloaked sentry's gun: a low head on the lid with a short barrel and a red sight.
-static func _sentry_gun(m: LowPolyMesh, pos: Vector3, yaw: float) -> void:
+## The cloaked sentry's gun: a low head on the lid with a short barrel and a red sight. From L4 a
+## chrome head and barrel (obsidian and a violet crystal sight from the Obsidian tier), twin
+## longer barrels from L5, and at the Crown the antimatter core glowing in its sight.
+static func _sentry_gun(m: LowPolyMesh, pos: Vector3, yaw: float, level: int = 1, tier: int = Parts.Tier.BASE) -> void:
 	var heading := Vector3(0, yaw, 0)
-	m.box_chamfered(Vector3(0.26, 0.15, 0.34), 0.04, pos, SHELL_MID, heading)
+	m.box_chamfered(Vector3(0.26, 0.15, 0.34), 0.04, pos, _by_tier(tier, SHELL_MID, Parts.CHROME, Parts.OBSIDIAN), heading)
 	var aim := Vector3(84, yaw, 0)
-	m.prism(0.045, 0.045, 0.42, 16, _at(pos, Vector3(0, 0.08, 0.12), heading), BARREL, aim)
-	m.box(Vector3(0.1, 0.04, 0.02), _at(pos, Vector3(0, 0.08, 0.171), heading), LASER, heading)
+	var barrel := BARREL if tier < Parts.Tier.CHROME else Parts.CHROME_ROUND
+	var across: Array[float] = [0.0]
+	if level >= 5:
+		across = [-0.055, 0.055]
+	for x: float in across:
+		m.prism(0.045 if level < 5 else 0.038, 0.045 if level < 5 else 0.038, 0.42 if level < 5 else 0.52, 16,
+			_at(pos, Vector3(x, 0.08, 0.12), heading), barrel, aim)
+	var sight := LASER
+	if tier >= Parts.Tier.CROWN:
+		sight = BRIGHT_CORE
+	elif tier >= Parts.Tier.OBSIDIAN:
+		sight = FOCUS
+	m.box(Vector3(0.1, 0.04, 0.02), _at(pos, Vector3(0, 0.08 if level < 5 else 0.125, 0.171), heading), sight, heading)
 
 
 ## A tesla coil standing on `base`: a dark column `height` tall stacked with white insulator
