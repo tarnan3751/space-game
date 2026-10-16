@@ -79,12 +79,63 @@ static var CONDUIT := Parts.current(MaterialKit.ENERGY.darkened(0.35), 0.8)
 ## The orbital cannon's bore, its bands rippling out.
 static var BORE_ION := Parts.current(MaterialKit.ENERGY, 0.3)
 static var LENS_PULSE := Surf.make(MaterialKit.Layer.CRYSTAL, MaterialKit.ENERGY, 2.0, Surf.GLOSSY | Surf.PULSE, true)
+## The high tiers' own (docs/reference/art-style.md, **Tiers**): from the Obsidian tier glowing
+## violet vein panels on the faces the camera sees (the walls' and the siphon's violet field: the
+## glow layer's stripes a third as fine, lifted by FLOW), crystal inlays, and the violet focusing
+## crystals and shell tips; a hovering ring's obsidian, veins, violet rim, red sights and, at the
+## Crown, gold rim, bobbing together (their one phase is also the veins' FLOW speed and the
+## glows' PULSE offset).
+static var VEIN_PANEL := Surf.make(MaterialKit.Layer.GLOW, Parts.CORE_GLOW_TINT, 1.0 / 3.0, Surf.UNLIT | Surf.FLOW, false, true,
+	0.45)
+static var INLAY := Surf.make(MaterialKit.Layer.CRYSTAL, MaterialKit.CRYSTAL, 1.0, Surf.UNLIT | Surf.PULSE)
+static var FOCUS := Surf.make(MaterialKit.Layer.CRYSTAL, Parts.CORE_GLOW_TINT.lightened(0.3), 1.0, Surf.UNLIT | Surf.PULSE)
+static var HOVER := Surf.make(MaterialKit.Layer.OBSIDIAN, Parts.OBSIDIAN_TINT, 1.0, Surf.GLOSSY | Surf.BOB, true, true, 0.7)
+static var HOVER_VEINS := Surf.make(MaterialKit.Layer.VEINS, MaterialKit.ANTIMATTER, 1.0, Surf.UNLIT | Surf.FLOW | Surf.BOB, true, true,
+	0.7)
+static var HOVER_RIM := Surf.make(MaterialKit.Layer.GLOW, Parts.CORE_GLOW_TINT, 1.0, Surf.UNLIT | Surf.PULSE | Surf.BOB, true, true,
+	0.7)
+static var HOVER_SIGHT := Surf.make(MaterialKit.Layer.GLOW, MaterialKit.DEFENCE, 1.0, Surf.UNLIT | Surf.PULSE | Surf.BOB, true, true,
+	0.7)
+static var HOVER_GOLD := Surf.make(MaterialKit.Layer.FLAT, MaterialKit.CORE_GOLD, 1.0, Surf.GLOSSY | Surf.BOB, true, true, 0.7)
+
+## The horizontal direction towards the camera (IsoCamera's yaw): vein panels go on the faces
+## turned to it.
+const TOWARD_CAMERA := Vector3(0.70710678, 0, 0.70710678)
+## The armoured octagon plinth's faces the camera sees, by the Parts.around() angle of each face's
+## normal: the vein panels' and the filigree's places.
+const PLINTH_FACES := [0.0, 45.0, 90.0]
+## The Crown guard drones' size: twice the shared one, so they read at the gameplay zoom.
+const ESCORT_SCALE := 2.0
+
+## The laser turret from L6, by level from L6: the plinth's height, and how far the mount lifts
+## the head above the turret ring.
+const LASER_PLINTHS := [0.5, 0.5, 0.58, 0.58, 0.64]
+const LASER_LIFTS := [0.3, 0.54, 0.62, 0.72, 0.86]
+## The L9 targeting ring's and the L10 spotter drone's heights over the dome's top, and the drone's
+## round.
+const LASER_RING_LIFT := 0.3
+const LASER_ESCORT_RADIUS := 1.15
+const LASER_ESCORT_LIFT := 0.85
 
 
+## From L6 the head rides a mount that lifts it a little more each level, on a taller plinth.
+## L6 (Chrome): chrome plinth, mount, head and barrels, cyan strips along the barrels and cyan
+## capacitor rings round their breeches, the cheeks chrome armour and bigger. L7 a much taller
+## mount with a broad glowing band under the head, and a second pair of barrels over the first on
+## a mantlet. L8 (Obsidian): the plinth, mount and head obsidian, glowing violet vein panels on the
+## plinth's faces the camera sees and veins round the deck, the mount and the head, crystal inlays
+## at the mount's foot, a violet focusing crystal at every muzzle. L9 a targeting ring hovering
+## over the head, turning. L10 (Crown): gold filigree round the plinth and the head, a big gold
+## crown on a stem over the dome, in the targeting ring, holding the antimatter core up, and a
+## spotter drone circling above (the escort).
 static func build_laser_turret(p: Parts, level: int) -> void:
 	var m := p.body
-	var top := _plinth(m, 3, 1.2, 0.42, BELT)
-	Parts.drum(m, 0.84, 0.12, 0.04, 24, Vector3(0, top, 0), SHELL_MID)
+	var plinth := 0.42 if level < 6 else float(LASER_PLINTHS[level - 6])
+	var lift := 0.0 if level < 6 else float(LASER_LIFTS[level - 6])
+	var plate := _by_tier(p.tier, Parts.GUNMETAL, Parts.CHROME_ROUND, Parts.OBSIDIAN_ROUND)
+	var glow := Parts.CORE_GLOW if p.tier >= Parts.Tier.OBSIDIAN else Parts.CYAN_STRIP
+	var top := _plinth(m, 3, 1.2, plinth, BELT, plate)
+	Parts.drum(m, 0.84, 0.12, 0.04, 24, Vector3(0, top, 0), _by_tier(p.tier, SHELL_MID, Parts.CHROME_ROUND, Parts.OBSIDIAN_ROUND))
 	for k: int in 2:
 		_cell(m, Parts.around(1.42, 135.0 + 180.0 * k, Parts.PAD_HEIGHT), 0.3, LASER_PULSE.phased(k / 3.0))
 	if level >= 3:
@@ -93,26 +144,77 @@ static func build_laser_turret(p: Parts, level: int) -> void:
 		for degrees: float in [0.0, 90.0]:
 			m.box_chamfered(Vector3(0.62, 0.22, 0.08), 0.02, Parts.around(1.1, degrees, Parts.PAD_HEIGHT + 0.06), ARMOUR,
 				Vector3(0, 90.0 - degrees, 0))
+	var foot := top + 0.12
+	if level >= 6:
+		# The mount: a column flared at its foot, a red band round the flare and a glowing band
+		# (cyan, violet from the Obsidian tier) under the head.
+		m.lathe(PackedVector2Array([Vector2(0.74, 0), Vector2(0.74, 0.05), Vector2(0.6, 0.13), Vector2(0.6, lift)]), 24,
+			Vector3(0, foot, 0), _by_tier(p.tier, SHELL_MID, Parts.CHROME_ROUND, Parts.OBSIDIAN_ROUND))
+		m.ring(0.59, 0.64, 0.07, 24, Vector3(0, foot + 0.15, 0), ARMOUR_ROUND)
+		var band := 0.06 if level < 7 else 0.16
+		m.ring(0.59, 0.625, band, 24, Vector3(0, foot + lift - 0.04 - band, 0), glow)
+	if level >= 8:
+		_plinth_panels(m, 1.2, plinth)
+		m.ring(0.9, 1.08, 0.012, 8, Vector3(0, top, 0), Parts.VEINS, Parts.OCTAGON)
+		m.ring(0.595, 0.615, lift - 0.45, 24, Vector3(0, foot + 0.2, 0), VEIN_PANEL)
+		for degrees: float in [15.0, 45.0, 75.0]:
+			m.prism(0.07, 0.07, 0.05, 4, Parts.around(0.8, degrees, top + 0.08), INLAY.phased(degrees / 90.0),
+				Vector3(90, 90.0 - degrees, 0))
+	if level >= 10:
+		_plinth_filigree(m, 1.2, plinth)
+		m.ring(0.98, 1.12, 0.02, 8, Vector3(0, top, 0), Parts.FILIGREE, Parts.OCTAGON)
+	var pivot := Vector3(0, foot + lift, 0)
 	# The head is built turned to SCREEN_RIGHT - 25, so the middle of its scan shows the barrels'
 	# length.
-	var head := p.moving(Vector3(0, top + 0.12, 0), Motion.swing(Vector3.UP, 45.0, 6.0))
+	var head := p.moving(pivot, Motion.swing(Vector3.UP, 45.0, 6.0))
 	var heading := Vector3(0, SCREEN_RIGHT - 25.0, 0)
 	var along := Vector3(90, SCREEN_RIGHT - 25.0, 0)
-	Parts.drum(head, 0.62, 0.32, 0.05, 20, Vector3.ZERO, SHELL)
-	head.dome(0.57, 0.3, 20, 6, Vector3(0, 0.32, 0), SHELL)
+	var shell := _by_tier(p.tier, SHELL, Parts.CHROME_ROUND, Parts.OBSIDIAN_ROUND)
+	Parts.drum(head, 0.62, 0.32, 0.05, 20, Vector3.ZERO, shell)
+	head.dome(0.57, 0.3, 20, 6, Vector3(0, 0.32, 0), shell)
 	head.box_chamfered(Vector3(0.72, 0.38, 0.3), 0.06, LowPolyMesh.turn(Vector3(0, 0.1, 0.5), heading), DENSE, heading)
-	var bore := 0.07 + 0.012 * level
-	var length := 0.5 + 0.04 * level
-	for k: int in 2:
-		var root := LowPolyMesh.turn(Vector3(-0.18 + 0.36 * k, 0.29, 0.5), heading)
-		head.prism(bore, bore, length, 16, root, BARREL, along)
-		head.tube(bore * 0.5, bore + 0.035, 0.12, 16, _at(root, Vector3(0, length - 0.1, 0), along),
-			GOLD if p.tier >= Parts.Tier.GOLD else Parts.GUNMETAL, along)
-		head.orb(bore * 0.85, 16, 8, _at(root, Vector3(0, length + 0.03, 0), along), LASER_PULSE.phased(0.5 * k))
+	var bore := 0.07 + 0.012 * mini(level, 5)
+	var length := 0.5 + 0.04 * mini(level, 5)
+	var barrel := BARREL if p.tier < Parts.Tier.CHROME else Parts.CHROME_ROUND
+	var pairs: Array[Vector3] = [Vector3(0.18, 0.29, 0.5)]
+	if level >= 7:
+		pairs.append(Vector3(0.15, 0.58, 0.5))
+		head.box_chamfered(Vector3(0.6, 0.2, 0.34), 0.04, LowPolyMesh.turn(Vector3(0, 0.45, 0.46), heading),
+			_by_tier(p.tier, DENSE, Parts.CHROME, Parts.OBSIDIAN), heading)
+	for pair: int in pairs.size():
+		var scale := 1.0 if pair == 0 else 0.85
+		var thick := bore * scale
+		var long := length * (1.0 if pair == 0 else 0.9)
+		# The upper pair is thinner, so it takes fewer sides.
+		var sides := 16 if pair == 0 else 12
+		for k: int in 2:
+			var root := LowPolyMesh.turn(Vector3((2 * k - 1) * pairs[pair].x, pairs[pair].y, pairs[pair].z), heading)
+			head.prism(thick, thick, long, sides, root, barrel, along)
+			head.tube(thick * 0.5, thick + 0.035, 0.12, sides, _at(root, Vector3(0, long - 0.1, 0), along),
+				GOLD if p.tier >= Parts.Tier.GOLD else Parts.GUNMETAL, along)
+			if level < 8:
+				head.orb(thick * 0.85, sides if pair == 0 else 10, 8 if pair == 0 else 4, _at(root, Vector3(0, long + 0.03, 0), along),
+					LASER_PULSE.phased(0.5 * k))
+			else:
+				# A violet focusing crystal in the muzzle: a long point out, a short one back.
+				head.cone(thick * 0.8, 0.2 * scale, 8, _at(root, Vector3(0, long + 0.02, 0), along), FOCUS.phased(0.5 * k), along)
+				head.cone(thick * 0.8, 0.06, 8, _at(root, Vector3(0, long + 0.02, 0), along), FOCUS.phased(0.5 * k),
+					Vector3(-90, along.y, 0))
+			if level >= 6:
+				head.box(Vector3(0.04, 0.025, long * 0.5), _at(root, Vector3(0, thick - 0.012, long * 0.25), heading), glow,
+					heading)
+				if pair == 0:
+					for ring: float in [0.2, 0.32]:
+						Parts.torus(head, thick + 0.012, 0.026, 12, 6, _at(root, Vector3(0, ring, 0), along), glow, along)
 	if level >= 2:
+		var cheek := Vector3(0.14, 0.34, 0.62) if level < 6 else Vector3(0.16, 0.44, 0.72)
+		var cheek_surf := _by_tier(p.tier, ARMOUR, Parts.CHROME, Parts.OBSIDIAN)
 		for side: float in [-1.0, 1.0]:
-			head.box_chamfered(Vector3(0.14, 0.34, 0.62), 0.04, LowPolyMesh.turn(Vector3(side * 0.62, 0.04, 0.02), heading),
-				ARMOUR, heading)
+			var out := 0.62 if level < 6 else 0.64
+			head.box_chamfered(cheek, 0.04, LowPolyMesh.turn(Vector3(side * out, 0.04, 0.02), heading), cheek_surf, heading)
+			if level >= 8 and LowPolyMesh.turn(Vector3(side, 0, 0), heading).dot(TOWARD_CAMERA) > 0.2:
+				head.box(Vector3(0.02, cheek.y - 0.14, cheek.z - 0.16),
+					LowPolyMesh.turn(Vector3(side * (out + cheek.x * 0.5 + 0.01), 0.11, 0.02), heading), VEIN_PANEL, heading)
 	if level >= 3:
 		head.box_chamfered(Vector3(0.66, 0.3, 0.34), 0.05, LowPolyMesh.turn(Vector3(0, 0.14, 0.8), heading), VENT, heading)
 		head.box(Vector3(0.42, 0.05, 0.02), LowPolyMesh.turn(Vector3(0, 0.33, 0.655), heading), LASER, heading)
@@ -121,6 +223,24 @@ static func build_laser_turret(p: Parts, level: int) -> void:
 		Parts.mast(head, LowPolyMesh.turn(Vector3(-0.28, 0.5, -0.25), heading), 0.4, 0.05, LASER_BLINK)
 	if level >= 5:
 		Parts.torus(head, 0.63, 0.035, 24, 10, Vector3(0, 0.27, 0), GOLD if p.tier >= Parts.Tier.GOLD else SHELL_MID)
+	if level >= 8:
+		# Veins round the head's drum and up its dome.
+		head.ring(0.615, 0.64, 0.12, 20, Vector3(0, 0.08, 0), VEIN_PANEL)
+		for degrees: float in [20.0, 110.0, 200.0, 290.0]:
+			Parts.dome_seam(head, 0.57, 0.3, Vector3(0, 0.32, 0), degrees, Parts.CORE_GLOW)
+	if level >= 10:
+		# Filigree round the drum, and a gold crown on a stem over the dome, in the targeting ring,
+		# holding the antimatter core up where it shows.
+		head.ring(0.625, 0.645, 0.1, 20, Vector3(0, 0.2, 0), Parts.FILIGREE)
+		head.prism(0.07, 0.05, 0.4, 12, Vector3(0, 0.56, 0), Parts.GOLD_ROUND)
+		_crown(head, Vector3(0, 0.94, 0), 0.25, 6, 0.18)
+		head.orb(0.19, 16, 6, Vector3(0, 1.08, 0), Parts.CORE_GLOW)
+	if level >= 9:
+		var ring_y := pivot.y + 0.62 + LASER_RING_LIFT
+		var ring := p.moving(Vector3(0, ring_y, 0), Motion.spin(Vector3.UP, 0.6))
+		_hover_ring(ring, 0.5, 0.62, p.tier)
+		if level >= 10:
+			Parts.escort_drone(p, LASER_ESCORT_RADIUS, pivot.y + 0.62 + LASER_ESCORT_LIFT, 0.8, Vector3.ZERO, ESCORT_SCALE)
 
 
 static func build_missile_battery(p: Parts, level: int) -> void:
@@ -635,15 +755,70 @@ static func build_orbital_cannon(p: Parts, level: int) -> void:
 
 # --- Shared parts --------------------------------------------------------------------
 
-## The family's plinth on its pad: an armoured octagon of gunmetal plate, `radius` to its
-## corners and `height` tall, belted in defence red (`belt_surf`). Returns the height of its top.
-static func _plinth(m: LowPolyMesh, size: int, radius: float, height: float, belt_surf: Surf = ARMOUR) -> float:
+## The family's plinth on its pad: an armoured octagon of gunmetal plate (`plate`: chrome or
+## obsidian at the high tiers), `radius` to its corners and `height` tall, belted in defence red
+## (`belt_surf`). Returns the height of its top.
+static func _plinth(m: LowPolyMesh, size: int, radius: float, height: float, belt_surf: Surf = ARMOUR,
+		plate: Surf = Parts.GUNMETAL) -> float:
 	Parts.foundation(m, size)
 	var base := Vector3(0, Parts.PAD_HEIGHT, 0)
-	Parts.drum(m, radius, height, 0.08, 8, base, Parts.GUNMETAL, Parts.OCTAGON)
+	Parts.drum(m, radius, height, 0.08, 8, base, plate, Parts.OCTAGON)
 	var belt := minf(0.08, height * 0.3)
 	m.ring(radius - 0.04, radius + 0.03, belt, 8, base + Vector3(0, height * 0.45 - belt * 0.5, 0), belt_surf, Parts.OCTAGON)
 	return Parts.PAD_HEIGHT + height
+
+
+## Glowing violet vein panels on the faces of a plinth (_plinth) the camera sees, a row under its
+## belt and a row over it, clear of the filigree's place under the chamfer; a row too short to
+## read is left out.
+static func _plinth_panels(m: LowPolyMesh, radius: float, height: float) -> void:
+	var apothem := radius * cos(deg_to_rad(22.5))
+	var width := 2.0 * radius * sin(deg_to_rad(22.5)) * 0.7
+	var belt := minf(0.08, height * 0.3)
+	var rows: Array[Vector2] = [Vector2(0.05, height * 0.45 - belt * 0.5 - 0.025),
+		Vector2(height * 0.45 + belt * 0.5 + 0.025, height - 0.15)]
+	for degrees: float in PLINTH_FACES:
+		for row: Vector2 in rows:
+			if row.y - row.x < 0.08:
+				continue
+			m.box(Vector3(width, row.y - row.x, 0.02), Parts.around(apothem + 0.008, degrees, Parts.PAD_HEIGHT + row.x),
+				VEIN_PANEL, Vector3(0, 90.0 - degrees, 0))
+
+
+## Gold filigree bands round a plinth (_plinth): under its chamfer and round its foot.
+static func _plinth_filigree(m: LowPolyMesh, radius: float, height: float) -> void:
+	for y: float in [height - 0.13, 0.0]:
+		m.ring(radius - 0.03, radius + 0.025, 0.05, 8, Vector3(0, Parts.PAD_HEIGHT + y, 0), Parts.FILIGREE, Parts.OCTAGON)
+
+
+## A gold crown standing on `pos`: a band `radius` round with `points` spikes `spike` tall on it.
+static func _crown(m: LowPolyMesh, pos: Vector3, radius: float, points: int, spike: float = 0.1) -> void:
+	m.ring(radius - 0.035, radius, 0.06, 16, pos, Parts.GOLD_ROUND)
+	for k: int in points:
+		m.cone(spike * 0.35, spike, 8, pos + Parts.around(radius - 0.0175, 360.0 * k / points + 90.0, 0.06), Parts.GOLD_ROUND)
+
+
+## A ring hovering over a weapon, built about its own centre on a moving part: obsidian between
+## `inner` and `outer`, glowing violet across its top, veins round its rim (gold at the Crown) and
+## four red sights pointing in, all bobbing together.
+static func _hover_ring(s: LowPolyMesh, inner: float, outer: float, tier: int) -> void:
+	s.ring(inner, outer, 0.07, 24, Vector3.ZERO, HOVER)
+	s.lathe(PackedVector2Array([Vector2(outer - 0.02, 0.072), Vector2(inner + 0.02, 0.072)]), 24, Vector3.ZERO, HOVER_RIM)
+	s.lathe(PackedVector2Array([Vector2(outer + 0.006, 0.006), Vector2(outer + 0.006, 0.064)]), 24, Vector3.ZERO,
+		HOVER_GOLD if tier >= Parts.Tier.CROWN else HOVER_VEINS)
+	for k: int in 4:
+		var degrees := 90.0 * k
+		s.box(Vector3(0.06, 0.05, 0.16), Parts.around(inner - 0.05, degrees, 0.01), HOVER_SIGHT, Vector3(0, 90.0 - degrees, 0))
+
+
+## A surface by tier: `base` below the Chrome tier, `chrome` at it, `obsidian` from the Obsidian
+## tier up.
+static func _by_tier(tier: int, base: Surf, chrome: Surf, obsidian: Surf) -> Surf:
+	if tier >= Parts.Tier.OBSIDIAN:
+		return obsidian
+	if tier >= Parts.Tier.CHROME:
+		return chrome
+	return base
 
 
 ## A power cell: a ribbed can `height` tall with a glowing cap.
