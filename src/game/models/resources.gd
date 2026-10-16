@@ -403,10 +403,13 @@ static func build_metal_extractor(p: Parts, level: int) -> void:
 		m.orb(0.15, 16, 6, core + Vector3(0, 0.22, 0), BRIGHT_CORE)
 		Parts.torus(m, 0.17, 0.035, 16, 6, core + Vector3(0, 0.16, 0), Parts.CORE_GLOW)
 	var stacks := 1 + (1 if level >= 2 else 0) + (1 if level >= 4 else 0)
+	# Two puffs a stack to L5, where three stacks fill the Base budget; Parts.puffs' full column of
+	# four from the Chrome tier, whose budget has room for them.
+	var puffs := 4 if p.tier >= Parts.Tier.CHROME else 2
 	for k: int in stacks:
 		var stack: Array = STACKS[k]
 		var stack_height: float = stack[2]
-		_stack(m, Vector3(stack[0], house.y + 0.58, stack[1]), stack_height, gold, k / 3.0)
+		_stack(m, Vector3(stack[0], house.y + 0.58, stack[1]), stack_height, gold, k / 3.0, puffs)
 
 	var pivot := DRILL + Vector3(0, ground + 0.1, 0)
 	_drill(p.moving(pivot, Motion.spin(Vector3.UP, 3.0)), crown.y - pivot.y,
@@ -530,14 +533,14 @@ static func _belt(m: LowPolyMesh, from: Vector3, to: Vector3, phase: float, nugg
 	m.box(Vector3(0.08, middle.y - foot.y, 0.08), foot, Parts.GUNMETAL)
 
 
-## An exhaust stack: a collar, a ribbed pipe, a lipped mouth with soot inside, and puffs of
-## smoke rising from it, bobbing on phases from `phase`.
-static func _stack(m: LowPolyMesh, pos: Vector3, height: float, gold: bool, phase: float) -> void:
+## An exhaust stack: a collar, a ribbed pipe, a lipped mouth with soot inside, and `puffs` puffs of
+## smoke rising from it, climbing, drifting and fading on phases from `phase` (Parts.puffs).
+static func _stack(m: LowPolyMesh, pos: Vector3, height: float, gold: bool, phase: float, puffs: int) -> void:
 	m.prism(0.14, 0.13, 0.08, 16, pos - Vector3(0, 0.04, 0), Parts.HULL_DARK_ROUND)
 	m.prism(0.09, 0.09, height, 16, pos, STACK)
 	m.ring(0.07, 0.12, 0.08, 16, pos + Vector3(0, height, 0), Parts.GOLD_ROUND if gold else Parts.HULL_DARK_ROUND)
 	m.disc(0.07, 16, pos + Vector3(0, height + 0.04, 0), SOOT)
-	Parts.puffs(m, pos + Vector3(0, height + 0.08, 0), phase, 2, 8, 3)
+	Parts.puffs(m, pos + Vector3(0, height + 0.08, 0), phase, puffs)
 
 
 ## The walking beam rocking on its pin, built along ACROSS: a beam with a horse head over the
