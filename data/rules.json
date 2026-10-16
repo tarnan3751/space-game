@@ -8,8 +8,7 @@
     { "id": "resources", "name": "Resources" },
     { "id": "army", "name": "Army" },
     { "id": "defense", "name": "Defence" },
-    { "id": "traps", "name": "Traps" },
-    { "id": "walls", "name": "Walls" }
+    { "id": "traps", "name": "Traps" }
   ],
   "grid": { "width": 40, "height": 40 },
   "menu_order": [

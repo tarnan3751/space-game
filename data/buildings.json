@@ -482,7 +482,7 @@
   "barrier_wall": {
     "name": "Barrier Wall",
     "size": 1,
-    "category": "walls",
+    "category": "defense",
     "max_count": [25, 50, 75, 100, 150],
     "levels": [
       { "cost": { "metal": 50 }, "build_seconds": 0, "hp": 300 },

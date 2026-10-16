@@ -329,8 +329,8 @@ carrying `BuildingModels.MOVE_META`) moves: sampled every four frames for 1.5 se
 passes once any sample differs from its first pose, so a hammer's hold or a period that divides
 the gap cannot hide it. Once the "Template base" toast has faded (2.5 seconds after the press),
 it screenshots the whole base at the widest zoom in a 1560x720 window, then each category's
-band with the fence under it (the Command Center's with the first category's; the walls have no
-band of their own), a band wider than 16 cells in even parts, each part centred and at camera
+band with the fence under it (the Command Center's with the first category's; the walls are the
+fences, so they are left out of the Defence band's frame), a band wider than 16 cells in even parts, each part centred and at camera
 size 16 or as far out as it takes for the part, with 4 units of model height, to fill no more
 than 70% of the screen, so none runs under the HUD or off the screen; each part again a second
 later where a part turns in it, to compare the two.

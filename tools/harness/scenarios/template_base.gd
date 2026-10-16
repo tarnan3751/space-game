@@ -1,11 +1,12 @@
 extends HarnessScenario
 ## The debug build's Template base (TemplateBase, main._template_base), pressed through the HUD's
 ## button. Checks every type at its count for the top Command Center level, all at the top level
-## and finished; no two footprints overlapping and all inside the grid; every wall joined to
-## another (each is part of a fence); every resource at its cap; every drone free, on the ring
-## too; every moving part moving; the save written to the run's own file, user://base.json
-## untouched. Screenshots: the whole base at the widest zoom in a WIDE window, then each band
-## with the fence under it (the Command Center's with the first category's), in even parts
+## and finished; no two footprints overlapping and all inside the grid; every wall
+## (PlacementController.PAINT_TYPE) joined to another (each is part of a fence); every resource
+## at its cap; every drone free, on the ring too; every moving part moving; the save written to
+## the run's own file, user://base.json untouched. Screenshots: the whole base at the widest zoom
+## in a WIDE window, then each band, framed on its buildings but the walls, with the fence under
+## it (the Command Center's with the first category's), in even parts
 ## PART_CELLS wide at most, each centred and at BAND_ZOOM or as far out as it takes for the part
 ## and its models to fill no more than FILL of the screen, so none runs under the HUD or off the
 ## screen; each again a second later where a part turns. The first shot waits until the
@@ -49,12 +50,12 @@ func run(main: MainScript) -> void:
 	var walls := 0
 	var joined := 0
 	for building: BuildingState in state.buildings.values():
-		if catalog.category_of(building.type) != PlacementController.PAINT_CATEGORY:
+		if building.type != PlacementController.PAINT_TYPE:
 			continue
 		walls += 1
 		for step: Vector2i in [Vector2i.LEFT, Vector2i.RIGHT, Vector2i.UP, Vector2i.DOWN]:
 			var next: BuildingState = state.buildings.get(grid.occupant_at(building.cell + step))
-			if next != null and catalog.category_of(next.type) == PlacementController.PAINT_CATEGORY:
+			if next != null and next.type == PlacementController.PAINT_TYPE:
 				joined += 1
 				break
 	check(walls > 0 and joined == walls, "%d of %d walls joined to another" % [joined, walls])
@@ -69,7 +70,8 @@ func run(main: MainScript) -> void:
 	check(main.save_path == harness.save_path and (saved["buildings"] as Array).size() == state.buildings.size()
 		and real_saved.call() == real_saved_before, "saved to %s, %s untouched" % [main.save_path, real])
 
-	# Each band's footprints, and every turning part with its pose.
+	# Each band's footprints, the walls' left out (they are the fences), and every turning part
+	# with its pose.
 	var bands := {}
 	var turning := []
 	for view: BuildingView in main.base_view.views.values():
@@ -77,7 +79,8 @@ func run(main: MainScript) -> void:
 		var band := catalog.category_of(building.type)
 		band = catalog.categories[0] if band == Catalog.CORE_CATEGORY else band
 		var foot := Rect2i(building.cell, Vector2i.ONE * view.footprint_size)
-		bands[band] = (bands.get(band, foot) as Rect2i).merge(foot)
+		if building.type != PlacementController.PAINT_TYPE:
+			bands[band] = (bands.get(band, foot) as Rect2i).merge(foot)
 		turning.append_array(view.find_children("*", "Node3D", true, false).filter(
 			func(node: Node) -> bool: return node.has_meta(BuildingModels.MOVE_META)))
 	# A part may hold still for a while (a hammer's hold) or come back to its first pose on a
@@ -99,8 +102,6 @@ func run(main: MainScript) -> void:
 	main.get_window().size = WIDE
 	await _shot(main, "whole", Vector3.ZERO, IsoCamera.MAX_ZOOM_SIZE)
 	for band: String in catalog.categories:
-		if band == PlacementController.PAINT_CATEGORY:
-			continue
 		# The band with the fence under it.
 		var box: Rect2i = (bands[band] as Rect2i).grow_side(SIDE_BOTTOM, 1)
 		var parts := ceili(box.size.x / float(PART_CELLS))

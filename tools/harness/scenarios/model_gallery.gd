@@ -24,7 +24,7 @@ extends HarnessScenario
 
 ## Body triangles a model may have, by footprint size; a wall piece has WALL_BUDGET.
 const BUDGETS := {1: 600, 2: 2000, 3: 3000, 4: 5000, 5: 5000}
-const WALL_CATEGORY := "walls"
+const WALL_TYPE := "barrier_wall"
 const WALL_BUDGET := 250
 ## How far past its footprint's edge (world units) a model may reach in x or z.
 const EXTENT_SLACK := 0.15
@@ -46,7 +46,7 @@ func run(main: MainScript) -> void:
 	var roster := _roster(main)
 	var categories := _categories(main)
 	check(not roster.is_empty(), "the catalog has building types")
-	check(categories.has(WALL_CATEGORY), "the catalog has the %s category" % WALL_CATEGORY)
+	check(main.state.catalog.has_type(WALL_TYPE), "the catalog has the %s type" % WALL_TYPE)
 	for entry: Dictionary in roster:
 		_check_budget(entry)
 
@@ -155,7 +155,7 @@ func _categories(main: MainScript) -> PackedStringArray:
 func _check_budget(entry: Dictionary) -> void:
 	var type: String = entry["type"]
 	var size: int = entry["size"]
-	var limit: int = WALL_BUDGET if entry["category"] == WALL_CATEGORY else BUDGETS[mini(size, 5)]
+	var limit: int = WALL_BUDGET if entry["type"] == WALL_TYPE else BUDGETS[mini(size, 5)]
 	for level: int in range(1, int(entry["levels"]) + 1):
 		var model := BuildingModels.create(type, level, size)
 		var bodies := _bodies(model)

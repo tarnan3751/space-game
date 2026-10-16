@@ -19,8 +19,9 @@ extends RefCounted
 ## part or an accent, the top level carries gold.
 ##
 ## This file dispatches: each type's builder is a static build_<type>(p: Parts, level) in its
-## category's file under src/game/models/ (core, resources, army, defense, traps, walls), and
-## the helpers they share are on Parts (models/parts.gd).
+## category's file under src/game/models/ (core, resources, army, defense, traps), but for the
+## wall, a defence type whose builder has a file of its own (walls), and the helpers they share
+## are on Parts (models/parts.gd).
 
 ## Set on a moving part's node: its Motion.
 const MOVE_META := "motion"

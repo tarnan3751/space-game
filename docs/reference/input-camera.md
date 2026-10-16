@@ -53,14 +53,14 @@ showcase base the same way and saves at once: `TemplateBase.build(catalog, grid,
 (`template_base.gd`) returns a save dictionary (`data-format.md`, **The save file**), loaded
 through `BaseState.from_dict`. Every type in the catalog, hidden ones included, is there as many
 times as the top Command Center level allows (`max_count` at `max_cc_level()`), at its top level
-and finished, grouped by category with the walls as fences between the groups, and every
-resource is at the cap of the base as laid out, which a throwaway `BaseState` works out. The
-bands are `catalog.categories` in tab order but the walls (`PlacementController.PAINT_CATEGORY`),
-from the top of the field (cell y 0) down, with the Command Center (`core`) leading the first;
-in a band, the types in `menu_order` run left to right from x 0, each type's copies side by
-side, a cell apart, wrapping to a new row a cell below the row's tallest footprint when the
-next would pass the field's right edge. The row under each band is a fence: walls of the paint
-category, one per cell from x 0 rightwards until they run out, and the next band starts on the
+and finished, grouped by category with the walls (`PlacementController.PAINT_TYPE`) as fences
+between the groups, and every resource is at the cap of the base as laid out, which a throwaway
+`BaseState` works out. The bands are `catalog.categories` in tab order, from the top of the
+field (cell y 0) down, with the Command Center (`core`) leading the first and the walls left out
+of the Defence band; in a band, the types in `menu_order` run left to right from x 0, each
+type's copies side by side, a cell apart, wrapping to a new row a cell below the row's tallest
+footprint when the next would pass the field's right edge. The row under each band is a fence:
+walls, one per cell from x 0 rightwards until they run out, and the next band starts on the
 row after it, so buildings touch a fence on both sides; walls left over once every band has its
 fence carry on in rows below. With the shipped roster the bands are 12, 10, 12 and 2 rows deep
 (resources, army, defence, traps), so with their fences (the last a run of 30 under the traps:
@@ -129,7 +129,7 @@ while a drag nears the screen's edge.
 | `clock: Callable` | Returns the unix time in seconds for every command it applies; `main._now` in the game, the harness's clock under the harness. |
 | `selected_id` | The selected building, `0` for none. `select(id)` updates the view's selection tile and emits `selection_changed`; a change of selection ends a building drag in progress with no move (a second finger can press Close or Reset base). |
 | `placing_type` | The type being placed, `""` when not. `is_placing()`, `ghost_is_valid()`, `ghost_cell()` (the ghost's top-left cell, the brush's while painting). |
-| `is_painting()` | Placing a one-cell type of `PAINT_CATEGORY` (`"walls"`): the ghost is a brush (**Painting walls**). |
+| `is_painting()` | Placing the type `PAINT_TYPE` (`"barrier_wall"`): the ghost is a brush (**Painting walls**). |
 | `signal selection_changed`, `signal placing_changed` | Selection changed; placement began, ended or the ghost moved. `main.gd` refreshes the HUD on the first and calls `hud.refresh_placing` on the second (`hud.md`, **Refresh**). |
 | `signal command_failed(error)` | A command returned an error code; the HUD shows it as a toast. |
 
@@ -148,8 +148,10 @@ ends placement and selects `state.last_added_id`; on failure emits `command_fail
 Done), frees the ghost and dims the grid again. `refresh()` re-checks the ghost after the state
 changed (resources, builders).
 
-**Painting walls.** `begin_place(type)` of a one-cell type whose `category_of` is `"walls"`
-enters paint mode: the ghost is a brush (a larger type of that category places normally). A tap
+**Painting walls.** `begin_place(type)` of `PlacementController.PAINT_TYPE` (`"barrier_wall"`,
+a Defence card, one cell by data) enters paint mode: the ghost is a brush. Painting is keyed on
+that type id in the game layer, not on data, until a wall flag in `buildings.json` (a schema
+change) is needed, as the battle sim will need one. A tap
 places a wall on the tapped cell at once, through the same `place` command, and moves the brush
 there. A one-finger drag that starts on the grid is `Drag.PAINT`: it places a wall on the cell
 it starts on, then on every cell the finger crosses, walking the straight line between two drag
@@ -290,13 +292,14 @@ doors and cranes that slide) with their outlines, each under a pivot node carryi
 at most eight `MeshInstance3D`, half of them at most outlines that cast no shadow
 (`art-style.md`, **Animation**).
 The models are built in code, one per type and level of the 32-type roster, each type's in its
-category's file under `src/game/models/`; `MODELS` gives each type the footprint its models are
-built for and its level count. A level above that shows the top model, a catalog size other than
-the footprint scales the model, and an unknown type gets a hull block with a hazard stripe and
-one warning. Meshes are built once per type and level and cached in a static dictionary; the
-nodes are per view. `create_scaffold(size)` is one cached, outlined model in hazard stripes;
-`create_drone()` and `create_drone_effect(part)` build and cache the construction drone and its
-laser's beam and flare the same way. How a
+category's file under `src/game/models/` but the wall's, which has a file of its own
+(`walls.gd`) although the wall is a defence type; `MODELS` gives each type the footprint its
+models are built for and its level count. A level above that shows the top model, a catalog size
+other than the footprint scales the model, and an unknown type gets a hull block with a hazard
+stripe and one warning. Meshes are built once per type and level and cached in a static
+dictionary; the nodes are per view. `create_scaffold(size)` is one cached, outlined model in
+hazard stripes; `create_drone()` and `create_drone_effect(part)` build and cache the
+construction drone and its laser's beam and flare the same way. How a
 model is built and what it must keep (the contract, the budgets, the vocabulary) is in
 `art-style.md`, **Models**.
 
@@ -316,7 +319,7 @@ level's piece.
 | `WallMesh` member | What |
 | --- | --- |
 | `body`, `outline` | Its two `MeshInstance3D`: the pieces' bodies and their ink outlines. The outline casts no shadow. |
-| `draws(catalog, building)` | Static: whether the merged mesh draws a building, a wall (category `PlacementController.PAINT_CATEGORY`, `"walls"`) with `level >= 1`. Every type of that category is drawn as barrier pieces, so it must be 1x1. |
+| `draws(building)` | Static: whether the merged mesh draws a building, a wall (type `PlacementController.PAINT_TYPE`, `"barrier_wall"`, 1x1) with `level >= 1`. |
 | `rebuild(state, skip_id)` | Collects every wall `draws` accepts but `skip_id`, computes each one's mask from the others' cells and its lower mask from their solid tops, and appends each piece's body and outline arrays, moved to its cell, into one `ArrayMesh` for each. The copy is the engine's bulk calls (`Transform3D * PackedVector3Array`, `append_array`), nothing per vertex in script. |
 | `mask_at(cell)` | The mask of the wall drawn on a cell at the last rebuild, `-1` when none is. |
 

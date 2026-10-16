@@ -125,7 +125,7 @@ src/game/        main, template_base, iso_camera, world_input, placement_control
                  toon_common.gdshaderinc, effects.gdshaderinc, ink.gdshader, holo.gdshader,
                  ground.gdshader, terrain.gdshader, field_marks.gdshaderinc, meter.gdshader
 src/game/models/ parts (the model being built, shared helpers and surfaces), then one file of
-                 model builders per category: core, resources, army, defense, traps, walls; and
+                 model builders per category: core, resources, army, defense, traps; walls, the wall's own; and
                  drone, the construction drone and its laser
 test/core/       test_*.gd (one file per core area)
 test/support/    TestCase base class, fixtures and fixture JSON

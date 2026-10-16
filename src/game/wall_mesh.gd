@@ -36,10 +36,10 @@ func setup(base_view: BaseView) -> void:
 	add_child(outline)
 
 
-## Whether the merged mesh draws `building`: a wall (PlacementController.PAINT_CATEGORY, so
-## always 1x1), once finished.
-static func draws(catalog: Catalog, building: BuildingState) -> bool:
-	return building.level >= 1 and catalog.category_of(building.type) == PlacementController.PAINT_CATEGORY
+## Whether the merged mesh draws `building`: a wall (PlacementController.PAINT_TYPE, 1x1),
+## once finished.
+static func draws(building: BuildingState) -> bool:
+	return building.level >= 1 and building.type == PlacementController.PAINT_TYPE
 
 
 ## Rebuilds the mesh from every wall of `state` that draws() accepts, except `skip_id`.
@@ -47,7 +47,7 @@ func rebuild(state: BaseState, skip_id: int) -> void:
 	_levels.clear()
 	for id: int in state.buildings:
 		var building: BuildingState = state.buildings[id]
-		if id != skip_id and draws(state.catalog, building):
+		if id != skip_id and draws(building):
 			_levels[building.cell] = building.level
 	if _levels.is_empty():
 		body.mesh = null

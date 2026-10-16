@@ -59,7 +59,7 @@ the building view's timer label included, wider.
 | Trough `TROUGH` | `17162A` | the meters' troughs |
 | Warning `WARNING` | `FFB37A` | the info panel's note |
 | Resource colours | `rules.json`, `Catalog.resource_color` | costs, the meters' fills and icons |
-| Category stripes `CATEGORY_STRIPE` | `MaterialKit` roles: resources `ENERGY`, army `ARMY`, defense `DEFENCE`, traps `HAZARD`, walls `WALL` | the stripe along a card's top; a category not listed takes `ACCENT` |
+| Category stripes `CATEGORY_STRIPE` | `MaterialKit` roles: resources `ENERGY`, army `ARMY`, defense `DEFENCE`, traps `HAZARD` | the stripe along a card's top; a category not listed takes `ACCENT` |
 
 **Shapes.** A `StyleBoxFlat` with a flat fill, a 3 px ink border (`BORDER`), round corners
 (12; tabs, the meters and the toast 10) and a flat shadow, the ink at 60 % offset 4 px down
@@ -239,8 +239,9 @@ under it:
 
 A type the Command Center has not unlocked (`max_count` 0 at the current level) is still
 listed, disabled with its "Needs Command Center N" line. Pressing a card closes the panel and
-emits `build_pressed(type)`; a drag across the strip scrolls it and presses nothing. The walls
-tab's Barrier Wall is a card like any other, and placement paints it (`input-camera.md`).
+emits `build_pressed(type)`; a drag across the strip scrolls it and presses nothing. The Barrier
+Wall, the Defence tab's last card, is a card like any other, and placement paints it
+(`input-camera.md`).
 
 **Pictures.** `ModelPreview` renders each type's level 1 model (`BuildingModels.create`) into a
 160×160 texture once and keeps it for the session. It owns one `SubViewport` with a world of its

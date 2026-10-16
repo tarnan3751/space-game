@@ -326,7 +326,7 @@ func _sync_walls(state: BaseState) -> void:
 	var signature := PackedInt64Array()
 	for id: int in state.buildings:
 		var building: BuildingState = state.buildings[id]
-		var merged := id != dragging_id and WallMesh.draws(state.catalog, building)
+		var merged := id != dragging_id and WallMesh.draws(building)
 		views[id].set_merged(merged)
 		if merged:
 			signature.append(building.cell.x << 32 | building.cell.y << 16 | building.level)

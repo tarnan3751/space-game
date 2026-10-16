@@ -54,7 +54,6 @@ const CATEGORY_STRIPE := {
 	"army": MaterialKit.ARMY,
 	"defense": MaterialKit.DEFENCE,
 	"traps": MaterialKit.HAZARD,
-	"walls": MaterialKit.WALL,
 }
 ## Text on a disabled button, and a card's name and cost while it cannot be built.
 const DISABLED_ALPHA := 0.55

@@ -20,8 +20,7 @@ A non-whole number stays a float and fails validation wherever an int is require
     { "id": "resources", "name": "Resources" },
     { "id": "army", "name": "Army" },
     { "id": "defense", "name": "Defence" },
-    { "id": "traps", "name": "Traps" },
-    { "id": "walls", "name": "Walls" }
+    { "id": "traps", "name": "Traps" }
   ],
   "grid": { "width": 40, "height": 40 },
   "menu_order": ["drone_bay", "metal_extractor", "crystal_harvester", "antimatter_siphon",
@@ -135,7 +134,7 @@ curve goes down from one level to the next (`testing-tools.md`).
 
 Three resources: metal, crystal, and antimatter (rare: unlocked at Command Center 4, produced
 slowly, spent only on top-tier levels). A 40×40 grid, the Command Center with five levels, and
-31 types in five build-menu categories. The ids are final.
+31 types in four build-menu categories. The ids are final.
 
 | Category | Type | Name | Size | Unlock (CC) | Levels | `max_count` at CC 1–5 | Notes |
 | --- | --- | --- | --- | --- | --- | --- | --- |
@@ -166,11 +165,11 @@ slowly, spent only on top-tier levels). A 40×40 grid, the Command Center with f
 | defense | `railgun` | Railgun | 3 | 5 | 3 | 0,0,0,0,1 | both, range 14 |
 | defense | `ion_beam` | Ion Beam | 2 | 5 | 2 | 0,0,0,0,1 | both, range 9 |
 | defense | `orbital_cannon` | Orbital Cannon | 4 | 5 | 2 | 0,0,0,0,1 | both, range 50 |
+| defense | `barrier_wall` | Barrier Wall | 1 | 1 | 5 | 25,50,75,100,150 | instant at every level |
 | traps | `proximity_mine` | Proximity Mine | 1 | 2 | 3 | 0,2,4,6,6 | hidden; ground, blast 2 |
 | traps | `grav_trap` | Gravity Trap | 1 | 3 | 2 | 0,0,2,4,6 | hidden; ground, blast 1; no damage |
 | traps | `flak_mine` | Flak Mine | 1 | 4 | 3 | 0,0,0,2,4 | hidden; air, blast 3 |
 | traps | `mega_mine` | Mega Mine | 2 | 5 | 2 | 0,0,0,0,2 | hidden; ground, blast 3 |
-| walls | `barrier_wall` | Barrier Wall | 1 | 1 | 5 | 25,50,75,100,150 | instant at every level |
 
 The curve, which `test_catalog.gd` checks for affordability and for never going down:
 

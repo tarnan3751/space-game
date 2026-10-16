@@ -18,9 +18,9 @@ signal command_failed(error: String)
 
 enum Drag { NONE, CAMERA, GHOST, BUILDING, PAINT }
 
-## One-cell types of this category are painted rather than placed one at a time; a larger
-## type of it places normally, with the ghost and Place.
-const PAINT_CATEGORY := "walls"
+## The type painted rather than placed one at a time, with the ghost and Place: the wall,
+## one cell by data.
+const PAINT_TYPE := "barrier_wall"
 
 ## The edge margin, as a fraction of the viewport's shorter side.
 const EDGE_MARGIN := 0.08
@@ -98,7 +98,7 @@ func begin_place(type: String) -> void:
 	select(0)
 	placing_type = type
 	var size := state.catalog.size_of(type)
-	_painting = state.catalog.category_of(type) == PAINT_CATEGORY and size == 1
+	_painting = type == PAINT_TYPE
 	_ghost = BuildingView.new()
 	_ghost.setup(0, type, 1, size)
 	_ghost.set_lifted(true)
