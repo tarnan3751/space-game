@@ -133,6 +133,15 @@ static var HAUL_PLATE := Surf.make(MaterialKit.Layer.CHROME, Parts.CHROME_TINT, 
 static var SLING := Surf.make(MaterialKit.Layer.FLAT, MaterialKit.GUNMETAL, 1.0, Surf.BOB, true, false, 0.3)
 ## The research lab's: screens glowing cyan, their rows scrolling (phased() sets the speed).
 static var CYAN_SCREEN := Surf.make(MaterialKit.Layer.SCREEN, MaterialKit.ENERGY, 1.0, Surf.UNLIT | Surf.FLOW)
+## The nanite foundry's: cyan pipes, their bands flowing; the goo brighter, rising and swirling;
+## the hovering stirrer ring's crystal vanes, bobbing with it (HOVER's phase).
+static var CYAN_PIPE := Surf.make(MaterialKit.Layer.PIPE, MaterialKit.ENERGY, 2.0, Surf.UNLIT | Surf.FLOW, true, true, 0.3)
+static var GOO_BRIGHT := Surf.make(MaterialKit.Layer.GLASS, MaterialKit.NANITE_GREEN.lerp(Color.WHITE, 0.3), 1.0,
+	Surf.UNLIT | Surf.FLOW, true, true, 0.3)
+static var GOO_BRIGHT_SWIRL := Surf.make(MaterialKit.Layer.GLASS, MaterialKit.NANITE_GREEN.lerp(Color.WHITE, 0.3), 1.0,
+	Surf.UNLIT | Surf.FLOW_U, false, true, 0.65)
+static var HOVER_CRYSTAL := Surf.make(MaterialKit.Layer.CRYSTAL, MaterialKit.CRYSTAL, 1.0, Surf.UNLIT | Surf.PULSE | Surf.BOB,
+	false, true, 0.6)
 
 
 ## The L10 escort skiff's round: its centre on the ground, towards the apron, and its radius, so
@@ -1304,16 +1313,32 @@ static func _antenna(m: LowPolyMesh, foot: Vector3, height: float, foot_surf: Su
 ## and their elbows running between them. A vat more at each level; gold rims at 4. The goo
 ## rises in every vat and bubbles, the pipes and the pump's screens flow, and a stirrer turns in
 ## the big vat's open top.
+##
+## From 5 the vats stand taller at each level and the pump block rises to a tower: L5 chrome vats
+## with cyan rims, a chrome pump tower and cyan pipes; L6 a sixth vat, a tall column on the right;
+## L7 obsidian
+## vats veined violet, their rims glowing violet, crystal elbows on the pipes, the goo brighter
+## in taller glass, and a stirrer ring hovering over the big vat, turning against the stirrer;
+## L8 gold filigree rims and gold caps, the antimatter core glowing on the pump tower in a gold
+## crown, and a guard drone circling over the vats as its escort.
 static func build_nanite_foundry(p: Parts, level: int) -> void:
 	var m := p.body
 	var g := Parts.PAD_HEIGHT
+	var chrome := p.tier >= Parts.Tier.CHROME
+	var obsidian := p.tier >= Parts.Tier.OBSIDIAN
 	Parts.foundation(m, 3)
-	# The pump block in the middle, with goo screens and a vent.
+	# The pump block in the middle, with goo screens and a vent; a chrome tower from 5.
 	var pump := Vector3(0.1, g, 0.1)
-	m.box_chamfered(Vector3(0.5, 0.45, 0.5), 0.05, pump, Parts.HULL_LIGHT)
-	m.box_chamfered(Vector3(0.3, 0.18, 0.03), 0.01, pump + Vector3(0, 0.16, 0.25), GOO_SCREEN)
-	m.box_chamfered(Vector3(0.03, 0.18, 0.3), 0.01, pump + Vector3(0.25, 0.16, 0), GOO_SCREEN)
-	m.box_chamfered(Vector3(0.3, 0.1, 0.3), 0.03, pump + Vector3(0, 0.45, 0), VENT)
+	var tower := 0.45
+	if level >= 5:
+		var towers: Array[float] = [0.75, 0.85, 1.0, 1.15]
+		tower = towers[mini(level, 8) - 5]
+		_pump_tower(p, pump, tower, level)
+	else:
+		m.box_chamfered(Vector3(0.5, 0.45, 0.5), 0.05, pump, Parts.HULL_LIGHT)
+		m.box_chamfered(Vector3(0.3, 0.18, 0.03), 0.01, pump + Vector3(0, 0.16, 0.25), GOO_SCREEN)
+		m.box_chamfered(Vector3(0.03, 0.18, 0.3), 0.01, pump + Vector3(0.25, 0.16, 0), GOO_SCREEN)
+		m.box_chamfered(Vector3(0.3, 0.1, 0.3), 0.03, pump + Vector3(0, 0.45, 0), VENT)
 	# [position, radius, height] of each vat, in the order the levels add them.
 	var vats: Array[Array] = [
 		[Vector3(-0.62, g, -0.62), 0.5, 1.35],
@@ -1322,14 +1347,27 @@ static func build_nanite_foundry(p: Parts, level: int) -> void:
 		[Vector3(0.78, g, 0.62), 0.32, 0.75],
 		[Vector3(0.02, g, 1.0), 0.26, 0.6],
 	]
+	if level >= 6:
+		vats.append([Vector3(0.98, g, -0.02), 0.27, 1.25])
+	# Taller vats from 5, the arch, the stirrer and the lids raised with the first two.
+	var grows: Array[float] = [1.0, 1.25, 1.35, 1.55, 1.65]
+	var grow := grows[clampi(level - 4, 0, 4)]
+	var lids := Vector2(1.33, 0.98)
+	var stir := 1.3
+	if level >= 5:
+		lids = Vector2(1.35 * grow - 0.02, 1.0 * grow - 0.02)
+		stir = 1.35 * grow - 0.05
+	var pipe := PIPE_FLOW
+	if chrome:
+		pipe = CYAN_PIPE
 	# An arch of pipe over from the big vat's lid into the next one's.
-	var big: Vector3 = vats[0][0] + Vector3(0.3, 1.33, -0.02)
-	var second: Vector3 = vats[1][0] + Vector3(-0.16, 0.98, 0.01)
-	Parts.pipe_run(m, PackedVector3Array([
+	var big: Vector3 = vats[0][0] + Vector3(0.3, lids.x, -0.02)
+	var second: Vector3 = vats[1][0] + Vector3(-0.16, lids.y, 0.01)
+	_goo_pipe(m, PackedVector3Array([
 		big, big + Vector3(0, 0.2, 0), Vector3(second.x, big.y + 0.2, second.z), second,
-	]), 0.05, PIPE_FLOW, 12)
+	]), pipe, obsidian)
 	# The stirrer: a hub with two crossed paddles turning in the big vat's goo.
-	var stirrer := p.moving(vats[0][0] + Vector3(0, 1.3, 0), Motion.spin(Vector3.UP, 1.6))
+	var stirrer := p.moving(vats[0][0] + Vector3(0, stir, 0), Motion.spin(Vector3.UP, 1.6))
 	stirrer.prism(0.08, 0.06, 0.12, 12, Vector3(0, -0.02, 0), ORANGE_ROUND)
 	for yaw: float in [0.0, 90.0]:
 		stirrer.box_chamfered(Vector3(0.44, 0.08, 0.05), 0.02, Vector3(0, -0.04, 0), ORANGE, Vector3(0, yaw, 0))
@@ -1337,58 +1375,132 @@ static func build_nanite_foundry(p: Parts, level: int) -> void:
 		var spot: Vector3 = vats[i][0]
 		var radius: float = vats[i][1]
 		var height: float = vats[i][2]
-		_vat(m, spot, radius, height, p.tier >= Parts.Tier.GOLD, i)
-		if i < 3:
+		height *= grow
+		_vat(m, spot, radius, height, p.tier, i, 0.36 if level >= 7 else 0.28)
+		if i < 3 or i == 5:
 			# Out of the vat's upper shell, down to the pad and along it into the pump.
 			var toward := Vector3(pump.x - spot.x, 0, pump.z - spot.z).normalized()
 			var high := spot + toward * (radius + 0.16) + Vector3(0, height * 0.8, 0)
 			var low := Vector3(high.x, g + 0.1, high.z)
-			Parts.pipe_run(m, PackedVector3Array([
+			_goo_pipe(m, PackedVector3Array([
 				spot + toward * (radius - 0.04) + Vector3(0, height * 0.8, 0), high, low,
 				pump + Vector3(0, 0.1, 0) - toward * 0.2,
-			]), 0.05, PIPE_FLOW, 12)
+			]), pipe, obsidian)
 		else:
 			# A short pipe across to the vat it stands next to.
 			var next: Vector3 = vats[i - 2][0]
 			var toward := Vector3(next.x - spot.x, 0, next.z - spot.z).normalized()
 			var y := Vector3(0, height * 0.82, 0)
-			Parts.pipe(m, spot + toward * (radius - 0.04) + y, next - toward * 0.2 + y, 0.05, PIPE_FLOW,
+			Parts.pipe(m, spot + toward * (radius - 0.04) + y, next - toward * 0.2 + y, 0.05, pipe,
 				12, false)
+	if level >= 7:
+		# The stirrer ring hovering over the big vat, turning against the stirrer: obsidian rimmed
+		# in violet, four crystal vanes pointing in.
+		var hover := p.moving(vats[0][0] + Vector3(0, stir + 0.42, 0), Motion.spin(Vector3.UP, -0.8))
+		hover.ring(0.3, 0.42, 0.06, 24, Vector3.ZERO, HOVER)
+		hover.lathe(PackedVector2Array([Vector2(0.425, 0.01), Vector2(0.425, 0.05)]), 24, Vector3.ZERO, HOVER_RIM)
+		hover.lathe(PackedVector2Array([Vector2(0.4, 0.062), Vector2(0.32, 0.062)]), 24, Vector3.ZERO, HOVER_RIM)
+		for k: int in 4:
+			var degrees := 45.0 + 90.0 * k
+			hover.cone(0.04, 0.16, 8, Parts.around(0.31, degrees, 0.03), HOVER_CRYSTAL,
+				Parts.facing(Parts.around(-1.0, degrees, 0.0)))
+	if level >= 8:
+		# The guard drone circles over the vats and the hovering ring.
+		Parts.escort_drone(p, 1.25, stir + 0.95, 0.65, Vector3.ZERO, 2.0)
+
+
+## The pump tower from 5 (_nanite_foundry's), on `foot`, `tall` high: a chrome block with goo
+## screens on its faces to the camera, a cyan band round its top and a vent on its roof; at 8 a
+## filigree band and the antimatter core on the roof instead, a bright orb on a gold mount between
+## gold prongs with a violet ring round it.
+static func _pump_tower(p: Parts, foot: Vector3, tall: float, level: int) -> void:
+	var m := p.body
+	m.box_chamfered(Vector3(0.5, tall, 0.5), 0.05, foot, Parts.CHROME)
+	for k: int in 2:
+		var y := 0.16 + 0.3 * k
+		m.box_chamfered(Vector3(0.3, 0.2, 0.03), 0.01, foot + Vector3(0, y, 0.25), GOO_SCREEN)
+		m.box_chamfered(Vector3(0.03, 0.2, 0.3), 0.01, foot + Vector3(0.25, y, 0), GOO_SCREEN)
+	var band := Parts.FILIGREE if level >= 8 else _glow(p.tier)
+	m.lathe(PackedVector2Array([Vector2(0.37, 0), Vector2(0.37, 0.06)]), 4, foot + Vector3(0, tall - 0.12, 0), band,
+		Vector3(0, 45, 0))
+	var roof := foot + Vector3(0, tall, 0)
+	if level < 8:
+		m.box_chamfered(Vector3(0.3, 0.1, 0.3), 0.03, roof, VENT)
+		return
+	m.prism(0.22, 0.18, 0.08, 16, roof, GOLD_ROUND)
+	m.orb(0.2, 16, 6, roof + Vector3(0, 0.28, 0), BRIGHT_CORE)
+	Parts.torus(m, 0.22, 0.03, 16, 6, roof + Vector3(0, 0.24, 0), Parts.CORE_GLOW)
+	for k: int in 4:
+		var degrees := 45.0 + 90.0 * k
+		m.cone(0.03, 0.34, 8, roof + Parts.around(0.2, degrees, 0.05), GOLD_ROUND,
+			Parts.facing(Parts.around(0.3, degrees, 1.0)))
+
+
+## A pipe of goo through `points` with ball elbows (Parts.pipe_run), on `surface`; with
+## `crystal` a crystal knuckle glowing round each elbow.
+static func _goo_pipe(m: LowPolyMesh, points: PackedVector3Array, surface: Surf, crystal: bool) -> void:
+	Parts.pipe_run(m, points, 0.05, surface, 12)
+	if crystal:
+		for i: int in range(1, points.size() - 1):
+			m.orb(0.085, 12, 4, points[i], INLAY.phased(0.3 * i))
 
 
 ## A vat standing on `foot`, the `index`th of the foundry's: an armoured lower shell, a band of
 ## glowing goo rising behind glass framed by rims, with bubbles blinking on it, and an upper
 ## shell with a chamfered lid and an orange cap. The first vat is open at the top instead, over
-## a swirl of goo for the stirrer to turn in. The rims are gold from the Gold tier.
-static func _vat(m: LowPolyMesh, foot: Vector3, radius: float, height: float, gold: bool, index: int) -> void:
+## a swirl of goo for the stirrer to turn in. `glass` is the goo band's share of the height. The
+## tier paints it: gold rims from the Gold tier; chrome shells and cyan rims at the Chrome tier;
+## obsidian shells veined violet, violet rims and the goo brighter from the Obsidian tier; at
+## Crown filigree rims and gold caps.
+static func _vat(m: LowPolyMesh, foot: Vector3, radius: float, height: float, tier: int, index: int,
+		glass: float = 0.28) -> void:
 	var band := height * 0.4
-	var glass := height * 0.28
+	var lit := height * glass
 	var rim := radius + 0.035
-	m.lathe(PackedVector2Array([Vector2(radius, 0), Vector2(radius, band - 0.05)]), 16, foot, ARMOUR_ROUND)
+	var gold := tier >= Parts.Tier.GOLD
+	var bright := tier >= Parts.Tier.OBSIDIAN
+	var lower := _plating(tier, ARMOUR_ROUND, true)
+	var upper_shell := _plating(tier, HULL_ROUND, true)
+	var rims := GOLD_ROUND if gold else ARMOUR_ROUND
+	var upper_rim := GOLD_ROUND if gold else HULL_ROUND
+	if tier >= Parts.Tier.CROWN:
+		rims = FILIGREE_ROUND
+		upper_rim = FILIGREE_ROUND
+	elif tier >= Parts.Tier.CHROME:
+		rims = _glow(tier)
+		upper_rim = _glow(tier)
+	m.lathe(PackedVector2Array([Vector2(radius, 0), Vector2(radius, band - 0.05)]), 16, foot, lower)
 	# The rim's underside faces the ground, which the camera never sees, so it is left out.
 	m.lathe(PackedVector2Array([
 		Vector2(rim, band - 0.05), Vector2(rim, band), Vector2(radius - 0.03, band),
-	]), 16, foot, GOLD_ROUND if gold else ARMOUR_ROUND)
-	m.lathe(PackedVector2Array([Vector2(radius - 0.03, 0), Vector2(radius - 0.03, glass)]), 16,
-		foot + Vector3(0, band, 0), GOO_FLOW.phased(0.27 + 0.02 * index))
+	]), 16, foot, rims)
+	m.lathe(PackedVector2Array([Vector2(radius - 0.03, 0), Vector2(radius - 0.03, lit)]), 16,
+		foot + Vector3(0, band, 0), (GOO_BRIGHT if bright else GOO_FLOW).phased(0.27 + 0.02 * index))
 	for k: int in 2:
 		m.orb(0.045, 8, 2, foot + Parts.around(radius - 0.03, 25.0 + 40.0 * k + 7.0 * index,
-			band + glass * (0.3 + 0.4 * k)), BUBBLE.phased(fposmod(0.37 * index + 0.5 * k, 1.0)))
-	var upper := band + glass
+			band + lit * (0.3 + 0.4 * k)), BUBBLE.phased(fposmod(0.37 * index + 0.5 * k, 1.0)))
+	var upper := band + lit
 	var top := height - upper
 	m.lathe(PackedVector2Array([Vector2(rim, 0), Vector2(rim, 0.05), Vector2(radius, 0.05)]), 16,
-		foot + Vector3(0, upper, 0), GOLD_ROUND if gold else HULL_ROUND)
+		foot + Vector3(0, upper, 0), upper_rim)
+	if bright:
+		# Violet veins round the lower and the upper shell.
+		m.lathe(PackedVector2Array([Vector2(radius + 0.005, 0), Vector2(radius + 0.005, 0.1)]), 16,
+			foot + Vector3(0, band * 0.4, 0), Parts.VEINS)
+		m.lathe(PackedVector2Array([Vector2(radius + 0.005, 0), Vector2(radius + 0.005, 0.1)]), 16,
+			foot + Vector3(0, upper + 0.05 + (top - 0.13) * 0.45, 0), Parts.VEINS)
 	if index == 0:
 		m.lathe(PackedVector2Array([
 			Vector2(radius, 0.05), Vector2(radius, top - 0.08), Vector2(radius - 0.08, top),
 			Vector2(radius - 0.13, top), Vector2(radius - 0.13, top - 0.05),
-		]), 16, foot + Vector3(0, upper, 0), HULL_ROUND)
-		m.disc(radius - 0.13, 16, foot + Vector3(0, height - 0.05, 0), GOO_SWIRL)
+		]), 16, foot + Vector3(0, upper, 0), upper_shell)
+		m.disc(radius - 0.13, 16, foot + Vector3(0, height - 0.05, 0), GOO_BRIGHT_SWIRL if bright else GOO_SWIRL)
 		return
 	m.lathe(PackedVector2Array([
 		Vector2(radius, 0.05), Vector2(radius, top - 0.08), Vector2(radius - 0.08, top), Vector2(0, top),
-	]), 16, foot + Vector3(0, upper, 0), HULL_ROUND)
-	m.prism(radius * 0.42, radius * 0.34, 0.1, 16, foot + Vector3(0, height, 0), ORANGE_ROUND)
+	]), 16, foot + Vector3(0, upper, 0), upper_shell)
+	m.prism(radius * 0.42, radius * 0.34, 0.1, 16, foot + Vector3(0, height, 0),
+		GOLD_ROUND if tier >= Parts.Tier.CROWN else ORANGE_ROUND)
 
 
 ## A drydock: an orange gantry crane over a cradle holding a half-built ship, its nose plated,
