@@ -4,10 +4,14 @@ extends RefCounted
 ## pad, and glows in its weapon's own colour: laser red, plasma violet, arc electric blue, ion
 ## and railgun cyan, EMP yellow. Levels add barrels, armour, coils or capacitors to the same
 ## weapon; the Gold tier (Parts.tier) adds gold trim. The laser turret, the missile battery, the
-## plasma mortar and the flak cannon go on to their tops through the high tiers: chrome with cyan
+## plasma mortar, the flak cannon, the shield generator, the arc tower, the cloaked sentry, the
+## gravity well and the EMP tower go on to their tops through the high tiers: chrome with cyan
 ## strips, then obsidian with glowing violet vein panels on the faces the camera sees and a
 ## hovering ring, then gold filigree, the antimatter core, a crown and an escort; the plinth keeps
-## its octagon and its red belt, plated in the tier's chrome or obsidian.
+## its octagon and its red belt, plated in the tier's chrome or obsidian (the cloaked sentry, which
+## has no plinth, rises on a hex skirt banded in red). Where the core is the weapon's heart (the
+## shield's orb, the arc tower's sphere, the well's core, the EMP's emitter) it glows steady and
+## light violet at the Crown (BRIGHT_CORE).
 ##
 ## They animate (docs/reference/art-style.md, **Animation**): heads scan and barrels recoil as
 ## moving parts, emitters pulse, lamps blink in chases, currents flow along conduits, and arcs
@@ -226,6 +230,16 @@ const WELL_RING_OUTER := 1.03
 const WELL_RING_DROP := 0.6
 const WELL_ESCORT_RADIUS := 0.86
 const WELL_ESCORT_LIFT := 0.4
+## The EMP tower from L4, by level from L4: the plinth's height and the storey it gains between
+## its two blocks; the L5 pulse ring's radii and how far under the cage it hovers, round the
+## tower's neck, so the core shows over it; the L6 guard drone's round and its height over the cage.
+const EMP_PLINTHS := [0.36, 0.55, 0.6]
+const EMP_RISES := [0.45, 0.9, 1.2]
+const EMP_RING_INNER := 0.6
+const EMP_RING_OUTER := 0.74
+const EMP_RING_DROP := 0.14
+const EMP_ESCORT_RADIUS := 1.3
+const EMP_ESCORT_LIFT := 1.2
 
 
 ## From L6 the head rides a mount that lifts it a little more each level, on a taller plinth.
@@ -1167,18 +1181,41 @@ static func build_gravity_well(p: Parts, level: int) -> void:
 		Parts.escort_drone(p, WELL_ESCORT_RADIUS, core.y + 0.5 + WELL_ESCORT_LIFT, 0.9, Vector3.ZERO, ESCORT_SCALE)
 
 
+## From L4 the tower gains a storey between its blocks, taller every level, and its capacitor
+## stacks a third can. L4 (Chrome): chrome plinth, blocks, storey and cans, the cans' bands
+## blinking cyan in their chase, a cyan band round each stack's foot and round the storey's top,
+## red armour plates on the storey's corners. L5 (Obsidian): a taller plinth with glowing violet
+## vein panels on its faces the camera sees, the tower and the cans obsidian with vein panels on
+## the faces the camera sees, the bands violet crystal, crystal tips on the cans, and a pulse ring
+## hovering round the tower's neck under the cage, turning. L6 (Crown): gold filigree round the plinth and the storey, the
+## core the antimatter core under a gold crown on the cage's ring, the pulse ring violet and gold,
+## and a guard drone circling over the tower (the escort).
 static func build_emp_tower(p: Parts, level: int) -> void:
 	var m := p.body
-	var top := _plinth(m, 3, 1.2, 0.3)
-	m.box_chamfered(Vector3(0.9, 0.56, 0.9), 0.07, Vector3(0, top, 0), Parts.HULL_LIGHT)
+	var plinth := 0.3 if level < 4 else float(EMP_PLINTHS[level - 4])
+	var rise := 0.0 if level < 4 else float(EMP_RISES[level - 4])
+	var obsidian := p.tier >= Parts.Tier.OBSIDIAN
+	var crown := p.tier >= Parts.Tier.CROWN
+	var top := _plinth(m, 3, 1.2, plinth, ARMOUR, _by_tier(p.tier, Parts.GUNMETAL, Parts.CHROME_ROUND, Parts.OBSIDIAN_ROUND))
+	var block := _by_tier(p.tier, Parts.HULL_LIGHT, Parts.CHROME, Parts.OBSIDIAN)
+	m.box_chamfered(Vector3(0.9, 0.56, 0.9), 0.07, Vector3(0, top, 0), block)
 	m.box_chamfered(Vector3(0.94, 0.12, 0.94), 0.03, Vector3(0, top + 0.38, 0), HAZARD_FINE)
-	m.box_chamfered(Vector3(0.72, 0.5, 0.72), 0.06, Vector3(0, top + 0.56, 0), Parts.HULL_LIGHT)
+	if level >= 4:
+		# The storey between the blocks, red armour plates on its corners and a glowing band round
+		# its top.
+		m.box_chamfered(Vector3(0.82, rise, 0.82), 0.06, Vector3(0, top + 0.56, 0), block)
+		for k: int in 4:
+			m.box_chamfered(Vector3(0.12, rise - 0.1, 0.12), 0.03, Parts.around(0.56, 45.0 + 90.0 * k, top + 0.61), ARMOUR,
+				Vector3(0, 45.0 - 90.0 * k, 0))
+		m.box(Vector3(0.84, 0.05, 0.84), Vector3(0, top + 0.56 + rise - 0.1, 0), Parts.CORE_GLOW if obsidian else Parts.CYAN_STRIP)
+	m.box_chamfered(Vector3(0.72, 0.5, 0.72), 0.06, Vector3(0, top + 0.56 + rise, 0), block)
 	m.box_chamfered(Vector3(0.74, 0.16, 0.04), 0.01, Vector3(0, top + 0.16, 0.45), VENT)
-	var neck := top + 1.06
+	var neck := top + 1.06 + rise
 	Parts.drum(m, 0.28, 0.12, 0.04, 16, Vector3(0, neck, 0), SHELL_MID)
 	var cage := Vector3(0, neck + 0.12, 0)
 	Parts.drum(m, 0.46, 0.08, 0.02, 16, cage, Parts.GUNMETAL)
-	m.orb(0.22 + 0.03 * level, 16, 6, cage + Vector3(0, 0.34, 0), EMP_CORE)
+	# The core grows to L4's 0.34, where the cage's bars (at 0.4) still show round it.
+	m.orb(0.22 + 0.03 * mini(level, 4), 16, 6, cage + Vector3(0, 0.34, 0), BRIGHT_FLOAT if crown else EMP_CORE)
 	for k: int in 8:
 		m.box(Vector3(0.05, 0.56, 0.05), Parts.around(0.4, 22.5 + 45.0 * k, cage.y + 0.08), Parts.ROD,
 			Vector3(0, -22.5 - 45.0 * k, 0))
@@ -1190,17 +1227,45 @@ static func build_emp_tower(p: Parts, level: int) -> void:
 	Parts.torus(m, 0.4, 0.05, 16, 10, cage + Vector3(0, 0.62, 0), GOLD if p.tier >= Parts.Tier.GOLD else Parts.GUNMETAL)
 	m.dome(0.22, 0.12, 16, 6, cage + Vector3(0, 0.67, 0), SHELL_MID)
 	Parts.mast(m, cage + Vector3(0, 0.78, 0), 0.22, 0.05, EMP_BLINK.phased(0.5))
-	# The cans' bands blink in a chase round the ring.
+	# The cans' bands blink in a chase round the ring: yellow, cyan from the Chrome tier, violet
+	# crystal from the Obsidian tier.
 	var cans: Array[float] = [135.0, 315.0]
 	if level >= 2:
 		cans = [45.0, 135.0, 225.0, 315.0]
+	var blink := EMP_BLINK
+	var ribbed := RIBBED
+	if level >= 4:
+		blink = CRYSTAL_BLINK if obsidian else ION_BLINK
+		ribbed = OBSIDIAN_RIBBED if obsidian else CHROME_RIBBED
 	for k: int in cans.size():
 		var degrees := cans[k]
-		var band := EMP_BLINK.phased(Parts.chase(k, cans.size()))
-		var can_top := _capacitor(m, Parts.around(0.94, degrees, top), 0.5, level < 3, band)
+		var band := blink.phased(Parts.chase(k, cans.size()))
+		var foot := Parts.around(0.94, degrees, top)
+		var can_top := _capacitor(m, foot, 0.5, level < 3, band, ribbed)
 		if level >= 3:
-			can_top = _capacitor(m, can_top, 0.36, true, band)
+			can_top = _capacitor(m, can_top, 0.36, level < 4, band, ribbed)
+		if level >= 4:
+			can_top = _capacitor(m, can_top, 0.3, true, band, ribbed)
+			m.lathe(PackedVector2Array([Vector2(0.205, 0), Vector2(0.205, 0.05)]), 16, foot + Vector3(0, 0.08, 0),
+				Parts.VEINS if obsidian else Parts.CYAN_STRIP)
+			if obsidian:
+				m.cone(0.07, 0.16, 8, can_top, INLAY.phased(k / 4.0))
 		Parts.pipe_run(m, PackedVector3Array([can_top, Parts.around(0.3, degrees, can_top.y)]), 0.035, Parts.GUNMETAL)
+	if level < 5:
+		return
+	_plinth_panels(m, 1.2, plinth)
+	# Vein panels on the tower's faces the camera sees (+X and +Z), the storey's and the upper block's.
+	for face: float in [0.0, 90.0]:
+		m.box(Vector3(0.5, rise - 0.3, 0.02), Parts.around(0.415, face, top + 0.68), VEIN_PANEL, Vector3(0, 90.0 - face, 0))
+		m.box(Vector3(0.44, 0.3, 0.02), Parts.around(0.365, face, top + 0.66 + rise), VEIN_PANEL, Vector3(0, 90.0 - face, 0))
+	var ring := p.moving(cage - Vector3(0, EMP_RING_DROP, 0), Motion.spin(Vector3.UP, 0.7))
+	_hover_ring(ring, EMP_RING_INNER, EMP_RING_OUTER, p.tier)
+	if level >= 6:
+		_plinth_filigree(m, 1.2, plinth)
+		m.box(Vector3(0.86, 0.04, 0.86), Vector3(0, top + 0.62, 0), Parts.FILIGREE)
+		# The gold crown on the cage's ring, over the core.
+		_crown(m, cage + Vector3(0, 0.68, 0), 0.44, 8, 0.16)
+		Parts.escort_drone(p, EMP_ESCORT_RADIUS, cage.y + EMP_ESCORT_LIFT, 0.8, Vector3.ZERO, ESCORT_SCALE)
 
 
 static func build_railgun(p: Parts, level: int) -> void:
@@ -1427,10 +1492,12 @@ static func _crate(m: LowPolyMesh, pos: Vector3) -> void:
 	m.box_chamfered(Vector3(0.38, 0.06, 0.38), 0.02, pos + Vector3(0, 0.26, 0), HAZARD_FINE, Vector3(0, 45, 0))
 
 
-## A capacitor can standing on `pos`, `height` tall. The can on top of a stack (`top`) wears the
-## glowing `band` and the insulator cap. Returns the can's top.
-static func _capacitor(m: LowPolyMesh, pos: Vector3, height: float, top: bool, band: Surf) -> Vector3:
-	Parts.drum(m, 0.2, height, 0.04, 16, pos, RIBBED)
+## A capacitor can standing on `pos`, `height` tall, of `body` (ribbed: chrome or obsidian at the
+## high tiers). The can on top of a stack (`top`) wears the glowing `band` and the insulator cap.
+## Returns the can's top.
+static func _capacitor(m: LowPolyMesh, pos: Vector3, height: float, top: bool, band: Surf,
+		body: Surf = RIBBED) -> Vector3:
+	Parts.drum(m, 0.2, height, 0.04, 16, pos, body)
 	if not top:
 		return pos + Vector3(0, height, 0)
 	m.ring(0.19, 0.225, 0.07, 16, pos + Vector3(0, height * 0.5, 0), band)

@@ -67,7 +67,7 @@ const MODELS := {
 	"arc_tower": [3, 8],
 	"cloaked_sentry": [2, 7],
 	"gravity_well": [2, 6],
-	"emp_tower": [3, 3],
+	"emp_tower": [3, 6],
 	"railgun": [3, 3],
 	"ion_beam": [2, 2],
 	"orbital_cannon": [4, 2],
