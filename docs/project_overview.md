@@ -101,6 +101,7 @@ for the real numbers).
 | 1 | Offline base: placement, timers, economy | Built |
 | 2 | Base polish: the building roster, build-menu categories, a third resource (antimatter), low-poly models built in code, HUD category tabs, safe-area margins for notches, painting walls by dragging, edge auto-scroll while dragging | Built |
 | 2a | The upgrade pass (`docs/plans/upgrade-pass.md`): the Command Center and every type to Command Center 10 (ten levels for the staples), the five tiers, 138 new level models with Crown escorts, the 48×48 field with a version 2 save migration, the maxed base measured | Built |
+| 2b | The model feedback pass (`docs/plans/model-feedback.md`): the owner's review of every max-level model folded in: no robot above defence buildings, every robot tailored to its building (a security bot, an ore hauler, a collector, a marshaller, welders), one slow lightning crackle, rising smoke, the Command Center's broader base, the academy and fabricator reshaped, the mortar's plasma and the orbital cannon's spire | Built |
 | 3 | Seeded PvE expeditions: a field generated from a seed with `SeededRng` (asteroids, deposits, hazards); loot returns into `BaseState` through a new command | Planned |
 | 4 | Deterministic battle sim in `src/core/battle/`: fixed-point integer positions (1 cell = 1000 units), fixed tick; replay = seed + base layout + list of deploy commands; tested headless against AI-built bases; same inputs give byte-identical results | Planned |
 | 5 | Server: Nakama with accounts, base storage and command validation; battles verified by replaying them in headless Godot running the same `src/core` | Planned |
@@ -119,7 +120,7 @@ for the real numbers).
 - **Phones are unmeasured for the maxed base.** At the Command Center 10 counts the template
   base is 1,318 draw calls and 1.7 million primitives a frame at the widest zoom on the
   development Mac (`docs/reference/art-style.md`, **Cost**); no phone has run it, and that
-  measurement decides whether the Crown escorts stay.
+  measurement decides whether the Crown robots stay.
 - **Build times are on the development scale**: 27 to 40 minutes at the top levels (the walls
   and the Drone Bay instant), the Command Center's 75 to 150 minutes at levels 6 to 10
   (`docs/reference/data-format.md`); the retune is parked until the economy is tuned.

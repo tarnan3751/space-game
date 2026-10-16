@@ -1,7 +1,7 @@
 # Model feedback pass (after the upgrade pass)
 
-Status: **in progress, 2026-10-16**. The owner reviewed every max-level model after the upgrade
-pass (`upgrade-pass.md`) and gave a list of problems. This file sorts that list, records the
+Status: **built, 2026-10-16** (main f11b8d4; §3 says what landed). The owner reviewed every
+max-level model after the upgrade pass (`upgrade-pass.md`) and gave a list of problems. This file sorts that list, records the
 decisions, and names the lanes that fix it. The owner's rules for the pass:
 
 - A problem seen at the max level is checked at **every level** of that type; lower levels that
@@ -83,3 +83,29 @@ Five developer lanes on disjoint files, each a tier B brief with its own review:
 
 Every lane: no new footprint, the per-tier budgets, the height caps, the reach bound, the clash
 scenario clean, the comic style, and the visibility rule of `docs/reference/art-style.md`.
+
+## 3. What landed
+
+Five series, each with its own tier B review and the review's findings folded before landing:
+parts (5 commits, to 3c582d2), core (3, to 76062d5), defense (5, to d204552), army (11, to
+893923f), resources (8, to f11b8d4). Departures from §1 and §2, decided on the way:
+
+- The Command Center's two guards fly at scale 1.0 on r 1.39, between the tower's conduits
+  (r 1.13) and the dish pylon moved to the pad's edge (r 1.66 at their heights), with 0.01 to
+  spare each side; the L10 wing dish is built into the body and the L10 masts are lowered so the
+  low guard clears them. The guards are about 10 px at the widest zoom and clear at close zoom.
+- The harvester's ring was laid out three times: over the carriage (beams hidden against the
+  crystal), low round the crystal (the owner: "the lasers are angled upwards"), and finally at
+  1.1× the aimed shard's height, radius 0.7 / 0.8 / 1.0 by level, each beam running down into the
+  crystal at 43–53°, aimed at 0.62 of its height (0.77 at L10, over the gold collar).
+- The metal silo's guard flies a tight round in the front gap at mid-height (no round about the
+  middle clears the twin tanks); the vault's flies over the pylon caps at 3.3.
+- The extractor's stacks keep 2 puffs below Chrome (the Base budget) and 4 from L6.
+- The dry dock's low welder arrives at L6 and the high one at L7, so L6 keeps a bold change.
+- The academy's L10 parade (troopers at scale 0.8) replaces the target posts; the plinth moves.
+- `Parts.puffs` defaults to 8×3 orbs so four puffs fit the fabricator's Base budget.
+- Kept for the owner to veto: the plasma mortar's balcony troopers, the academy's marching
+  cadets; the siphon lost its drone with no replacement.
+
+Parked (memory, `model-feedback-leftovers`): a per-part RISE drift, the harness blind to RISE's
+climb and to black rendered frames, the HUD meter's steel blue against the models' teal metal.

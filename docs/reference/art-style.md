@@ -396,7 +396,7 @@ requires k − 1 (its level 5, which requires 4, is Gold; its level 10 is Crown)
 | Gold | 5 | core-gold trim on rims, caps and crowns | gold trim |
 | Chrome | 6–7 | polished chrome plating with brushed highlights, cyan light strips; more mass, a second storey or mast; stronger emissives | chrome plates, cyan strips, a chrome cap on the signature element |
 | Obsidian | 8–9 | dark obsidian armour veined with violet antimatter energy (FLOW), crystal inlays; hovering parts (rings, plates) on HOLO or BOB; taller | obsidian plates, violet veins, one hovering element |
-| Crown | 10 | an obsidian base under gold filigree, a violet antimatter core glowing in the body, a crowning element (spire, halo, banner or beacon beam) and an escort, a fourth moving part that patrols or orbits | gold filigree, antimatter core, crown, escort |
+| Crown | 10 | an obsidian base under gold filigree, a violet antimatter core glowing in the body, a crowning element (spire, halo, banner or beacon beam) and, where the building's story has one, a robot of its own as a fourth moving part | gold filigree, antimatter core, crown, a tailored robot where one belongs |
 
 The rule: **surfaces follow the tier, geometry follows the level.** A builder picks the tier's
 surfaces from `p.tier` (`p.tier >= Parts.Tier.GOLD` for gold trim, so a higher tier keeps the
@@ -419,9 +419,10 @@ saturated accents, ink outlines and glows that pop. The tiers change the palette
 style: **Chrome** is bright white with a cool cyan cast and cyan light strips, never grey or dull;
 **Obsidian** is ink-black glass kept vibrant by saturated violet veins, bright glints and gold or
 cyan accents, at least a third of a model's visible surface bright or glowing, never a muddy or
-realistic metal; **Crown** is the loudest, gold filigree, a violet core, a crown and an escort,
-bigger and bolder than anything below it. A level that reads grim, grey, realistic or cluttered
-fails its review whatever its budgets say; the rendered gallery shots are judged for this first.
+realistic metal; **Crown** is the loudest, gold filigree, a violet core, a crown and, where one
+belongs, a robot of its own, bigger and bolder than anything below it. A level that reads grim,
+grey, realistic or cluttered fails its review whatever its budgets say; the rendered gallery
+shots are judged for this first.
 
 The shared elements are named once on `Parts`, for every model batch:
 
@@ -654,7 +655,8 @@ placement ghost (**View states**).
 
 `Parts.moving(pivot, motion) -> LowPolyMesh` makes a moving part: build it in its own space,
 the pivot at its origin, as the parts of the body are built. A model has at most three, four at
-Crown, the fourth its escort (`Parts.max_moving(tier)`, asserted). `Motion` (`src/game/motion.gd`) says how it moves:
+Crown, the fourth a robot tailored to the building where its story has one
+(`Parts.max_moving(tier)`, asserted). `Motion` (`src/game/motion.gd`) says how it moves:
 
 | Constructor | Motion |
 | --- | --- |
@@ -727,7 +729,7 @@ every kind of motion, in two rows on the field, checked headless and screenshott
   tier, then the Chrome, Obsidian and Crown looks. Every level of a type reads as one building
   growing, never as separate buildings.
 - Moving parts (radar dishes, turbines, gyros, press arms, recoiling barrels): three per
-  building at most, four at Crown, the fourth the escort (**Animation**).
+  building at most, four at Crown, the fourth a tailored robot where one belongs (**Animation**).
 - Scale: at Base and Gold a size-2 building stands 1.2 to 2.0 units tall, a 3×3 about 1.6 to 2.2,
   a 4×4 Command Center up to 3.2. As guidance, Chrome grows to about 1.3 times the type's Gold
   height, Obsidian 1.6 and Crown 2; the height caps above govern (7 units for the Command Center,
@@ -748,8 +750,9 @@ show at gameplay zoom (camera size 24) is not a step.
 - **Where the camera lands.** Every addition is placed where the camera sees it: the camera looks
   down at 45° yaw, so the faces towards it and the tops show, and what stands behind a mass, or
   stacked along the camera's line of sight, does not read.
-- **Escorts.** A Crown escort orbits above or outside the building's masses, never through
-  smoke, arcs or parts, scaled so it reads at size 24.
+- **Robots.** A building's robot moves outside its masses, never through smoke, arcs or parts,
+  scaled so it reads at size 24, and tailored to the building; no robot flies above a defence
+  building (`docs/plans/model-feedback.md`).
 - **Cores and halos** sit on top or on the face the camera sees, in the bright light-violet unlit
   surface the model files call `BRIGHT_CORE` (`C9A2FF` on the glow layer).
 - **Veins** go on the faces that show, as glowing violet panels.
@@ -1215,7 +1218,7 @@ render CPU, with room for a loaded machine), so a regression shows. The upgrade 
 about 1,200 draw calls at the widest zoom before the merged walls and the scenery
 (`docs/plans/upgrade-pass.md`, §9); measured with both, it is 1,318. The primitives count every
 pass, the outlines and the shadow map's included. Phones are unmeasured for the maxed base: that
-measurement, still parked, decides whether the Crown escorts stay.
+measurement, still parked, decides whether the Crown robots stay.
 
 The render thread's CPU time does not move with the shadow's filter (0, 2 or 4 measure the same
 within the gallery's run-to-run noise), since PCF costs on the GPU: 13 shadow taps a fragment near a shadow edge (fewer where the first taps
