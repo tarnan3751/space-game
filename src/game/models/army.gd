@@ -142,6 +142,15 @@ static var GOO_BRIGHT_SWIRL := Surf.make(MaterialKit.Layer.GLASS, MaterialKit.NA
 	Surf.UNLIT | Surf.FLOW_U, false, true, 0.65)
 static var HOVER_CRYSTAL := Surf.make(MaterialKit.Layer.CRYSTAL, MaterialKit.CRYSTAL, 1.0, Surf.UNLIT | Surf.PULSE | Surf.BOB,
 	false, true, 0.6)
+## The drydock's: the welders' sparks cyan, then crystal (and the crystal arcs off them); the
+## hovering crane platform's deck and cab, bobbing with its rim (HOVER's phase).
+static var CYAN_SPARK_ARC := Parts.spark(MaterialKit.ENERGY)
+static var CRYSTAL_SPARK_ARC := Parts.spark(MaterialKit.CRYSTAL)
+static var HOVER_PLATE := Surf.make(MaterialKit.Layer.OBSIDIAN, Parts.OBSIDIAN_TINT, 1.0, Surf.GLOSSY | Surf.BOB, false, true, 0.6)
+static var HOVER_CHROME := Surf.make(MaterialKit.Layer.CHROME, Parts.CHROME_TINT, 1.0, Surf.GLOSSY | Surf.BOB, false, true, 0.6)
+## Filigree for thin parts at Crown (the drydock's gantry posts): Parts.FILIGREE's bands at about a
+## third the repeats, so a thin part reads as banded gold, not as dashes.
+static var FILIGREE_LEG := Surf.make(MaterialKit.Layer.BANDS, MaterialKit.CORE_GOLD, 0.7, Surf.GLOSSY)
 
 
 ## The L10 escort skiff's round: its centre on the ground, towards the apron, and its radius, so
@@ -1508,64 +1517,118 @@ static func _vat(m: LowPolyMesh, foot: Vector3, radius: float, height: float, ti
 ## plated hull and a third gantry at 2. The bare stern is completed in a hologram of the hull
 ## to come, the first gantry rides its rails along the dock, the welds flash and throw sparks,
 ## and the reactor pulses (the engines too, at 2).
+##
+## From 3 the gantries stand taller at each level, the chocks lift the ship higher and the plating
+## runs further aft, the hull growing from 5: L3 the gantries slim chrome cantilevers on posts at
+## the back, braced, with cyan strips up the posts, so the camera sees the ship under their beams;
+## a chrome hull, cradle and booth, an engine bank on the stern, its bells ringed in cyan, and the
+## welders' sparks cyan, the reactor glowing through a port on the near flank; L4 a fourth gantry;
+## L5 obsidian plates veined violet along the hull's spine and a broad violet band glowing on the
+## chrome flank the camera sees, an obsidian cradle, crystal arcs crackling from the welders onto
+## the hull; L6 a crane platform hovering over the hull between the gantries, obsidian rimmed in
+## violet, a violet tractor beam down to it; L7 the ship complete, gold filigree gantries, the
+## antimatter reactor's light violet in its port, along the near flank, in a band round the stern
+## and under a gold-ringed blister, gold fins, and a launch skiff circling above the gantries as
+## its escort.
 static func build_drydock(p: Parts, level: int) -> void:
 	var m := p.body
 	var g := Parts.PAD_HEIGHT
+	var chrome := p.tier >= Parts.Tier.CHROME
+	var obsidian := p.tier >= Parts.Tier.OBSIDIAN
+	var crown := p.tier >= Parts.Tier.CROWN
 	Parts.foundation(m, 4)
-	# The cradle: rails along the dock and hazard chocks under the hull.
+	# The cradle: rails along the dock and hazard chocks under the hull; chrome from the Chrome
+	# tier, obsidian from the Obsidian, banded in the tier's light.
 	for z: float in [-0.45, 0.45]:
-		m.box_chamfered(Vector3(3.5, 0.08, 0.16), 0.03, Vector3(0, g, z), Parts.GUNMETAL)
+		m.box_chamfered(Vector3(3.5, 0.08, 0.16), 0.03, Vector3(0, g, z), _plating(p.tier, Parts.GUNMETAL))
+	# From 3 the chocks stand taller each level, lifting the ship higher in the cradle.
+	var lifts: Array[float] = [0.0, 0.0, 0.1, 0.15, 0.2, 0.25, 0.3]
+	var lift := lifts[clampi(level, 1, 7) - 1]
 	for x: float in [-1.15, -0.35, 0.45, 1.2]:
-		m.box_chamfered(Vector3(0.24, 0.36, 0.86), 0.04, Vector3(x, g, 0), Parts.HAZARD)
+		m.box_chamfered(Vector3(0.24, 0.36 + lift, 0.86), 0.04, Vector3(x, g, 0), _plating(p.tier, Parts.HAZARD))
+		if chrome:
+			m.box(Vector3(0.26, 0.06, 0.88), Vector3(x, g + 0.22 + lift, 0), _strip(p.tier))
 	# The hull lies along X, nose to +X. [distance from the stern, radius] down its profile.
-	var scale := 1.0 if level < 2 else 1.08
+	var scales: Array[float] = [1.0, 1.08, 1.08, 1.08, 1.15, 1.15, 1.2]
+	var scale := scales[clampi(level, 1, 7) - 1]
 	var stern := -1.65
-	var axis_y := g + 0.36 + 0.55 * scale
+	var axis_y := g + 0.36 + lift + 0.55 * scale
 	var profile := PackedVector2Array([
 		Vector2(0.38, 0), Vector2(0.52, 0.35), Vector2(0.56, 1.0), Vector2(0.54, 1.7),
 		Vector2(0.44, 2.45), Vector2(0.24, 3.05), Vector2(0, 3.3),
 	])
-	var plated_from := 1.7 if level < 2 else 1.0
+	var plating: Array[float] = [1.7, 1.0, 0.7, 0.45, 0.3, 0.15, 0.0]
+	var plated_from := plating[clampi(level, 1, 7) - 1]
 	var plated := PackedVector2Array()
+	if level >= 3:
+		plated.append(Vector2(_hull_radius(profile, plated_from) * scale, 0))
 	for point: Vector2 in profile:
-		if point.y >= plated_from:
+		if point.y >= plated_from and (level < 3 or point.y > plated_from):
 			plated.append(Vector2(point.x * scale, point.y - plated_from))
 	# Round parts lie along +X: their axis, +Y, turned onto +X.
 	var lie := Vector3(0, 0, -90)
-	m.lathe(plated, 24, Vector3(stern + plated_from, axis_y, 0), HULL_ROUND, lie)
+	m.lathe(plated, 24, Vector3(stern + plated_from, axis_y, 0), Parts.CHROME_ROUND if chrome else HULL_ROUND, lie)
 	m.ring(0.46 * scale, 0.56 * scale, 0.12, 24, Vector3(stern + 2.3, axis_y, 0), ORANGE_ROUND, lie)
 	var canopy := Vector3(stern + 2.55, axis_y + 0.36 * scale, 0)
 	m.dome(0.2, 0.14, 16, 4, canopy, Parts.GLASS, Vector3(0, 0, -20))
-	# The hull to come, aft of the plating, a hologram round the ribs.
-	var plan := PackedVector2Array([Vector2(0, 0)])
-	for point: Vector2 in profile:
-		if point.y <= plated_from:
-			plan.append(Vector2(point.x * scale + 0.01, point.y))
-	m.lathe(plan, 24, Vector3(stern, axis_y, 0), HOLO_HULL, lie)
-	# Bare ribs aft of the plating, with a keel, a spine and stringers through them.
-	var x := stern + 0.12
-	while x < stern + plated_from - 0.05:
-		var radius := _hull_radius(profile, x - stern) * scale
-		m.ring(radius - 0.07, radius, 0.08, 24, Vector3(x, axis_y, 0), ARMOUR_ROUND, lie)
-		x += 0.34
-	var aft := Vector3(stern + 0.05, axis_y, 0)
-	var fore := Vector3(stern + plated_from + 0.05, axis_y, 0)
-	for offset: Vector3 in [Vector3(0, -0.5, 0), Vector3(0, 0.5, 0), Vector3(0, 0, 0.5), Vector3(0, 0, -0.5)]:
-		Parts.beam(m, aft + offset * scale, fore + offset * scale, 0.06, Parts.GUNMETAL, 0.015)
-	# The reactor glowing inside the bare ribs; engine bells on the stern at 2.
-	m.orb(0.2, 16, 6, Vector3(stern + 0.75, axis_y, 0), GLOW_PULSE)
-	if level >= 2:
+	if level >= 5:
+		_hull_plates(m, profile, Vector3(stern, axis_y, 0), scale, crown)
+	if level < 7:
+		# The hull to come, aft of the plating, a hologram round the ribs.
+		var plan := PackedVector2Array([Vector2(0, 0)])
+		for point: Vector2 in profile:
+			if point.y <= plated_from:
+				plan.append(Vector2(point.x * scale + 0.01, point.y))
+		if level >= 3:
+			plan.append(Vector2(_hull_radius(profile, plated_from) * scale + 0.01, plated_from))
+		m.lathe(plan, 24, Vector3(stern, axis_y, 0), HOLO_HULL, lie)
+		# Bare ribs aft of the plating, with a keel, a spine and stringers through them.
+		var x := stern + 0.12
+		while x < stern + plated_from - 0.05:
+			var radius := _hull_radius(profile, x - stern) * scale
+			m.ring(radius - 0.07, radius, 0.08, 24, Vector3(x, axis_y, 0), ARMOUR_ROUND, lie)
+			x += 0.34
+		var aft := Vector3(stern + 0.05, axis_y, 0)
+		var fore := Vector3(stern + plated_from + 0.05, axis_y, 0)
+		for offset: Vector3 in [Vector3(0, -0.5, 0), Vector3(0, 0.5, 0), Vector3(0, 0, 0.5), Vector3(0, 0, -0.5)]:
+			Parts.beam(m, aft + offset * scale, fore + offset * scale, 0.06, Parts.GUNMETAL, 0.015)
+	# The reactor glowing inside the bare ribs; engine bells on the stern at 2, an engine bank
+	# from 3.
+	if level < 3:
+		m.orb(0.2, 16, 6, Vector3(stern + 0.75, axis_y, 0), GLOW_PULSE)
+	else:
+		# From 3, plated over, the reactor glows through a port on the near flank, aft, where the
+		# camera sees it; the antimatter core's light violet at Crown.
+		var port := Vector3(stern + 0.75, axis_y - 0.06, _hull_radius(profile, 0.75) * scale - 0.02)
+		m.ring(0.12, 0.17, 0.05, 16, port, _plating(p.tier, Parts.GUNMETAL, true), Vector3(90, 0, 0))
+		m.disc(0.125, 16, port + Vector3(0, 0, 0.045), BRIGHT_CORE if crown else GLOW_PULSE, Vector3(90, 0, 0))
+	if level >= 3:
+		_engine_bank(m, Vector3(stern, axis_y, 0), scale, p.tier, level)
+	elif level >= 2:
 		for z: float in [-0.2, 0.2]:
 			m.prism(0.1, 0.17, 0.22, 16, Vector3(stern + 0.1, axis_y - 0.1, z), Parts.GUNMETAL, -lie)
 			m.disc(0.14, 16, Vector3(stern - 0.125, axis_y - 0.1, z), GLOW_PULSE.phased(0.25), -lie)
 	# The gantries, each with a welder reaching down to the hull. The first rides rails along
 	# the dock, where the hull's radius hardly changes, so its welder stays on the hull.
-	var top := g + 1.95
-	for z: float in [-1.6, 1.6]:
+	var tops: Array[float] = [1.95, 1.95, 2.3, 2.55, 2.75, 2.9, 3.05]
+	var top := g + tops[clampi(level, 1, 7) - 1]
+	var rails: Array[float] = [-1.6, 1.6]
+	if level >= 3:
+		rails = [-1.6]
+	for z: float in rails:
 		m.box_chamfered(Vector3(0.84, 0.03, 0.12), 0.01, Vector3(-0.75, g, z), Parts.GUNMETAL)
 	var gantries: Array[float] = [-0.75, 0.55]
-	if level >= 2:
+	if level >= 4:
+		gantries = [-0.75, 0.15, 0.8, 1.45]
+	elif level >= 2:
 		gantries.append(1.45)
+	var post := ORANGE
+	var span := Parts.GOLD_TRIM if p.tier >= Parts.Tier.GOLD else ORANGE
+	if crown:
+		post = FILIGREE_LEG
+		span = Parts.FILIGREE
+	elif chrome:
+		post = Parts.CHROME
 	for k: int in gantries.size():
 		var gx := gantries[k]
 		var crane := m
@@ -1573,27 +1636,132 @@ static func build_drydock(p: Parts, level: int) -> void:
 		if k == 0:
 			crane = p.moving(at, Motion.slide(Vector3.RIGHT, 0.3, 7.0))
 			at = Vector3.ZERO
-		for z: float in [-1.6, 1.6]:
-			crane.box_chamfered(Vector3(0.24, 0.12, 0.24), 0.03, at + Vector3(0, g, z), DARK_PLATE)
-			crane.box_chamfered(Vector3(0.14, top - g - 0.12, 0.14), 0.03, at + Vector3(0, g + 0.12, z), ORANGE)
-		Parts.beam(crane, at + Vector3(0, top, -1.7), at + Vector3(0, top, 1.7), 0.18,
-			Parts.GOLD_TRIM if p.tier >= Parts.Tier.GOLD else ORANGE, 0.04)
+		if level >= 3:
+			# From 3 a slim cantilever on a post at the back, braced, its beam reaching out over the
+			# hull, so the camera sees the ship under it; cyan strips up the post's faces to the
+			# camera, below Crown.
+			crane.box_chamfered(Vector3(0.24, 0.12, 0.24), 0.03, at + Vector3(0, g, -1.6), ORANGE)
+			crane.box_chamfered(Vector3(0.12, top - g - 0.12, 0.12), 0.03, at + Vector3(0, g + 0.12, -1.6), post)
+			if not crown:
+				crane.box(Vector3(0.02, top - g - 0.3, 0.07), at + Vector3(0.061, g + 0.2, -1.6), Parts.CYAN_STRIP)
+				crane.box(Vector3(0.07, top - g - 0.3, 0.02), at + Vector3(0, g + 0.2, -1.539), Parts.CYAN_STRIP)
+			Parts.beam(crane, at + Vector3(0, top, -1.68), at + Vector3(0, top, 0.55), 0.13, span, 0.03)
+			Parts.beam(crane, at + Vector3(0, top - 0.75, -1.58), at + Vector3(0, top - 0.02, -0.75), 0.06, post, 0.015)
+		else:
+			for z: float in [-1.6, 1.6]:
+				crane.box_chamfered(Vector3(0.24, 0.12, 0.24), 0.03, at + Vector3(0, g, z), DARK_PLATE)
+				crane.box_chamfered(Vector3(0.14, top - g - 0.12, 0.14), 0.03, at + Vector3(0, g + 0.12, z), post)
+			Parts.beam(crane, at + Vector3(0, top, -1.7), at + Vector3(0, top, 1.7), 0.18, span, 0.04)
 		var trolley := at + Vector3(0, top - 0.16, 0.25)
-		crane.box_chamfered(Vector3(0.22, 0.14, 0.26), 0.03, trolley, Parts.GUNMETAL)
+		crane.box_chamfered(Vector3(0.22, 0.14, 0.26), 0.03, trolley, ORANGE if chrome else Parts.GUNMETAL)
 		var surface := axis_y + _hull_radius(profile, gx - stern) * scale
 		var tip := at + Vector3(0, surface + 0.16, 0.25)
 		Parts.pipe(crane, trolley, tip, 0.03, Parts.ROD)
-		_weld(crane, at + Vector3(0, surface + 0.04, 0.25), float(k) / gantries.size())
+		var spot := at + Vector3(0, surface + 0.04, 0.25)
+		var phase := float(k) / gantries.size()
+		if obsidian:
+			_weld(crane, spot, phase, CRYSTAL_SPARK_ARC)
+			# Crystal arcs crackling from the welder's tip onto the hull either side of the weld.
+			for side: float in [-1.0, 1.0]:
+				var hit := at + Vector3(side * 0.16, axis_y + _hull_radius(profile, gx + side * 0.16 - stern) * scale * 0.97, 0.22)
+				Parts.arc(crane, tip + Vector3(side * 0.02, 0, 0), hit, 3, 0.03,
+					CRYSTAL_SPARK_ARC.phased(fposmod(phase + 0.25 + 0.5 * side, 1.0)))
+		else:
+			_weld(crane, spot, phase, CYAN_SPARK_ARC if chrome else SPARK_ARC)
 	# The control booth in the front corner.
 	var booth := Vector3(-1.45, g, 1.4)
-	m.box_chamfered(Vector3(0.5, 0.45, 0.4), 0.05, booth, Parts.HULL_LIGHT)
+	m.box_chamfered(Vector3(0.5, 0.45, 0.4), 0.05, booth, _plating(p.tier, Parts.HULL_LIGHT))
 	m.box_chamfered(Vector3(0.4, 0.16, 0.03), 0.01, booth + Vector3(0, 0.24, 0.2), Parts.GLASS)
 	Parts.mast(m, booth + Vector3(0.12, 0.45, -0.08), 0.35, 0.05, GLOW)
+	if level >= 6:
+		_crane_platform(m, Vector3(0.475, top + 0.45, 0), axis_y + _hull_radius(profile, 0.475 - stern) * scale)
+	if level >= 7:
+		# The launch skiff circles above the gantries and the platform.
+		Parts.escort_skiff(p, 1.55, top + 1.0, 0.5, Vector3.ZERO, 1.5)
+
+
+## The engine bank on the drydock's stern from 3 (_drydock's), `stern` the hull's aft end on its
+## axis: a block in the tier's plating, three engine bells out of it ringed in light (cyan, violet
+## from the Obsidian tier) with their nozzles glowing; at 7 gold fins, the antimatter reactor
+## glowing in a band round the stern and under a gold-ringed blister on its top, where the camera
+## sees it.
+static func _engine_bank(m: LowPolyMesh, stern: Vector3, scale: float, tier: int, level: int) -> void:
+	var out := Vector3(0, 0, 90)
+	m.box_chamfered(Vector3(0.3, 0.5 * scale, 0.7 * scale), 0.05, stern + Vector3(0.12, -0.25 * scale, 0),
+		_plating(tier, Parts.GUNMETAL))
+	for spec: Vector3 in [Vector3(0, 0.1, -0.2), Vector3(0, 0.1, 0.2), Vector3(0, -0.14, 0)]:
+		var bell := stern + spec * scale
+		m.prism(0.11, 0.16, 0.24, 16, bell + Vector3(-0.02, 0, 0), _plating(tier, Parts.GUNMETAL, true), out)
+		m.ring(0.16, 0.185, 0.06, 16, bell + Vector3(-0.2, 0, 0), _glow(tier), out)
+		m.disc(0.13, 16, bell + Vector3(-0.261, 0, 0), GLOW_PULSE.phased(0.25), out)
+	if level < 7:
+		return
+	# Gold fins: two up and out over the stern, two out to the sides and down.
+	for fin: Vector3 in [Vector3(0, 0.71, 0.71), Vector3(0, 0.71, -0.71), Vector3(0, -0.5, 0.87), Vector3(0, -0.5, -0.87)]:
+		var root := stern + Vector3(0.45, 0, 0) + fin * 0.42 * scale
+		var tip := root + fin * 0.34 + Vector3(-0.3, 0, 0)
+		var back := root + Vector3(-0.42, 0, 0)
+		var front := root + Vector3(0.35, 0, 0)
+		var t := Vector3(0, -fin.z, fin.y) * 0.02
+		m.polygon(PackedVector3Array([front + t, back + t, tip + t]), Parts.GOLD_TRIM)
+		m.polygon(PackedVector3Array([front - t, tip - t, back - t]), Parts.GOLD_TRIM)
+		m.polygon(PackedVector3Array([front + t, tip + t, tip - t, front - t]), Parts.GOLD_TRIM)
+		m.polygon(PackedVector3Array([back - t, tip - t, tip + t, back + t]), Parts.GOLD_TRIM)
+	# The reactor: a broad band of the core round the stern, a blister of it on top in a gold ring,
+	# aft of the first gantry's reach.
+	m.lathe(PackedVector2Array([Vector2(0.45 * scale, 0), Vector2(0.5 * scale, 0.26)]), 24, stern + Vector3(0.06, 0, 0),
+		BRIGHT_CORE, Vector3(0, 0, -90))
+	var blister := stern + Vector3(0.36, 0.5 * scale - 0.05, 0)
+	Parts.torus(m, 0.22, 0.04, 16, 6, blister, GOLD_ROUND)
+	m.dome(0.22, 0.2, 16, 4, blister + Vector3(0, 0.03, 0), BRIGHT_CORE)
+
+
+## Obsidian plates along the hull's spine from 5 (_drydock's), `stern` the hull's aft end on its
+## axis, each with a violet vein down it, and a broad violet band glowing beside them on the chrome
+## flank the camera sees; at Crown the band is the antimatter reactor's light violet, and gold
+## filigree bands go round the hull at the plates' ends.
+static func _hull_plates(m: LowPolyMesh, profile: PackedVector2Array, stern: Vector3, scale: float, crown: bool) -> void:
+	for plate: Vector2 in [Vector2(0.55, 1.4), Vector2(1.6, 2.4)]:
+		_hull_strip(m, profile, stern, scale, plate, 0.012, Vector2(150, 210), Parts.OBSIDIAN_ROUND)
+		_hull_strip(m, profile, stern, scale, plate + Vector2(0.06, -0.06), 0.022, Vector2(170, 190), Parts.VEINS)
+		_hull_strip(m, profile, stern, scale, plate + Vector2(0.06, -0.06), 0.014, Vector2(106, 134),
+			BRIGHT_CORE if crown else VIOLET_PANEL)
+		if crown:
+			for along: float in [plate.x - 0.05, plate.y]:
+				_hull_strip(m, profile, stern, scale, Vector2(along, along + 0.05), 0.026, Vector2(0, 360), FILIGREE_ROUND)
+
+
+## A strip over the hull from `along.x` to `along.y` from the stern (on its axis at `stern`),
+## `proud` off it, swept round the hull between `degrees.x` and `degrees.y` (0 underneath, 90 to
+## the camera's side, 180 on top).
+static func _hull_strip(m: LowPolyMesh, profile: PackedVector2Array, stern: Vector3, scale: float, along: Vector2,
+		proud: float, degrees: Vector2, surface: Surf) -> void:
+	var section := PackedVector2Array()
+	for k: int in 4:
+		var at := lerpf(along.x, along.y, k / 3.0)
+		section.append(Vector2(_hull_radius(profile, at) * scale + proud, at - along.x))
+	m.lathe(section, 24, stern + Vector3(along.x, 0, 0), surface, Vector3(0, 0, -90), degrees.x, degrees.y)
+
+
+## The crane platform hovering over the hull from 6, `at` its middle, above the gantries' beams
+## between two of them: an obsidian deck rimmed in violet, a violet grid glowing on its top, a
+## chrome crane cab on it, crystal lamps on its corners and a violet hologram tractor beam down to
+## the hull's top at `hull_top`, every part bobbing with it (HOVER's phase).
+static func _crane_platform(m: LowPolyMesh, at: Vector3, hull_top: float) -> void:
+	m.box_chamfered(Vector3(0.6, 0.12, 1.3), 0.04, at, HOVER_PLATE)
+	m.box(Vector3(0.62, 0.05, 1.32), at + Vector3(0, 0.03, 0), HOVER_RIM)
+	m.box(Vector3(0.44, 0.01, 1.1), at + Vector3(0, 0.12, 0), HOVER_RIM)
+	m.box_chamfered(Vector3(0.3, 0.2, 0.36), 0.04, at + Vector3(0, 0.12, -0.3), HOVER_CHROME)
+	m.box(Vector3(0.24, 0.08, 0.01), at + Vector3(0, 0.2, -0.115), DRONE_EYE)
+	for corner: Vector2 in [Vector2(-1, -1), Vector2(1, -1), Vector2(1, 1), Vector2(-1, 1)]:
+		m.cone(0.05, 0.18, 8, at + Vector3(corner.x * 0.24, 0.12, corner.y * 0.58), HOVER_CRYSTAL)
+	var drop := at.y - hull_top - 0.04
+	m.prism(0.2, 0.1, drop, 12, at - Vector3(0, drop, 0), HOLO_VIOLET.phased(0.6))
 
 
 ## A welding point on the hull: a glowing arc flashing, `phase` into its blink, with hot sparks
-## flickering and shaking off it.
-static func _weld(m: LowPolyMesh, spot: Vector3, phase: float) -> void:
+## (`sparks`, hazard yellow unless given) flickering and shaking off it.
+static func _weld(m: LowPolyMesh, spot: Vector3, phase: float, sparks_surf: Surf = SPARK_ARC) -> void:
 	m.orb(0.08, 16, 6, spot, WELD_BLINK.phased(phase))
 	var sparks: Array[Vector3] = [
 		Vector3(1, 0.7, 0.3), Vector3(-0.4, 0.8, 0.9), Vector3(0.2, 0.6, -1), Vector3(-1, 0.5, -0.2),
@@ -1602,7 +1770,7 @@ static func _weld(m: LowPolyMesh, spot: Vector3, phase: float) -> void:
 	for i: int in sparks.size():
 		var spark := sparks[i]
 		m.cone(0.025, 0.18, 8, spot + spark.normalized() * 0.06,
-			SPARK_ARC.phased(fposmod(phase + i / 6.0 + 0.05, 1.0)), Parts.facing(spark))
+			sparks_surf.phased(fposmod(phase + i / 6.0 + 0.05, 1.0)), Parts.facing(spark))
 
 
 ## The radius of the hull's `profile` at `along` from the stern, between its points.
