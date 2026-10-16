@@ -63,7 +63,7 @@ const MODELS := {
 	"missile_battery": [3, 10],
 	"plasma_mortar": [3, 8],
 	"shield_generator": [3, 4],
-	"flak_cannon": [3, 4],
+	"flak_cannon": [3, 8],
 	"arc_tower": [3, 4],
 	"cloaked_sentry": [2, 3],
 	"gravity_well": [2, 3],
