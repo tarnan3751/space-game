@@ -122,9 +122,10 @@ static var CYAN_BEAM := Surf.make(MaterialKit.Layer.GLOW, MaterialKit.ENERGY, 1.
 static var GLAZING := Surf.make(MaterialKit.Layer.GLASS, Color("c9a2ff"), 1.0, Surf.UNLIT)
 ## The Crown cadet's halo: BRIGHT_CORE's light violet, solid, bobbing out of step with the cadet.
 static var BRIGHT_HALO := Surf.make(MaterialKit.Layer.GLOW, Color("c9a2ff"), 1.0, Surf.UNLIT | Surf.BOB, true, true, 0.5)
-## The fabricator's: chrome roller doors, crystal-lit smoke.
+## The fabricator's: chrome roller doors; crystal-lit smoke, rising as Parts.SMOKE does (both
+## fabricators' from the Obsidian tier).
 static var CHROME_ROLLER := Surf.make(MaterialKit.Layer.VENT, Parts.CHROME_TINT, 2.0, Surf.GLOSSY)
-static var CRYSTAL_SMOKE := Surf.make(MaterialKit.Layer.GLOW, MaterialKit.CRYSTAL, 1.0, Surf.HOLO | Surf.BOB, true)
+static var CRYSTAL_SMOKE := Surf.make(MaterialKit.Layer.GLOW, MaterialKit.CRYSTAL, 1.0, Surf.HOLO | Surf.RISE, true)
 ## The heavy fabricator's: the pour and its hot core in crystal pink; the violet sparks.
 static var CRYSTAL_POUR := Surf.make(MaterialKit.Layer.GLOW, MaterialKit.CRYSTAL, 1.0, Surf.UNLIT | Surf.FLOW, false, true,
 	0.7)
@@ -789,7 +790,7 @@ static func _watchtower(p: Parts, foot: Vector3, roof: float, level: int) -> voi
 ## out to a loading dock under an orange gantry crane: a smaller, lower factory than the heavy
 ## fabricator's, its stacks shorter. More crates at 2 and 3, a third stack at 3, a second storey
 ## at 4. The roof windows pulse orange, the crane's trolley runs to and fro along its bridge with
-## the hook, the dock's lamp blinks and the stacks puff smoke.
+## the hook, the dock's lamp blinks and smoke rises from the stacks, fading.
 ##
 ## From 6 the stacks stand taller with chrome collars: L6 a chrome block, storey and sawtooth
 ## roof, chrome roller doors and cyan lamps chasing along the conveyor; L7 the factory's product,
@@ -892,10 +893,7 @@ static func build_fabricator(p: Parts, level: int) -> void:
 		var foot := stacks[i] + Vector3(0, g + tall, 0)
 		var height := mouth - tall
 		_stack(m, foot, 0.12, height, p.tier >= Parts.Tier.GOLD, Parts.CHROME_ROUND if level >= 6 else null)
-		if obsidian:
-			_crystal_puffs(m, foot + Vector3(0, height, 0), 0.29 * i)
-		else:
-			Parts.puffs(m, foot + Vector3(0, height, 0), 0.29 * i)
+		Parts.puffs(m, foot + Vector3(0, height, 0), 0.29 * i, 4, 8, 3, CRYSTAL_SMOKE if obsidian else Parts.SMOKE)
 	if level >= 10:
 		# The core on the storey's roof: a bright orb on a gold mount between four gold prongs, a
 		# violet ring pulsing round its middle.
@@ -934,13 +932,6 @@ static func _stack(m: LowPolyMesh, foot: Vector3, radius: float, height: float, 
 	m.disc(radius * 0.56, 16, mouth + Vector3(0, 0.03, 0), GLOW)
 
 
-## Crystal-lit smoke over a stack's `mouth`, as Parts.puffs but on CRYSTAL_SMOKE.
-static func _crystal_puffs(m: LowPolyMesh, mouth: Vector3, phase: float) -> void:
-	for k: int in 3:
-		m.orb(0.06 + 0.025 * k, 10, 4, mouth + Vector3(0.02 * k, 0.12 + 0.17 * k, 0),
-			CRYSTAL_SMOKE.phased(fposmod(phase + 0.3 * k, 1.0)))
-
-
 ## The bulky fabricator: an armoured hall with a furnace in its front, an orange press arm
 ## hammering an anvil beside it. A second arm at 2, a chimney cluster at 3. The arms hammer
 ## in turn, sparks fly at the anvils, the furnace mouth pulses and the molten pour runs out of
@@ -952,7 +943,8 @@ static func _crystal_puffs(m: LowPolyMesh, mouth: Vector3, phase: float) -> void
 ## armour slabs, violet veins between the side slabs, a violet band round the hall's top and the
 ## pour crystal pink; L7 a forge ring hovering round each press head over its anvil, obsidian
 ## rimmed in violet; L8 gold filigree over the roof block and the hall's top, the antimatter core
-## glowing in a crowned gold ring on the roof block and the anvils' sparks violet.
+## glowing in a crowned gold ring on the roof block and the anvils' sparks violet. Every stack
+## smokes, the smoke rising and fading, crystal-lit from the Obsidian tier.
 static func build_heavy_fabricator(p: Parts, level: int) -> void:
 	var m := p.body
 	var g := Parts.PAD_HEIGHT
@@ -1014,16 +1006,23 @@ static func build_heavy_fabricator(p: Parts, level: int) -> void:
 	_press_arm(p, Vector3(-0.15, g + 1.0, 0.1), Vector3(0.88, g, 0.85), 0.0)
 	if level >= 2:
 		_press_arm(p, Vector3(-0.15, g + 1.0, -0.95), Vector3(0.88, g, -0.85), 0.5)
-	# Exhausts: one stack, a cluster of three at 3, taller and collared from 4, four at 5.
+	# Exhausts: one stack, a cluster of three at 3, taller and collared from 4, four at 5, each
+	# smoking (crystal-lit from the Obsidian tier).
 	var gold := p.tier >= Parts.Tier.GOLD
 	var taller := 0.2 if level >= 4 else 0.0
 	var collar: Surf = Parts.CHROME_ROUND if level >= 4 else null
-	_stack(m, Vector3(-0.95, g + 1.4, -0.95), 0.14, 0.55 + taller, gold, collar)
+	# [foot, radius, height] of each stack, in the order the levels add them.
+	var stacks: Array[Array] = [[Vector3(-0.95, g + 1.4, -0.95), 0.14, 0.55 + taller]]
 	if level >= 3:
-		_stack(m, Vector3(-0.55, g + 1.4, -1.05), 0.12, 0.75 + taller, gold, collar)
-		_stack(m, Vector3(-1.02, g + 1.4, -0.55), 0.1, 0.4 + taller, gold, collar)
+		stacks.append([Vector3(-0.55, g + 1.4, -1.05), 0.12, 0.75 + taller])
+		stacks.append([Vector3(-1.02, g + 1.4, -0.55), 0.1, 0.4 + taller])
 	if level >= 5:
-		_stack(m, Vector3(-0.6, g + 1.4, -0.6), 0.11, 0.6, gold, collar)
+		stacks.append([Vector3(-0.6, g + 1.4, -0.6), 0.11, 0.6])
+	for i: int in stacks.size():
+		var foot: Vector3 = stacks[i][0]
+		var height: float = stacks[i][2]
+		_stack(m, foot, stacks[i][1], height, gold, collar)
+		Parts.puffs(m, foot + Vector3(0, height, 0), 0.29 * i, 4, 8, 3, CRYSTAL_SMOKE if obsidian else Parts.SMOKE)
 	if level >= 7:
 		for anvil: Vector3 in [Vector3(0.88, g, 0.85), Vector3(0.88, g, -0.85)]:
 			# A forge ring hovering round the press head's path over the anvil.
