@@ -757,7 +757,9 @@ static func _watchtower(p: Parts, foot: Vector3, level: int) -> void:
 	var cyan := p.tier >= Parts.Tier.CHROME
 	Parts.drum(light, 0.08, 0.14, 0.02, 12, lamp - beam * 0.06, Parts.GUNMETAL, Parts.facing(beam))
 	light.disc(0.065, 16, lamp + beam * 0.085, CYAN_LENS if cyan else SEARCH_LENS, Parts.facing(beam))
-	light.prism(0.06, 0.16, 1.4 + grown * 0.6, 12, lamp + beam * 0.09, CYAN_BEAM if cyan else SEARCH_BEAM, Parts.facing(beam))
+	# At 4 and 5, where the tower stands lowest, the beam stops short of the simulator's rings.
+	var reach := 1.25 if level < 6 else 1.4 + grown * 0.6
+	light.prism(0.06, 0.16, reach, 12, lamp + beam * 0.09, CYAN_BEAM if cyan else SEARCH_BEAM, Parts.facing(beam))
 
 
 ## The drill drone hovering over the yard from 9, `at` its centre: an obsidian saucer rimmed in
