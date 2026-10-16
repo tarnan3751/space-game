@@ -240,6 +240,17 @@ const EMP_RING_OUTER := 0.74
 const EMP_RING_DROP := 0.14
 const EMP_ESCORT_RADIUS := 1.3
 const EMP_ESCORT_LIFT := 1.2
+## The railgun from L4, by level from L4: the plinth's height and how far the mount lifts the gun
+## over the drum; the capacitor cans' height on the drum, and how far the rear row and the L5
+## front bank stand out on the plinth. The L6 targeting ring's height over the gun's deck, and
+## the L7 spotter drone's round and its height over the ring.
+const RAIL_PLINTHS := [0.34, 0.34, 0.46, 0.5]
+const RAIL_LIFTS := [0.55, 0.7, 0.9, 1.1]
+const RAIL_CAN := 0.5
+const RAIL_ROW := 0.98
+const RAIL_RING_LIFT := 1.05
+const RAIL_ESCORT_RADIUS := 1.2
+const RAIL_ESCORT_LIFT := 0.5
 
 
 ## From L6 the head rides a mount that lifts it a little more each level, on a taller plinth.
@@ -1268,40 +1279,117 @@ static func build_emp_tower(p: Parts, level: int) -> void:
 		Parts.escort_drone(p, EMP_ESCORT_RADIUS, cage.y + EMP_ESCORT_LIFT, 0.8, Vector3.ZERO, ESCORT_SCALE)
 
 
+## From L4 a mount lifts the gun over its capacitor banks, higher each level. L4 (Chrome): chrome
+## plinth, drum, mount, housing and rails, cyan strips along the rails, a cyan band under the gun,
+## taller ribbed chrome capacitors banded in cyan and a longer barrel with three bolder collars. L5
+## a third bank on the plinth's front under the barrel, a taller mount and a broad band. L6
+## (Obsidian): a taller plinth with glowing violet vein panels on its faces the camera sees, the
+## drum, mount, housing and rails obsidian, veins up the mount, round the drum and across its top,
+## and across the housing's top, crystal inlays on the plinth, the capacitors capped with violet
+## crystals swelling in turn, and a targeting ring hovering over the gun, turning. L7 (Crown): gold
+## filigree round the plinth, the mount and the barrel's collars, the breech the antimatter core
+## glowing light violet in gold rings, a gold crown on the muzzle, and a spotter drone circling
+## above (the escort).
 static func build_railgun(p: Parts, level: int) -> void:
 	var m := p.body
-	var top := _plinth(m, 3, 1.2, 0.34)
-	Parts.drum(m, 0.86, 0.14, 0.04, 24, Vector3(0, top, 0), SHELL_MID)
-	var deck := Vector3(0, top + 0.14, 0)
+	var plinth := 0.34 if level < 4 else float(RAIL_PLINTHS[level - 4])
+	var lift := 0.0 if level < 4 else float(RAIL_LIFTS[level - 4])
+	var glow := Parts.CORE_GLOW if p.tier >= Parts.Tier.OBSIDIAN else Parts.CYAN_STRIP
+	var top := _plinth(m, 3, 1.2, plinth, ARMOUR, _by_tier(p.tier, Parts.GUNMETAL, Parts.CHROME_ROUND, Parts.OBSIDIAN_ROUND))
+	Parts.drum(m, 0.86, 0.14, 0.04, 24, Vector3(0, top, 0), _by_tier(p.tier, SHELL_MID, Parts.CHROME_ROUND, Parts.OBSIDIAN_ROUND))
+	var lower := Vector3(0, top + 0.14, 0)
+	var deck := lower + Vector3(0, lift, 0)
 	var heading := Vector3(0, SCREEN_RIGHT, 0)
 	var aim := Vector3(-6, SCREEN_RIGHT, 0)
-	m.box_chamfered(Vector3(0.95, 0.46, 1.1), 0.08, _at(deck, Vector3(0, 0, -0.3), heading), Parts.HULL_LIGHT, heading)
+	var along := aim + Vector3(90, 0, 0)
+	var foot := _at(lower, Vector3(0, 0, -0.3), heading)
+	if level >= 4:
+		# The mount under the housing: a column flared at its foot, a red band round the flare and a
+		# glowing band (cyan, violet from the Obsidian tier) under the gun, broad from L5.
+		m.lathe(PackedVector2Array([Vector2(0.5, 0), Vector2(0.5, 0.05), Vector2(0.36, 0.15), Vector2(0.36, lift), Vector2(0, lift)]),
+			24, foot, _by_tier(p.tier, SHELL_MID, Parts.CHROME_ROUND, Parts.OBSIDIAN_ROUND))
+		m.ring(0.35, 0.4, 0.07, 24, foot + Vector3(0, 0.16, 0), ARMOUR_ROUND)
+		var band := 0.08 if level < 5 else 0.16
+		m.ring(0.35, 0.385, band, 24, foot + Vector3(0, lift - 0.04 - band, 0), glow)
+	m.box_chamfered(Vector3(0.95, 0.46, 1.1), 0.08, _at(deck, Vector3(0, 0, -0.3), heading),
+		_by_tier(p.tier, Parts.HULL_LIGHT, Parts.CHROME, Parts.OBSIDIAN), heading)
 	m.box_chamfered(Vector3(0.7, 0.3, 0.34), 0.05, _at(deck, Vector3(0, 0.46, -0.62), heading), VENT, heading)
 	m.box(Vector3(0.36, 0.05, 0.02), _at(deck, Vector3(0, 0.6, -0.449), heading), ION, heading)
 	for side: float in [-1.0, 1.0]:
 		m.box_chamfered(Vector3(0.05, 0.3, 0.8), 0.015, _at(deck, Vector3(side * 0.49, 0.08, -0.3), heading), ARMOUR,
 			heading)
 	m.box_chamfered(Vector3(0.6, 0.06, 0.3), 0.02, _at(deck, Vector3(0, 0.46, 0.0), heading), HAZARD_FINE, heading)
-	var length := 1.8 + 0.3 * level
+	var length := 1.8 + 0.3 * mini(level, 4)
 	var root := _at(deck, Vector3(0, 0.42, -1.0), heading)
 	for side: float in [-1.0, 1.0]:
 		m.box_chamfered(Vector3(0.14, 0.26, length), 0.04, _at(root, Vector3(side * 0.16, 0, length * 0.5), aim),
-			Parts.GUNMETAL, aim)
+			_by_tier(p.tier, Parts.GUNMETAL, Parts.CHROME, Parts.OBSIDIAN), aim)
 		m.box_chamfered(Vector3(0.16, 0.28, 0.16), 0.04, _at(root, Vector3(side * 0.16, -0.01, length - 0.08), aim),
 			GOLD if p.tier >= Parts.Tier.GOLD else ARMOUR, aim)
+		if level >= 4:
+			# A light strip down the rail's outer face.
+			m.box(Vector3(0.02, 0.08, length - 0.6), _at(root, Vector3(side * 0.24, 0.1, length * 0.5), aim), glow, aim)
 	m.box(Vector3(0.14, 0.08, length - 0.5), _at(root, Vector3(0, 0.08, length * 0.5 + 0.15), aim), RAIL_CURRENT, aim)
 	m.box(Vector3(0.16, 0.18, 0.06), _at(root, Vector3(0, 0.03, length - 0.06), aim), ION_PULSE, aim)
-	var collars := int((length - 0.7) / 0.5)
+	# From L4 three bolder collars, further apart.
+	var collars := int((length - 0.7) / 0.5) if level < 4 else 3
+	var pitch := 0.5 if level < 4 else 0.75
+	var collar := Parts.FILIGREE if p.tier >= Parts.Tier.CROWN else _by_tier(p.tier, DENSE, Parts.CHROME, Parts.OBSIDIAN)
 	for i: int in collars:
-		m.box_chamfered(Vector3(0.56, 0.36, 0.12), 0.03, _at(root, Vector3(0, -0.06, 0.75 + 0.5 * i), aim), DENSE, aim)
-	_bank(m, deck, heading, -1.0)
-	if level >= 2:
-		_bank(m, deck, heading, 1.0)
-	# The capacitors charge in a sequence that runs towards the muzzle: the rear row (L3), then
-	# each pair of the banks, a BLINK step (0.2 s) apart.
-	if level >= 3:
+		m.box_chamfered(Vector3(0.56, 0.36, 0.12) if level < 4 else Vector3(0.6, 0.4, 0.16), 0.03,
+			_at(root, Vector3(0, -0.06 if level < 4 else -0.08, 0.75 + pitch * i), aim), collar, aim)
+	if level < 4:
+		_bank(m, deck, heading, -1.0)
+		if level >= 2:
+			_bank(m, deck, heading, 1.0)
+		# The capacitors charge in a sequence that runs towards the muzzle: the rear row (L3), then
+		# each pair of the banks, a BLINK step (0.2 s) apart.
+		if level >= 3:
+			for k: int in 3:
+				_cell(m, _at(deck, Vector3(-0.28 + 0.28 * k, 0, -1.18), heading), 0.4, ION_BLINK.phased(Parts.chase(0, 6)), 0.12)
+		return
+	# From L4 the banks stand taller on the drum either side of the mount, the rear row on the
+	# plinth behind it, and from L5 a third bank on the plinth's front under the barrel: the charge
+	# runs from the rear row through the banks to the front.
+	for side: float in [-1.0, 1.0]:
 		for k: int in 3:
-			_cell(m, _at(deck, Vector3(-0.28 + 0.28 * k, 0, -1.18), heading), 0.4, ION_BLINK.phased(Parts.chase(0, 6)), 0.12)
+			_rail_cell(m, _at(lower, Vector3(side * 0.66, 0, -0.62 + 0.3 * k), heading), RAIL_CAN, k + 1, p.tier)
+	var rise := lower.y - top
+	for k: int in 3:
+		_rail_cell(m, _at(Vector3(0, top, 0), Vector3(-0.28 + 0.28 * k, 0, -RAIL_ROW), heading), RAIL_CAN + rise, 0, p.tier)
+	if level >= 5:
+		for k: int in 3:
+			_rail_cell(m, _at(Vector3(0, top, 0), Vector3(-0.3 + 0.3 * k, 0, RAIL_ROW), heading), RAIL_CAN + rise, 4, p.tier)
+	if level < 6:
+		return
+	_plinth_panels(m, 1.2, plinth)
+	# Veins round the plinth's top, up the mount on the side the camera sees, round the drum, across
+	# its top round the mount and across the housing's top either side of the rails; crystal inlays
+	# on the plinth.
+	m.ring(0.88, 1.08, 0.012, 8, Vector3(0, top, 0), Parts.VEINS, Parts.OCTAGON)
+	m.lathe(PackedVector2Array([Vector2(0.372, 0.3), Vector2(0.372, lift - 0.26)]), 24, foot, VEIN_PANEL, Vector3.ZERO, -30.0, 120.0)
+	m.ring(0.855, 0.875, 0.07, 24, Vector3(0, top + 0.03, 0), VEIN_PANEL)
+	m.ring(0.5, 0.84, 0.012, 24, lower, VEIN_PANEL)
+	for side: float in [-1.0, 1.0]:
+		m.box(Vector3(0.18, 0.02, 0.6), _at(deck, Vector3(side * 0.36, 0.46, -0.1), heading), VEIN_PANEL, heading)
+	for degrees: float in [15.0, 75.0]:
+		m.prism(0.07, 0.07, 0.05, 4, Parts.around(1.0, degrees, top), INLAY.phased(degrees / 90.0), Vector3(90, 90.0 - degrees, 0))
+	var ring_y := deck.y + RAIL_RING_LIFT
+	var ring := p.moving(Vector3(0, ring_y, 0), Motion.spin(Vector3.UP, 0.6))
+	_hover_ring(ring, 0.56, 0.7, p.tier)
+	if level < 7:
+		return
+	_plinth_filigree(m, 1.2, plinth)
+	m.ring(0.37, 0.39, 0.06, 24, foot + Vector3(0, 0.24, 0), Parts.FILIGREE)
+	# The breech: the antimatter core glowing light violet behind the rails, in gold rings, where the
+	# camera sees it; a gold crown on the muzzle.
+	var breech := _at(root, Vector3(0, 0.13, -0.3), aim)
+	m.prism(0.22, 0.22, 0.3, 20, breech, BRIGHT_CORE, along)
+	m.dome(0.22, 0.12, 20, 3, breech, BRIGHT_CORE, aim + Vector3(-90, 0, 0))
+	for k: int in 2:
+		Parts.torus(m, 0.22, 0.035, 20, 8, _at(breech, Vector3(0, 0, 0.27 * k), aim), Parts.GOLD_ROUND, along)
+	_crown(m, _at(root, Vector3(0, 0.26, length - 0.1), aim), 0.2, 5, 0.18)
+	Parts.escort_drone(p, RAIL_ESCORT_RADIUS, ring_y + RAIL_ESCORT_LIFT, 0.8, Vector3.ZERO, ESCORT_SCALE)
 
 
 static func build_ion_beam(p: Parts, level: int) -> void:
@@ -1511,6 +1599,20 @@ static func _bank(m: LowPolyMesh, deck: Vector3, heading: Vector3, side: float) 
 	for k: int in 3:
 		_cell(m, _at(deck, Vector3(side * 0.66, 0, -0.62 + 0.3 * k), heading), 0.4,
 			ION_BLINK.phased(Parts.chase(k + 1, 6)), 0.12)
+
+## A capacitor can of the railgun from L4 standing on `pos`, `height` tall and 12 sides round
+## (small, and up to twelve of them): ribbed chrome (obsidian from the Obsidian tier) banded in
+## the tier's glow, its cap lit at step `step` of the six-step charging sequence: a cyan lamp
+## blinking, a violet crystal swelling from the Obsidian tier.
+static func _rail_cell(m: LowPolyMesh, pos: Vector3, height: float, step: int, tier: int) -> void:
+	Parts.drum(m, 0.12, height, 0.03, 12, pos, _by_tier(tier, RIBBED, CHROME_RIBBED, OBSIDIAN_RIBBED))
+	m.ring(0.115, 0.135, 0.06, 12, pos + Vector3(0, height - 0.16, 0),
+		Parts.CORE_GLOW if tier >= Parts.Tier.OBSIDIAN else Parts.CYAN_STRIP)
+	var phase := Parts.chase(step, 6)
+	if tier < Parts.Tier.OBSIDIAN:
+		Parts.drum(m, 0.075, 0.07, 0.02, 12, pos + Vector3(0, height, 0), ION_BLINK.phased(phase))
+	else:
+		m.cone(0.08, 0.2, 8, pos + Vector3(0, height, 0), FOCUS.phased(phase))
 
 
 ## The cloaked sentry's gun: a low head on the lid with a short barrel and a red sight. From L4 a
