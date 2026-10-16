@@ -124,10 +124,12 @@ budgets scale by tier. The gallery and `wall_junctions` check these per level.
 - Moving parts: 3 (8 instances) through Obsidian; **4 at Crown** (10 instances), the fourth
   reserved for the escort. Draw calls, not triangles, are the phone's cost, so the fourth part
   is used only where the type's story needs it.
-- Height: Base and Gold as today (a 3×3 about 1.6–2.2 units, the Command Center 3.2). Chrome
-  up to 1.3×, Obsidian 1.6×, Crown 2× the type's Gold height, with hard caps of **7 units for
-  the Command Center and 5 for every other type** (the camera's scene top is 13 with the
-  construction drone hovering 3.5 above a site). Verticality is given to: the Command Center
+- Height: Base and Gold as today (a 3×3 about 1.6–2.2 units, the Command Center 3.2). As
+  guidance, Chrome about 1.3×, Obsidian 1.6×, Crown 2× the type's Gold height; the hard caps
+  govern: **7 units for the Command Center and 5 for every other type** (the camera's scene top
+  is 13 with the construction drone hovering 3.5 above a site). The Command Center is the one
+  type given more than the guidance, since verticality there is the owner's ask: 3.90, 4.40,
+  5.20, 6.00 and 6.94 at levels 6–10. Verticality is given to: the Command Center
   (stacked storeys and a spire from 8), the Alliance Beacon, the Research Lab, the Hangar's
   control tower, the Antimatter Siphon's pylons, the Metal Silo, the Railgun, the Shield
   Generator, the Orbital Cannon, the Drydock's gantry. The rest grow in mass and detail.
@@ -195,18 +197,18 @@ review, one landing.
   replaced (identical renders proven by the gallery), per-tier budgets and moving-part caps in
   the gallery and `wall_junctions`, the three new kit layers (chrome, obsidian, energy veins)
   generated and the kit count updated, the escort helpers in `Parts`, the meter abbreviation,
-  the template framing by band height, the contract text in `art-style.md`.
+  the template framing by band height, the contract text in `art-style.md`. Landed.
 - **B2 Economy to ten levels**: the Command Center 6–10, every type's new levels and
   ten-entry `max_count`, the data-format reference (table, curve, reachable storage). Levels
   above a type's modelled top show its top model until its batch lands. Landed.
-- **A1 The field** (tier A for the save migration): as §6 decides.
+- **A1 The field** (tier A for the save migration): as §6 decides. Landed.
 
 **Phase 2, models, two lanes at a time, in roughly this order** (each batch also writes its
 model-table rows and proves budgets, reach and motion in the gallery, rendered):
 
 | Batch | Types | New models |
 | --- | --- | --- |
-| M1 Core | Command Center 6–10 | 5 |
+| M1 Core | Command Center 6–10 (landed) | 5 |
 | M2 Walls | Barrier Wall 6–10, junctions, `wall_junctions` to ten | 5 |
 | M3 Collectors | Drone Bay, Extractor, Harvester, Siphon | 17 |
 | M4 Storages | Metal Silo, Crystal Silo, Vault | 15 |
