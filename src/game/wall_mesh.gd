@@ -78,7 +78,7 @@ func mask_at(cell: Vector2i) -> int:
 
 
 ## The bits of the walls beside `cell` whose solid segment stands lower than its own
-## (WallModels.solid_top: by height, not level, since the top level's is a low slab).
+## (WallModels.solid_top: by height, not level, since level 5's is a low slab).
 func _lower_mask_at(cell: Vector2i) -> int:
 	var own := WallModels.solid_top(_levels[cell])
 	var mask := 0

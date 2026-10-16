@@ -75,7 +75,7 @@ const MODELS := {
 	"grav_trap": [1, 2],
 	"flak_mine": [1, 3],
 	"mega_mine": [2, 2],
-	"barrier_wall": [1, 5],
+	"barrier_wall": [1, 10],
 }
 
 static var _cache: Dictionary[String, Meshes] = {}
