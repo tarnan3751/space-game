@@ -13,9 +13,9 @@ extends RefCounted
 ## higher tiers (docs/reference/art-style.md, **Tiers**): chrome with cyan strips, then obsidian
 ## veined violet with crystal inlays and a hovering ring, then gold filigree over the obsidian and
 ## the antimatter core glowing; at the top levels the hangar's marshaller bot and the drydock's
-## welder bots, robots of their own, and the academy's marching troopers are among the moving
-## parts. The army's orange stays its accent through them, and the foundry's goo stays green. The
-## surfaces follow the tier (_plating, _strip, _glow, _trim), the parts the level.
+## welder bots, robots of their own, are among the moving parts. The army's orange stays its
+## accent through them, and the foundry's goo stays green. The surfaces follow the tier
+## (_plating, _strip, _glow, _trim), the parts the level.
 ##
 ## BuildingModels calls one static build_<type>(p: Parts, level: int) per type. Each builds
 ## its level as a run of additions (`if level >= 3:` adds the second bay), so the levels of a
@@ -519,9 +519,8 @@ static func _vault(p: Parts, back: Vector3, width: float, length: float, wall: f
 ## the hall's front, the third storey's band glowing violet and crystal shards on the tower; L9 the
 ## lecture room raised into a glazed lecture hall, its front a wall of light-violet glass; L10 gold
 ## filigree on the hall's trims and round the plinth, the band glowing the antimatter core's light
-## violet, a gold ring round the cadet's feet and a solid light-violet halo over it, a violet core
-## beacon on the tower, and two troopers marching round a gold parade ring at the courtyard's front
-## as its escort, the target posts gone and the plinth moved left into their place.
+## violet, a gold ring round the cadet's feet and a solid light-violet halo over it, and a violet
+## core beacon on the tower.
 static func build_cadet_academy(p: Parts, level: int) -> void:
 	var m := p.body
 	var g := Parts.PAD_HEIGHT
@@ -599,11 +598,8 @@ static func build_cadet_academy(p: Parts, level: int) -> void:
 	var yard := g + 0.03
 	m.box_chamfered(Vector3(2.5, 0.03, 1.18), 0.01, Vector3(0, g, front + 0.81), PAVING)
 	m.box(Vector3(2.5, 0.012, 0.05), Vector3(0, yard, 1.33), Parts.HAZARD)
-	# The target posts down the courtyard's left side, their silhouettes blinking on in turn; at 10
-	# the cadets have graduated from targets to parade, and the posts give the plinth their place.
+	# The target posts down the courtyard's left side, their silhouettes blinking on in turn.
 	var posts := 3 if level < 4 else 4
-	if level >= 10:
-		posts = 0
 	for i: int in posts:
 		var foot := Vector3(-1.12, yard, 0.45 + 0.22 * i)
 		m.box_chamfered(Vector3(0.16, 0.06, 0.16), 0.02, foot, _plating(p.tier, Parts.GUNMETAL))
@@ -611,9 +607,8 @@ static func build_cadet_academy(p: Parts, level: int) -> void:
 		var lit := TARGET.phased(Parts.chase(i, posts))
 		m.box(Vector3(0.02, 0.22, 0.18), foot + Vector3(0, 0.36, 0), lit)
 		m.box(Vector3(0.02, 0.09, 0.09), foot + Vector3(0, 0.6, 0), lit)
-	# The parade plinth: an armoured octagon with a rim and a projector lens, the cadet over it; at
-	# 10 moved left into the posts' place, to make room for the parade.
-	var plinth := Vector3(-0.4, yard, 0.72) if level < 10 else Vector3(-0.95, yard, 0.62)
+	# The parade plinth: an armoured octagon with a rim and a projector lens, the cadet over it.
+	var plinth := Vector3(-0.4, yard, 0.72)
 	Parts.drum(m, 0.32, 0.2, 0.05, 8, plinth, Parts.CHROME if chrome else ARMOUR, Parts.OCTAGON)
 	var top := plinth + Vector3(0, 0.2, 0)
 	Parts.drum(m, 0.34, 0.05, 0.02, 8, top - Vector3(0, 0.04, 0), Parts.GOLD_TRIM if gold else Parts.HULL_LIGHT,
@@ -640,15 +635,6 @@ static func build_cadet_academy(p: Parts, level: int) -> void:
 		_simulator(p, Vector3(0.33, yard, 0.42), false)
 	if level >= 4:
 		_watchtower(p, Vector3(1.08, g, front - 0.2), roof, level)
-	if level >= 10:
-		# A gold parade ring inlaid in the courtyard's front middle, nearest the camera, clear of
-		# the plinth and the pods, the core glowing at its middle, and the two troopers marching
-		# round it at the contract's size (0.8 times the shared one: 0.64 tall), so they read as
-		# soldiers.
-		var parade := Vector3(-0.22, yard, 0.92)
-		m.ring(0.15, 0.27, 0.006, 24, parade, Parts.FILIGREE)
-		m.disc(0.09, 16, parade + Vector3(0, 0.006, 0), BRIGHT_CORE)
-		Parts.escort_troopers(p, 0.21, yard, 0.5, parade, 0.8)
 
 
 ## The lecture room on the hall's roof from 3, `room` the middle of its base: a glass band and a
