@@ -611,7 +611,7 @@ static var CHIP := Surf.make(MaterialKit.Layer.CRYSTAL, MaterialKit.CRYSTAL, 1.0
 ## ring round the cluster, L4 pylons on it with lamps chasing round, L5 gold trim.
 ##
 ## L6 (Chrome): a taller gantry in chrome (the beam chrome over a gold band) with cyan strips up
-## its legs, twin emitters either side of its middle sweeping cyan beams out of step, the shards
+## its legs, twin emitters either side of its middle sweeping cyan beams in step, the shards
 ## growing faster, the pylons in chrome. L7 taller chrome containment pylons with cyan strips and
 ## a second power box. L8 (Obsidian): obsidian containment set with crystal inlays and pylons
 ## veined violet, violet beams, a crowning mega-shard in the cluster's middle with three crystal
@@ -712,13 +712,13 @@ static func build_crystal_harvester(p: Parts, level: int) -> void:
 		# It swings along the gantry, across the camera's view, about the axis square to the beam.
 		_emitter(p.moving(pivot, Motion.swing(Vector3(1, 0, 1), 25.0, 5.0)), pivot.y - tallest, gold)
 		return
-	# The twin emitters either side of the carriage, sweeping out of step down to the outer shards'
-	# tips.
+	# The twin emitters either side of the carriage, sweeping in step (so their beams never cross)
+	# down to the outer shards' tips.
 	var target := ground + 0.12 + float(SHARDS[1][2]) * growth
 	for k: int in 2:
 		var side := -1.0 if k == 0 else 1.0
 		var pivot := beam + Vector3(0, -0.06, 0) + GANTRY_ALONG * TWIN_OFFSET * side
-		_emitter(p.moving(pivot, Motion.swing(Vector3(1, 0, 1), 25.0, 5.0, 0.5 * k)), pivot.y - target, gold,
+		_emitter(p.moving(pivot, Motion.swing(Vector3(1, 0, 1), 25.0, 5.0)), pivot.y - target, gold,
 			VIOLET_BEAM if obsidian else CYAN_BEAM, VIOLET_LENS if obsidian else CYAN_LENS)
 	if level >= 9:
 		# The obsidian ring hovering over the cluster, bobbing.
