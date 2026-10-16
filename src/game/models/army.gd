@@ -61,16 +61,19 @@ static var SCREEN_FLOW := Surf.make(MaterialKit.Layer.SCREEN, MaterialKit.CORE_G
 ## The lit hangar inside an opening door: an orange glow, its stripes rising.
 static var INTERIOR := Surf.make(MaterialKit.Layer.GLOW, MaterialKit.ARMY, 2.0, Surf.UNLIT | Surf.FLOW, false,
 	false, 0.35)
-## Goo rising behind glass (phased() sets its speed), goo swirling in an open vat, its bubbles,
-## and the pipes carrying it along.
+## Goo lapping round behind glass (phased() sets its speed), goo swirling in an open vat, its
+## bubbles, the bright meniscus at its surface, and the pipes carrying it along.
 static var GOO_FLOW := Surf.make(MaterialKit.Layer.GLASS, MaterialKit.NANITE_GREEN, 1.0,
-	Surf.UNLIT | Surf.FLOW, true, true, 0.3)
+	Surf.UNLIT | Surf.FLOW_U, true, true, 0.55)
 static var GOO_SWIRL := Surf.make(MaterialKit.Layer.GLASS, MaterialKit.NANITE_GREEN, 1.0,
 	Surf.UNLIT | Surf.FLOW_U, false, true, 0.65)
 ## A bubble is the goo's green half way to white, so it flashes brighter than the goo and
 ## shows as a dim green dot between flashes; too small for an outline.
 static var BUBBLE := Surf.make(MaterialKit.Layer.GLOW, MaterialKit.NANITE_GREEN.lerp(Color.WHITE, 0.5), 1.0,
 	Surf.UNLIT | Surf.BLINK, true, false)
+## The meniscus is the bubbles' glow, steady: too thin for an outline.
+static var MENISCUS := Surf.make(MaterialKit.Layer.GLOW, MaterialKit.NANITE_GREEN.lerp(Color.WHITE, 0.5), 1.0,
+	Surf.UNLIT, true, false)
 static var PIPE_FLOW := Surf.make(MaterialKit.Layer.PIPE, MaterialKit.HULL_MID, 2.0, Surf.FLOW, true, true,
 	0.3)
 ## Glass glowing on a pulse: the hangar's control cab, the fabricator's roof windows.
@@ -130,11 +133,11 @@ static var HOT_CRYSTAL_POUR := Surf.make(MaterialKit.Layer.GLOW, MaterialKit.CRY
 static var VIOLET_SPARK := Surf.make(MaterialKit.Layer.GLOW, Parts.CORE_GLOW_TINT, 1.0, Surf.UNLIT | Surf.FLICKER)
 ## The research lab's: screens glowing cyan, their rows scrolling (phased() sets the speed).
 static var CYAN_SCREEN := Surf.make(MaterialKit.Layer.SCREEN, MaterialKit.ENERGY, 1.0, Surf.UNLIT | Surf.FLOW)
-## The nanite foundry's: cyan pipes, their bands flowing; the goo brighter, rising and swirling;
+## The nanite foundry's: cyan pipes, their bands flowing; the goo brighter, lapping and swirling;
 ## the hovering stirrer ring's crystal vanes, bobbing with it (HOVER's phase).
 static var CYAN_PIPE := Surf.make(MaterialKit.Layer.PIPE, MaterialKit.ENERGY, 2.0, Surf.UNLIT | Surf.FLOW, true, true, 0.3)
 static var GOO_BRIGHT := Surf.make(MaterialKit.Layer.GLASS, MaterialKit.NANITE_GREEN.lerp(Color.WHITE, 0.3), 1.0,
-	Surf.UNLIT | Surf.FLOW, true, true, 0.3)
+	Surf.UNLIT | Surf.FLOW_U, true, true, 0.55)
 static var GOO_BRIGHT_SWIRL := Surf.make(MaterialKit.Layer.GLASS, MaterialKit.NANITE_GREEN.lerp(Color.WHITE, 0.3), 1.0,
 	Surf.UNLIT | Surf.FLOW_U, false, true, 0.65)
 static var HOVER_CRYSTAL := Surf.make(MaterialKit.Layer.CRYSTAL, MaterialKit.CRYSTAL, 1.0, Surf.UNLIT | Surf.PULSE | Surf.BOB,
@@ -1294,8 +1297,8 @@ static func _antenna(m: LowPolyMesh, foot: Vector3, height: float, foot_surf: Su
 
 ## Vats of glowing green nanite goo seen through glass bands, round a pump block, with pipes
 ## and their elbows running between them. A vat more at each level; gold rims at 4. The goo
-## rises in every vat and bubbles, the pipes and the pump's screens flow, and a stirrer turns in
-## the big vat's open top.
+## laps round every vat under its bright meniscus and bubbles, the pipes and the pump's screens
+## flow, and a stirrer turns in the big vat's open top.
 ##
 ## From 5 the vats stand taller at each level and the pump block rises to a tower: L5 chrome vats
 ## with cyan rims, a chrome pump tower and cyan pipes; L6 a sixth vat, a tall column on the right;
@@ -1375,7 +1378,7 @@ static func build_nanite_foundry(p: Parts, level: int) -> void:
 			var toward := Vector3(next.x - spot.x, 0, next.z - spot.z).normalized()
 			var y := Vector3(0, height * 0.82, 0)
 			Parts.pipe(m, spot + toward * (radius - 0.04) + y, next - toward * 0.2 + y, 0.05, pipe,
-				12, false)
+				10, false)
 	if level >= 7:
 		# The stirrer ring hovering over the big vat, turning against the stirrer: obsidian rimmed
 		# in violet, four crystal vanes pointing in.
@@ -1416,17 +1419,18 @@ static func _pump_tower(p: Parts, foot: Vector3, tall: float, level: int) -> voi
 			Parts.facing(Parts.around(0.3, degrees, 1.0)))
 
 
-## A pipe of goo through `points` with ball elbows (Parts.pipe_run), on `surface`; with
+## A pipe of goo through `points` with ball elbows (Parts.pipe_run), ten-sided, on `surface`; with
 ## `crystal` a crystal knuckle glowing round each elbow.
 static func _goo_pipe(m: LowPolyMesh, points: PackedVector3Array, surface: Surf, crystal: bool) -> void:
-	Parts.pipe_run(m, points, 0.05, surface, 12)
+	Parts.pipe_run(m, points, 0.05, surface, 10)
 	if crystal:
 		for i: int in range(1, points.size() - 1):
 			m.orb(0.085, 12, 4, points[i], INLAY.phased(0.3 * i))
 
 
 ## A vat standing on `foot`, the `index`th of the foundry's: an armoured lower shell, a band of
-## glowing goo rising behind glass framed by rims, with bubbles blinking on it, and an upper
+## glowing goo lapping round behind glass framed by rims, a bright meniscus at its surface and
+## bubbles blinking on it, and an upper
 ## shell with a chamfered lid and an orange cap. The first vat is open at the top instead, over
 ## a swirl of goo for the stirrer to turn in. `glass` is the goo band's share of the height. The
 ## tier paints it: gold rims from the Gold tier; chrome shells and cyan rims at the Chrome tier;
@@ -1454,14 +1458,19 @@ static func _vat(m: LowPolyMesh, foot: Vector3, radius: float, height: float, ti
 	m.lathe(PackedVector2Array([
 		Vector2(rim, band - 0.05), Vector2(rim, band), Vector2(radius - 0.03, band),
 	]), 16, foot, rims)
-	m.lathe(PackedVector2Array([Vector2(radius - 0.03, 0), Vector2(radius - 0.03, lit)]), 16,
-		foot + Vector3(0, band, 0), (GOO_BRIGHT if bright else GOO_FLOW).phased(0.27 + 0.02 * index))
+	# The goo laps slowly round the vat, each a little faster than the one before (0.16 to 0.36
+	# repeats a second), under a bright meniscus standing just proud of it at its surface.
+	m.lathe(PackedVector2Array([Vector2(radius - 0.03, 0), Vector2(radius - 0.03, lit - 0.045)]), 16,
+		foot + Vector3(0, band, 0), (GOO_BRIGHT if bright else GOO_FLOW).phased(0.54 + 0.01 * index))
+	m.lathe(PackedVector2Array([Vector2(radius - 0.008, lit - 0.045), Vector2(radius - 0.008, lit)]), 16,
+		foot + Vector3(0, band, 0), MENISCUS)
 	for k: int in 2:
 		m.orb(0.045, 8, 2, foot + Parts.around(radius - 0.03, 25.0 + 40.0 * k + 7.0 * index,
 			band + lit * (0.3 + 0.4 * k)), BUBBLE.phased(fposmod(0.37 * index + 0.5 * k, 1.0)))
 	var upper := band + lit
 	var top := height - upper
-	m.lathe(PackedVector2Array([Vector2(rim, 0), Vector2(rim, 0.05), Vector2(radius, 0.05)]), 16,
+	# The upper rim stands flush with the shell, so it never hides the meniscus under it.
+	m.lathe(PackedVector2Array([Vector2(radius + 0.005, 0), Vector2(radius + 0.005, 0.05), Vector2(radius, 0.05)]), 16,
 		foot + Vector3(0, upper, 0), upper_rim)
 	if bright:
 		# Violet veins round the lower and the upper shell.
