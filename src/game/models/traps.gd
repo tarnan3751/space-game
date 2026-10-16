@@ -1,12 +1,18 @@
 extends RefCounted
 ## Models of the traps, in the comic style (docs/reference/art-style.md): low, squat devices on
 ## concrete pads, gunmetal casings banded in hazard stripes, one warning glow each, gold trim
-## from the Gold tier (Parts.tier), each well inside its footprint and its budget. Each is animated by its
-## surfaces alone (docs/reference/art-style.md, **Animation**): warning lights BLINK, glows PULSE,
-## the gravity trap's vortex streams inward.
+## from the Gold tier (Parts.tier), each well inside its footprint and its budget, and low (a 1x1
+## trap under 1.0 unit, the Mega Mine under 1.6), as traps read as ground hazards. From the
+## Chrome tier (Parts.Tier) each is grown: chrome with cyan light, then obsidian with glowing
+## violet vein panels on the faces the camera sees, glowing crystals and a hovering ring, then
+## gold filigree and a violet core lens under a small gold crown; traps have no escort. Most are
+## animated by their surfaces alone (docs/reference/art-style.md, **Animation**): warning lights
+## BLINK in a chase, glows PULSE, the vortex streams inward, hovering rings BOB; from the Obsidian
+## tier the Gravity Trap's and the Mega Mine's hovering rings turn (their one moving part).
 ##
 ## BuildingModels calls one static build_<type>(p: Parts, level: int) per type. Each builds
-## its level as a run of additions, so the levels of a type read as one trap growing.
+## its level as a run of additions, so the levels of a type read as one trap growing; the levels
+## from the Chrome tier on are built by a _grown_<type> of their own, the trap's parts made bigger.
 
 ## Hazard stripes at three times the kit's scale, so a narrow band still shows several.
 static var HAZARD_FINE := Surf.make(MaterialKit.Layer.HAZARD, Color.WHITE, 3.0, Surf.LIT, true)
@@ -59,6 +65,15 @@ static var CYAN_SWIRL := Surf.make(MaterialKit.Layer.GLOW, MaterialKit.ENERGY, 0
 static var HOVER_CRYSTAL := Surf.make(MaterialKit.Layer.CRYSTAL, MaterialKit.CRYSTAL, 1.0, Surf.UNLIT | Surf.PULSE | Surf.BOB,
 	false, true, 0.7)
 static var HOVER_GOLD := Surf.make(MaterialKit.Layer.FLAT, MaterialKit.CORE_GOLD, 1.0, Surf.GLOSSY | Surf.BOB, true, true, 0.7)
+## The Mega Mine's seams by tier, too thin to ink: cyan and violet glowing, swelling in turn,
+## then gold filigree; and its hovering ring's obsidian, bobbing with the violet ring's phase.
+static var CYAN_SEAM := Surf.make(MaterialKit.Layer.GLOW, MaterialKit.ENERGY, 1.0, Surf.UNLIT | Surf.PULSE, true, false)
+static var VIOLET_SEAM := Surf.make(MaterialKit.Layer.GLOW, Parts.CORE_GLOW_TINT, 1.0, Surf.UNLIT | Surf.PULSE, true, false)
+static var GOLD_SEAM := Surf.make(MaterialKit.Layer.BANDS, MaterialKit.CORE_GOLD, 2.0, Surf.GLOSSY, false, false)
+static var HOVER_OBSIDIAN := Surf.make(MaterialKit.Layer.OBSIDIAN, Parts.OBSIDIAN_TINT, 1.0, Surf.GLOSSY | Surf.BOB, true, true,
+	0.7)
+## The Obsidian fuse: the core lens's light violet, steady, so it never dims to grey.
+static var BRIGHT_FUSE := Surf.make(MaterialKit.Layer.GLOW, CORE_LIGHT, 1.0, Surf.UNLIT)
 ## The horizontal directions towards the camera (IsoCamera's yaw, 45 degrees round from +X):
 ## the vein panels go round them.
 const CAMERA_SIDE: Array[float] = [5.0, 45.0, 85.0]
@@ -322,6 +337,9 @@ static func build_mega_mine(p: Parts, level: int) -> void:
 	var m := p.body
 	var base := Vector3(0, Parts.PAD_HEIGHT, 0)
 	Parts.foundation(m, 2)
+	if level >= 3:
+		_grown_mega_mine(p, level)
+		return
 	m.ring(0.6, 0.72, 0.12, 24, base, HAZARD_FINE)
 	var radius := 0.62 if level < 2 else 0.68
 	var height := 0.42 if level < 2 else 0.54
@@ -342,6 +360,73 @@ static func build_mega_mine(p: Parts, level: int) -> void:
 		var degrees := 90.0 + 120.0 * i
 		var foot := Parts.around(0.1, degrees, 0.06) + crown
 		m.cone(0.025, 0.14, 8, foot, CASING_MID, Parts.facing(Parts.around(0.5, degrees, 1.0)))
+
+
+## Levels 3 to 5, the mine grown: a wider, taller dome on a wider hazard band, eight lights
+## chasing round it with glowing seams up the dome between them, a bigger fuse cap with a sensor
+## mast. L3 (Chrome): a chrome dome with cyan seams and cyan lights, a chrome fuse cap round the
+## red fuse light. L4 (Obsidian): an obsidian dome with violet vein seams and glowing violet vein
+## panels on the faces the camera sees, violet lights, an obsidian cap with a crystal fuse glowing
+## light violet, and a violet-rimmed obsidian ring hovering round the dome's waist, turning with its
+## crystal studs. L5 (Crown): gold filigree seams and band, gold and violet lights, a violet core
+## fuse under a gold crown on a gold cap, the hovering ring's rim gold and its studs violet.
+static func _grown_mega_mine(p: Parts, level: int) -> void:
+	var m := p.body
+	var base := Vector3(0, Parts.PAD_HEIGHT, 0)
+	var obsidian := p.tier >= Parts.Tier.OBSIDIAN
+	var crown := p.tier >= Parts.Tier.CROWN
+	var radius := 0.74 + 0.03 * (level - 3)
+	var height := 0.62 + 0.05 * (level - 3)
+	var foot := base + Vector3(0, 0.06, 0)
+	m.ring(radius - 0.06, radius + 0.08, 0.13, 24, base, HAZARD_FINE)
+	m.dome(radius, height, 24, 6, foot, Parts.OBSIDIAN_ROUND if obsidian else Parts.CHROME_ROUND)
+	m.ring(radius - 0.02, radius + 0.04, 0.05, 24, base + Vector3(0, 0.1, 0), Parts.FILIGREE if crown else GOLD_ROUND)
+	var seam := CYAN_SEAM
+	var light := CYAN_BLINK
+	if crown:
+		seam = GOLD_SEAM
+	elif obsidian:
+		seam = VIOLET_SEAM
+		light = VIOLET_BLINK
+	for i: int in 8:
+		var degrees := 45.0 * i
+		if crown:
+			light = GOLD_BLINK if i % 2 == 0 else VIOLET_BLINK
+		m.dome(0.06, 0.06, 12, 3, Parts.around(radius + 0.02, degrees, 0.13) + base, light.phased(Parts.chase(i, 8)))
+		Parts.dome_seam(m, radius, height, foot, degrees + 22.5, seam.phased(i / 8.0))
+	if level >= 4:
+		var panel := PackedVector2Array()
+		for k: int in range(1, 6):
+			var angle := PI * 0.5 * k / 6
+			panel.append(Vector2((radius + 0.01) * cos(angle), (height + 0.01) * sin(angle)))
+		_vein_panels(m, panel, foot, 30.0)
+	var cap := base + Vector3(0, 0.06 + height - 0.02, 0)
+	var cap_surf := Parts.CHROME_ROUND
+	if crown:
+		cap_surf = GOLD_ROUND
+	elif obsidian:
+		cap_surf = Parts.OBSIDIAN_ROUND
+	m.prism(0.16, 0.13, 0.1, 16, cap, cap_surf)
+	var fuse := cap + Vector3(0, 0.1, 0)
+	if level >= 5:
+		m.orb(0.09, 16, 6, fuse + Vector3(0, 0.08, 0), Parts.CORE_GLOW)
+		_crown(m, fuse + Vector3(0, 0.12, 0), 0.12)
+	elif level >= 4:
+		m.prism(0.09, 0.03, 0.26, 8, fuse, BRIGHT_FUSE)
+	else:
+		m.dome(0.08, 0.08, 16, 3, fuse, RED_PULSE)
+	for i: int in 3:
+		var degrees := 90.0 + 120.0 * i
+		m.cone(0.03, 0.16, 8, Parts.around(0.12, degrees, 0.07) + cap, GOLD_ROUND if crown else Parts.CHROME_ROUND,
+			Parts.facing(Parts.around(0.5, degrees, 1.0)))
+	Parts.mast(m, Parts.around(0.1, 150.0, 0.1) + cap, 0.22, 0.03, light.phased(0.5))
+	if level >= 4:
+		# The ring hovering round the dome's waist, turning with its studs.
+		var s := p.moving(foot + Vector3(0, height * 0.45, 0), Motion.spin(Vector3.UP, 0.6))
+		s.ring(0.75, 0.84, 0.05, 24, Vector3.ZERO, HOVER_OBSIDIAN)
+		s.ring(0.84, 0.86, 0.035, 24, Vector3(0, 0.008, 0), HOVER_GOLD if crown else HOVER_GLOW)
+		for i: int in 4:
+			s.orb(0.045, 10, 4, Parts.around(0.795, 45.0 + 90.0 * i, 0.07), HOVER_GLOW if crown else HOVER_CRYSTAL)
 
 
 ## Glowing violet vein panels on a round part where the camera sees it: `profile` (radius and

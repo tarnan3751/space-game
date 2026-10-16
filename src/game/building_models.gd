@@ -74,7 +74,7 @@ const MODELS := {
 	"proximity_mine": [1, 6],
 	"grav_trap": [1, 5],
 	"flak_mine": [1, 5],
-	"mega_mine": [2, 2],
+	"mega_mine": [2, 5],
 	"barrier_wall": [1, 10],
 }
 
