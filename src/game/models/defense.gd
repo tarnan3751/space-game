@@ -214,6 +214,18 @@ const SENTRY_MANTLET := Vector3(0.66, 0.08, 0.36)
 const SENTRY_CROWN_BACK := 0.3
 const SENTRY_ESCORT_RADIUS := 0.86
 const SENTRY_ESCORT_LIFT := 1.0
+## The gravity well from L4, by level from L4: the plinth's height, how much higher the core
+## floats over the well (the pillars growing with it) and the core's radius (bobbing at L4, so
+## held at L1's size to clear the inner gyro ring over its bob; bigger and steady from L5); the L5 gyro ring's
+## radii and its height under the core; the L6 guard drone's round and its height over the rotor.
+const WELL_PLINTHS := [0.3, 0.44, 0.48]
+const WELL_LIFTS := [0.3, 0.55, 0.85]
+const WELL_CORES := [0.17, 0.21, 0.23]
+const WELL_RING_INNER := 0.9
+const WELL_RING_OUTER := 1.03
+const WELL_RING_DROP := 0.6
+const WELL_ESCORT_RADIUS := 0.86
+const WELL_ESCORT_LIFT := 0.4
 
 
 ## From L6 the head rides a mount that lifts it a little more each level, on a taller plinth.
@@ -1071,33 +1083,88 @@ static func build_cloaked_sentry(p: Parts, level: int) -> void:
 		Parts.escort_drone(p, SENTRY_ESCORT_RADIUS, base.y + SENTRY_ESCORT_LIFT, 0.9, Vector3.ZERO, ESCORT_SCALE)
 
 
+## From L4 the core floats higher over the well every level, the pillars growing with it and a
+## housing ring joining them low over the well. L4 (Chrome): chrome plinth, well, pillars and
+## housing, cyan strips up the pillars, a red armour band round the housing, the first gyro ring
+## glowing cyan and the rotor chrome. L5 (Obsidian): a taller plinth with glowing violet vein
+## panels on its faces the camera sees, the well, pillars and housing obsidian, violet strips up the
+## pillars and veins round the housing, a bigger pink crystal core held still in the gyro rings,
+## and a gyro ring hovering round the pillars, turning with the rotor. L6 (Crown): gold filigree
+## round the plinth and the housing, the core the antimatter core, bigger again and still, the gyro
+## rings and the rotor gold, and a guard drone circling over the rotor (the escort).
 static func build_gravity_well(p: Parts, level: int) -> void:
 	var m := p.body
-	var top := _plinth(m, 2, 0.8, 0.22)
-	Parts.torus(m, 0.5, 0.08, 16, 10, Vector3(0, top, 0), SHELL_MID)
+	var plinth := 0.22 if level < 4 else float(WELL_PLINTHS[level - 4])
+	var lift := 0.0 if level < 4 else float(WELL_LIFTS[level - 4])
+	var obsidian := p.tier >= Parts.Tier.OBSIDIAN
+	var crown := p.tier >= Parts.Tier.CROWN
+	var top := _plinth(m, 2, 0.8, plinth, ARMOUR, _by_tier(p.tier, Parts.GUNMETAL, Parts.CHROME_ROUND, Parts.OBSIDIAN_ROUND))
+	Parts.torus(m, 0.5, 0.08, 16, 10, Vector3(0, top, 0), _by_tier(p.tier, SHELL_MID, Parts.CHROME_ROUND, Parts.OBSIDIAN_ROUND))
 	m.disc(0.44, 20, Vector3(0, top + 0.01, 0), SWIRL)
-	var core := Vector3(0, top + 0.7, 0)
+	var core := Vector3(0, top + 0.7 + lift, 0)
+	var pillar := 0.82 + lift
+	var pillar_surf := _by_tier(p.tier, SHELL_MID, Parts.CHROME, Parts.OBSIDIAN)
 	for k: int in 3:
 		var degrees := 30.0 + 120.0 * k
 		var foot := Parts.around(0.66, degrees, top)
-		m.box_chamfered(Vector3(0.14, 0.82, 0.18), 0.04, foot, SHELL_MID, Vector3(0, 90.0 - degrees, 0))
-		m.box_chamfered(Vector3(0.1, 0.08, 0.12), 0.02, foot + Vector3(0, 0.82, 0), PLASMA_BLINK.phased(Parts.chase(k, 3)),
+		m.box_chamfered(Vector3(0.14, pillar, 0.18), 0.04, foot, pillar_surf, Vector3(0, 90.0 - degrees, 0))
+		m.box_chamfered(Vector3(0.1, 0.08, 0.12), 0.02, foot + Vector3(0, pillar, 0), PLASMA_BLINK.phased(Parts.chase(k, 3)),
 			Vector3(0, 90.0 - degrees, 0))
-	m.orb(0.17, 12, 6, core, CORE)
+		if level >= 4:
+			# A strip up the pillar's outer face: cyan, violet from the Obsidian tier.
+			m.box(Vector3(0.07, pillar - 0.36, 0.02), Parts.around(0.755, degrees, top + 0.08),
+				Parts.CORE_GLOW if obsidian else Parts.CYAN_STRIP, Vector3(0, 90.0 - degrees, 0))
+	var core_surf := CORE
+	var core_radius := 0.17
+	if level >= 4:
+		core_radius = WELL_CORES[level - 4]
+		core_surf = BRIGHT_CORE if crown else (CRYSTAL_CORE if obsidian else CORE)
+	m.orb(core_radius, 12 if level < 4 else 16, 6, core, core_surf)
+	if level >= 4:
+		# The housing ring joining the pillars low over the well, under the core, so the core shows
+		# over it; a red armour band round it.
+		var housing := Vector3(0, top + 0.2, 0)
+		m.ring(0.56, 0.76, 0.1, 24, housing, _by_tier(p.tier, SHELL_MID, Parts.CHROME_ROUND, Parts.OBSIDIAN_ROUND))
+		m.lathe(PackedVector2Array([Vector2(0.765, 0), Vector2(0.765, 0.05)]), 24, housing + Vector3(0, 0.025, 0),
+			Parts.FILIGREE if crown else (Parts.VEINS if obsidian else ARMOUR_ROUND))
 	# The gyro rings tumble about the core: each lies across the axis it turns about.
+	var gold := GOLD if p.tier >= Parts.Tier.GOLD else SHELL
 	if level >= 2:
-		_gyro(p.moving(core, Motion.spin(Vector3.RIGHT, 1.3)), Vector3.ZERO, 0.38, 0.04, Vector3(62, 0, 0), SHELL)
+		var first := SHELL
+		if level >= 4:
+			first = GOLD if crown else Parts.CYAN_STRIP
+		_gyro(p.moving(core, Motion.spin(Vector3.RIGHT, 1.3)), Vector3.ZERO, 0.38, 0.04, Vector3(62, 0, 0), first)
 	if level >= 3:
-		_gyro(p.moving(core, Motion.spin(Vector3.BACK, -0.9)), Vector3.ZERO, 0.29, 0.035, Vector3(0, 0, -35),
-			GOLD if p.tier >= Parts.Tier.GOLD else SHELL)
+		_gyro(p.moving(core, Motion.spin(Vector3.BACK, -0.9)), Vector3.ZERO, 0.29, 0.035, Vector3(0, 0, -35), gold)
 	var rotor := p.moving(core + Vector3(0, 0.5, 0), Motion.spin(Vector3.UP, 1.5))
-	Parts.torus(rotor, 0.42, 0.05, 16, 10, Vector3(0, -0.05, 0), SHELL)
+	var rotor_surf := SHELL
+	if level >= 4:
+		rotor_surf = GOLD if crown else _by_tier(p.tier, SHELL, Parts.CHROME_ROUND, Parts.OBSIDIAN_ROUND)
+	Parts.torus(rotor, 0.42, 0.05, 16, 10, Vector3(0, -0.05, 0), rotor_surf)
 	Parts.drum(rotor, 0.1, 0.1, 0.03, 16, Vector3(0, -0.05, 0), Parts.GUNMETAL)
 	for k: int in 3:
 		var degrees := 120.0 * k
 		rotor.box_chamfered(Vector3(0.36, 0.04, 0.09), 0.015, Parts.around(0.24, degrees, -0.02), SHELL_MID,
 			Vector3(0, -degrees, 0))
 		rotor.box_chamfered(Vector3(0.1, 0.06, 0.1), 0.02, Parts.around(0.42, degrees, 0.04), PLASMA, Vector3(0, -degrees, 0))
+	if level < 5:
+		return
+	_plinth_panels(m, 0.8, plinth)
+	m.ring(0.6, 0.72, 0.012, 8, Vector3(0, top, 0), Parts.VEINS, Parts.OCTAGON)
+	# The gyro ring hovering round the pillars at their middle, turning with the rotor.
+	var ring_y := -0.5 - WELL_RING_DROP
+	rotor.ring(WELL_RING_INNER, WELL_RING_OUTER, 0.07, 24, Vector3(0, ring_y, 0), HOVER)
+	rotor.lathe(PackedVector2Array([Vector2(WELL_RING_OUTER - 0.02, 0.072), Vector2(WELL_RING_INNER + 0.02, 0.072)]), 24,
+		Vector3(0, ring_y, 0), HOVER_RIM)
+	rotor.lathe(PackedVector2Array([Vector2(WELL_RING_OUTER + 0.006, 0.006), Vector2(WELL_RING_OUTER + 0.006, 0.064)]), 24,
+		Vector3(0, ring_y, 0), HOVER_GOLD if crown else HOVER_VEINS)
+	for k: int in 3:
+		rotor.box(Vector3(0.06, 0.05, 0.12), Parts.around(WELL_RING_INNER - 0.02, 60.0 + 120.0 * k, ring_y + 0.01), HOVER_SIGHT,
+			Vector3(0, 30.0 - 120.0 * k, 0))
+	if level >= 6:
+		_plinth_filigree(m, 0.8, plinth)
+		m.ring(0.64, 0.76, 0.02, 8, Vector3(0, top, 0), Parts.FILIGREE, Parts.OCTAGON)
+		Parts.escort_drone(p, WELL_ESCORT_RADIUS, core.y + 0.5 + WELL_ESCORT_LIFT, 0.9, Vector3.ZERO, ESCORT_SCALE)
 
 
 static func build_emp_tower(p: Parts, level: int) -> void:
