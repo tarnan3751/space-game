@@ -1,14 +1,16 @@
 extends HarnessScenario
-## Walls that connect. A fresh base is grown to Command Center 5, then walls are painted in a
-## straight run, a corner, a T, a cross, a ramp (a run whose walls end at levels 1 to 5) and a
-## two-level L and T (arms that stop at level 1, 2 or 3, STEP_CAPS), and upgraded together to
-## level 3, then 5. At each level the pattern is screenshotted at the closest zoom and the
+## Walls that connect. A fresh base is grown to Command Center 10, then walls are painted in a
+## straight run, a corner, a T, a cross, a ramp (a run whose walls end at levels 1 to 10) and a
+## two-level L and T (arms that stop at level 1, 2 or 3, STEP_CAPS), and upgraded together a
+## level at a time to level 10. At each level the pattern is screenshotted at the closest zoom and the
 ## merged wall mesh is checked: the mask of a named cell in each shape, every wall's mask
 ## against the rule (four-connected, any levels), its triangles against the sum of its pieces',
 ## and its outline's triangles against the sum of its pieces' outlines, each piece outlining
 ## its steps down to neighbours whose solid segment is lower (WallModels.solid_top: by height,
 ## so an L5's low slab is lower than an L1 segment). STEPS names the walls that must, or must
-## not, show a step's extra ink triangles at levels 3 and 5, an L5 beside an L3 among them. A
+## not, show a step's extra ink triangles at levels 3, 5, 7 and 10, an L5 beside an L3 among
+## them, and at level 10 RAMP_STEPS gives every ramp wall's steps, between each pair of adjacent
+## levels, each logged with the two solid tops. A
 ## wall's own model, which the brush and the gallery show, is the lone post, every piece of
 ## every level is within PIECE_TRIANGLES for its level's tier, and every piece's body is the
 ## same whatever its lower mask.
@@ -21,11 +23,11 @@ const WallModels := preload("res://src/game/models/walls.gd")
 ## The pattern's top-left cell, clear of a fresh base's Command Center (22-25 x 22-25) and
 ## drone bay (28-29 x 23-24). Shapes are in cells from it.
 const ORIGIN := Vector2i(10, 10)
-const CENTRE := Vector2i(4, 4)
+const CENTRE := Vector2i(5, 1)
 const CROSS_CENTRE := Vector2i(5, 5)
 ## Where the lifted wall is carried: a free cell, clear of the info panel at this zoom.
 const LIFT_TO := Vector2i(3, 6)
-const RAMP_ROW := 8
+const RAMP_ROW := -3
 ## The two-level shapes' arms that stop below the rest, by cell: their level at most.
 const STEP_CAPS: Dictionary[Vector2i, int] = {
 	Vector2i(7, 4): 1, Vector2i(8, 5): 3, Vector2i(6, 7): 1, Vector2i(8, 7): 2,
@@ -34,10 +36,20 @@ const STEP_CAPS: Dictionary[Vector2i, int] = {
 const STEP_CORNERS: Array[Vector2i] = [Vector2i(8, 4), Vector2i(7, 7)]
 ## [stage, cell, whether its piece inks a step]. At level 3 the L's corner and the T's centre
 ## (L3) stand over their L1 and L2 arms. At level 5 the L's corner is an L5, whose solid slab is
-## lower than both its arms: its L3 and L1 arms step down to it, and it inks nothing.
+## lower than both its arms: its L3 and L1 arms step down to it, and it inks nothing. From level
+## 6 the corner and the centre stand over their arms again, which ink nothing.
 const STEPS: Array[Array] = [
 	[3, Vector2i(8, 4), true], [3, Vector2i(7, 7), true],
 	[5, Vector2i(8, 5), true], [5, Vector2i(7, 4), true], [5, Vector2i(8, 4), false],
+	[7, Vector2i(8, 4), true], [7, Vector2i(7, 7), true], [7, Vector2i(8, 5), false],
+	[10, Vector2i(8, 4), true], [10, Vector2i(7, 7), true], [10, Vector2i(8, 5), false],
+	[10, Vector2i(7, 4), false], [10, Vector2i(6, 7), false],
+]
+## At level 10, the lower mask of each ramp wall, levels 1 to 10 from the left: each steps down
+## to the level below it, but level 5, the lowest, and level 1; level 4 steps down to both.
+const RAMP_STEPS: Array[int] = [
+	0, WallModels.MINUS_X, WallModels.MINUS_X, WallModels.MINUS_X | WallModels.PLUS_X, 0,
+	WallModels.MINUS_X, WallModels.MINUS_X, WallModels.MINUS_X, WallModels.MINUS_X, WallModels.MINUS_X,
 ]
 const CLOSE_UP_SIZE := 10.0
 
@@ -56,12 +68,12 @@ func run(main: MainScript) -> void:
 		if state.buildings[id].type == Catalog.HQ_TYPE:
 			cc_id = id
 	_fund(state)
-	for level: int in range(2, 6):
+	for level: int in range(2, WallModels.LEVELS + 1):
 		placement.select(cc_id)
 		placement.upgrade_selected()
 		advance(state.seconds_left(cc_id) + 1)
 		_fund(state)
-	check(state.cc_level() == 5, "the Command Center is at level %d" % state.cc_level())
+	check(state.cc_level() == WallModels.LEVELS, "the Command Center is at level %d" % state.cc_level())
 	placement.select(0)
 	_frame(main, ORIGIN + CENTRE)
 
@@ -69,7 +81,7 @@ func run(main: MainScript) -> void:
 		var model := BuildingModels.create(WALL, level, 1, _tier(level))
 		var own: PackedVector3Array = _first_mesh(model).surface_get_arrays(0)[Mesh.ARRAY_VERTEX]
 		var post: PackedVector3Array = _piece(level, 0).body[Mesh.ARRAY_VERTEX]
-		check(own == post, "a level %d wall's own model is the lone post" % level)
+		check(own == post, "a level %d wall's own model is the lone post (%d triangles)" % [level, post.size() / 3])
 		model.free()
 		var most := 0
 		var differs := PackedStringArray()
@@ -82,7 +94,8 @@ func run(main: MainScript) -> void:
 		check(differs.is_empty(), "level %d pieces' bodies are the same whatever the lower mask (%s)" % [
 			level, ", ".join(differs)])
 		var limit: int = PIECE_TRIANGLES[_tier(level)]
-		check(most <= limit, "level %d pieces have at most %d triangles (limit %d)" % [level, most, limit])
+		check(most <= limit, "level %d pieces have at most %d triangles (limit %d, %s tier)" % [level, most, limit,
+			Parts.Tier.keys()[_tier(level)].to_lower()])
 
 	placement.begin_place(WALL)
 	var cells: Array[Vector2i] = []
@@ -93,11 +106,13 @@ func run(main: MainScript) -> void:
 	placement.confirm_place()
 	check(state.count_of(WALL) == cells.size(), "painted %d walls (%d)" % [cells.size(), state.count_of(WALL)])
 
-	for stage: int in [1, 3, 5]:
+	for stage: int in range(1, WallModels.LEVELS + 1):
 		_upgrade(main, stage)
 		await frames(2)
 		_check_walls(main, "level %d" % stage)
 		_check_steps(main, stage)
+		if stage == WallModels.LEVELS:
+			_check_ramp(main)
 		for shape: Array in _shapes():
 			var named: Vector2i = shape[2]
 			var expected: int = shape[3]
@@ -105,7 +120,7 @@ func run(main: MainScript) -> void:
 			check(mask == expected, "level %d: the %s's mask at %s is %d (%d)" % [
 				stage, shape[0], ORIGIN + named, expected, mask])
 		if stage == 1:
-			# The brush starts on the free cell at the screen centre, beside the cross.
+			# The brush starts on the free cell at the screen centre, beside the corner.
 			placement.begin_place(WALL)
 			await screenshot("level1-brush")
 			placement.cancel_place()
@@ -117,7 +132,7 @@ func run(main: MainScript) -> void:
 ## [name, cells, the named cell, its mask]. The shapes do not touch one another.
 func _shapes() -> Array[Array]:
 	var ramp: Array[Vector2i] = []
-	for x: int in 5:
+	for x: int in WallModels.LEVELS:
 		ramp.append(Vector2i(x, RAMP_ROW))
 	return [
 		["straight run", _cells([[0, 0], [1, 0], [2, 0], [3, 0], [4, 0]]), Vector2i(2, 0),
@@ -257,6 +272,31 @@ func _check_steps(main: MainScript, stage: int) -> void:
 			stage, levels[cell], cell, "steps down and inks it" if inks else "inks no step", lower, stepped, plain])
 
 
+## The ramp at level 10, levels 1 to 10 side by side: each wall's lower mask is RAMP_STEPS', and a
+## wall that steps down inks more than the same piece with no step.
+func _check_ramp(main: MainScript) -> void:
+	var levels: Dictionary[Vector2i, int] = {}
+	for id: int in main.state.buildings:
+		var building: BuildingState = main.state.buildings[id]
+		if building.type == WALL and building.level >= 1:
+			levels[building.cell] = building.level
+	for x: int in WallModels.LEVELS:
+		var cell := ORIGIN + Vector2i(x, RAMP_ROW)
+		var level: int = levels.get(cell, 0)
+		var mask := _rule(levels, cell)
+		var lower := _lower_rule(levels, cell)
+		var expected: int = RAMP_STEPS[x]
+		var inked := _outline_triangles(level, mask, lower) > _outline_triangles(level, mask, 0)
+		check(level == x + 1 and lower == expected and inked == (expected != 0),
+			"ramp: the L%d wall's lower mask is %d (%d), its step %s" % [level, expected, lower,
+			"inked" if inked else "not inked"])
+		if x > 0:
+			var below := WallModels.solid_top(x)
+			var above := WallModels.solid_top(x + 1)
+			say("step L%d|L%d: solid tops %.3f|%.3f, %s" % [x, x + 1, below, above,
+				"L%d steps down" % (x + 1 if above > below else x)])
+
+
 ## Four-connected neighbours that are walls, as WallModels' bits.
 static func _rule(levels: Dictionary[Vector2i, int], cell: Vector2i) -> int:
 	var mask := 0
@@ -325,7 +365,7 @@ static func _first_mesh(model: Node3D) -> Mesh:
 
 func _fund(state: BaseState) -> void:
 	for res: String in state.catalog.resources:
-		state.resources[res] = 1_000_000
+		state.resources[res] = 1_000_000_000
 
 
 func _screen_of(main: MainScript, cell: Vector2i) -> Vector2:

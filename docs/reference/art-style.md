@@ -513,6 +513,7 @@ triangles as the gallery counts them.
 | `grav_trap` | ring emitter round a dark funnel with a violet swirl | pulse: the emitter's violet lip, and the hovering ring from L2; flow: the vortex's throat and swirl strips stream inward. Its L2 requires Command Center 4, so it is Base tier: the hovering ring's outer band is hull-mid casing | 580 |
 | `flak_mine` | hazard-banded pod, upward barrels with glowing bores round a lens | pulse: the bores, phased in turn; blink: the sensor lens | 574 |
 | `mega_mine` | big armoured dome on a hazard band ringed with red lights, dim red seams up the dome between them | blink: the band's lights in a chase; pulse: the seams, faintly and in turn, and the fuse light | 1,454 |
+| `barrier_wall` | posts joined by thick segments on a shared curb (**Walls**): slate with a cyan strip and field to level 5, chrome with cyan strips at 6–7 (a cyan lens on the post and strips along the sides at 7), obsidian with glowing violet fields, vein strips and crystal shards at 8–9, gold filigree rails and a crown cup holding a violet core at 10 | none moving. FLOW: the strips along the top and sides, the fields; PULSE: level 5's field, the lamp bands, level 7's lens, the shards and inlays, the core bead | the lone post 198, the full cross 390 |
 
 ### Construction drone
 
@@ -744,8 +745,12 @@ The mask has one bit per orthogonal neighbour in cell space, where cell (x, y) i
 Each level is the same wall grown: a slim hull post (at most 0.46 of the cell, its chamfered cap
 never wider than itself) on a concrete footing, and slate segments 0.4 of the cell thick and
 0.85 of the post's height on a concrete curb that runs on from wall to wall, so a run reads as
-one thick slab with the posts standing just proud as joints. Heights are the post's top, cap
-included:
+one thick slab with the posts standing just proud as joints. Levels 6 to 10 are the same wall
+in the higher tiers' surfaces (**Tiers**): the surfaces follow the tier, from a palette per tier
+(`PALETTES`: plating, rail, the strip along the top, lamp, field, crystal, trim), and the
+geometry the level. They grow a little at each tier, not at each level, and stay low, so a wall
+never hides what stands behind it: the top post stands 1.36 with its crown. Heights are the
+post's top, cap included (the shards and the crown cup above levels 6 to 10's caps not):
 
 | Level | Post | Segments |
 | --- | --- | --- |
@@ -754,33 +759,48 @@ included:
 | 3 | Ribbed (the `pipe` layer), 0.72, gunmetal cap | Ribbed slate, an energy cyan strip along the top, a current flowing along it |
 | 4 | A plated pylon with wide chamfers, 0.81, gunmetal cap | Double plated: a sloped riveted skirt under a slate plate, a brighter strip, its current a little faster |
 | 5 | The level 4 post with a gold crown, 0.9 | A low riveted base under an energy field panel, shimmering upward as it pulses |
+| 6 | Chrome, 0.96, a chamfered chrome cap over a band of cyan lamps (`CYAN_STRIP`, PULSE) | A chrome slab on a sloped chrome skirt, a cyan strip along the top, its current as level 4's |
+| 7 | Chrome, 1.02, heavier: chrome fins up its four corners, its cap a raised chrome hip over a taller lamp band, crowned with a glowing cyan lens (1.16 with it) | A battered chrome slab, wider at its foot, a cyan strip along its top and a broad one across both its faces, so a run glows along its sides |
+| 8 | Obsidian, 1.08, a glowing crystal shard (the `crystal` layer, PULSE) on its cap over a tall violet lamp band | Obsidian: a glowing violet field (`CORE_GLOW_TINT` on the `glow` layer, FLOW) between a low rail and a chamfered top rail, a broad vein strip along the top (the `veins` layer, FLOW, its veins running along the wall) |
+| 9 | Obsidian, 1.15, a cap half again as thick, two shards leaning apart, crystal inlays up its four corners | Level 8's, the field wider between thinner rails, the low rail heavier, the strip broader |
+| 10 | Obsidian with the inlays, 1.18, a gold cap and on it a gold crown cup with four points holding a violet core bead (`CORE_GLOW`, PULSE) | Level 9's with gold filigree rails (`FILIGREE`): black, gold and violet |
+
+A lamp band is a course of the post itself, as wide as it, between its body and its cap. No level has a moving
+part, and no part is HOLO, BOB or JITTER (below).
 
 The strips and the field are unlit on the `glow` layer at a third of its scale (`FLOW_SCALE`), so
 its stripes are coarse enough to see move, and, being thin, have no ink. A strip is a box built
 along its own z and turned onto world +x or +z, so its top's stripes cross it on every segment and
-its FLOW (0.6, 0.65 on level 4) carries them towards +x or +z on both halves of a segment: the
+its FLOW (0.6; 0.65 on level 4 and on the cyan strips of levels 6 and 7) carries them towards +x
+or +z on both halves of a segment: the
 current runs on along a run, from wall to wall, a half-segment being about two whole stripes long.
+From the Obsidian tier the strip is on the `veins` layer at full scale instead, unlit and not
+inked, its channels running along the wall and its FLOW (0.7) carrying their beads along them.
 The field is a swept panel whose stripes run along it, so its FLOW (0.45) lifts them up the panel,
-with PULSE. A segment's
+with PULSE on level 5; the violet fields of levels 8 to 10 are the same, inked as they are thick,
+and do not pulse, so they stay bright: the glowing side of an obsidian wall. A segment's
 end on the cell edge is a cap painted like the segment but left out of the outline, so two
 segments that meet there draw one unbroken ink line. Where walls of different levels meet, the
 taller segment's end shows as a step, and its caps are outlined (the curb's excepted, so every
 level's curb meets the next unbroken). Taller goes by height, not level: `solid_top(level)` is
-the top of a level's solid segment, the segment itself on levels 1 to 4 (about 0.47 to 0.69)
-and on level 5 the low slab under its unoutlined field (about 0.34), so a level 5 wall is the
-lowest and every other level steps down to it. A piece takes a second mask, `lower_mask`, of
+the top of a level's solid segment, the segment itself (rails included) on levels 1 to 4 (about
+0.47 to 0.69) and 6 to 10 (0.82, 0.87, 0.92, 0.98, 1.0), and on level 5 the low slab under its
+unoutlined field (about 0.34), so a level 5 wall is the lowest and every other level steps down
+to it, and otherwise of two adjacent levels the higher steps down to the lower. A piece takes a second mask, `lower_mask`, of
 the neighbours whose solid top is lower (the same bits, a subset of the mask). Only the outline
 differs; the body is the same whatever `lower_mask` says (each cap keeps its segment's paint
 and phase). The step's ink edge shows where its
 end stands above the lower wall; beside a post nearly as high as the step (an L4 segment next
 to an L2 post) it is a short dark mark over the post's cap.
 
-`piece(level, tier, mask, lower_mask = 0)` builds a piece on first use for its level's tier (the
-crown is gold from the Gold tier, `CAP` gunmetal below it) and keeps its body and outline arrays
+`piece(level, tier, mask, lower_mask = 0)` builds a piece on first use for its level's tier (level
+5's crown is gold from the Gold tier, `CAP` gunmetal below it; levels 6 to 10 take their tier's
+palette, a tier below Chrome taking Chrome's) and keeps its body and outline arrays
 (`to_arrays`, `to_outline_arrays`), cached by tier, level, mask and lower mask (a higher level
-shows level 5's, built for its own tier); every piece stays within its tier's budget for a wall
-piece (250 at Base and Gold)
-(`wall_junctions` checks all 80 masks and levels, that each piece's body is the same whatever
+shows level 10's, built for its own tier); every piece stays within its tier's budget for a wall
+piece (250 at Base and Gold, 300 at Chrome, 350 at Obsidian, 400 at Crown; the full crosses of
+levels 1 to 10 are 148, 210, 218, 250, 240, 260, 294, 310, 348 and 390 triangles)
+(`wall_junctions` checks all 160 masks and levels, that each piece's body is the same whatever
 its lower mask, and the merged outline against its pieces' with their steps). `build_barrier_wall`, which `BuildingModels.create("barrier_wall", level, 1, tier)` dispatches
 to, is the lone post (mask 0): the paint brush, a lifted wall and the gallery show it.
 
