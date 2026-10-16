@@ -81,6 +81,31 @@ static var TARGET := Surf.make(MaterialKit.Layer.GLOW, MaterialKit.ENERGY, 1.0, 
 static var DRILL_GRID := Surf.make(MaterialKit.Layer.GLOW, MaterialKit.ENERGY, 1.0, Surf.UNLIT | Surf.FLICKER)
 static var SEARCH_LENS := Surf.make(MaterialKit.Layer.GLOW, MaterialKit.HAZARD, 1.0, Surf.UNLIT | Surf.PULSE, true)
 static var SEARCH_BEAM := Surf.make(MaterialKit.Layer.GLOW, MaterialKit.HAZARD, 1.0, Surf.HOLO, true)
+## The high tiers' own (docs/reference/art-style.md, **Tiers**), beside the shared ones on Parts.
+## The hangar's, shared by the others: a cyan lamp blinking in a chase; the violet glow of an
+## obsidian level, a rib pulsing; crystal inlays and shards pulsing; gold filigree smooth shaded,
+## for rings; a violet hologram; an obsidian ring hovering on BOB with its violet rim, on one phase
+## so they bob together.
+static var CYAN_LAMP := Surf.make(MaterialKit.Layer.GLOW, MaterialKit.ENERGY, 1.0, Surf.UNLIT | Surf.BLINK, true)
+static var VIOLET_RIB := Surf.make(MaterialKit.Layer.GLOW, Parts.CORE_GLOW_TINT, 1.0, Surf.UNLIT | Surf.PULSE, true)
+static var INLAY := Surf.make(MaterialKit.Layer.CRYSTAL, MaterialKit.CRYSTAL, 1.0, Surf.UNLIT | Surf.PULSE)
+static var FILIGREE_ROUND := Surf.make(MaterialKit.Layer.BANDS, MaterialKit.CORE_GOLD, 2.0, Surf.GLOSSY, true)
+static var HOLO_VIOLET := Surf.make(MaterialKit.Layer.GLOW, Parts.CORE_GLOW_TINT, 1.0, Surf.HOLO | Surf.BOB, true)
+static var HOVER := Surf.make(MaterialKit.Layer.OBSIDIAN, Parts.OBSIDIAN_TINT, 1.0, Surf.GLOSSY | Surf.BOB, true, true, 0.6)
+static var HOVER_RIM := Surf.make(MaterialKit.Layer.GLOW, Parts.CORE_GLOW_TINT, 1.0, Surf.UNLIT | Surf.PULSE | Surf.BOB, true,
+	true, 0.6)
+## The antimatter core where it must read from across the base (the Hangar's crests, the
+## Academy's band and halo, the Fabricator's furnace): a light violet, unlit and steady, so it is
+## the brightest thing on the model where CORE_GLOW's pulse would dim it (as the collectors'
+## BRIGHT_CORE in resources.gd).
+static var BRIGHT_CORE := Surf.make(MaterialKit.Layer.GLOW, Color("c9a2ff"), 1.0, Surf.UNLIT, true)
+
+
+## The L10 escort skiff's round: its centre on the ground, towards the apron, and its radius, so
+## the skiff, at 1.5 times the helpers' size, flies out over the apron and the bays and clears the
+## tower by about 0.1.
+const SKIFF_CENTRE := Vector3(-0.2, 0, 0.4)
+const SKIFF_ROUND := 1.5
 
 
 ## A long vaulted hangar: the main bay with its striped door, the control tower in the back
@@ -88,26 +113,45 @@ static var SEARCH_BEAM := Surf.make(MaterialKit.Layer.GLOW, MaterialKit.HAZARD, 
 ## dishes at 4. The main bay's door rises over its lit inside and drops again, the lights chase
 ## along the apron, the cab's glass pulses and a radar turns on its roof; from 4 the big roof
 ## dish sweeps.
+##
+## From 6 the tower grows taller at each level and the apron's lights stand in two rows before
+## the main door, chasing apart: L6 chrome roofs with cyan ribs, a chrome tower with cyan strips
+## and a bigger radar dish, chrome lamps, a skiff parked on a pad on the apron; L7 a third, small
+## bay on the apron's right and a chrome gallery round the tower; L8 obsidian walls and tower,
+## violet-veined doors, ribs glowing violet, crystal beacons in the second row, crystal inlays on
+## the tower; L9 a landing ring hovering over the skiff, obsidian rimmed in violet, and a second
+## gallery; L10 an obsidian roof under gold filigree ribs with the antimatter core glowing in
+## broad bands along its crests, filigree banners on the bays' gables and bands up the tower, a
+## violet core beacon on a gold spire atop it, and a big hover skiff circling out over the apron
+## and the bays as its escort.
 static func build_hangar(p: Parts, level: int) -> void:
 	var m := p.body
 	var g := Parts.PAD_HEIGHT
+	var chrome := p.tier >= Parts.Tier.CHROME
+	var obsidian := p.tier >= Parts.Tier.OBSIDIAN
 	Parts.foundation(m, 5)
 	var doors: Array[float] = [1.3, 1.6, 1.9]
-	_vault(p, Vector3(-1.0, g, -2.25), 2.6, 3.6, 0.75, doors[mini(level, 3) - 1], true)
+	_vault(p, Vector3(-1.0, g, -2.25), 2.6, 3.6, 0.75, doors[mini(level, 3) - 1], true, level)
 	if level >= 3:
-		_vault(p, Vector3(1.35, g, -0.9), 1.8, 2.25, 0.55, 1.2, false)
+		_vault(p, Vector3(1.35, g, -0.9), 1.8, 2.25, 0.55, 1.2, false, level)
 	else:
 		m.disc(0.75, 24, Vector3(1.35, g + 0.002, 0.2), Parts.HAZARD)
 		m.disc(0.6, 24, Vector3(1.35, g + 0.004, 0.2), ARMOUR)
-	var lights := 4 + level
-	for i: int in lights:
-		var x := -1.85 + 3.9 * i / (lights - 1)
-		Parts.landing_light(m, Vector3(x, g, 2.05), 0.11, LAMP.phased(float(i) / lights))
-	# The control tower.
+	if level < 6:
+		var lights := 4 + level
+		for i: int in lights:
+			var x := -1.85 + 3.9 * i / (lights - 1)
+			Parts.landing_light(m, Vector3(x, g, 2.05), 0.11, LAMP.phased(float(i) / lights))
+	else:
+		_apron(p, level)
+	# The control tower, taller from 6.
 	var tower := Vector3(1.45, g, -1.65)
-	m.box_chamfered(Vector3(0.95, 0.3, 0.95), 0.06, tower, ARMOUR)
-	var shaft := 1.0 + 0.06 * level
-	m.prism(0.3, 0.25, shaft, 16, tower + Vector3(0, 0.3, 0), MID_ROUND)
+	m.box_chamfered(Vector3(0.95, 0.3, 0.95), 0.06, tower, _plating(p.tier, ARMOUR))
+	var extra: Array[float] = [0.0, 0.45, 0.75, 1.05, 1.3, 1.4]
+	var shaft := 1.0 + 0.06 * level + extra[clampi(level - 5, 0, 5)]
+	m.prism(0.3, 0.25, shaft, 16, tower + Vector3(0, 0.3, 0), _plating(p.tier, MID_ROUND, true))
+	if level >= 6:
+		_tower_dress(m, tower + Vector3(0, 0.3, 0), shaft, level, p.tier)
 	var cab := tower + Vector3(0, 0.3 + shaft, 0)
 	m.prism(0.42, 0.42, 0.1, 16, cab, HULL_ROUND)
 	m.ring(0.41, 0.44, 0.05, 16, cab + Vector3(0, 0.03, 0), GLOW)
@@ -115,18 +159,22 @@ static func build_hangar(p: Parts, level: int) -> void:
 	m.lathe(PackedVector2Array([
 		Vector2(0.56, 0), Vector2(0.56, 0.06), Vector2(0.4, 0.16), Vector2(0, 0.16),
 	]), 16, cab + Vector3(0, 0.44, 0), GOLD_ROUND if p.tier >= Parts.Tier.GOLD else HULL_ROUND)
-	Parts.mast(m, cab + Vector3(0.12, 0.6, -0.1), 0.3 + 0.03 * level, 0.06, GLOW)
-	# The radar turning on the cab's roof, clear of the mast.
+	if level >= 10:
+		_crown_beacon(m, cab + Vector3(0.12, 0.6, -0.1), 0.62)
+	else:
+		Parts.mast(m, cab + Vector3(0.12, 0.6, -0.1), 0.3 + 0.03 * level, 0.06, GLOW)
+	# The radar turning on the cab's roof, clear of the mast; bigger from 6.
+	var big := 1.45 if level >= 6 else 1.0
 	var stub := cab + Vector3(-0.14, 0.6, 0.12)
 	m.prism(0.05, 0.04, 0.12, 12, stub, Parts.GUNMETAL)
 	var radar := p.moving(stub + Vector3(0, 0.12, 0), Motion.spin(Vector3.UP, 1.2))
 	radar.box_chamfered(Vector3(0.08, 0.08, 0.08), 0.02, Vector3.ZERO, Parts.GUNMETAL)
 	var tilt := Vector3(60, 90, 0)
 	var hub := Vector3(0, 0.08, 0)
-	Parts.dish(radar, 0.18, 0.07, hub, GOLD_ROUND if p.tier >= Parts.Tier.GOLD else HULL_ROUND, tilt)
+	Parts.dish(radar, 0.18 * big, 0.07 * big, hub, GOLD_ROUND if p.tier >= Parts.Tier.GOLD else HULL_ROUND, tilt)
 	var axis := LowPolyMesh.turn(Vector3.UP, tilt)
-	Parts.pipe(radar, hub + axis * 0.03, hub + axis * 0.15, 0.015, Parts.ROD)
-	radar.orb(0.03, 10, 4, hub + axis * 0.15, GLOW)
+	Parts.pipe(radar, hub + axis * 0.03, hub + axis * 0.15 * big, 0.015, Parts.ROD)
+	radar.orb(0.03 * big, 10, 4, hub + axis * 0.15 * big, CYAN_LAMP if chrome else GLOW)
 	if level >= 2:
 		# Fuel tanks on the apron, beside the main door.
 		for z: float in [1.68, 1.92]:
@@ -134,6 +182,123 @@ static func build_hangar(p: Parts, level: int) -> void:
 	if level >= 4:
 		_roof_dish(p, Vector3(-1.0, g + 1.98, -1.5), 0.5, true)
 		_roof_dish(p, Vector3(1.35, g + 1.38, -0.4), 0.32, false)
+	if level >= 7:
+		_vault(p, Vector3(1.75, g, 1.58), 1.0, 0.85, 0.4, 0.5, false, level)
+	if obsidian:
+		# Crystal inlays on the tower's base, facing the camera.
+		for face: Vector3 in [Vector3(0, 0, 1), Vector3(1, 0, 0)]:
+			m.prism(0.14, 0.14, 0.04, 4, tower + face * 0.475 + Vector3(0, 0.15, 0), INLAY,
+				Vector3(90, 90.0 * face.x, 0))
+	if level >= 10:
+		# A skiff half again the helpers' size, its round set out over the apron so it passes
+		# over the bays and the apron and clears the tower.
+		Parts.escort_skiff(p, SKIFF_ROUND, 3.3, 0.45, SKIFF_CENTRE, 1.5)
+
+
+## The apron from 6 (_hangar's): two rows of lamps before the main door chasing apart, chrome
+## housings, the front row orange, the back row cyan (crystal beacons from the Obsidian tier); a
+## hazard pad left of the second bay's door with a skiff parked on it; from 9 a landing ring
+## hovering over the skiff, obsidian with a violet rim, a violet hologram ring over it.
+static func _apron(p: Parts, level: int) -> void:
+	var m := p.body
+	var g := Parts.PAD_HEIGHT
+	var housing := _plating(p.tier, Parts.GUNMETAL, true)
+	var lights := level - 1
+	for i: int in lights:
+		var x := -1.85 + 1.9 * i / (lights - 1)
+		Parts.landing_light(m, Vector3(x, g, 1.98), 0.11, LAMP.phased(Parts.chase(i, lights)), housing)
+		var back := Vector3(x + 0.95 / (lights - 1), g, 2.3)
+		if i == lights - 1:
+			continue
+		if p.tier >= Parts.Tier.OBSIDIAN:
+			m.prism(0.07, 0.06, 0.05, 8, back, Parts.OBSIDIAN, Parts.OCTAGON)
+			m.cone(0.045, 0.2, 8, back + Vector3(0, 0.05, 0), INLAY.phased(Parts.chase(lights - 2 - i, lights - 1)))
+		else:
+			Parts.landing_light(m, back, 0.075, CYAN_LAMP.phased(Parts.chase(lights - 2 - i, lights - 1)), housing)
+	var pad := Vector3(0.62, g, 1.92)
+	m.disc(0.42, 24, pad + Vector3(0, 0.002, 0), Parts.HAZARD)
+	m.disc(0.34, 24, pad + Vector3(0, 0.004, 0), _plating(p.tier, ARMOUR))
+	_parked_skiff(m, pad + Vector3(0, 0.004, 0), p.tier)
+	if level >= 9:
+		var ring := pad + Vector3(0, 0.85, 0)
+		m.ring(0.3, 0.42, 0.06, 24, ring, HOVER)
+		m.lathe(PackedVector2Array([Vector2(0.425, 0.01), Vector2(0.425, 0.05)]), 24, ring, HOVER_RIM)
+		m.lathe(PackedVector2Array([Vector2(0.4, 0.062), Vector2(0.32, 0.062)]), 24, ring, HOVER_RIM)
+		m.ring(0.16, 0.2, 0.03, 24, ring + Vector3(0, 0.16, 0), HOLO_VIOLET)
+
+
+## A skiff parked on `foot`, nose to +X: a chamfered hull on landing skids, a glass canopy, two
+## engine pods with glowing nozzles, an orange nose and a light strip down its back (_strip), its
+## hull chrome at the Chrome tier, obsidian from Obsidian.
+static func _parked_skiff(m: LowPolyMesh, foot: Vector3, tier: int) -> void:
+	for side: float in [-1.0, 1.0]:
+		m.box_chamfered(Vector3(0.44, 0.04, 0.05), 0.015, foot + Vector3(0, 0, side * 0.12), Parts.GUNMETAL)
+	var hull := foot + Vector3(0, 0.08, 0)
+	m.box_chamfered(Vector3(0.56, 0.12, 0.3), 0.04, hull, _plating(tier, Parts.HULL_LIGHT))
+	m.box_chamfered(Vector3(0.2, 0.06, 0.16), 0.03, hull + Vector3(0.22, 0.02, 0), ORANGE)
+	m.dome(0.1, 0.08, 12, 3, hull + Vector3(0.08, 0.12, 0), Parts.GLASS)
+	m.box(Vector3(0.3, 0.015, 0.05), hull + Vector3(-0.12, 0.12, 0), _strip(tier))
+	for side: float in [-1.0, 1.0]:
+		var pod := hull + Vector3(-0.22, 0.03, side * 0.19)
+		m.prism(0.055, 0.05, 0.22, 12, pod, Parts.GUNMETAL, Vector3(0, 0, 90))
+		m.disc(0.04, 12, pod + Vector3(-0.221, 0, 0), GLOW_PULSE, Vector3(0, 0, 90))
+
+
+## The tower's dress from 6, on its shaft from `foot` up `shaft`: four light strips up it
+## (cyan, violet veins from the Obsidian tier); from 7 a gallery round it half way up, a second
+## from 9; at 10 gold filigree bands round it.
+static func _tower_dress(m: LowPolyMesh, foot: Vector3, shaft: float, level: int, tier: int) -> void:
+	for k: int in 4:
+		var degrees := 45.0 + 90.0 * k
+		m.box(Vector3(0.07, shaft - 0.2, 0.03), foot + Parts.around(0.265, degrees, 0.1), _strip(tier),
+			Vector3(0, 90.0 - degrees, 0))
+	var galleries: Array[float] = []
+	if level >= 7:
+		galleries.append(0.45)
+	if level >= 9:
+		galleries.append(0.75)
+	for share: float in galleries:
+		var at := foot + Vector3(0, shaft * share, 0)
+		m.lathe(PackedVector2Array([
+			Vector2(0.28, 0), Vector2(0.48, 0.04), Vector2(0.48, 0.1), Vector2(0.27, 0.1),
+		]), 16, at, _plating(tier, ARMOUR_ROUND, true))
+		m.lathe(PackedVector2Array([Vector2(0.485, 0.03), Vector2(0.485, 0.08)]), 16, at, _glow(tier))
+	if level >= 10:
+		for y: float in [0.25, shaft - 0.15]:
+			m.lathe(PackedVector2Array([Vector2(0.31, 0), Vector2(0.31, 0.1)]), 16, foot + Vector3(0, y, 0), FILIGREE_ROUND)
+
+
+## The Crown tier's beacon: a gold spire `height` tall on `foot` under a gold crown of four
+## prongs round a violet antimatter core, pulsing.
+static func _crown_beacon(m: LowPolyMesh, foot: Vector3, height: float) -> void:
+	m.prism(0.06, 0.035, height, 12, foot, GOLD_ROUND)
+	var top := foot + Vector3(0, height, 0)
+	m.ring(0.05, 0.12, 0.05, 12, top - Vector3(0, 0.03, 0), GOLD_ROUND)
+	for k: int in 4:
+		var degrees := 45.0 + 90.0 * k
+		m.cone(0.03, 0.18, 8, top + Parts.around(0.1, degrees, 0.0), GOLD_ROUND,
+			Parts.facing(Parts.around(0.35, degrees, 1.0)))
+	m.orb(0.1, 12, 6, top + Vector3(0, 0.12, 0), Parts.CORE_GLOW)
+
+
+## A surface in the tier's plating: obsidian from the Obsidian tier, chrome at the Chrome tier,
+## `base` below it. `smooth` picks the round versions.
+static func _plating(tier: int, base: Surf, smooth: bool = false) -> Surf:
+	if tier >= Parts.Tier.OBSIDIAN:
+		return Parts.OBSIDIAN_ROUND if smooth else Parts.OBSIDIAN
+	if tier >= Parts.Tier.CHROME:
+		return Parts.CHROME_ROUND if smooth else Parts.CHROME
+	return base
+
+
+## A light strip by tier: violet veins from the Obsidian tier, cyan below it.
+static func _strip(tier: int) -> Surf:
+	return Parts.VEINS if tier >= Parts.Tier.OBSIDIAN else Parts.CYAN_STRIP
+
+
+## A band of light by tier: violet from the Obsidian tier, cyan below it.
+static func _glow(tier: int) -> Surf:
+	return VIOLET_RIB if tier >= Parts.Tier.OBSIDIAN else Parts.CYAN_STRIP
 
 
 ## A dish on a stub at `foot`, turned to the right of the view, with a glowing feed. One that
@@ -157,27 +322,45 @@ static func _roof_dish(p: Parts, foot: Vector3, radius: float, sweeps: bool) -> 
 ## One bay of the hangar: walls, a barrel roof with orange ribs, and the striped door on its
 ## +Z end. `back` is the middle of its back wall on the pad. A door that `opens` is a moving
 ## part: it rises behind its lintel and a hood over it, as far as the roof leaves room, and the
-## lit bay shows under it.
+## lit bay shows under it. The tier paints it (_hangar's levels): from Chrome a chrome roof
+## with cyan ribs and a cyan strip along its +X wall; from Obsidian obsidian walls, veined door
+## leaves and ribs glowing violet; at Crown an obsidian roof under filigree ribs, and from 10 the
+## antimatter core glowing in a broad band along its crest and a filigree banner with a violet
+## emblem on a gable wide enough for it.
 static func _vault(p: Parts, back: Vector3, width: float, length: float, wall: float,
-		door: float, opens: bool) -> void:
+		door: float, opens: bool, level: int) -> void:
 	var m := p.body
+	var chrome := p.tier >= Parts.Tier.CHROME
+	var obsidian := p.tier >= Parts.Tier.OBSIDIAN
+	var crown := p.tier >= Parts.Tier.CROWN
 	var radius := width * 0.5 - 0.005
 	var front := back.z + length
 	m.box_chamfered(Vector3(width, wall, length + 0.02), 0.06, back + Vector3(0, 0, length * 0.5 + 0.01),
-		ARMOUR)
+		Parts.OBSIDIAN if obsidian else ARMOUR)
 	var axis := back + Vector3(0, wall, 0)
 	# The barrel roof: the half of a cylinder lying along +Z that stands above the walls,
 	# which, turned so, is 180 to 360 degrees round its own axis.
-	m.prism(radius, radius, length, 24, axis, HULL_ROUND, Vector3(90, 0, 0), 180.0, 360.0)
+	var roof := Parts.OBSIDIAN_ROUND if crown else (Parts.CHROME_ROUND if chrome else HULL_ROUND)
+	m.prism(radius, radius, length, 24, axis, roof, Vector3(90, 0, 0), 180.0, 360.0)
 	var gable := PackedVector3Array()
 	for k: int in 13:
 		var angle := PI * k / 12
 		gable.append(axis + Vector3(radius * cos(angle), radius * sin(angle), length + 0.012))
-	m.polygon(gable, Parts.HULL_LIGHT)
+	m.polygon(gable, Parts.OBSIDIAN if crown else (Parts.CHROME if chrome else Parts.HULL_LIGHT))
+	var rib := ORANGE_ROUND
+	if crown:
+		rib = FILIGREE_ROUND
+	elif obsidian:
+		rib = VIOLET_RIB
+	elif chrome:
+		rib = Parts.CYAN_STRIP
 	for k: int in 3:
 		var rib_z := back.z + length * (0.18 + 0.32 * k)
-		m.ring(radius - 0.02, radius + 0.07, 0.14, 24, Vector3(back.x, axis.y, rib_z), ORANGE_ROUND,
+		m.ring(radius - 0.02, radius + 0.07, 0.14, 24, Vector3(back.x, axis.y, rib_z), rib.phased(k / 3.0) if obsidian and not crown else rib,
 			Vector3(90, 0, 0))
+	if chrome:
+		m.box(Vector3(0.02, 0.07, length - 0.1), Vector3(back.x + width * 0.5 + 0.005, back.y + wall - 0.17, back.z + length * 0.5),
+			_glow(p.tier))
 	# The door: leaves with a hazard band, hazard posts, a lintel and a glow strip.
 	var post := door * 0.5 + 0.08
 	var height := wall + sqrt(radius * radius - (post + 0.08) * (post + 0.08)) - 0.2
@@ -185,6 +368,7 @@ static func _vault(p: Parts, back: Vector3, width: float, length: float, wall: f
 	var leaves := m
 	var at := Vector3(back.x, back.y, z)
 	var strip := back.y + height + 0.22
+	var above := strip + 0.03
 	if opens:
 		# The hood over the lintel reaches as high as the roof allows over the door's corners;
 		# the door stands a little proud of the lit inside, and rises to the hood's top.
@@ -195,12 +379,13 @@ static func _vault(p: Parts, back: Vector3, width: float, length: float, wall: f
 			Vector3(back.x, back.y + height + 0.14, z + 0.08), ARMOUR)
 		m.box(Vector3(door, rise + 0.06, 0.008), Vector3(back.x, back.y, z + 0.006), INTERIOR)
 		strip = (back.y + height + 0.14 + hood) * 0.5 - 0.03
+		above = hood
 		leaves = p.moving(at + Vector3(0, rise * 0.5, 0), Motion.slide(Vector3.UP, rise * 0.5, 6.0))
 		at = Vector3(0, 0, 0.015)
 	var leaf := door / 4.0
 	for i: int in 4:
 		var x := -door * 0.5 + leaf * (i + 0.5)
-		leaves.box_chamfered(Vector3(leaf - 0.03, height, 0.08), 0.02, at + Vector3(x, 0, 0.04), DARK_PLATE)
+		leaves.box_chamfered(Vector3(leaf - 0.03, height, 0.08), 0.02, at + Vector3(x, 0, 0.04), Parts.VEINS if obsidian else DARK_PLATE)
 	leaves.box_chamfered(Vector3(door, 0.26, 0.1), 0.03, at + Vector3(0, 0, 0.05), Parts.HAZARD)
 	for side: float in [-1.0, 1.0]:
 		m.box_chamfered(Vector3(0.16, height + 0.14, 0.16), 0.04, Vector3(back.x + side * post, back.y, z + 0.08),
@@ -208,6 +393,19 @@ static func _vault(p: Parts, back: Vector3, width: float, length: float, wall: f
 	m.box_chamfered(Vector3(door + 0.32, 0.14, 0.18), 0.04, Vector3(back.x, back.y + height, z + 0.09),
 		Parts.GOLD_TRIM if p.tier >= Parts.Tier.GOLD else ORANGE)
 	m.box(Vector3(door * 0.6, 0.06, 0.04), Vector3(back.x, strip, z + (0.15 if opens else 0.0)), GLOW)
+	var crest := axis.y + radius
+	if level >= 10:
+		# The antimatter core's glow along the roof's crest: a band of the barrel 16 degrees wide,
+		# just proud of it, under the ribs.
+		m.prism(radius + 0.012, radius + 0.012, length - 0.1, 24, axis + Vector3(0, 0, 0.05), BRIGHT_CORE,
+			Vector3(90, 0, 0), 262.0, 278.0)
+	if level >= 10 and crest - above >= 0.3:
+		# A filigree banner on the gable over the door, a violet emblem glowing on it.
+		var tall := crest - above - 0.12
+		var wide := minf(0.5, 2.0 * sqrt(radius * radius - (above + 0.04 - axis.y) * (above + 0.04 - axis.y)) - 0.2)
+		var banner := Vector3(back.x, above + 0.04, z)
+		m.box(Vector3(wide, tall, 0.025), banner, Parts.FILIGREE)
+		m.prism(0.08, 0.08, 0.02, 12, banner + Vector3(0, tall * 0.5, 0.0125), Parts.CORE_GLOW, Vector3(90, 0, 0))
 
 
 ## A training ground for human cadets: a barracks hall along the back of a drill yard, a parade
