@@ -55,7 +55,14 @@ static var PLASMA_PULSE := _glow(MaterialKit.ANTIMATTER, Surf.PULSE)
 ## Bubbles surfacing on the plasma chamber: a paler violet, swelling, so they stay lighter than
 ## the chamber.
 static var BUBBLE := _glow(MaterialKit.ANTIMATTER.lightened(0.75), Surf.PULSE)
-static var PLASMA_ARC := Parts.spark(MaterialKit.ANTIMATTER.lightened(0.3))
+## The plasma's swirl: a violet-pink hologram shell round the chamber, its crystal blotches
+## crawling slowly round it.
+static var PLASMA_SWIRL := Surf.make(MaterialKit.Layer.CRYSTAL, Color("e05cff"), 1.5, Surf.HOLO | Surf.FLOW_U, true, true,
+	0.58)
+## Tongues of plasma licking out of the chamber: the core's glow lifted paler, swelling, and soft,
+## with no ink line round them.
+static var PLASMA_TONGUE := Surf.make(MaterialKit.Layer.GLOW, MaterialKit.ANTIMATTER.lightened(0.6), 1.0,
+	Surf.UNLIT | Surf.PULSE, true, false)
 ## The mortar's bore lining, its bands running out of the muzzle.
 static var BORE := Parts.current(MaterialKit.ANTIMATTER, 0.3)
 ## The shield generator's orb, floating and swelling.
@@ -514,17 +521,19 @@ static func _pod(s: LowPolyMesh, trunnion: Vector3, aim: Vector3, x: float, colu
 					_at(trunnion, Vector3(x + side * (width * 0.5 + 0.01), -(height - 0.24) * 0.5, -0.05), aim), VEIN_PANEL, aim)
 
 
-## From L5 a bigger bowl stands on a pedestal that lifts it more each level, the buttresses round
-## its foot giving way to it. L5 (Chrome): chrome plinth, pedestal, bowl and barrel, a cyan strip
-## round the pedestal and cyan plasma coils round the barrel's breech. L6 a third coil and a chrome
-## loader arm on the near corner, standing as tall as the bowl's rise, its boom swinging a plasma
-## canister over the bowl. L7 (Obsidian): a taller plinth with glowing violet vein panels on its
-## faces the camera sees, the pedestal, bowl and barrel obsidian veined violet, the coils violet, a
-## violet plasma pool glowing on the bowl round the chamber, and a glowing charge ring hovering well
-## past the muzzle, turning about the barrel. L8 (Crown): gold filigree round the plinth and the
-## pedestal, the pool the antimatter core with a core ring round the chamber's foot, a gold crown
-## round the bowl's rim, and a gold-topped balcony on the near corner where the loader arm stands
-## and two troopers march round it as the loaders (the escort).
+## The chamber is a ball of boiling plasma at every level: the glowing core, tongues licking out of
+## it and a translucent swirl shell crawling round it. From L5 a bigger bowl stands on a pedestal
+## that lifts it more each level, the buttresses round its foot giving way to it. L5 (Chrome):
+## chrome plinth, pedestal, bowl and barrel, a cyan strip round the pedestal and cyan plasma coils
+## round the barrel's breech. L6 a third coil and a chrome loader arm on the near corner, standing
+## as tall as the bowl's rise, its boom swinging a plasma canister over the bowl. L7 (Obsidian): a
+## taller plinth with glowing violet vein panels on its faces the camera sees, the pedestal, bowl
+## and barrel obsidian veined violet, the coils violet, a violet plasma pool glowing on the bowl
+## round the chamber, and a glowing charge ring hovering well past the muzzle, turning about the
+## barrel. L8 (Crown): gold filigree round the plinth and the pedestal, the pool the antimatter core
+## with a core ring round the chamber's foot, a gold crown round the bowl's rim, and a gold-topped
+## balcony on the near corner where the loader arm stands and two troopers march round it as the
+## loaders (the escort).
 static func build_plasma_mortar(p: Parts, level: int) -> void:
 	var m := p.body
 	var plinth := 0.3 if level < 5 else float(MORTAR_PLINTHS[level - 5])
@@ -564,25 +573,28 @@ static func build_plasma_mortar(p: Parts, level: int) -> void:
 	var breech := Vector3(0, seat + chamber, 0)
 	var tilt := Vector3(34, SCREEN_RIGHT, 0)
 	var heading := Vector3(0, SCREEN_RIGHT, 0)
-	m.orb(chamber, 16, 8, breech, PLASMA_PULSE)
+	m.orb(chamber, 16, 6, breech, PLASMA_PULSE)
 	var band := GOLD if p.tier >= Parts.Tier.GOLD else Parts.GUNMETAL
 	Parts.torus(m, chamber + 0.01, 0.045, 20, 10, breech - Vector3(0, 0.045, 0), band)
 	# The cage's ribs cross the band at Parts.around() angles 15, 105, 195 and 285; the quarter
 	# between 15 and 105 faces the viewer, the barrel and the cheeks hiding its top and its foot.
 	for yaw: float in [30.0, 120.0]:
 		var rib := Vector3(0, SCREEN_RIGHT + yaw, 90)
-		Parts.torus(m, chamber + 0.01, 0.035, 16, 8, _at(breech, Vector3(0, -0.035, 0), rib), Parts.GUNMETAL, rib)
-	# Plasma bubbles surfacing between the bars, and arcs crackling from the ribs to the band.
+		Parts.torus(m, chamber + 0.01, 0.035, 16, 6, _at(breech, Vector3(0, -0.035, 0), rib), Parts.GUNMETAL, rib)
+	# Plasma bubbles surfacing between the bars, and tongues of plasma licking out of the core round
+	# its rim as the camera sees it, swelling out of step.
 	var bubbles: Array[Vector2] = [Vector2(35, 22), Vector2(70, 40), Vector2(92, 14)]
 	for k: int in bubbles.size():
 		m.orb(0.05, 8, 3, breech + Parts.on_sphere(chamber - 0.01, bubbles[k]), BUBBLE.phased(k / 3.0 + 0.1))
-	var arcs: Array[Array] = [
-		[Vector2(15, 30), Vector2(52, 52)], [Vector2(105, 30), Vector2(78, 12)], [Vector2(15, 8), Vector2(50, 6)],
-	]
-	for k: int in arcs.size():
-		var ends: Array = arcs[k]
-		Parts.arc(m, breech + Parts.on_sphere(chamber + 0.06, ends[0]), breech + Parts.on_sphere(chamber + 0.06, ends[1]),
-			3, 0.03, PLASMA_ARC.phased(k / 3.0))
+	var tongues: Array[Vector2] = [Vector2(140, 4), Vector2(180, 40), Vector2(30, -18)]
+	for k: int in tongues.size():
+		var out := Parts.on_sphere(1.0, tongues[k])
+		m.lathe(PackedVector2Array([
+			Vector2(0.07, 0), Vector2(0.1, 0.06), Vector2(0.09, 0.13), Vector2(0.055, 0.19), Vector2(0, 0.21),
+		]), 8, breech + out * (chamber - 0.03), PLASMA_TONGUE.phased(k / 3.0), Parts.facing(out))
+	# The swirl: a translucent shell round the core and its cage, its blotches crawling round it, so
+	# the ball reads as boiling plasma.
+	m.orb(chamber + 0.06, 16, 5, breech, PLASMA_SWIRL)
 	# A cooling fan on the heavy ring's flank, turning about the outward +Z.
 	var fan := Vector3(0, base + 0.15, 1.08 * bowl)
 	m.ring(0.1, 0.13, 0.07, 12, fan - Vector3(0, 0, 0.06), Parts.GUNMETAL, Vector3(90, 0, 0))
