@@ -799,9 +799,6 @@ const TOWARD_CAMERA := Vector3(0.70710678, 0, 0.70710678)
 ## The L6 ring hovering over the core and the L8 halo over it: their heights over the core.
 const SIPHON_HOVER_LIFT := 0.55
 const HALO_LIFT := 0.95
-## The L8 guard drone's round, outside the pylons between their filigree bands.
-const SIPHON_ESCORT_RADIUS := 1.5
-const SIPHON_ESCORT_HEIGHT := 2.3
 
 ## The high levels' arcs: cyan at the Chrome tier, violet from the Obsidian tier. From the Obsidian
 ## tier the pylons' faces to the camera carry glowing violet vein panels (the walls' violet field:
@@ -823,8 +820,8 @@ static var VEIN_PANEL := Surf.make(MaterialKit.Layer.GLOW, Parts.CORE_GLOW_TINT,
 ## corner. L6 (Obsidian): obsidian pylons with glowing violet vein panels and violet rings, an
 ## obsidian ring hovering over the core, violet arcs. L7 crystal inlays at the pylons' feet and
 ## crystal crowns on their heads. L8 (Crown): gold filigree bands round the pylons, a halo glowing over the core (its crown),
-## the loudest arcs (a second from each tip to the halo, and one between each two tips), and a
-## guard drone orbiting round the pylons as the escort.
+## and the loudest arcs (a second from each tip to the halo, and one between each two tips). It
+## has no escort: its arcs and halo are its life.
 static func build_antimatter_siphon(p: Parts, level: int) -> void:
 	var m := p.body
 	var gold := p.tier >= Parts.Tier.GOLD
@@ -901,8 +898,6 @@ static func build_antimatter_siphon(p: Parts, level: int) -> void:
 		var tilt := Vector3(12, 0, 0)
 		Parts.torus(s, 1.05, 0.07, 24, 10, -LowPolyMesh.turn(Vector3(0, 0.07, 0), tilt),
 			Parts.GOLD_ROUND if gold else Parts.HULL_MID_ROUND, tilt)
-	if level >= 8:
-		Parts.escort_drone(p, SIPHON_ESCORT_RADIUS, SIPHON_ESCORT_HEIGHT, 0.7)
 
 
 ## A field pylon on the pedestal's rim: a column on a foot with an antimatter band, its
