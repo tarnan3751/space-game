@@ -12,8 +12,8 @@ extends RefCounted
 ## Fabricator and the Nanite Foundry eight, the Drydock and the Alliance Beacon seven, through the
 ## higher tiers (docs/reference/art-style.md, **Tiers**): chrome with cyan strips, then obsidian
 ## veined violet with crystal inlays and a hovering ring, drone or platform, then gold filigree
-## over the obsidian, the antimatter core glowing and an escort (Parts.escort_*) as the fourth
-## moving part. The army's orange stays its accent through them, and the foundry's goo stays
+## over the obsidian and the antimatter core glowing, with, on the hangar, the academy and the
+## drydock, an escort as the fourth moving part. The army's orange stays its accent through them, and the foundry's goo stays
 ## green. The surfaces follow the tier (_plating, _strip, _glow, _trim), the parts the level.
 ##
 ## BuildingModels calls one static build_<type>(p: Parts, level: int) per type. Each builds
@@ -125,15 +125,12 @@ static var BRIGHT_HALO := Surf.make(MaterialKit.Layer.GLOW, Color("c9a2ff"), 1.0
 ## The fabricator's: chrome roller doors, crystal-lit smoke.
 static var CHROME_ROLLER := Surf.make(MaterialKit.Layer.VENT, Parts.CHROME_TINT, 2.0, Surf.GLOSSY)
 static var CRYSTAL_SMOKE := Surf.make(MaterialKit.Layer.GLOW, MaterialKit.CRYSTAL, 1.0, Surf.HOLO | Surf.BOB, true)
-## The heavy fabricator's: the pour and its hot core in crystal pink; the violet sparks; the plate
-## its escort hauls and the slings it hangs from, bobbing with the skiff (its phase).
+## The heavy fabricator's: the pour and its hot core in crystal pink; the violet sparks.
 static var CRYSTAL_POUR := Surf.make(MaterialKit.Layer.GLOW, MaterialKit.CRYSTAL, 1.0, Surf.UNLIT | Surf.FLOW, false, true,
 	0.7)
 static var HOT_CRYSTAL_POUR := Surf.make(MaterialKit.Layer.GLOW, MaterialKit.CRYSTAL.lerp(Color.WHITE, 0.5), 1.0,
 	Surf.UNLIT | Surf.FLOW, false, true, 0.8)
 static var VIOLET_SPARK := Surf.make(MaterialKit.Layer.GLOW, Parts.CORE_GLOW_TINT, 1.0, Surf.UNLIT | Surf.FLICKER)
-static var HAUL_PLATE := Surf.make(MaterialKit.Layer.CHROME, Parts.CHROME_TINT, 1.0, Surf.GLOSSY | Surf.BOB, false, true, 0.3)
-static var SLING := Surf.make(MaterialKit.Layer.FLAT, MaterialKit.GUNMETAL, 1.0, Surf.BOB, true, false, 0.3)
 ## The research lab's: screens glowing cyan, their rows scrolling (phased() sets the speed).
 static var CYAN_SCREEN := Surf.make(MaterialKit.Layer.SCREEN, MaterialKit.ENERGY, 1.0, Surf.UNLIT | Surf.FLOW)
 ## The nanite foundry's: cyan pipes, their bands flowing; the goo brighter, rising and swirling;
@@ -794,8 +791,7 @@ static func _drill_drone(m: LowPolyMesh, at: Vector3) -> void:
 ## its top, the smoke crystal-lit; L9 crystal inlays on the armour and an assembler ring
 ## hovering over the dock, obsidian rimmed in violet; L10 gold filigree over the sawtooth roof and
 ## the cranes' bridges, the antimatter core glowing as a bright orb between gold prongs on the
-## storey's roofline, and a guard drone, the factory's product, half again the helpers' size,
-## circling wide over the dock above the smoke as its escort.
+## storey's roofline.
 static func build_fabricator(p: Parts, level: int) -> void:
 	var m := p.body
 	var g := Parts.PAD_HEIGHT
@@ -915,8 +911,6 @@ static func build_fabricator(p: Parts, level: int) -> void:
 			var degrees := 45.0 + 90.0 * k
 			m.cone(0.035, 0.42, 8, core + Parts.around(0.27, degrees, 0.06), GOLD_ROUND,
 				Parts.facing(Parts.around(0.25, degrees, 1.0)))
-		# The guard drone, half again the helpers' size, circles wide over the stacks' smoke.
-		Parts.escort_drone(p, 1.45, 3.2, 0.7, Vector3.ZERO, 1.5)
 
 
 ## A smokestack standing on `foot`: a ribbed pipe with an orange band and a glowing mouth, and
@@ -972,8 +966,7 @@ static func _yard_crane(p: Parts) -> void:
 ## armour slabs, violet veins between the side slabs, a violet band round the hall's top and the
 ## pour crystal pink; L7 a forge ring hovering round each press head over its anvil, obsidian
 ## rimmed in violet; L8 gold filigree over the roof block and the hall's top, the antimatter core
-## glowing in a crowned gold ring on the roof block, the anvils' sparks violet, and a hover skiff
-## hauling a plate round the hall as its escort.
+## glowing in a crowned gold ring on the roof block and the anvils' sparks violet.
 static func build_heavy_fabricator(p: Parts, level: int) -> void:
 	var m := p.body
 	var g := Parts.PAD_HEIGHT
@@ -1052,15 +1045,6 @@ static func build_heavy_fabricator(p: Parts, level: int) -> void:
 			m.ring(0.36, 0.46, 0.06, 24, ring, HOVER)
 			m.lathe(PackedVector2Array([Vector2(0.465, 0.01), Vector2(0.465, 0.05)]), 24, ring, HOVER_RIM)
 			m.lathe(PackedVector2Array([Vector2(0.44, 0.062), Vector2(0.38, 0.062)]), 24, ring, HOVER_RIM)
-	if crown:
-		# A skiff hauling a chrome plate round the hall on two slings, high enough that the plate
-		# clears the tallest stack's smoke.
-		var radius := 1.15
-		var skiff := Parts.escort_skiff(p, radius, 3.6, -0.5)
-		var under := Vector3(radius, -0.32, 0)
-		skiff.box_chamfered(Vector3(0.26, 0.04, 0.22), 0.015, under, HAUL_PLATE)
-		for z: float in [-0.08, 0.08]:
-			skiff.box(Vector3(0.015, 0.29, 0.015), under + Vector3(0, 0.03, z), SLING)
 
 
 ## A press arm: a turret on the hall's roof at `shoulder`, a fat orange boom up to an elbow
@@ -1105,8 +1089,7 @@ static func _press_arm(p: Parts, shoulder: Vector3, anvil: Vector3, phase: float
 ## band of light; L8 the rings obsidian, violet vein panels between the screens, a crystal lens in
 ## the telescope and the hologram violet; L9 a ring of rings hovering round the hologram, raised
 ## clear of the telescope's nod, turning; L10 gold filigree bands on the rings and the dome's
-## seams, a violet core beacon on the dome's crown, the hologram's rings gold, and a probe drone
-## circling above the dome as its escort.
+## seams, a violet core beacon on the dome's crown and the hologram's rings gold.
 static func build_research_lab(p: Parts, level: int) -> void:
 	var m := p.body
 	var g := Parts.PAD_HEIGHT
@@ -1230,8 +1213,7 @@ static func _lab_corners(p: Parts, level: int) -> void:
 ## round it, under a bigger dome (chrome, with filigree seams at Crown) cut by the glowing slit;
 ## the longer telescope nodding along it, a crystal lens in it from the Obsidian tier; the
 ## hologram over the dome, violet from the Obsidian tier; from 9 a ring of rings hovering round
-## it, turning, gold at Crown; at 10 a violet core beacon on the dome's crown under the hologram,
-## and a probe drone circling above the dome.
+## it, turning, gold at Crown; at 10 a violet core beacon on the dome's crown under the hologram.
 static func _lab_tower(p: Parts, foot: Vector3, level: int) -> void:
 	var m := p.body
 	var obsidian := p.tier >= Parts.Tier.OBSIDIAN
@@ -1302,8 +1284,6 @@ static func _lab_tower(p: Parts, foot: Vector3, level: int) -> void:
 			Parts.torus(gyro, 0.075, 0.022, 8, 6, Parts.around(0.48, degrees, -0.045), HOVER_RIM,
 				Vector3(90, 90 - degrees, 0))
 	_lab_corners(p, level)
-	if level >= 10:
-		Parts.escort_drone(p, 1.2, subject.y, 0.6, Vector3.ZERO, 2.0)
 
 
 ## The lab's band of light round a ring's lip: cyan at the Chrome tier, violet veins from the
@@ -1338,8 +1318,8 @@ static func _antenna(m: LowPolyMesh, foot: Vector3, height: float, foot_surf: Su
 ## L7 obsidian
 ## vats veined violet, their rims glowing violet, crystal elbows on the pipes, the goo brighter
 ## in taller glass, and a stirrer ring hovering over the big vat, turning against the stirrer;
-## L8 gold filigree rims and gold caps, the antimatter core glowing on the pump tower in a gold
-## crown, and a guard drone circling over the vats as its escort.
+## L8 gold filigree rims and gold caps and the antimatter core glowing on the pump tower in a gold
+## crown.
 static func build_nanite_foundry(p: Parts, level: int) -> void:
 	var m := p.body
 	var g := Parts.PAD_HEIGHT
@@ -1423,9 +1403,6 @@ static func build_nanite_foundry(p: Parts, level: int) -> void:
 			var degrees := 45.0 + 90.0 * k
 			hover.cone(0.04, 0.16, 8, Parts.around(0.31, degrees, 0.03), HOVER_CRYSTAL,
 				Parts.facing(Parts.around(-1.0, degrees, 0.0)))
-	if level >= 8:
-		# The guard drone circles over the vats and the hovering ring.
-		Parts.escort_drone(p, 1.25, stir + 0.95, 0.65, Vector3.ZERO, 2.0)
 
 
 ## The pump tower from 5 (_nanite_foundry's), on `foot`, `tall` high: a chrome block with goo
@@ -1803,8 +1780,7 @@ static func _hull_radius(profile: PackedVector2Array, along: float) -> float:
 ## under each ring; L6 obsidian legs with violet veins down their faces, the rings' lights violet,
 ## a crystal emitter orb and an obsidian ring hovering round the tower's upper reach, turning,
 ## rimmed in violet; L7 gold filigree legs, the orb the antimatter core's bright violet
-## under a gold halo, a violet hologram beam rising from it, and a hover skiff circling the tower
-## over the dish, the allies arriving, as its escort.
+## under a gold halo and a violet hologram beam rising from it.
 static func build_alliance_beacon(p: Parts, level: int) -> void:
 	var m := p.body
 	var g := Parts.PAD_HEIGHT
@@ -1928,7 +1904,3 @@ static func build_alliance_beacon(p: Parts, level: int) -> void:
 		hover.lathe(PackedVector2Array([Vector2(0.62, 0.062), Vector2(0.52, 0.062)]), 24, Vector3.ZERO, HOVER_RIM)
 		for k: int in 4:
 			hover.cone(0.04, 0.16, 8, Parts.around(0.57, 90.0 * k, 0.06), HOVER_CRYSTAL)
-	if level >= 7:
-		# The allies arriving: a skiff circling the tower over the dish, inside the hovering ring's
-		# reach outward and below the emitter.
-		Parts.escort_skiff(p, 1.15, top - 0.15, 0.55, Vector3.ZERO, 1.5)
