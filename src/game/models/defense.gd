@@ -146,7 +146,7 @@ const LASER_PLINTHS := [0.5, 0.5, 0.58, 0.58, 0.64]
 const LASER_LIFTS := [0.3, 0.54, 0.62, 0.72, 0.86]
 ## The L9 targeting ring's and the L10 spotter drone's heights over the dome's top, and the drone's
 ## round.
-const LASER_RING_LIFT := 0.3
+const LASER_RING_LIFT := 0.45
 const LASER_ESCORT_RADIUS := 1.15
 const LASER_ESCORT_LIFT := 0.85
 ## The missile battery from L6: its tubes' spacing, half the slot between its pods where the radar
