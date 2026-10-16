@@ -4,10 +4,10 @@ extends HarnessScenario
 ## swatches across the screen, one per surface in _swatches()' order (Base hull-light, plate,
 ## gunmetal, gold trim, chrome; cyan strip, obsidian, veins, filigree, core glow), each a chamfered
 ## cube and a drum beside it (on the surface's smooth version where it has one), and before the
-## rows a 3x3 pad with the three escorts (Parts.escort_drone, escort_skiff, escort_troopers)
-## orbiting it. Left of the pad, the shared effects: a lightning arc between two posts on
-## Parts.spark (the slow LIGHTNING crackle) beside a cluster of point sparks on plain FLICKER (the
-## fast one); right of it, a stack with Parts.puffs rising from its mouth.
+## rows a 3x3 pad with the four escorts (Parts.escort_drone, escort_skiff, escort_troopers,
+## escort_guard) orbiting it. Left of the pad, the shared effects: a lightning arc between two posts
+## on Parts.spark (the slow LIGHTNING crackle) beside a cluster of point sparks on plain FLICKER
+## (the fast one); right of it, a stack with Parts.puffs rising from its mouth.
 ##
 ## It logs each swatch by index with its layer and flags, and checks that every swatch's layer is
 ## within the kit, that each escort is at most ESCORT_TRIANGLES body triangles and stays within
@@ -66,8 +66,9 @@ func run(main: MainScript) -> void:
 		Parts.escort_drone(pad, 1.3, 1.2, 0.8),
 		Parts.escort_skiff(pad, 1.0, 0.7, -0.6),
 		Parts.escort_troopers(pad, 1.3, Parts.PAD_HEIGHT, 0.4),
+		Parts.escort_guard(pad, 1.0, 1.8, -0.5),
 	]
-	var names: Array[String] = ["drone", "skiff", "troopers"]
+	var names: Array[String] = ["drone", "skiff", "troopers", "guard"]
 	var bound := PAD_SIZE * 0.5 + 0.15
 	for k: int in escorts.size():
 		var reach := 0.0

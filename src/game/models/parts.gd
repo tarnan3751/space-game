@@ -359,6 +359,19 @@ static var SKIFF_GLOW := Surf.make(MaterialKit.Layer.GLOW, MaterialKit.ENERGY, 1
 static var TROOPER_PLATE := Surf.make(MaterialKit.Layer.PLATE, MaterialKit.ARMY, 2.0)
 static var TROOPER_LIMB := Surf.make(MaterialKit.Layer.HULL, MaterialKit.HULL_MID, 2.0)
 static var TROOPER_HELMET := Surf.make(MaterialKit.Layer.HULL, MaterialKit.HULL_LIGHT, 1.0, Surf.LIT, true)
+## The security bot's surfaces, every one bobbing together on GUARD_PHASE: cream hull armour,
+## gunmetal pods and antenna, a dark chest plate, a gold lip, the red visor and antenna tip, and
+## the cyan pod tips and thruster skirt.
+const GUARD_PHASE := 0.6
+static var GUARD_ARMOUR := Surf.make(MaterialKit.Layer.HULL, MaterialKit.HULL_LIGHT, 1.0, Surf.BOB, false, true, GUARD_PHASE)
+static var GUARD_GUNMETAL := Surf.make(MaterialKit.Layer.PLATE, MaterialKit.GUNMETAL, 1.0, Surf.BOB, true, true, GUARD_PHASE)
+static var GUARD_CHEST := Surf.make(MaterialKit.Layer.HULL, MaterialKit.HULL_DARK, 1.0, Surf.BOB, false, true, GUARD_PHASE)
+static var GUARD_LIP := Surf.make(MaterialKit.Layer.FLAT, MaterialKit.CORE_GOLD, 1.0, Surf.GLOSSY | Surf.BOB, false, true,
+	GUARD_PHASE)
+static var GUARD_VISOR := Surf.make(MaterialKit.Layer.GLOW, MaterialKit.DEFENCE, 1.0, Surf.UNLIT | Surf.PULSE | Surf.BOB, true,
+	true, GUARD_PHASE)
+static var GUARD_GLOW := Surf.make(MaterialKit.Layer.GLOW, MaterialKit.ENERGY, 1.0, Surf.UNLIT | Surf.PULSE | Surf.BOB, true,
+	true, GUARD_PHASE)
 
 
 ## A small quadrotor guard drone, a third the size of the drone bay's (times `scale`), orbiting
@@ -383,6 +396,38 @@ static func escort_drone(p: Parts, radius: float, height: float, rate: float,
 		var hub := at + around(0.1, degrees, 0.005) * z
 		s.box(Vector3(0.07, 0.016, 0.02) * z, at + around(0.065, degrees, -0.003) * z, HULL_MID, Vector3(0, -degrees, 0))
 		s.disc(0.035 * z, 8, hub, ESCORT_ROTOR.phased(0.9 if k % 2 == 0 else 0.1))
+	return s
+
+
+## A security bot patrolling round the footprint's centre (or `centre` on the ground) `radius` out
+## and `height` up (its middle) at `rate` radians a second: a robust hover sentinel, unlike the
+## drones and the skiff. A chunky chamfered cream hull body wider than tall, a gold lip round its
+## foot, a dark chest plate under one wide red visor strip, two stubby gunmetal weapon pods on its
+## shoulders with cyan tips, a short antenna nub and a thin cyan thruster skirt glowing round its
+## lower edge, under the lip, where the camera sees it, every part bobbing together, `scale` times
+## its own size (0.36 across its travel, 0.18 tall, 0.26 long). About 0.3 times `scale` from its
+## centre to its pods' ends: keep its round within the extent. Returns the moving part.
+static func escort_guard(p: Parts, radius: float, height: float, rate: float,
+		centre: Vector3 = Vector3.ZERO, scale: float = 1.0) -> LowPolyMesh:
+	var s := p.moving(centre + Vector3(0, height, 0), Motion.spin(Vector3.UP, rate))
+	var at := Vector3(radius, 0, 0)
+	var z := scale
+	var heading := Vector3(0, 180.0 if rate > 0.0 else 0.0, 0)
+	var forward := heading + Vector3(90, 0, 0)
+	s.box_chamfered(Vector3(0.36, 0.18, 0.26) * z, 0.05 * z, at + Vector3(0, -0.09, 0) * z, GUARD_ARMOUR, heading)
+	s.box_chamfered(Vector3(0.38, 0.035, 0.28) * z, 0.012 * z, at + Vector3(0, -0.09, 0) * z, GUARD_LIP, heading)
+	s.box_chamfered(Vector3(0.22, 0.075, 0.03) * z, 0.012 * z, at + LowPolyMesh.turn(Vector3(0, -0.05, 0.13) * z, heading),
+		GUARD_CHEST, heading)
+	s.box_chamfered(Vector3(0.3, 0.045, 0.03) * z, 0.01 * z, at + LowPolyMesh.turn(Vector3(0, 0.03, 0.13) * z, heading),
+		GUARD_VISOR, heading)
+	for side: float in [-1.0, 1.0]:
+		s.box_chamfered(Vector3(0.08, 0.08, 0.2) * z, 0.02 * z, at + LowPolyMesh.turn(Vector3(side * 0.21, 0, 0.05) * z, heading),
+			GUARD_GUNMETAL, heading)
+		s.disc(0.026 * z, 8, at + LowPolyMesh.turn(Vector3(side * 0.21, 0.04, 0.151) * z, heading), GUARD_GLOW, forward)
+	s.box_chamfered(Vector3(0.39, 0.035, 0.29) * z, 0.01 * z, at + Vector3(0, -0.125, 0) * z, GUARD_GLOW, heading)
+	var nub := at + LowPolyMesh.turn(Vector3(0.1, 0.09, -0.07) * z, heading)
+	s.prism(0.03 * z, 0.024 * z, 0.06 * z, 8, nub, GUARD_GUNMETAL)
+	s.dome(0.026 * z, 0.025 * z, 8, 2, nub + Vector3(0, 0.06, 0) * z, GUARD_VISOR)
 	return s
 
 
