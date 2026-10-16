@@ -137,6 +137,9 @@ static var CHROME_RIBBED := Surf.make(MaterialKit.Layer.PIPE, Parts.CHROME_TINT,
 static var OBSIDIAN_RIBBED := Surf.make(MaterialKit.Layer.PIPE, Parts.OBSIDIAN_TINT, 2.0, Surf.GLOSSY, true)
 ## The ion beam's lens from L3: cyan crystal glowing unlit, swelling.
 static var ION_LENS := Surf.make(MaterialKit.Layer.CRYSTAL, MaterialKit.ENERGY, 2.0, Surf.UNLIT | Surf.PULSE, true)
+## The orbital cannon's spire lens from the Obsidian tier: the light violet of the Crown's cores,
+## swelling, so it stays the brightest thing on the spire.
+static var LENS_VIOLET := _glow(CORE_LIGHT, Surf.PULSE)
 
 ## The horizontal direction towards the camera (IsoCamera's yaw): vein panels go on the faces
 ## turned to it.
@@ -250,6 +253,16 @@ const ORBITAL_PITCHES := [35.0, 31.0, 28.0]
 ## second and the third, as shares of the barrel between its first coil's place and its muzzle.
 const ORBITAL_BANDS := [0.08, 0.42, 0.84]
 const ORBITAL_RING_AT := 0.63
+## The fire-control spire on the left corner: its tower's steps from the foot up, each [width,
+## height], its lens's height over the foot, the halo's radius round the lens and its vanes' reach
+## out from it, and from L4 the targeting beam's length up from the lens.
+const ORBITAL_STEPS := [Vector2(0.34, 0.8), Vector2(0.27, 0.7), Vector2(0.2, 0.5)]
+const ORBITAL_SPIRE := 2.2
+const ORBITAL_HALO := 0.6
+const ORBITAL_VANE := 0.48
+const ORBITAL_BEAM := 1.3
+## The way the spire's lens faces: towards the camera, tilted up to meet its 35-degree look down.
+const TOWARD_LENS := Vector3(0.5792, 0.5736, 0.5792)
 
 
 ## From L6 the head rides a mount that lifts it a little more each level, on a taller plinth.
@@ -1475,15 +1488,19 @@ static func build_ion_beam(p: Parts, level: int) -> void:
 	_ion_crown(m, _at(lens, Vector3(0, 0.02, 0), aim), 0.36, 5, 0.24, aim)
 
 
-## From L3 the barrel grows longer each level and stands steeper, so it climbs higher within the
-## footprint, one clean mass with three bold accelerator rings in place of the coils. L3 (Chrome):
-## chrome plinth, bunker, breech and barrel, the rings chrome banded in cyan, the pad's cells
-## ribbed chrome. L4 (Obsidian): a taller plinth with glowing violet vein panels on its faces the
-## camera sees, the bunker, breech, barrel and cells obsidian, veins round the plinth's top and the
-## bunker, crystal inlays on the plinth's corners, the rings banded and the bunker's lamps and the
-## cells' caps violet, and an uplink ring hovering round the barrel, turning about it. L5 (Crown):
-## gold filigree round the plinth and on the rings' collars, the antimatter core glowing light
-## violet in the breech, and a gold crown round the muzzle.
+## A fire-control spire stands on the bunker's left corner at every level: a tower of three square
+## steps with trim lips, the top one glowing, a big glowing targeting lens in a gold rim, in a
+## chunky housing on top facing the camera, and round the lens a halo of three big pointed red vanes
+## turning slowly. From L3 the barrel grows longer each level and stands steeper, so it climbs
+## higher within the footprint, one clean mass with three bold accelerator rings in place of the
+## coils. L3 (Chrome): chrome plinth, bunker, breech and barrel, the rings chrome banded in cyan,
+## the pad's cells ribbed chrome. L4 (Obsidian): a taller plinth with glowing violet vein panels on
+## its faces the camera sees, the bunker, breech, barrel and cells obsidian, veins round the
+## plinth's top and the bunker, crystal inlays on the plinth's corners, the rings banded and the
+## bunker's lamps and the cells' caps violet, the spire's lens and lip violet, a violet targeting
+## beam rising from the lens, and an uplink ring hovering round the barrel, turning about it. L5
+## (Crown): gold filigree round the plinth and on the rings' collars, the antimatter core glowing
+## light violet in the breech, and a gold crown round the muzzle.
 static func build_orbital_cannon(p: Parts, level: int) -> void:
 	var m := p.body
 	var plinth := 0.32 if level < 3 else float(ORBITAL_PLINTHS[level - 3])
@@ -1527,7 +1544,7 @@ static func build_orbital_cannon(p: Parts, level: int) -> void:
 		var coils := 2 + level
 		for i: int in coils:
 			var at := 0.5 + (length - 0.7) * i / (coils - 1)
-			Parts.torus(gun, 0.315, 0.04, 24, 10, _at(barrel, Vector3(0, at, 0), aim), ION_PULSE.phased(Parts.chase(i, coils)),
+			Parts.torus(gun, 0.315, 0.04, 24, 6, _at(barrel, Vector3(0, at, 0), aim), ION_PULSE.phased(Parts.chase(i, coils)),
 				aim)
 	else:
 		var collar := Parts.FILIGREE if p.tier >= Parts.Tier.CROWN else _by_tier(p.tier, Parts.CHROME_ROUND, Parts.CHROME_ROUND,
@@ -1538,20 +1555,37 @@ static func build_orbital_cannon(p: Parts, level: int) -> void:
 			gun.tube(0.29, 0.4, 0.14, 24, at, collar, aim)
 			Parts.torus(gun, 0.4, 0.05, 24, 10, _at(at, Vector3(0, 0.02, 0), aim), band.phased(Parts.chase(k, 3)), aim)
 	if level >= 2:
-		Parts.torus(m, 1.0, 0.04, 24, 10, Vector3(0, deck - 0.04, 0), GOLD if p.tier >= Parts.Tier.GOLD else SHELL_MID)
-	# The radar mast and dish stay chrome from the Chrome tier up, a bright mark on the dark
-	# Obsidian and Crown bunkers, as the missile battery's and the flak cannon's do.
-	var mast := Parts.around(1.3, 135.0, top + 0.24)
-	m.prism(0.08, 0.06, 0.9, 16, mast, _by_tier(p.tier, Parts.GUNMETAL, Parts.CHROME_ROUND, Parts.CHROME_ROUND))
-	var radar := p.moving(mast + Vector3(0, 0.9, 0), Motion.spin(Vector3.UP, 0.8))
-	var dish_aim := Vector3(55, SCREEN_RIGHT + 60.0, 0)
-	radar.lathe(PackedVector2Array([
-		Vector2(0.08, 0), Vector2(0.48, 0.16), Vector2(0.45, 0.2), Vector2(0, 0.06),
-	]), 24, Vector3.ZERO, _by_tier(p.tier, SHELL, Parts.CHROME_ROUND, Parts.CHROME_ROUND), dish_aim)
-	var feed := LowPolyMesh.turn(Vector3(0, 0.06, 0), dish_aim)
-	var horn := LowPolyMesh.turn(Vector3(0, 0.42, 0), dish_aim)
-	radar.prism(0.02, 0.02, feed.distance_to(horn), 8, feed, Parts.ROD, Parts.facing(horn - feed))
-	radar.orb(0.06, 12, 6, horn, ION_PULSE)
+		Parts.torus(m, 1.0, 0.04, 24, 6, Vector3(0, deck - 0.04, 0), GOLD if p.tier >= Parts.Tier.GOLD else SHELL_MID)
+	# The fire-control spire: a stepped tower, chrome from the Chrome tier up, a bright mark on the
+	# dark Obsidian and Crown bunkers, a trim lip at each step and a glowing one at its top; its lens
+	# and lip glow cyan, violet from the Obsidian tier.
+	var spire := Parts.around(1.3, 135.0, top + 0.24)
+	var lens_glow := _by_tier(p.tier, ION_PULSE, Parts.CYAN_STRIP, LENS_VIOLET)
+	var trim := GOLD if p.tier >= Parts.Tier.GOLD else Parts.GUNMETAL
+	var rise := 0.0
+	for k: int in ORBITAL_STEPS.size():
+		var step: Vector2 = ORBITAL_STEPS[k]
+		m.box_chamfered(Vector3(step.x, step.y, step.x), 0.04, spire + Vector3(0, rise, 0),
+			_by_tier(p.tier, Parts.GUNMETAL, Parts.CHROME, Parts.CHROME))
+		rise += step.y
+		if k < ORBITAL_STEPS.size() - 1:
+			m.box_chamfered(Vector3(step.x + 0.06, 0.06, step.x + 0.06), 0.02, spire + Vector3(0, rise - 0.06, 0),
+				lens_glow if k == ORBITAL_STEPS.size() - 2 else trim)
+	var lens := spire + Vector3(0, ORBITAL_SPIRE, 0)
+	var lens_aim := Parts.facing(TOWARD_LENS)
+	Parts.drum(m, 0.48, 0.2, 0.05, 16, lens - TOWARD_LENS * 0.14, _by_tier(p.tier, ARMOUR_ROUND, Parts.CHROME_ROUND,
+		Parts.CHROME_ROUND), lens_aim)
+	m.tube(0.4, 0.47, 0.05, 16, lens + TOWARD_LENS * 0.06, trim, lens_aim)
+	m.disc(0.4, 16, lens + TOWARD_LENS * 0.065, lens_glow, lens_aim)
+	# The halo turns slowly round the lens: a ring and three pointed vanes swept back from it.
+	var halo := p.moving(lens, Motion.spin(Vector3.UP, 0.4))
+	Parts.torus(halo, ORBITAL_HALO, 0.04, 16, 4, Vector3(0, -0.04, 0), trim)
+	for k: int in 3:
+		var degrees := 120.0 * k + 30.0
+		_vane(halo, Parts.around(ORBITAL_HALO, degrees, 0.0), Parts.around(ORBITAL_HALO + ORBITAL_VANE, degrees + 28.0, 0.2),
+			0.26, 0.1, ARMOUR)
+	if level >= 4:
+		m.prism(0.07, 0.03, ORBITAL_BEAM, 12, lens + TOWARD_LENS * 0.07, Parts.CORE_GLOW)
 	# Lights round the bunker's lower tier blink in a chase.
 	for k: int in 8:
 		m.orb(0.07, 8, 3, Parts.around(1.2, 22.5 + 45.0 * k, bunker + 0.01),
@@ -1733,6 +1767,24 @@ static func _ion_crown(m: LowPolyMesh, pos: Vector3, radius: float, points: int,
 	for k: int in points:
 		m.cone(spike * 0.35, spike, 8, pos + LowPolyMesh.turn(Parts.around(radius - 0.0175, 360.0 * k / points + 90.0, 0.06), rot),
 			Parts.GOLD_ROUND, rot)
+
+
+## A pointed vane from `root` to `tip`: a blade `width` wide and `thick` thick at its widest, a
+## third of the way out, tapering to a point at either end, lying flat across the up direction.
+static func _vane(s: LowPolyMesh, root: Vector3, tip: Vector3, width: float, thick: float, surf: Surf) -> void:
+	var along := tip - root
+	var side := Vector3.UP.cross(along).normalized() * width * 0.5
+	var up := along.cross(side).normalized() * thick * 0.5
+	var mid := root + along * 0.33
+	var waist: Array[Vector3] = [mid + side, mid + up, mid - side, mid - up]
+	for i: int in 4:
+		for end: Vector3 in [tip, root]:
+			var a := waist[i]
+			var b := waist[(i + 1) % 4]
+			if (b - a).cross(end - a).dot((a + b + end) / 3.0 - mid) < 0.0:
+				s.triangle(a, end, b, surf)
+			else:
+				s.triangle(a, b, end, surf)
 
 
 ## The cloaked sentry's gun: a low head on the lid with a short barrel and a red sight. From L4 a
