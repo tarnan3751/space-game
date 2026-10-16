@@ -14,11 +14,12 @@ extends HarnessScenario
 ## the relief is full (BaseView.blend_end) wanders by more than BLEND_WANDER; that at the widest
 ## zoom in a WIDE window, the focus at each corner of its bounds, the ray from every screen corner
 ## meets the terrain; and that in a WIDER window, focused on the field's nearest corner, it does
-## not, so the sky shows; and, rendered only, that at the start zoom the ground just inside the
-## field's two far sides and just outside them differs by under EDGE_STEP (_check_edge_step), and
+## not, so the sky shows; and, rendered only, that at the start zoom, focused EDGE_VIEW in from the
+## field's far corner, the ground just inside the field's two far sides and just outside them
+## differs by under EDGE_STEP (_check_edge_step), and
 ## that in the widest shot the field's quarters and two flat stretches of the ring average to the
 ## same shade, the value noise they share divided out (_check_field_shade). Screenshots: the
-## start zoom, the closest on the field, the closest on a point where four of the field texture's
+## start zoom, the far sides at it, the closest on the field, the closest on a point where four of the field texture's
 ## tiles meet (nothing should show where they do), a wider stretch of the field, the perimeter at
 ## the middle of each side, a side and a corner of it at the closest zoom, the widest in the WIDE
 ## window and in the WIDER one on the nearest corner (stars beyond the ring, no bare colour), the
@@ -47,9 +48,9 @@ const WIDEST := Vector2i(1600, 400)
 ## The field's shade against the ring's in the widest shot: the centres of the field's four
 ## quarters (clear of the buildings), two flat stretches of the ring, the box averaged round each
 ## in pixels, and how far the two averages may differ in HSL lightness and saturation.
-const FIELD_QUARTERS: Array[Vector3] = [Vector3(-10, 0, -10), Vector3(10, 0, -10), Vector3(10, 0, 10),
-	Vector3(-10, 0, 10)]
-const RING_FLATS: Array[Vector3] = [Vector3(9, 0, -26.5), Vector3(26, 0, -9.5)]
+const FIELD_QUARTERS: Array[Vector3] = [Vector3(-12, 0, -12), Vector3(12, 0, -12), Vector3(12, 0, 12),
+	Vector3(-12, 0, 12)]
+const RING_FLATS: Array[Vector3] = [Vector3(15.5, 0, -30), Vector3(30, 0, -1)]
 const SHADE_BOX := Vector2i(80, 40)
 const SHADE_L := 0.01
 const SHADE_S := 0.02
@@ -57,12 +58,15 @@ const SHADE_S := 0.02
 ## its strength either way.
 const MACRO_CELLS := 12.0
 const MACRO := 0.06
-## The step at the field's edge in the start shot: on each side whose strip outside the edge lies
+## The step at the field's edge at the start zoom, the focus EDGE_VIEW in from the field's far
+## corner along each axis (so the two far sides show as far as the start view showed them on the
+## 40x40 field, whose far corner lay that far from its centre): on each side whose strip outside the edge lies
 ## clear of the perimeter (the two far from the camera, by the screen corner each faces, with its
 ## outward direction), the ground EDGE_IN inside the edge and EDGE_IN outside it, sampled every
 ## EDGE_EVERY cells along the side in a box of EDGE_BOX pixels, and the most the medians of the two
 ## may differ in any channel, in 255ths.
 const EDGE_SIDES := {"top-left": Vector2(-1, 0), "top-right": Vector2(0, -1)}
+const EDGE_VIEW := 20.0
 const EDGE_IN := 0.5
 const EDGE_EVERY := 1
 const EDGE_BOX := Vector2i(8, 4)
@@ -151,12 +155,14 @@ func run(main: MainScript) -> void:
 			"%.1f out from the %s side the ground is %.2f to %.2f high, its relief full %.1f to %.1f out"
 			% [EDGE_OUT, side, heights.x, heights.y, full.x, full.y])
 	await _shot(main, "start", Vector3.ZERO, main.camera.size)
+	var far := field.position + Vector2.ONE * EDGE_VIEW
+	await _shot(main, "far-sides", Vector3(far.x, 0.0, far.y), IsoCamera.START_ZOOM_SIZE)
 	_check_edge_step(main)
-	await _shot(main, "closest-field", view.cell_to_world(Vector2i(9, 9), 1), IsoCamera.MIN_ZOOM_SIZE)
-	# Cells (12, 28) are a corner of the field texture's tiles, which are 4 cells square.
-	var tile_corner := field.position + Vector2(12, 28)
+	await _shot(main, "closest-field", view.cell_to_world(Vector2i(13, 13), 1), IsoCamera.MIN_ZOOM_SIZE)
+	# Cells (16, 32) are a corner of the field texture's tiles, which are 4 cells square.
+	var tile_corner := field.position + Vector2(16, 32)
 	await _shot(main, "tile-corner", Vector3(tile_corner.x, 0.0, tile_corner.y), IsoCamera.MIN_ZOOM_SIZE)
-	await _shot(main, "tiles", view.cell_to_world(Vector2i(12, 26), 1), 12.0)
+	await _shot(main, "tiles", view.cell_to_world(Vector2i(16, 30), 1), 12.0)
 	main.camera.bounds = field.grow(BaseView.TERRAIN_EXTENT - field.end.x)
 	var curb := field.end + Vector2.ONE * (BaseView.CURB_GAP + BaseView.CURB_WIDTH * 0.5)
 	for side: String in sides:

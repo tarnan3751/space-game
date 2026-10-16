@@ -10,7 +10,7 @@
     { "id": "defense", "name": "Defence" },
     { "id": "traps", "name": "Traps" }
   ],
-  "grid": { "width": 40, "height": 40 },
+  "grid": { "width": 48, "height": 48 },
   "menu_order": [
     "drone_bay",
     "metal_extractor",
@@ -48,8 +48,8 @@
   "start": {
     "resources": { "metal": 750, "crystal": 750, "antimatter": 0 },
     "buildings": [
-      { "type": "command_center", "cell": [18, 18], "level": 1 },
-      { "type": "drone_bay", "cell": [24, 19], "level": 1 }
+      { "type": "command_center", "cell": [22, 22], "level": 1 },
+      { "type": "drone_bay", "cell": [28, 23], "level": 1 }
     ]
   }
 }

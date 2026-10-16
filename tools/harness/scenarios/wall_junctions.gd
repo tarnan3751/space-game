@@ -18,9 +18,9 @@ extends HarnessScenario
 
 const WALL := "barrier_wall"
 const WallModels := preload("res://src/game/models/walls.gd")
-## The pattern's top-left cell, clear of a fresh base's Command Center (18-21 x 18-21) and
-## drone bay (24-25 x 19-20). Shapes are in cells from it.
-const ORIGIN := Vector2i(6, 6)
+## The pattern's top-left cell, clear of a fresh base's Command Center (22-25 x 22-25) and
+## drone bay (28-29 x 23-24). Shapes are in cells from it.
+const ORIGIN := Vector2i(10, 10)
 const CENTRE := Vector2i(4, 4)
 const CROSS_CENTRE := Vector2i(5, 5)
 ## Where the lifted wall is carried: a free cell, clear of the info panel at this zoom.

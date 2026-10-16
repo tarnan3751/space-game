@@ -234,7 +234,8 @@ headless. One check runs rendered only (headless it logs that it skipped): on th
 the 1560x720 window, the average colour of an 80x40 pixel box round the centre of each of the
 field's four quarters (clear of the buildings) and round two flat stretches of the ring agree
 within 0.01 in HSL lightness and 0.02 in saturation, so the field renders in the ring's shade
-(**Colour**); it prints both. It screenshots the start zoom, the closest zoom on the field (its marks; the grid is hidden),
+(**Colour**); it prints both. It screenshots the start zoom, the two far sides at the start zoom
+(`far-sides`, focused 20 in from the field's far corner, the frame the edge-step check reads), the closest zoom on the field (its marks; the grid is hidden),
 the closest zoom on a point where four of the field texture's tiles meet (`tile-corner`, where
 nothing should show the tiles' edges), a wider stretch of the field at camera size 12 (`tiles`),
 the perimeter at the middle of each side of the field at size 16 (`edge-top-left`, `edge-top-right`,

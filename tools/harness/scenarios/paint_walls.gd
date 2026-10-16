@@ -12,12 +12,12 @@ extends HarnessScenario
 
 const WALL := "barrier_wall"
 const WallModels := preload("res://src/game/models/walls.gd")
-## A fresh base's free cells: the Command Center covers 18-21 x 18-21, the drone bay
-## 24-25 x 19-20. Every row here is on screen at the starting zoom and clear of the edges.
-const LINE_START := Vector2i(6, 14)
+## A fresh base's free cells: the Command Center covers 22-25 x 22-25, the drone bay
+## 28-29 x 23-24. Every row here is on screen at the starting zoom and clear of the edges.
+const LINE_START := Vector2i(10, 18)
 const LINE_LENGTH := 12
-const CROSSING_COLUMN := 10
-const SPARE_ROW := 24
+const CROSSING_COLUMN := 14
+const SPARE_ROW := 28
 ## How far in from the right edge the finger is held: inside the edge margin.
 const EDGE_INSET := 24.0
 const HOLD_FRAMES := 30
@@ -105,7 +105,7 @@ func run(main: MainScript) -> void:
 		state.resources[res] = 0
 	count = state.count_of(WALL)
 	_failures.clear()
-	await _stroke(main, _line(Vector2i(6, SPARE_ROW), Vector2i(1, 0), 5))
+	await _stroke(main, _line(Vector2i(10, SPARE_ROW), Vector2i(1, 0), 5))
 	check(state.count_of(WALL) == count, "no wall placed without metal")
 	check(_failures.size() == 1 and _failures[0] == BaseState.ERR_FUNDS,
 		"one toast for the drag (%s)" % ", ".join(_failures))
@@ -141,7 +141,7 @@ func run(main: MainScript) -> void:
 	# A fast drag longer than the walls left: it stops at the limit, with one toast.
 	var left := limit - state.count_of(WALL)
 	_failures.clear()
-	var long_line := _line(Vector2i(6, SPARE_ROW), Vector2i(1, 0), left + 3)
+	var long_line := _line(Vector2i(10, SPARE_ROW), Vector2i(1, 0), left + 3)
 	var ends: Array[Vector2i] = [long_line[0], long_line[-1]]
 	await _stroke(main, ends)
 	check(state.count_of(WALL) == limit, "walls stop at the limit, %d" % state.count_of(WALL))

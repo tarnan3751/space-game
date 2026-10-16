@@ -6,7 +6,7 @@ extends HarnessScenario
 ## stroke places 12 walls, which stay instant.
 
 const WALL := "barrier_wall"
-const LINE_START := Vector2i(6, 14)
+const LINE_START := Vector2i(10, 18)
 const LINE_LENGTH := 12
 
 

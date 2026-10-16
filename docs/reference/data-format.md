@@ -22,15 +22,15 @@ A non-whole number stays a float and fails validation wherever an int is require
     { "id": "defense", "name": "Defence" },
     { "id": "traps", "name": "Traps" }
   ],
-  "grid": { "width": 40, "height": 40 },
+  "grid": { "width": 48, "height": 48 },
   "menu_order": ["drone_bay", "metal_extractor", "crystal_harvester", "antimatter_siphon",
                  "metal_silo", "crystal_silo", "antimatter_vault", "hangar", "cadet_academy",
                  "...", "mega_mine", "barrier_wall"],
   "start": {
     "resources": { "metal": 750, "crystal": 750, "antimatter": 0 },
     "buildings": [
-      { "type": "command_center", "cell": [18, 18], "level": 1 },
-      { "type": "drone_bay", "cell": [24, 19], "level": 1 }
+      { "type": "command_center", "cell": [22, 22], "level": 1 },
+      { "type": "drone_bay", "cell": [28, 23], "level": 1 }
     ]
   }
 }
@@ -135,7 +135,7 @@ Center level, and that no count goes down from one Command Center level to the n
 ## The shipped data
 
 Three resources: metal, crystal, and antimatter (rare: unlocked at Command Center 4, produced
-slowly, spent only on top-tier levels). A 40×40 grid, the Command Center with ten levels, and
+slowly, spent only on top-tier levels). A 48×48 grid, the Command Center with ten levels, and
 32 types in four build-menu categories. The ids are final.
 
 | Category | Type | Name | Size | Unlock (CC) | Levels | `max_count` at CC 1–10 | Notes |
@@ -244,13 +244,13 @@ line) replaces it, which is how the gate and the harness keep off the real save.
 ```json
 {
   "version": 2,
-  "grid": { "width": 40, "height": 40 },
+  "grid": { "width": 48, "height": 48 },
   "now": 1760400000,
   "next_id": 4,
   "resources": { "metal": 750, "crystal": 600, "antimatter": 0 },
   "remainders": { "metal": 0, "crystal": 0, "antimatter": 0 },
   "buildings": [
-    { "id": 1, "type": "command_center", "cell": [18, 18], "level": 1, "target_level": 1, "finish_at": 0 }
+    { "id": 1, "type": "command_center", "cell": [22, 22], "level": 1, "target_level": 1, "finish_at": 0 }
   ]
 }
 ```

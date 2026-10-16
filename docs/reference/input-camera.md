@@ -62,10 +62,10 @@ type's copies side by side, a cell apart, wrapping to a new row a cell below the
 footprint when the next would pass the field's right edge. The row under each band is a fence:
 walls, one per cell from x 0 rightwards until they run out, and the next band starts on the
 row after it, so buildings touch a fence on both sides; walls left over once every band has its
-fence carry on in rows below. With the shipped roster the bands are 12, 10, 12 and 2 rows deep
-(resources, army, defence, traps), so with their fences (the last a run of 30 under the traps:
-the 150 walls are three full fences and that) they fill all 40 rows of the field: a roster
-change that deepens a band by a row no longer fits. The layout is checked on a `BaseGrid` as it is
+fence carry on in rows below. With the shipped roster at Command Center 10 the bands are 12, 10,
+16 and 2 rows deep (resources, army, defence, traps), so with their fences and the walls left
+over (the 250 walls are four full fences, a fifth row and a run of 10) they fill 46 of the
+field's 48 rows. The layout is checked on a `BaseGrid` as it is
 made: a building that does not fit is left out, with an error naming the first, rather than
 overlap. The `template_base` harness scenario checks it
 (`tools/harness/README.md`).

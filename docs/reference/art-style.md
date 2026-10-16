@@ -201,7 +201,8 @@ the ring's flat dust. The field renders in the ring's shade, within 0.01 in L an
 `environment` scenario checks it, rendered, each spot's average divided by the large value noise's
 factor there, which the field and the ring share but which lies darker at the field's four spots
 than at the ring's two): it reads as a plain of its own by its marks, and the kerb is its border,
-not its tone. Where they meet there is no step: at the start zoom, half a cell inside the field's
+not its tone. Where they meet there is no step: at the start zoom, focused 20 in from the field's
+far corner along each axis, half a cell inside the field's
 edge and half a unit outside it, along each of the two sides far from the camera, the ground's
 median colour (marks excluded) differs by under 3/255 in every channel (checked there too). The
 buildings' hulls are the lightest things on screen.
@@ -811,7 +812,7 @@ plain inside a wilder landscape of the same ground, so the base reads as a settl
 builds it all once; the terrain, the rocks and the outcrops come from `SeededRng` on
 `SCENERY_SEED` (7), so every base sits in the same landscape (`input-camera.md`, **BaseView**).
 
-**The field** (`ground.gdshader`, on the 40×40 `PlaneMesh` at y = 0): one seamless levelled plain
+**The field** (`ground.gdshader`, on the 48×48 `PlaneMesh` at y = 0): one seamless levelled plain
 of regolith with natural marks scattered over it. Everywhere the ground is the plate tint covered
 at 60 % by the dust, with a fine grain drawn by the shader in world space, so it runs on unbroken
 across the field: two octaves of value noise at 6 and 12 repeats a cell, each 3.5 % either way, each
@@ -892,8 +893,8 @@ language, with no gate.
   further out along the diagonal (`CORNER_PYLON_OUT`) on a chamfered concrete footing, 0.6 wide,
   that runs out to it from the cut.
 - **Pylons**: on the kerb's middle line, one every four cells along each side (where the field
-  texture's tiles meet) and one at each corner, on its footing out from the middle of the cut, 40
-  on the 40×40 field: a
+  texture's tiles meet) and one at each corner, on its footing out from the middle of the cut, 48
+  on the 48×48 field (12 plates a side): a
   chamfered post 0.4 square and 0.9 tall on the plate layer in `HULL_MID`, a hazard-striped band
   near its top, a gunmetal cap, and on the cap an energy cyan lamp (unlit, PULSE) whose phase is
   the pylon's place round the loop over the count, so the pulse travels round the perimeter. The
@@ -910,7 +911,7 @@ language, with no gate.
   a flat one would be seen nearly edge-on on the two sides nearest it. It is low and see-through,
   so the field's edge cells show through and over it.
 
-One `LowPolyMesh`, about 6,500 triangles on its toon surface and 380 on its hologram surface,
+One `LowPolyMesh`, about 7,800 triangles on its toon surface and 450 on its hologram surface,
 and its outline. The body casts a shadow (the pylons are real masses; the transparent fence casts
 none); the outline does not.
 

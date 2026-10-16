@@ -17,9 +17,8 @@ extends RefCounted
 ## per cell from x 0 rightwards until they run out, and the next band starts on the row after
 ## it, so buildings touch the fence on both sides. Walls left over once every band has its fence
 ## carry on in further rows below. With the shipped roster the bands
-## are 12, 10, 12 and 2 rows deep (resources, army, defence, traps), and with their fences (the
-## 150 walls are three full fences and 30 under the traps) they fill all 40 rows: a band a row
-## deeper no longer fits. A building that does not fit is left out, with an error naming the
+## are 12, 10, 16 and 2 rows deep (resources, army, defence, traps), and with their fences (the
+## 250 walls are four full fences, a fifth row and 10 more) they fill 46 of the 48 rows. A building that does not fit is left out, with an error naming the
 ## first, rather than overlap.
 
 const GAP := 1
