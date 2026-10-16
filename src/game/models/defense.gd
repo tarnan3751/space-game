@@ -474,7 +474,7 @@ static func build_missile_battery(p: Parts, level: int) -> void:
 		# clear of the pods.
 		_crown(m, Vector3(0, deck + trunnion.y + 1.0, 0), 0.17, 6, 0.14)
 		m.orb(0.19, 16, 6, Vector3(0, deck + trunnion.y + 1.3, 0), Parts.CORE_GLOW)
-	var radar := p.moving(Vector3(0, dish_y, 0), Motion.spin(Vector3.UP, 1.2))
+	var radar := p.moving(Vector3(0, dish_y, 0), Motion.spin(Vector3.UP, Parts.DISH_RATE))
 	var face := Vector3(70, 0, 0)
 	# From L7 a bigger dish.
 	var dish := 1.0 if level < 7 else 1.3
@@ -881,7 +881,7 @@ static func build_flak_cannon(p: Parts, level: int) -> void:
 	var mast_foot := Parts.around(0.92, 135.0, top)
 	var mast := deck + 0.45 - top + (0.0 if level < 6 else FLAK_RADAR_RAISE)
 	m.prism(0.06, 0.05, mast, 16, mast_foot, _by_tier(p.tier, Parts.GUNMETAL, Parts.CHROME_ROUND, Parts.CHROME_ROUND))
-	var radar := p.moving(mast_foot + Vector3(0, mast, 0), Motion.spin(Vector3.UP, 1.2))
+	var radar := p.moving(mast_foot + Vector3(0, mast, 0), Motion.spin(Vector3.UP, Parts.DISH_RATE))
 	var face := Vector3(70, 0, 0)
 	var dish := 1.0 if level < 6 else 1.3
 	radar.lathe(PackedVector2Array([
