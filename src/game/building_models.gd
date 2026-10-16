@@ -45,7 +45,7 @@ const DroneModels := preload("res://src/game/models/drone.gd")
 const MODELS := {
 	"command_center": [4, 10],
 	"drone_bay": [2, 3],
-	"metal_extractor": [3, 5],
+	"metal_extractor": [3, 10],
 	"crystal_harvester": [3, 5],
 	"antimatter_siphon": [3, 3],
 	"metal_silo": [3, 5],
