@@ -256,6 +256,9 @@ static func build_flak_mine(p: Parts, level: int) -> void:
 	var m := p.body
 	var base := Vector3(0, Parts.PAD_HEIGHT, 0)
 	Parts.foundation(m, 1)
+	if level >= 4:
+		_grown_flak_mine(p, level)
+		return
 	Parts.tank(m, 0.26, 0.2, base, CASING, 0.05)
 	m.ring(0.26, 0.275, 0.07, 16, base + Vector3(0, 0.05, 0), HAZARD_FINE)
 	var top := base + Vector3(0, 0.2, 0)
@@ -267,6 +270,49 @@ static func build_flak_mine(p: Parts, level: int) -> void:
 	m.dome(0.075, 0.07, 16, 3, top, LENS)
 	if level >= 3:
 		m.ring(0.075, 0.1, 0.025, 16, top, GOLD_ROUND if p.tier >= Parts.Tier.GOLD else CASING_MID)
+
+
+## Levels 4 and 5, the mine grown: a wider, taller pod, a barrel more a level, a bigger sensor
+## lens raised on a collar over the barrels and four lamps round the pod blinking in turn. L4
+## (Chrome): a chrome pod banded in cyan, chrome barrels with cyan bores, cyan lamps, a chrome
+## collar. L5 (Crown): an obsidian pod banded in gold filigree with glowing violet vein panels on
+## the faces the camera sees, gold barrels with violet bores, gold and violet lamps, a taller gold
+## collar, and a big light-violet core lens pulsing in the sensor under a small gold crown.
+static func _grown_flak_mine(p: Parts, level: int) -> void:
+	var m := p.body
+	var base := Vector3(0, Parts.PAD_HEIGHT, 0)
+	var crown := p.tier >= Parts.Tier.CROWN
+	var radius := 0.3 + 0.02 * (level - 4)
+	var height := 0.24 + 0.02 * (level - 4)
+	Parts.tank(m, radius, height, base, Parts.OBSIDIAN_ROUND if crown else Parts.CHROME_ROUND, 0.06)
+	m.ring(radius, radius + 0.018, 0.07, 16, base + Vector3(0, 0.02, 0), HAZARD_FINE)
+	m.ring(radius - 0.002, radius + 0.012, 0.03, 16, base + Vector3(0, height - 0.075, 0),
+		Parts.FILIGREE if crown else Parts.CYAN_STRIP)
+	if level >= 5:
+		_vein_panels(m, PackedVector2Array([Vector2(radius + 0.006, 0.09), Vector2(radius + 0.006, height - 0.075)]), base,
+			30.0)
+	for i: int in 4:
+		var degrees := 15.0 + 90.0 * i
+		var lamp := CYAN_BLINK
+		if crown:
+			lamp = GOLD_BLINK if i % 2 == 0 else VIOLET_BLINK
+		m.dome(0.032, 0.035, 8, 2, Parts.around(radius, degrees, 0.125) + base, lamp.phased(Parts.chase(i, 4)),
+			Parts.facing(Parts.around(1.0, degrees, 0.0)))
+	var top := base + Vector3(0, height, 0)
+	var barrels := level + 1
+	for i: int in barrels:
+		var spot := Parts.around(0.19, 135.0 + 360.0 * i / barrels, 0.0) + top
+		m.prism(0.055, 0.05, 0.18, 12, spot, GOLD_ROUND if crown else Parts.CHROME_ROUND)
+		m.disc(0.036, 12, spot + Vector3(0, 0.181, 0), (Parts.CORE_GLOW if crown else Parts.CYAN_STRIP).phased(float(i) / barrels))
+	# The sensor raised on a collar over the barrels' mouths, higher at L5, its core lens bigger.
+	var collar := 0.12 if level < 5 else 0.19
+	Parts.drum(m, 0.11, collar, 0.02, 16, top, GOLD_ROUND if crown else Parts.CHROME_ROUND)
+	var sensor := top + Vector3(0, collar, 0)
+	if level >= 5:
+		m.dome(0.115, 0.17, 16, 3, sensor - Vector3(0, 0.005, 0), BRIGHT_CORE)
+		_crown(m, sensor + Vector3(0, 0.06, 0), 0.14)
+	else:
+		m.dome(0.095, 0.09, 16, 3, sensor, LENS)
 
 
 ## A big armoured dome on a hazard band, warning lights round its foot and a fuse cap on its
