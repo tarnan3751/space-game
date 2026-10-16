@@ -1227,21 +1227,54 @@ static func _valves(m: LowPolyMesh, pos: Vector3, gold: bool) -> void:
 
 ## The glass panels shimmer, each pulsing on a phase of its own; the finial pulses as it turns.
 static var CRYSTAL_PANEL := Surf.make(MaterialKit.Layer.GLASS, MaterialKit.CRYSTAL, 1.0, Surf.GLOSSY | Surf.PULSE)
+## The high levels' own: the L7 lid lamps, pulsing in a wave round it; from the Obsidian tier the panels in
+## a deeper pink, and the L8 crystal inlays round the plinth; the L9 crystal crown hovering over
+## the finial, its shards and its obsidian ring bobbing together (their one phase is also the
+## shards' PULSE offset), its ring gold at L10; the L10 mega crystal, a hologram shell of crystal
+## round the violet core.
+const DEEP_CRYSTAL := Color("e270ff")
+static var LID_LAMP := Surf.make(MaterialKit.Layer.GLOW, MaterialKit.CRYSTAL, 1.0, Surf.UNLIT | Surf.PULSE, true)
+static var DEEP_PANEL := Surf.make(MaterialKit.Layer.GLASS, DEEP_CRYSTAL, 1.0, Surf.GLOSSY | Surf.PULSE)
+static var SILO_INLAY := Surf.make(MaterialKit.Layer.CRYSTAL, MaterialKit.CRYSTAL, 1.0, Surf.UNLIT | Surf.PULSE)
+static var CROWN_SHARD := Surf.make(MaterialKit.Layer.CRYSTAL, DEEP_CRYSTAL, 1.5, Surf.GLOSSY | Surf.PULSE | Surf.BOB, false, true, 0.3)
+static var CROWN_RING := Surf.make(MaterialKit.Layer.OBSIDIAN, Parts.OBSIDIAN_TINT, 1.0, Surf.GLOSSY | Surf.BOB, true, true, 0.3)
+static var CROWN_GOLD_RING := Surf.make(MaterialKit.Layer.FLAT, MaterialKit.CORE_GOLD, 1.0, Surf.GLOSSY | Surf.BOB, true, true, 0.3)
+static var MEGA_SHELL := Surf.make(MaterialKit.Layer.CRYSTAL, MaterialKit.CRYSTAL, 1.0, Surf.HOLO)
 
 ## The crystal silo's hexagons are turned so a flat face looks at the camera; its container's
 ## corner radius and the height of one row of panels (a row per level, plus two).
 const HEXAGON := Vector3(0, -15, 0)
 const CRYSTAL_SILO_RADIUS := 0.86
 const PANEL_ROW := 0.2
+## From L6 the container is wider, of bigger panels in fewer rows, by level from L6: its corner
+## radius, the height of a row and the rows.
+const GROWN_SILO_RADIUS := [0.96, 0.96, 1.0, 1.0, 1.0]
+const GROWN_PANEL_ROW := [0.32, 0.32, 0.36, 0.36, 0.36]
+const GROWN_ROWS := [5, 6, 6, 6, 6]
+## The L10 mega crystal's height on the lid, and the escort drone's round about the container.
+const MEGA_CRYSTAL := 1.1
+const SILO_DRONE_RADIUS := 1.4
+const SILO_DRONE_HEIGHT := 1.7
 
 
 ## A tall hexagonal container of glass panels shimmering with the crystal inside, framed by
 ## corner posts and bands, under a chamfered lid with a turning crystal finial, on a hexagonal
 ## plinth with a feed pump at its side. It grows a row of panels a level; L5 adds gold on the
 ## lid and the bands.
+##
+## From L6 it grows wider, of bigger panels: L6 a chrome frame and lid, cyan light bars between
+## the rows, a chrome pump and a bigger finial turning in a chrome collar; L7 a row more, cyan
+## strips up the corner posts and lamps pulsing in a wave round the lid; L8 an obsidian frame veined violet,
+## the panels deeper pink and taller, crystal inlays round the plinth; L9 a crystal crown hovering
+## over the finial, turning the other way; L10 a gold filigree frame and violet light bars, a mega
+## crystal on the lid lit from within by the violet core in a gold cradle, a gold finial over it
+## with the crown hovering round the crystal, and an escort drone circling the container.
 static func build_crystal_silo(p: Parts, level: int) -> void:
 	var m := p.body
 	var gold := p.tier >= Parts.Tier.GOLD
+	if level >= 6:
+		_grown_crystal_silo(p, level)
+		return
 	Parts.foundation(m, 3)
 	var ground := Parts.PAD_HEIGHT
 	var radius := CRYSTAL_SILO_RADIUS
@@ -1284,6 +1317,133 @@ static func build_crystal_silo(p: Parts, level: int) -> void:
 	m.box_chamfered(Vector3(0.34, 0.36, 0.42), 0.05, pump, Parts.HULL_MID)
 	m.box(Vector3(0.2, 0.1, 0.44), pump + Vector3(0, 0.2, 0), CRYSTAL_GLOW)
 	Parts.pipe_run(m, PackedVector3Array([pump + Vector3(0.12, 0.26, -0.12), Vector3(-0.66, base + 0.15, 0.36)]), 0.055, Parts.GUNMETAL, 12)
+
+
+## The crystal silo from L6 (build_crystal_silo): the same container grown wider of bigger panels,
+## its frame, lid and pump in the tier's armour.
+static func _grown_crystal_silo(p: Parts, level: int) -> void:
+	var m := p.body
+	var tier := p.tier
+	var crown := tier >= Parts.Tier.CROWN
+	var frame := _silo_frame(tier, false)
+	Parts.foundation(m, 3)
+	var ground := Parts.PAD_HEIGHT
+	var radius: float = GROWN_SILO_RADIUS[level - 6]
+	var row_height: float = GROWN_PANEL_ROW[level - 6]
+	var rows: int = GROWN_ROWS[level - 6]
+	var plinth := radius + 0.26
+	m.lathe(PackedVector2Array([
+		Vector2(plinth, 0), Vector2(plinth, 0.1), Vector2(plinth - 0.08, 0.18), Vector2(0, 0.18),
+	]), 6, Vector3(0, ground, 0), Parts.HULL_DARK, HEXAGON)
+	var base := ground + 0.18
+	var height := rows * row_height
+	var panel := DEEP_PANEL if tier >= Parts.Tier.OBSIDIAN else CRYSTAL_PANEL
+	for row: int in rows:
+		for k: int in 6:
+			var a := Parts.around(radius, 15.0 + 60.0 * k, base + row * row_height)
+			var b := Parts.around(radius, 75.0 + 60.0 * k, base + row * row_height)
+			m.polygon(PackedVector3Array([a, a + Vector3(0, row_height, 0), b + Vector3(0, row_height, 0), b]),
+				panel.phased(fposmod(0.23 * k + 0.41 * row, 1.0)))
+	for k: int in 6:
+		var degrees := 15.0 + 60.0 * k
+		var yaw := Vector3(0, 90.0 - degrees, 0)
+		m.box_chamfered(Vector3(0.17, height, 0.17), 0.04, Parts.around(radius, degrees, base), frame, yaw)
+		if level >= 7:
+			m.box(Vector3(0.06, height - 0.12, 0.03), Parts.around(radius + 0.085, degrees, base + 0.06),
+				_silo_strip(tier).phased(fposmod(k / 6.0, 1.0)), yaw)
+	# The rims at the foot and the top, the light bars between the rows.
+	for row: int in rows + 1:
+		var band := _silo_strip(tier)
+		if row == 0:
+			band = CRYSTAL_ACCENT
+		elif row == rows:
+			band = Parts.GOLD_TRIM
+		m.lathe(PackedVector2Array([Vector2(radius + 0.05, 0), Vector2(radius + 0.05, 0.05), Vector2(radius, 0.05)]), 6,
+			Vector3(0, base + row * row_height - 0.025, 0), band, HEXAGON)
+	if level >= 8:
+		# Crystal inlays on the plinth's corners.
+		for k: int in 6:
+			_shard(m, Parts.around(plinth - 0.1, 15.0 + 60.0 * k, base - 0.02), 0.2, 0.06, Vector3.ZERO,
+				SILO_INLAY.phased(k / 6.0))
+
+	var lid := base + height + 0.03
+	m.lathe(PackedVector2Array([
+		Vector2(radius + 0.1, 0), Vector2(radius + 0.1, 0.12), Vector2(radius - 0.14, 0.26), Vector2(0, 0.26),
+	]), 6, Vector3(0, lid, 0), _silo_frame(tier, true), HEXAGON)
+	m.lathe(PackedVector2Array([Vector2(radius + 0.115, 0.02), Vector2(radius + 0.115, 0.1)]), 6, Vector3(0, lid, 0),
+		Parts.FILIGREE if crown else Parts.GOLD_TRIM, HEXAGON)
+	var cap := lid + 0.26
+	m.lathe(PackedVector2Array([Vector2(0.3, 0), Vector2(0.3, 0.06), Vector2(0.25, 0.1), Vector2(0, 0.1)]), 6,
+		Vector3(0, cap, 0), Parts.GOLD_TRIM if crown else Parts.HULL_DARK, HEXAGON)
+	if level >= 7:
+		for k: int in 6:
+			var degrees := 45.0 + 60.0 * k
+			m.orb(0.06, 10, 4, Parts.around(radius - 0.02, degrees, lid + 0.2), LID_LAMP.phased(k / 6.0))
+	var top := cap + 0.1
+	var finial_at := top
+	if crown:
+		# The mega crystal on the lid: the violet core glowing up through a hologram crystal, in a
+		# gold cradle; the finial turns on its tip.
+		m.prism(0.3, 0.26, 0.08, 16, Vector3(0, top, 0), Parts.GOLD_ROUND)
+		for k: int in 4:
+			var degrees := 45.0 + 90.0 * k
+			Parts.beam(m, Parts.around(0.22, degrees, top + 0.04), Parts.around(0.36, degrees, top + 0.4), 0.07, Parts.GOLD_TRIM)
+		_shard(m, Vector3(0, top + 0.06, 0), MEGA_CRYSTAL * 0.92, 0.22, Vector3(0, 15, 0), Parts.CORE_GLOW)
+		_shard(m, Vector3(0, top + 0.02, 0), MEGA_CRYSTAL, 0.34, Vector3(0, 15, 0), MEGA_SHELL)
+		finial_at = top + MEGA_CRYSTAL - 0.04
+	var finial := p.moving(Vector3(0, finial_at, 0), Motion.spin(Vector3.UP, 0.5))
+	var collar := Parts.GOLD_ROUND if crown else Parts.CHROME_ROUND
+	Parts.torus(finial, 0.13, 0.035, 16, 6, Vector3.ZERO, collar)
+	for k: int in 3:
+		var degrees := 120.0 * k
+		finial.strut(Parts.around(0.13, degrees, 0.05), Parts.around(0.07, degrees, 0.3), 0.045, collar)
+	if crown:
+		finial.prism(0.07, 0.0, 0.34, 12, Vector3(0, 0.06, 0), Parts.GOLD_ROUND)
+	else:
+		_shard(finial, Vector3(0, 0.02, 0), 0.62, 0.16, Vector3(0, 15, 0), CRYSTAL_SHARD)
+	if level >= 9:
+		# The crystal crown hovering over the finial, round the mega crystal at L10.
+		var crown_at := top + MEGA_CRYSTAL * 0.45 if crown else finial_at + 0.82
+		var hover := p.moving(Vector3(0, crown_at, 0), Motion.spin(Vector3.UP, -0.35))
+		var ring_radius := 0.5 if crown else 0.26
+		Parts.torus(hover, ring_radius, 0.035, 24, 6, Vector3.ZERO, CROWN_GOLD_RING if crown else CROWN_RING)
+		for k: int in 6:
+			var degrees := 60.0 * k
+			_shard(hover, Parts.around(ring_radius, degrees, 0.03), 0.26, 0.055, Vector3(0, 15, 0),
+				CROWN_SHARD)
+	Parts.landing_light(m, Parts.around(radius - 0.06, 30, lid + 0.13), 0.1, CRYSTAL_GLOW)
+	var apothem := radius * cos(PI / 6.0)
+	Parts.ladder(m, Parts.around(apothem + 0.05, 345, base), height + 0.06, 0.2, 90.0 - 345.0, Parts.ROD)
+
+	# The feed pump on the lit side, piped into the bottom row.
+	var pump := Vector3(-1.18, ground, 0.68)
+	m.box_chamfered(Vector3(0.38, 0.42, 0.46), 0.05, pump, frame)
+	m.box(Vector3(0.24, 0.12, 0.48), pump + Vector3(0, 0.22, 0), CRYSTAL_GLOW)
+	m.box(Vector3(0.4, 0.04, 0.48), pump + Vector3(0, 0.36, 0), _silo_strip(tier))
+	Parts.pipe_run(m, PackedVector3Array([pump + Vector3(0.14, 0.3, -0.14), Parts.around(radius - 0.05, 150, base + 0.18)]),
+		0.065, Parts.GUNMETAL, 12)
+	if crown:
+		Parts.escort_drone(p, SILO_DRONE_RADIUS, SILO_DRONE_HEIGHT, 0.6)
+
+
+## The crystal silo's frame by tier from L6: chrome, obsidian from the Obsidian tier, gold
+## filigree at the Crown (the lid, `lid`, stays obsidian under its filigree band).
+static func _silo_frame(tier: int, lid: bool) -> Surf:
+	if tier >= Parts.Tier.CROWN and not lid:
+		return Parts.FILIGREE
+	if tier >= Parts.Tier.OBSIDIAN:
+		return Parts.OBSIDIAN
+	return Parts.CHROME
+
+
+## The crystal silo's light bars and strips by tier from L6: cyan, violet veins from the Obsidian
+## tier, the violet core's glow at the Crown.
+static func _silo_strip(tier: int) -> Surf:
+	if tier >= Parts.Tier.CROWN:
+		return Parts.CORE_GLOW
+	if tier >= Parts.Tier.OBSIDIAN:
+		return Parts.VEINS
+	return Parts.CYAN_STRIP
 
 
 static var VAULT_ARMOUR := Surf.make(MaterialKit.Layer.PLATE, MaterialKit.HULL_MID)
