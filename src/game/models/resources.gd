@@ -7,7 +7,8 @@ extends RefCounted
 ## (BuildingModels.tier_of): from the Chrome tier their parts follow the level and their paint the
 ## tier, chrome with cyan strips, then obsidian with violet veins and a hovering element, then gold
 ## filigree, the antimatter core and an escort as the fourth moving part (docs/reference/art-style.md,
-## **Tiers**), within 5 units. The storage stops at its Gold top level for now.
+## **Tiers**), within 5 units. So are the storages: the metal and crystal silos to L10, the
+## antimatter vault to L8.
 ##
 ## BuildingModels calls one static build_<type>(p: Parts, level: int) per type.
 
@@ -1458,6 +1459,20 @@ static var SEAM_BAND := Surf.make(MaterialKit.Layer.SCREEN, MaterialKit.ANTIMATT
 ## The containment pylons' cells pulse and their tips blink in a chase round the vault.
 static var CELL := Surf.make(MaterialKit.Layer.GLOW, MaterialKit.ANTIMATTER, 1.0, Surf.UNLIT | Surf.PULSE, true)
 static var PYLON_TIP := Surf.make(MaterialKit.Layer.GLOW, MaterialKit.ANTIMATTER, 1.0, Surf.UNLIT | Surf.BLINK, true)
+## The high levels' own: the core floating in its cradle from L4, pulsing and bobbing, in the
+## violet core's glow at the Crown; the containment rings hovering round it from L6, obsidian with
+## veins across their tops and a violet rim, bobbing with it (one phase for all of them, which is
+## also the veins' FLOW speed and the PULSE offset); the L6 crystal inlays at the pylons' feet.
+## The arcs are the siphon's high-level arcs (CYAN_ARC, VIOLET_ARC).
+static var VAULT_CORE := Surf.make(MaterialKit.Layer.GLOW, MaterialKit.ANTIMATTER, 1.0, Surf.UNLIT | Surf.PULSE | Surf.BOB, true, true, 0.7)
+static var VAULT_CROWN_CORE := Surf.make(MaterialKit.Layer.GLOW, Parts.CORE_GLOW_TINT, 1.0, Surf.UNLIT | Surf.PULSE | Surf.BOB, true, true,
+	0.7)
+static var CONTAINMENT_RING := Surf.make(MaterialKit.Layer.OBSIDIAN, Parts.OBSIDIAN_TINT, 1.0, Surf.GLOSSY | Surf.BOB, true, true, 0.7)
+static var CONTAINMENT_VEINS := Surf.make(MaterialKit.Layer.VEINS, MaterialKit.ANTIMATTER, 1.0, Surf.UNLIT | Surf.FLOW | Surf.BOB, true,
+	true, 0.7)
+static var CONTAINMENT_RIM := Surf.make(MaterialKit.Layer.GLOW, Parts.CORE_GLOW_TINT, 1.0, Surf.UNLIT | Surf.PULSE | Surf.BOB, true,
+	true, 0.7)
+static var PYLON_INLAY := Surf.make(MaterialKit.Layer.CRYSTAL, MaterialKit.CRYSTAL, 1.0, Surf.UNLIT | Surf.PULSE)
 
 ## The antimatter vault's armoured cube, and its containment pylons' corners.
 const VAULT_SIZE := 1.7
@@ -1466,6 +1481,17 @@ const VAULT_CHAMFER := 0.14
 const VAULT_CORNERS := [Vector2(-1, -1), Vector2(1, -1), Vector2(-1, 1), Vector2(1, 1)]
 ## The pylons' corners in order round the vault, for the chase and the arcs.
 const VAULT_ROUND := [Vector2(-1, -1), Vector2(1, -1), Vector2(1, 1), Vector2(-1, 1)]
+## From L4: the core's radius by level from L4, its lift over its cradle, and at L8 the gold
+## pedestal raising the cradle off the lid's cap, so the core clears the front pylon's cap; the
+## containment rings' radii about it (the L7 second ring wider, a gimbal round the first); the L8
+## escort drone's round, over the pylons' caps and the halo.
+const VAULT_CORE_RADII := [0.2, 0.24, 0.26, 0.28, 0.3]
+const VAULT_CORE_LIFT := 0.12
+const VAULT_PEDESTAL := 0.5
+const CONTAINMENT_RADIUS := 0.46
+const OUTER_CONTAINMENT_RADIUS := 0.64
+const VAULT_DRONE_RADIUS := 1.2
+const VAULT_DRONE_HEIGHT := 3.6
 
 
 ## A heavy chamfered armoured cube on a skirt, violet glow seams with current flowing round it
@@ -1473,15 +1499,28 @@ const VAULT_ROUND := [Vector2(-1, -1), Vector2(1, -1), Vector2(1, 1), Vector2(-1
 ## screen on the other, and a containment pylon on each corner, their cells pulsing and their
 ## tips blinking in a chase round it. L2 adds an armoured domed lid and bigger pylons, L3
 ## bigger pylons again, gold trim, and arcs crackling between the pylons' tips.
+##
+## From L4 the pylons keep growing and an antimatter core floats in a cradle on the lid: L4 chrome
+## plating on the cube (from then on), chrome pylons with cyan seams up them, a chrome lid, the core
+## and cyan arcs between the tips; L5 a bigger core and cyan arcs from the tips down to it; L6
+## obsidian pylons and skirt veined violet, crystal inlays at the pylons' feet, veins up the lid, a
+## containment ring hovering round the core, turning (a moving part), and violet arcs; L7 a second,
+## wider ring tilted the other way, counter-turning, a gyroscope round the core; L8 gold filigree
+## over the pylons' heads and round the lid, the core raised on a gold pedestal clear of the pylons'
+## caps, in the violet core's glow under a halo, the loudest arcs (doubled between the tips) and an
+## escort drone circling over the pylons' caps and the halo.
 static func build_antimatter_vault(p: Parts, level: int) -> void:
 	var m := p.body
 	var gold := p.tier >= Parts.Tier.GOLD
+	var obsidian := p.tier >= Parts.Tier.OBSIDIAN
+	var crown := p.tier >= Parts.Tier.CROWN
 	Parts.foundation(m, 3)
 	var ground := Parts.PAD_HEIGHT
-	m.box_chamfered(Vector3(2.1, 0.14, 2.1), 0.05, Vector3(0, ground, 0), ARMOUR)
+	m.box_chamfered(Vector3(2.1, 0.14, 2.1), 0.05, Vector3(0, ground, 0), Parts.OBSIDIAN if obsidian else ARMOUR)
 	var floor_y := ground + 0.14
 	var half := VAULT_SIZE * 0.5
-	m.box_chamfered(Vector3(VAULT_SIZE, VAULT_HEIGHT, VAULT_SIZE), VAULT_CHAMFER, Vector3(0, floor_y, 0), VAULT_ARMOUR)
+	m.box_chamfered(Vector3(VAULT_SIZE, VAULT_HEIGHT, VAULT_SIZE), VAULT_CHAMFER, Vector3(0, floor_y, 0),
+		Parts.CHROME if p.tier >= Parts.Tier.CHROME else VAULT_ARMOUR)
 	# Seams: a band round the four faces, and one up each chamfered corner.
 	for k: int in 4:
 		var yaw := Vector3(0, 90 * k, 0)
@@ -1499,13 +1538,14 @@ static func build_antimatter_vault(p: Parts, level: int) -> void:
 	if level >= 2:
 		m.prism(0.72, 0.68, 0.1, 24, Vector3(0, top, 0), Parts.HULL_DARK_ROUND)
 		Parts.torus(m, 0.66, 0.035, 24, 6, Vector3(0, top + 0.065, 0), ANTIMATTER_GLOW)
-		m.dome(0.62, 0.3, 24, 5, Vector3(0, top + 0.1, 0), LID)
+		m.dome(0.62, 0.3, 24, 5, Vector3(0, top + 0.1, 0), _vault_lid(p.tier))
 		for k: int in 4:
 			var degrees := 45.0 + 90.0 * k
 			m.box_chamfered(Vector3(0.14, 0.2, 0.26), 0.03, Parts.around(0.6, degrees, top + 0.04),
 				Parts.GOLD_TRIM if gold else Parts.HULL_MID, Vector3(0, 90.0 - degrees, 0))
 		m.prism(0.18, 0.16, 0.06, 16, Vector3(0, top + 0.38, 0), Parts.HULL_DARK_ROUND)
-		m.disc(0.12, 16, Vector3(0, top + 0.441, 0), ANTIMATTER_GLOW)
+		if level < 4:
+			m.disc(0.12, 16, Vector3(0, top + 0.441, 0), ANTIMATTER_GLOW)
 	else:
 		m.box_chamfered(Vector3(0.7, 0.1, 0.7), 0.04, Vector3(0, top, 0), Parts.HULL_DARK)
 		m.box(Vector3(0.5, 0.02, 0.5), Vector3(0, top + 0.1, 0), ANTIMATTER_GLOW)
@@ -1518,10 +1558,65 @@ static func build_antimatter_vault(p: Parts, level: int) -> void:
 	for k: int in VAULT_ROUND.size():
 		var corner: Vector2 = VAULT_ROUND[k]
 		tips.append(_containment_pylon(m, Vector3(corner.x * 1.06, ground + 0.14, corner.y * 1.06), width, pylon_height,
-			gold, k / 4.0))
-	if level >= 3:
+			level, p.tier, k / 4.0))
+	if level == 3:
 		for k: int in tips.size():
 			Parts.arc(m, tips[k], tips[(k + 1) % tips.size()], 5, 0.07, ARC.phased(k / 4.0 + 0.1))
+	if level < 4:
+		return
+
+	# The core floating in its cradle on the lid's cap, the arcs round it.
+	var cradle := top + 0.44
+	if crown:
+		m.prism(0.13, 0.11, VAULT_PEDESTAL, 16, Vector3(0, cradle, 0), Parts.GOLD_ROUND)
+		cradle += VAULT_PEDESTAL
+	var core_radius: float = VAULT_CORE_RADII[level - 4]
+	var core := Vector3(0, cradle + VAULT_CORE_LIFT + core_radius, 0)
+	m.prism(0.22, 0.26, 0.08, 16, Vector3(0, cradle, 0), Parts.GOLD_ROUND if crown else _vault_lid(p.tier))
+	for k: int in 3:
+		var degrees := 30.0 + 120.0 * k
+		Parts.beam(m, Parts.around(0.2, degrees, cradle + 0.04), Parts.around(core_radius + 0.06, degrees, core.y), 0.05,
+			Parts.GOLD_TRIM if crown else Parts.CHROME)
+	m.orb(core_radius, 16, 6, core, VAULT_CROWN_CORE if crown else VAULT_CORE)
+	var arc := VIOLET_ARC if obsidian else CYAN_ARC
+	for k: int in tips.size():
+		Parts.arc(m, tips[k], tips[(k + 1) % tips.size()], 5, 0.07, arc.phased(k / 4.0 + 0.1))
+		if crown:
+			Parts.arc(m, tips[k], tips[(k + 1) % tips.size()], 6, 0.12, arc.phased(k / 4.0 + 0.6))
+		if level >= 5:
+			Parts.arc(m, tips[k], core + (tips[k] - core).normalized() * (core_radius + 0.04), 4, 0.05,
+				arc.phased(k / 4.0 + 0.35))
+	if level >= 6:
+		# Veins up the lid between its blocks.
+		for k: int in 4:
+			Parts.dome_seam(m, 0.62, 0.3, Vector3(0, top + 0.1, 0), 90.0 * k, Parts.VEINS)
+		_containment_ring(p, core, CONTAINMENT_RADIUS, Vector3(18, 0, 0), 0.4)
+	if level >= 7:
+		_containment_ring(p, core, OUTER_CONTAINMENT_RADIUS, Vector3(0, 0, 28), -0.55)
+	if crown:
+		m.lathe(PackedVector2Array([Vector2(0.725, 0.0), Vector2(0.725, 0.08)]), 24, Vector3(0, top + 0.01, 0), Parts.FILIGREE)
+		# The halo over the core.
+		Parts.torus(m, core_radius + 0.08, 0.04, 24, 6, core + Vector3(0, core_radius + 0.22, 0), Parts.CORE_GLOW)
+		Parts.escort_drone(p, VAULT_DRONE_RADIUS, VAULT_DRONE_HEIGHT, -0.7)
+
+
+## The vault's lid by tier: hull mid, chrome from the Chrome tier, obsidian from the Obsidian tier.
+static func _vault_lid(tier: int) -> Surf:
+	if tier >= Parts.Tier.OBSIDIAN:
+		return Parts.OBSIDIAN_ROUND
+	if tier >= Parts.Tier.CHROME:
+		return Parts.CHROME_ROUND
+	return LID
+
+
+## A containment ring of radius `r` hovering round the vault's core (L6), tilted `tilt` and
+## turning about the vertical at `rate`: an obsidian ring with veins across its top and a violet
+## rim, bobbing with the core.
+static func _containment_ring(p: Parts, core: Vector3, r: float, tilt: Vector3, rate: float) -> void:
+	var ring := p.moving(core, Motion.spin(Vector3.UP, rate))
+	ring.ring(r - 0.06, r + 0.06, 0.05, 24, Vector3(0, -0.025, 0), CONTAINMENT_RING, tilt)
+	ring.lathe(PackedVector2Array([Vector2(r + 0.05, 0.027), Vector2(r - 0.05, 0.027)]), 24, Vector3.ZERO, CONTAINMENT_VEINS, tilt)
+	ring.lathe(PackedVector2Array([Vector2(r + 0.065, -0.017), Vector2(r + 0.065, 0.017)]), 24, Vector3.ZERO, CONTAINMENT_RIM, tilt)
 
 
 ## The vault door: a round plate in a rim, a hub and a three-spoke handwheel, violet lock
@@ -1541,17 +1636,38 @@ static func _vault_door(m: LowPolyMesh, centre: Vector3, gold: bool) -> void:
 
 ## A containment pylon: an armoured column on a foot with its glowing containment cell bared
 ## between two bars, under a cap whose emitter leans in towards the vault; its cell and its
-## tip on `phase`. Returns the tip's centre.
-static func _containment_pylon(m: LowPolyMesh, foot: Vector3, width: float, height: float, gold: bool,
+## tip on `phase`. Returns the tip's centre. From L4 its armour is the tier's (chrome, obsidian
+## from the Obsidian tier, gold filigree over its head at the Crown) with a light seam up each face
+## of it (cyan, violet veins from the Obsidian tier); from L6 crystal inlays stand on its foot.
+static func _containment_pylon(m: LowPolyMesh, foot: Vector3, width: float, height: float, level: int, tier: int,
 		phase: float) -> Vector3:
+	var gold := tier >= Parts.Tier.GOLD
 	var square := Vector3(0, 45, 0)
+	var lower := PYLON_ARMOUR
+	if tier >= Parts.Tier.OBSIDIAN:
+		lower = Parts.OBSIDIAN
+	elif tier >= Parts.Tier.CHROME:
+		lower = Parts.CHROME
+	var upper := Parts.FILIGREE if tier >= Parts.Tier.CROWN else lower
 	m.box_chamfered(Vector3(width + 0.14, 0.12, width + 0.14), 0.04, foot, Parts.HULL_DARK)
-	m.box_chamfered(Vector3(width, height * 0.36, width), 0.04, foot, PYLON_ARMOUR, square)
+	m.box_chamfered(Vector3(width, height * 0.36, width), 0.04, foot, lower, square)
 	m.prism(width * 0.36, width * 0.36, height * 0.34, 16, foot + Vector3(0, height * 0.36, 0), CELL.phased(phase))
 	for side: float in [-1.0, 1.0]:
 		m.box(Vector3(0.05, height * 0.34, 0.05), foot + LowPolyMesh.turn(Vector3(side * width * 0.4, height * 0.36, 0), square),
 			Parts.ROD, square)
-	m.box_chamfered(Vector3(width, height * 0.3, width), 0.04, foot + Vector3(0, height * 0.7, 0), PYLON_ARMOUR, square)
+	m.box_chamfered(Vector3(width, height * 0.3, width), 0.04, foot + Vector3(0, height * 0.7, 0), upper, square)
+	if level >= 4:
+		var seam := Parts.VEINS if tier >= Parts.Tier.OBSIDIAN else Parts.CYAN_STRIP.phased(phase)
+		for k: int in 4:
+			var yaw := Vector3(0, 45.0 + 90.0 * k, 0)
+			for section: Vector2 in [Vector2(0.0, 0.36), Vector2(0.7, 0.3)]:
+				m.box(Vector3(0.06, height * section.y - 0.1, 0.02),
+					foot + LowPolyMesh.turn(Vector3(0, height * section.x + 0.05, width * 0.5 + 0.005), yaw), seam, yaw)
+	if level >= 6:
+		var out := Vector2(signf(foot.x), signf(foot.z))
+		for side: Vector2 in [Vector2(out.x, -out.y), Vector2(-out.x, out.y)]:
+			var corner := Vector3(side.x, 0, side.y) * (width * 0.5 + 0.02)
+			_shard(m, foot + corner + Vector3(0, 0.12, 0), 0.2, 0.05, Vector3.ZERO, PYLON_INLAY.phased(phase))
 	var cap := foot + Vector3(0, height, 0)
 	m.box_chamfered(Vector3(width + 0.08, 0.08, width + 0.08), 0.03, cap, Parts.GOLD_TRIM if gold else Parts.HULL_DARK, square)
 	var inward := Vector3(-foot.x, 0, -foot.z).normalized()

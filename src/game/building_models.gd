@@ -50,7 +50,7 @@ const MODELS := {
 	"antimatter_siphon": [3, 8],
 	"metal_silo": [3, 10],
 	"crystal_silo": [3, 10],
-	"antimatter_vault": [3, 3],
+	"antimatter_vault": [3, 8],
 	"hangar": [5, 5],
 	"cadet_academy": [3, 5],
 	"fabricator": [3, 5],
