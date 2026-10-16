@@ -61,7 +61,7 @@ const MODELS := {
 	"alliance_beacon": [3, 3],
 	"laser_turret": [3, 10],
 	"missile_battery": [3, 10],
-	"plasma_mortar": [3, 4],
+	"plasma_mortar": [3, 8],
 	"shield_generator": [3, 4],
 	"flak_cannon": [3, 4],
 	"arc_tower": [3, 4],

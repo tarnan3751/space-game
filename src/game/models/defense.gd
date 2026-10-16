@@ -130,6 +130,27 @@ const MISSILE_ESCORT_RADIUS := 1.1
 const MISSILE_ESCORT_LIFT := 0.45
 ## The skiff's size: larger than the shared one, as far as its round allows.
 const MISSILE_SKIFF_SCALE := 1.75
+## The plasma mortar from L5, by level from L5: the plinth's height and the pedestal's lifting the
+## bowl; the L6 loader arm's distance out on the near corner; the wider plinth from L7.
+const MORTAR_PLINTHS := [0.34, 0.34, 0.52, 0.56]
+const MORTAR_RISES := [0.2, 0.3, 0.45, 0.55]
+const MORTAR_LOADER := 1.45
+const MORTAR_WIDE := 1.38
+## From L5 the bowl's outer wall is this much wider; the L6 loader's canister hangs this far over
+## the bowl's rim (its seat), more at the Crown, over the crown's spikes.
+const MORTAR_BOWL := 1.1
+const MORTAR_LOADER_CLEAR := 0.4
+## The L7 charge ring: how far past the muzzle's lip it hovers, and its radii.
+const MORTAR_CHARGE_OFF := 0.38
+const MORTAR_CHARGE_INNER := 0.52
+const MORTAR_CHARGE_OUTER := 0.68
+## The L8 balcony on the near corner, level with the plinth's top, where the loader arm stands and
+## the troopers march round it in the camera's view: its distance out and its radius, and the
+## troopers' round and size (as large as the round allows within the extent).
+const MORTAR_BALCONY := 1.5
+const MORTAR_BALCONY_RADIUS := 0.56
+const MORTAR_ESCORT_RADIUS := 0.32
+const MORTAR_ESCORT_SCALE := 0.85
 
 
 ## From L6 the head rides a mount that lifts it a little more each level, on a taller plinth.
@@ -407,20 +428,44 @@ static func _pod(s: LowPolyMesh, trunnion: Vector3, aim: Vector3, x: float, colu
 					_at(trunnion, Vector3(x + side * (width * 0.5 + 0.01), -(height - 0.24) * 0.5, -0.05), aim), VEIN_PANEL, aim)
 
 
+## From L5 a bigger bowl stands on a pedestal that lifts it more each level, the buttresses round
+## its foot giving way to it. L5 (Chrome): chrome plinth, pedestal, bowl and barrel, a cyan strip
+## round the pedestal and cyan plasma coils round the barrel's breech. L6 a third coil and a chrome
+## loader arm on the near corner, standing as tall as the bowl's rise, its boom swinging a plasma
+## canister over the bowl. L7 (Obsidian): a taller plinth with glowing violet vein panels on its
+## faces the camera sees, the pedestal, bowl and barrel obsidian veined violet, the coils violet, a
+## violet plasma pool glowing on the bowl round the chamber, and a glowing charge ring hovering well
+## past the muzzle, turning about the barrel. L8 (Crown): gold filigree round the plinth and the
+## pedestal, the pool the antimatter core with a core ring round the chamber's foot, a gold crown
+## round the bowl's rim, and a gold-topped balcony on the near corner where the loader arm stands
+## and two troopers march round it as the loaders (the escort).
 static func build_plasma_mortar(p: Parts, level: int) -> void:
 	var m := p.body
-	var top := _plinth(m, 3, 1.25, 0.3)
+	var plinth := 0.3 if level < 5 else float(MORTAR_PLINTHS[level - 5])
+	var rise := 0.0 if level < 5 else float(MORTAR_RISES[level - 5])
+	var radius := 1.25 if level < 7 else MORTAR_WIDE
+	var top := _plinth(m, 3, radius, plinth, ARMOUR, _by_tier(p.tier, Parts.GUNMETAL, Parts.CHROME_ROUND, Parts.OBSIDIAN_ROUND))
+	if level >= 5:
+		# The pedestal, flaring out under the bowl.
+		m.lathe(PackedVector2Array([Vector2(0.88, 0), Vector2(0.88, rise - 0.1), Vector2(1.1, rise)]), 20, Vector3(0, top, 0),
+			_by_tier(p.tier, SHELL_MID, Parts.CHROME_ROUND, Parts.OBSIDIAN_ROUND))
+		m.ring(0.87, 0.9, 0.05, 20, Vector3(0, top + rise * 0.4, 0),
+			VEIN_PANEL if p.tier >= Parts.Tier.OBSIDIAN else Parts.CYAN_STRIP)
+	var base := top + rise
+	# From L5 a bigger bowl: its outer wall wider, its inner lip where it was.
+	var bowl := 1.0 if level < 5 else MORTAR_BOWL
 	m.lathe(PackedVector2Array([
-		Vector2(1.0, 0), Vector2(1.06, 0.12), Vector2(1.0, 0.26), Vector2(0.86, 0.32),
+		Vector2(1.0 * bowl, 0), Vector2(1.06 * bowl, 0.12), Vector2(1.0 * bowl, 0.26), Vector2(0.86 * bowl, 0.32),
 		Vector2(0.62, 0.32), Vector2(0.54, 0.2), Vector2(0.54, 0),
-	]), 20, Vector3(0, top, 0), SHELL_MID)
-	var seat := top + 0.32
+	]), 20, Vector3(0, base, 0), _by_tier(p.tier, SHELL_MID, Parts.CHROME_ROUND, Parts.OBSIDIAN_ROUND))
+	var seat := base + 0.32
 	if level >= 2:
 		for degrees: float in [135.0, 315.0]:
 			_cell(m, Parts.around(1.42, degrees, Parts.PAD_HEIGHT), 0.32, PLASMA)
-		for degrees: float in [0.0, 90.0, 180.0, 270.0]:
-			m.box_chamfered(Vector3(0.14, 0.3, 0.3), 0.04, Parts.around(1.0, degrees + 45.0, top + 0.02), Parts.GUNMETAL,
-				Vector3(0, 45.0 - degrees, 0))
+		if level < 5:
+			for degrees: float in [0.0, 90.0, 180.0, 270.0]:
+				m.box_chamfered(Vector3(0.14, 0.3, 0.3), 0.04, Parts.around(1.0, degrees + 45.0, top + 0.02), Parts.GUNMETAL,
+					Vector3(0, 45.0 - degrees, 0))
 	if level >= 3:
 		m.lathe(PackedVector2Array([
 			Vector2(0.86, 0), Vector2(0.86, 0.14), Vector2(0.78, 0.2), Vector2(0.6, 0.2),
@@ -453,7 +498,7 @@ static func build_plasma_mortar(p: Parts, level: int) -> void:
 		Parts.arc(m, breech + Parts.on_sphere(chamber + 0.06, ends[0]), breech + Parts.on_sphere(chamber + 0.06, ends[1]),
 			3, 0.03, PLASMA_ARC.phased(k / 3.0))
 	# A cooling fan on the heavy ring's flank, turning about the outward +Z.
-	var fan := Vector3(0, top + 0.15, 1.08)
+	var fan := Vector3(0, base + 0.15, 1.08 * bowl)
 	m.ring(0.1, 0.13, 0.07, 12, fan - Vector3(0, 0, 0.06), Parts.GUNMETAL, Vector3(90, 0, 0))
 	var rotor := p.moving(fan, Motion.spin(Vector3.BACK, 7.0))
 	Parts.drum(rotor, 0.045, 0.05, 0.015, 8, Vector3(0, 0, -0.03), Parts.GUNMETAL, Vector3(90, 0, 0))
@@ -464,8 +509,9 @@ static func build_plasma_mortar(p: Parts, level: int) -> void:
 		m.box_chamfered(Vector3(0.14, 0.24, 0.5), 0.04, Vector3(cheek.x, seat - 0.1, cheek.z), SHELL, heading)
 	var muzzle := 0.95
 	var mouth := _at(breech, Vector3(0, chamber * 0.85, 0), tilt)
+	var shell := _by_tier(p.tier, SHELL, Parts.CHROME_ROUND, Parts.OBSIDIAN_ROUND)
 	m.lathe(PackedVector2Array([Vector2(0.3, -0.12), Vector2(0.44, 0.0), Vector2(0.44, muzzle - 0.24)]),
-		20, mouth, SHELL, tilt)
+		20, mouth, shell, tilt)
 	m.lathe(PackedVector2Array([
 		Vector2(0.44, muzzle - 0.24), Vector2(0.52, muzzle - 0.18), Vector2(0.52, muzzle), Vector2(0.42, muzzle + 0.04),
 		Vector2(0.32, muzzle - 0.04),
@@ -474,6 +520,84 @@ static func build_plasma_mortar(p: Parts, level: int) -> void:
 	m.lathe(PackedVector2Array([Vector2(0.32, muzzle - 0.04), Vector2(0.32, muzzle - 0.3)]), 20, mouth, BORE, tilt)
 	m.disc(0.32, 20, _at(mouth, Vector3(0, muzzle - 0.3, 0), tilt), PLASMA_PULSE.phased(0.5), tilt)
 	m.tube(0.44, 0.47, 0.12, 20, _at(mouth, Vector3(0, 0.22, 0), tilt), ARMOUR_ROUND, tilt)
+	if level < 5:
+		return
+	# Plasma coils round the breech: cyan, violet from the Obsidian tier.
+	var coil := Parts.CORE_GLOW if p.tier >= Parts.Tier.OBSIDIAN else Parts.CYAN_STRIP
+	for along: float in ([0.4, 0.5] if level < 6 else [0.38, 0.47, 0.56]):
+		Parts.torus(m, 0.455, 0.032, 12, 6, _at(mouth, Vector3(0, along, 0), tilt), coil, tilt)
+	if level >= 6:
+		if level < 8:
+			_loader_arm(p, Parts.around(MORTAR_LOADER, 45.0, Parts.PAD_HEIGHT), Parts.around(0.95, 108.0, 0.0), p.tier,
+				seat + MORTAR_LOADER_CLEAR - Parts.PAD_HEIGHT)
+	if level >= 7:
+		_plinth_panels(m, radius, plinth)
+		# Veins round the barrel's breech and across the bowl's flank the camera sees.
+		m.lathe(PackedVector2Array([Vector2(0.446, 0.02), Vector2(0.446, 0.2)]), 20, mouth, VEIN_PANEL, tilt)
+		m.lathe(PackedVector2Array([Vector2(1.068 * bowl, 0.07), Vector2(1.068 * bowl, 0.17)]), 20, Vector3(0, base, 0), VEIN_PANEL,
+			Vector3.ZERO, -5.0, 80.0)
+		# The plasma pool on the armour ring round the chamber's foot, the antimatter core at the Crown.
+		m.lathe(PackedVector2Array([Vector2(0.775, 0.205), Vector2(0.58, 0.205)]), 20, Vector3(0, seat - 0.2, 0),
+			Parts.CORE_GLOW if p.tier >= Parts.Tier.CROWN else PLASMA_PULSE)
+		# The charge ring hovering well past the muzzle, glowing violet all over, turning about the barrel.
+		var axis := LowPolyMesh.turn(Vector3.UP, tilt)
+		var charge := p.moving(_at(mouth, Vector3(0, muzzle + MORTAR_CHARGE_OFF, 0), tilt), Motion.spin(axis, 1.6))
+		charge.ring(MORTAR_CHARGE_INNER, MORTAR_CHARGE_OUTER, 0.1, 24, LowPolyMesh.turn(Vector3(0, -0.05, 0), tilt), HOVER_RIM, tilt)
+		charge.lathe(PackedVector2Array([Vector2(MORTAR_CHARGE_OUTER - 0.02, 0.052), Vector2(MORTAR_CHARGE_INNER + 0.02, 0.052)]),
+			24, Vector3.ZERO, HOVER_RIM, tilt)
+		charge.lathe(PackedVector2Array([Vector2(MORTAR_CHARGE_OUTER + 0.006, -0.04), Vector2(MORTAR_CHARGE_OUTER + 0.006, 0.04)]),
+			24, Vector3.ZERO, HOVER_RIM, tilt)
+		for k: int in 4:
+			charge.orb(0.07, 8, 4, LowPolyMesh.turn(Parts.around((MORTAR_CHARGE_INNER + MORTAR_CHARGE_OUTER) * 0.5, 90.0 * k, 0.06),
+				tilt), (HOVER_GOLD if p.tier >= Parts.Tier.CROWN else HOVER_SIGHT))
+	if level >= 8:
+		_plinth_filigree(m, radius, plinth)
+		m.ring(0.885, 0.905, 0.08, 20, Vector3(0, top + rise * 0.6, 0), Parts.FILIGREE)
+		Parts.torus(m, chamber + 0.04, 0.06, 20, 8, Vector3(0, seat, 0), Parts.CORE_GLOW)
+		# The gold crown round the bowl's rim.
+		Parts.torus(m, 0.86, 0.04, 24, 8, Vector3(0, seat - 0.06, 0), Parts.GOLD_ROUND)
+		for k: int in 8:
+			m.cone(0.05, 0.16, 8, Parts.around(0.86, 22.5 + 45.0 * k, seat), Parts.GOLD_ROUND)
+		# The balcony on the near corner: the loader arm stands on it, taller, and the troopers march
+		# round it there.
+		var balcony := Parts.around(MORTAR_BALCONY, 45.0, Parts.PAD_HEIGHT)
+		Parts.drum(m, MORTAR_BALCONY_RADIUS, top - Parts.PAD_HEIGHT, 0.04, 24, balcony, Parts.OBSIDIAN_ROUND)
+		m.ring(MORTAR_BALCONY_RADIUS - 0.01, MORTAR_BALCONY_RADIUS + 0.025, 0.06, 24, Vector3(balcony.x, top - 0.1, balcony.z),
+			Parts.FILIGREE)
+		m.disc(MORTAR_BALCONY_RADIUS - 0.04, 24, Vector3(balcony.x, top + 0.002, balcony.z), Parts.GOLD_ROUND)
+		# The canister clears the crown's spikes.
+		_loader_arm(p, Vector3(balcony.x, top, balcony.z), Parts.around(0.95, 108.0, 0.0), p.tier,
+			seat + MORTAR_LOADER_CLEAR + 0.16 - top, false)
+		Parts.escort_troopers(p, MORTAR_ESCORT_RADIUS, top, 0.9, Vector3(balcony.x, 0, balcony.z), MORTAR_ESCORT_SCALE)
+
+
+## The plasma mortar's L6 loader arm standing on `foot`, a moving part swinging about its column: a
+## chrome column (obsidian from the Obsidian tier) on a gunmetal base, a long boom reaching across
+## the screen to over the bowl's left flank (`reach`, on the ground) and a plasma canister hanging
+## from its end; a glowing band round the column and a strip along the boom. Its shoulder stands
+## `shoulder_y` over `foot`, which the caller sets from the bowl's rim, so the canister hangs over
+## the bowl at every level; `base` gives it a gunmetal base on the ground.
+static func _loader_arm(p: Parts, foot: Vector3, reach: Vector3, tier: int, shoulder_y: float,
+		base: bool = true) -> void:
+	var arm := p.moving(foot, Motion.swing(Vector3.UP, 12.0, 5.0))
+	var plate := _by_tier(tier, SHELL, Parts.CHROME_ROUND, Parts.OBSIDIAN_ROUND)
+	var glow := Parts.CORE_GLOW if tier >= Parts.Tier.OBSIDIAN else Parts.CYAN_STRIP
+	var across := Vector3(reach.x - foot.x, 0, reach.z - foot.z)
+	var start := 0.14 if base else 0.0
+	if base:
+		Parts.drum(arm, 0.17, 0.14, 0.03, 12, Vector3.ZERO, Parts.GUNMETAL)
+	# On the balcony (no base) the column is slimmer, so the troopers clear it.
+	var column := 0.11 if base else 0.08
+	arm.prism(column, column - 0.02, shoulder_y - 0.06 - start, 12, Vector3(0, start, 0), plate)
+	arm.ring(column - 0.01, column + 0.01, 0.06, 12, Vector3(0, shoulder_y - 0.6, 0), glow)
+	var shoulder := Vector3(0, shoulder_y, 0)
+	arm.orb(0.13, 10, 5, shoulder, Parts.GUNMETAL)
+	var tip := shoulder + Vector3(0, 0.12, 0) + across
+	Parts.beam(arm, shoulder, tip, 0.12, plate)
+	Parts.beam(arm, shoulder + Vector3(0, 0.065, 0), tip + Vector3(0, 0.065, 0), 0.04, glow, 0.01)
+	arm.prism(0.05, 0.05, 0.16, 12, tip - Vector3(0, 0.16, 0), Parts.GUNMETAL)
+	arm.orb(0.13, 12, 6, tip - Vector3(0, 0.28, 0), PLASMA_PULSE)
+	Parts.torus(arm, 0.13, 0.03, 12, 6, tip - Vector3(0, 0.29, 0), plate)
 
 
 static func build_shield_generator(p: Parts, level: int) -> void:
