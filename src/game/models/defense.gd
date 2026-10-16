@@ -8,7 +8,7 @@ extends RefCounted
 ## gravity well, the EMP tower, the railgun, the ion beam and the orbital cannon go on to their
 ## tops through the high tiers: chrome with cyan strips, then obsidian with glowing violet vein
 ## panels on the faces the camera sees and a hovering ring, then gold filigree, the antimatter
-## core, a crown and an escort; the plinth keeps its octagon and its red belt, plated in the tier's
+## core and a crown; the plinth keeps its octagon and its red belt, plated in the tier's
 ## chrome or obsidian (the cloaked sentry, which has no plinth, rises on a hex skirt banded in
 ## red). Where the core is the weapon's heart (the shield's orb, the arc tower's sphere, the well's
 ## core, the EMP's emitter, the railgun's and the orbital cannon's breech, the ion beam's lens) it
@@ -137,29 +137,20 @@ const TOWARD_CAMERA := Vector3(0.70710678, 0, 0.70710678)
 ## The armoured octagon plinth's faces the camera sees, by the Parts.around() angle of each face's
 ## normal: the vein panels' and the filigree's places.
 const PLINTH_FACES := [0.0, 45.0, 90.0]
-## The Crown guard drones' size: twice the shared one, so they read at the gameplay zoom.
-const ESCORT_SCALE := 2.0
 
 ## The laser turret from L6, by level from L6: the plinth's height, and how far the mount lifts
 ## the head above the turret ring.
 const LASER_PLINTHS := [0.5, 0.5, 0.58, 0.58, 0.64]
 const LASER_LIFTS := [0.3, 0.54, 0.62, 0.72, 0.86]
-## The L9 targeting ring's and the L10 spotter drone's heights over the dome's top, and the drone's
-## round.
+## The L9 targeting ring's height over the dome's top.
 const LASER_RING_LIFT := 0.45
-const LASER_ESCORT_RADIUS := 1.15
-const LASER_ESCORT_LIFT := 0.85
 ## The missile battery from L6: its tubes' spacing, half the slot between its pods where the radar
 ## mast stands, the trunnion's height over the deck, and by level from L6 the dish's height over
-## the trunnion; the L10 skiff's round and its height over the dish.
+## the trunnion.
 const MISSILE_SPACING := 0.3
 const MISSILE_SLOT := 0.12
 const MISSILE_TRUNNION := 0.8
 const MISSILE_DISH_LIFTS := [1.0, 1.35, 1.35, 1.55, 1.9]
-const MISSILE_ESCORT_RADIUS := 1.1
-const MISSILE_ESCORT_LIFT := 0.45
-## The skiff's size: larger than the shared one, as far as its round allows.
-const MISSILE_SKIFF_SCALE := 1.75
 ## The plasma mortar from L5, by level from L5: the plinth's height and the pedestal's lifting the
 ## bowl; the L6 loader arm's distance out on the near corner; the wider plinth from L7.
 const MORTAR_PLINTHS := [0.34, 0.34, 0.52, 0.56]
@@ -181,91 +172,70 @@ const MORTAR_BALCONY := 1.5
 const MORTAR_BALCONY_RADIUS := 0.56
 const MORTAR_ESCORT_RADIUS := 0.32
 const MORTAR_ESCORT_SCALE := 0.85
-## The flak cannon: how much higher its radar stands from L6, the L7 targeting ring's and the L8
-## guard drone's heights over the deck, and the drone's round.
+## The flak cannon: how much higher its radar stands from L6, and the L7 targeting ring's height
+## over the deck.
 const FLAK_RADAR_RAISE := 0.25
 ## From L7 the height between the two rows of barrels.
 const FLAK_ROW := 0.22
 const FLAK_RING_LIFT := 1.6
-const FLAK_ESCORT_LIFT := 2.15
-const FLAK_ESCORT_RADIUS := 1.2
 ## The shield generator from L5, by level from L5: the plinth's height, and how much higher the orb
 ## floats, the pylons growing with it; the field ring's and the L7 hovering ring's distance out
-## from the orb, the hovering ring's drop under its centre, and the L8 guard drone's round and its
-## height over the orb's centre.
+## from the orb, and the hovering ring's drop under its centre.
 const SHIELD_PLINTHS := [0.36, 0.55, 0.58, 0.62]
 const SHIELD_LIFTS := [0.5, 0.8, 1.05, 1.3]
 const SHIELD_FIELD := 0.42
 const SHIELD_RING := 0.5
 const SHIELD_RING_DROP := 0.32
-const SHIELD_ESCORT_RADIUS := 1.38
-const SHIELD_ESCORT_LIFT := 0.45
 ## The arc tower from L5, by level from L5: the plinth's height, the coil's and the twin coils';
-## the L7 discharge ring's distance out from the sphere; the L8 guard drone's round and its height
-## over the sphere's top.
+## the L7 discharge ring's distance out from the sphere.
 const ARC_PLINTHS := [0.36, 0.4, 0.56, 0.6]
 const ARC_HEIGHTS := [1.85, 2.05, 2.3, 2.5]
 const ARC_TWINS := [0.85, 1.0, 1.1, 1.2]
 const ARC_RING := 0.18
-const ARC_ESCORT_RADIUS := 1.1
-const ARC_ESCORT_LIFT := 0.15
 ## The cloaked sentry from L4, by level from L4: how high its armoured hex skirt lifts the pod; the
 ## L6 cloak ring's radii and its height over the skirt, its sights clear of the shimmer ring under
-## it all through its bob; the L5 mantlet's size; the L7 crown's distance behind the guns, and the
-## guard drone's round and height (at ESCORT_SCALE, which the 2x2's extent allows).
+## it all through its bob; the L5 mantlet's size; the L7 crown's distance behind the guns.
 const SENTRY_RISES := [0.15, 0.24, 0.38, 0.5]
 const SENTRY_RING_INNER := 0.96
 const SENTRY_RING_OUTER := 1.08
 const SENTRY_RING_LIFT := 0.2
 const SENTRY_MANTLET := Vector3(0.66, 0.08, 0.36)
 const SENTRY_CROWN_BACK := 0.3
-const SENTRY_ESCORT_RADIUS := 0.86
-const SENTRY_ESCORT_LIFT := 1.0
 ## The gravity well from L4, by level from L4: the plinth's height, how much higher the core
 ## floats over the well (the pillars growing with it) and the core's radius (bobbing at L4, so
 ## held at L1's size to clear the inner gyro ring over its bob; bigger and steady from L5); the L5 gyro ring's
-## radii and its height under the core; the L6 guard drone's round and its height over the rotor.
+## radii and its height under the core.
 const WELL_PLINTHS := [0.3, 0.44, 0.48]
 const WELL_LIFTS := [0.3, 0.55, 0.85]
 const WELL_CORES := [0.17, 0.21, 0.23]
 const WELL_RING_INNER := 0.9
 const WELL_RING_OUTER := 1.03
 const WELL_RING_DROP := 0.6
-const WELL_ESCORT_RADIUS := 0.86
-const WELL_ESCORT_LIFT := 0.4
 ## The EMP tower from L4, by level from L4: the plinth's height and the storey it gains between
 ## its two blocks; the L5 pulse ring's radii and how far under the cage it hovers, round the
-## tower's neck, so the core shows over it; the L6 guard drone's round and its height over the cage.
+## tower's neck, so the core shows over it.
 const EMP_PLINTHS := [0.36, 0.55, 0.6]
 const EMP_RISES := [0.45, 0.9, 1.2]
 const EMP_RING_INNER := 0.6
 const EMP_RING_OUTER := 0.74
 const EMP_RING_DROP := 0.14
-const EMP_ESCORT_RADIUS := 1.3
-const EMP_ESCORT_LIFT := 1.2
 ## The railgun from L4, by level from L4: the plinth's height and how far the mount lifts the gun
 ## over the drum; the capacitor cans' height on the drum, and how far the rear row and the L5
-## front bank stand out on the plinth. The L6 targeting ring's height over the gun's deck, and
-## the L7 spotter drone's round and its height over the ring.
+## front bank stand out on the plinth. The L6 targeting ring's height over the gun's deck.
 const RAIL_PLINTHS := [0.34, 0.34, 0.46, 0.5]
 const RAIL_LIFTS := [0.55, 0.7, 0.9, 1.1]
 const RAIL_CAN := 0.5
 const RAIL_ROW := 0.98
 const RAIL_RING_LIFT := 1.05
-const RAIL_ESCORT_RADIUS := 1.2
-const RAIL_ESCORT_LIFT := 0.5
 ## The ion beam from L3, by level from L3: the plinth's height and how much higher the emitter
 ## stands; the L3 power cell's distance out on the near corner; the L5 focus ring's distance up
-## the beam from the lens; the L6 guard drone's round and its height over the emitter.
+## the beam from the lens.
 const ION_PLINTHS := [0.24, 0.44, 0.46, 0.5]
 const ION_RISES := [0.3, 0.45, 0.55, 0.65]
 const ION_CELL := 1.06
 const ION_FOCUS_OFF := 1.0
-const ION_ESCORT_RADIUS := 0.85
-const ION_ESCORT_LIFT := 1.6
 ## The orbital cannon from L3, by level from L3: the plinth's height, the barrel's length and its
-## lean from the vertical (steeper as it grows, so the muzzle stays over the footprint); the L5
-## skiff's round, its height and its size (as large as the round allows within the extent).
+## lean from the vertical (steeper as it grows, so the muzzle stays over the footprint).
 const ORBITAL_PLINTHS := [0.32, 0.46, 0.5]
 const ORBITAL_LENGTHS := [2.0, 2.2, 2.35]
 const ORBITAL_PITCHES := [35.0, 31.0, 28.0]
@@ -273,9 +243,6 @@ const ORBITAL_PITCHES := [35.0, 31.0, 28.0]
 ## second and the third, as shares of the barrel between its first coil's place and its muzzle.
 const ORBITAL_BANDS := [0.08, 0.42, 0.84]
 const ORBITAL_RING_AT := 0.63
-const ORBITAL_ESCORT_RADIUS := 1.72
-const ORBITAL_ESCORT_HEIGHT := 2.4
-const ORBITAL_SKIFF_SCALE := 1.75
 
 
 ## From L6 the head rides a mount that lifts it a little more each level, on a taller plinth.
@@ -286,8 +253,7 @@ const ORBITAL_SKIFF_SCALE := 1.75
 ## plinth's faces the camera sees and veins round the deck, the mount and the head, crystal inlays
 ## at the mount's foot, a violet focusing crystal at every muzzle. L9 a targeting ring hovering
 ## over the head, turning. L10 (Crown): gold filigree round the plinth and the head, a big gold
-## crown on a stem over the dome, in the targeting ring, holding the antimatter core up, and a
-## spotter drone circling above (the escort).
+## crown on a stem over the dome, in the targeting ring, holding the antimatter core up.
 static func build_laser_turret(p: Parts, level: int) -> void:
 	var m := p.body
 	var plinth := 0.42 if level < 6 else float(LASER_PLINTHS[level - 6])
@@ -399,8 +365,6 @@ static func build_laser_turret(p: Parts, level: int) -> void:
 		var ring_y := pivot.y + 0.62 + LASER_RING_LIFT
 		var ring := p.moving(Vector3(0, ring_y, 0), Motion.spin(Vector3.UP, 0.6))
 		_hover_ring(ring, 0.5, 0.62, p.tier)
-		if level >= 10:
-			Parts.escort_drone(p, LASER_ESCORT_RADIUS, pivot.y + 0.62 + LASER_ESCORT_LIFT, 0.8, Vector3.ZERO, ESCORT_SCALE)
 
 
 ## From L6 a chrome radar mast rises through the launcher's centre with a dish turning on top, and
@@ -412,8 +376,7 @@ static func build_laser_turret(p: Parts, level: int) -> void:
 ## plinth's and the pods' faces the camera sees, veins round the deck, crystal inlays on it, the
 ## missiles tipped with violet crystals. L9 a radar ring hovering round the mast under the dish,
 ## turning. L10 (Crown): gold filigree round the plinth, the deck and the pods' faces, a gold mast
-## with a gold crown over the racks holding the antimatter core up clear of the pods, and a hover
-## skiff circling over it all as the loader (the escort).
+## with a gold crown over the racks holding the antimatter core up clear of the pods.
 static func build_missile_battery(p: Parts, level: int) -> void:
 	var m := p.body
 	var plinth := 0.36 if level < 8 else (0.56 if level < 10 else 0.62)
@@ -504,8 +467,6 @@ static func build_missile_battery(p: Parts, level: int) -> void:
 	if level >= 9:
 		var ring := p.moving(Vector3(0, deck + trunnion.y + 1.0, 0), Motion.spin(Vector3.UP, -0.5))
 		_hover_ring(ring, 0.3, 0.42, p.tier)
-	if level >= 10:
-		Parts.escort_skiff(p, MISSILE_ESCORT_RADIUS, dish_y + MISSILE_ESCORT_LIFT, 0.6, Vector3.ZERO, MISSILE_SKIFF_SCALE)
 
 
 ## A missile pod on the launcher, `columns` by `rows` tubes `spacing` apart, centred `x` across
@@ -733,8 +694,8 @@ static func _loader_arm(p: Parts, foot: Vector3, reach: Vector3, tier: int, shou
 ## inlays on the deck, a pink crystal orb, the conduits, the field ring and the hologram band violet,
 ## violet crystal emitters and arcs. L7 a field ring hovering round the orb's lower half, turning,
 ## and a second collar on every pylon. L8 (Crown): gold filigree round the plinth and the
-## pylons, the orb the antimatter core under a gold halo, a gold field ring outside the violet one,
-## and a guard drone circling beside the orb's crown (the escort).
+## pylons, the orb the antimatter core under a gold halo, and a gold field ring outside the violet
+## one.
 static func build_shield_generator(p: Parts, level: int) -> void:
 	var m := p.body
 	var plinth := 0.3 if level < 5 else float(SHIELD_PLINTHS[level - 5])
@@ -824,7 +785,6 @@ static func build_shield_generator(p: Parts, level: int) -> void:
 		Parts.torus(m, orb_radius + SHIELD_FIELD + 0.09, 0.03, 24, 8, orb - Vector3(0, 0.03, 0), Parts.GOLD_ROUND)
 		# The gold halo floating over the orb, bobbing with it.
 		Parts.torus(m, 0.3, 0.05, 20, 8, orb + Vector3(0, orb_radius + 0.1, 0), HALO_GOLD)
-		Parts.escort_drone(p, SHIELD_ESCORT_RADIUS, orb.y + SHIELD_ESCORT_LIFT, 0.8, Vector3.ZERO, ESCORT_SCALE)
 
 
 ## The mount keeps growing taller every level. L5 (Chrome): chrome plinth, mount, carriage and
@@ -835,8 +795,7 @@ static func build_shield_generator(p: Parts, level: int) -> void:
 ## two tipped with violet crystal shells, the belts violet, and a targeting ring hovering over the
 ## guns, turning.
 ## L8 (Crown): gold filigree round the plinth and the mount, the antimatter core glowing round the
-## mount's foot and in a gold housing on its near side, a gold crown on the radar, and a guard
-## drone circling above (the escort).
+## mount's foot and in a gold housing on its near side, and a gold crown on the radar.
 static func build_flak_cannon(p: Parts, level: int) -> void:
 	var m := p.body
 	var plinth := 0.35 if level < 7 else (0.55 if level < 8 else 0.6)
@@ -934,7 +893,6 @@ static func build_flak_cannon(p: Parts, level: int) -> void:
 		m.box_chamfered(Vector3(0.3, 0.16, 0.3), 0.04, housing, Parts.GOLD_TRIM, Vector3(0, 75, 0))
 		m.orb(0.15, 16, 6, housing + Vector3(0, 0.26, 0), Parts.CORE_GLOW)
 		_crown(m, mast_foot + Vector3(0, mast - 0.2, 0), 0.13, 5)
-		Parts.escort_drone(p, FLAK_ESCORT_RADIUS, deck + FLAK_ESCORT_LIFT, 0.8, Vector3.ZERO, ESCORT_SCALE)
 
 
 ## A glowing ammo belt from a crate's lid `from` over the plinth's edge at `over` to `to` on the
@@ -955,8 +913,7 @@ static func _neck(h: float, rise: float) -> float:
 ## on its faces the camera sees, the drum and skirts obsidian with a violet band round every second
 ## skirt's lip, crystal crests on the coronas, the arcs between the coils violet, and a discharge
 ## ring hovering round the sphere, turning. L8 (Crown): gold filigree round the plinth and the same
-## skirts' lips, the sphere the antimatter core in a gold corona ring, and a guard drone circling
-## over the crown (the escort).
+## skirts' lips, and the sphere the antimatter core in a gold corona ring.
 static func build_arc_tower(p: Parts, level: int) -> void:
 	var m := p.body
 	var plinth := 0.3 if level < 5 else float(ARC_PLINTHS[level - 5])
@@ -1036,7 +993,6 @@ static func build_arc_tower(p: Parts, level: int) -> void:
 	if level >= 8:
 		_plinth_filigree(m, 1.1, plinth)
 		Parts.torus(m, sphere - 0.01, 0.035, 20, 6, centre - Vector3(0, 0.035, 0), Parts.GOLD_ROUND)
-		Parts.escort_drone(p, ARC_ESCORT_RADIUS, centre.y + sphere + ARC_ESCORT_LIFT, 0.8, Vector3.ZERO, ESCORT_SCALE)
 
 
 ## From L4 an armoured hex skirt lifts the pod higher every level. L4 (Chrome): a chrome skirt
@@ -1048,7 +1004,7 @@ static func build_arc_tower(p: Parts, level: int) -> void:
 ## the lid, violet crystal sights, the cloak and the mantlet's edge and dome violet, and a cloak ring
 ## hovering round the pod, turning. L7 (Crown): gold filigree round the lid and the skirt, the
 ## antimatter core glowing in the sights, one gold crown on a stem on the lid behind the guns
-## holding the core up where the camera sees it, and a guard drone circling above (the escort).
+## holding the core up where the camera sees it.
 static func build_cloaked_sentry(p: Parts, level: int) -> void:
 	var m := p.body
 	Parts.foundation(m, 2)
@@ -1130,7 +1086,6 @@ static func build_cloaked_sentry(p: Parts, level: int) -> void:
 		m.lathe(PackedVector2Array([Vector2(0.475, 0), Vector2(0.475, 0.04)]), 6, base + Vector3(0, 0.345, 0), Parts.FILIGREE)
 		m.lathe(PackedVector2Array([Vector2(0.785, 0), Vector2(0.785, 0.04)]), 6,
 			Vector3(0, Parts.PAD_HEIGHT + rise - 0.08, 0), Parts.FILIGREE)
-		Parts.escort_drone(p, SENTRY_ESCORT_RADIUS, base.y + SENTRY_ESCORT_LIFT, 0.9, Vector3.ZERO, ESCORT_SCALE)
 
 
 ## From L4 the core floats higher over the well every level, the pillars growing with it and a
@@ -1141,7 +1096,7 @@ static func build_cloaked_sentry(p: Parts, level: int) -> void:
 ## pillars and veins round the housing, a bigger pink crystal core held still in the gyro rings,
 ## and a gyro ring hovering round the pillars, turning with the rotor. L6 (Crown): gold filigree
 ## round the plinth and the housing, the core the antimatter core, bigger again and still, the gyro
-## rings and the rotor gold, and a guard drone circling over the rotor (the escort).
+## rings and the rotor gold.
 static func build_gravity_well(p: Parts, level: int) -> void:
 	var m := p.body
 	var plinth := 0.22 if level < 4 else float(WELL_PLINTHS[level - 4])
@@ -1214,7 +1169,6 @@ static func build_gravity_well(p: Parts, level: int) -> void:
 	if level >= 6:
 		_plinth_filigree(m, 0.8, plinth)
 		m.ring(0.64, 0.76, 0.02, 8, Vector3(0, top, 0), Parts.FILIGREE, Parts.OCTAGON)
-		Parts.escort_drone(p, WELL_ESCORT_RADIUS, core.y + 0.5 + WELL_ESCORT_LIFT, 0.9, Vector3.ZERO, ESCORT_SCALE)
 
 
 ## From L4 the tower gains a storey between its blocks, taller every level, and its capacitor
@@ -1224,8 +1178,8 @@ static func build_gravity_well(p: Parts, level: int) -> void:
 ## vein panels on its faces the camera sees, the tower and the cans obsidian with vein panels on
 ## the faces the camera sees, the bands violet crystal, crystal tips on the cans, and a pulse ring
 ## hovering round the tower's neck under the cage, turning. L6 (Crown): gold filigree round the plinth and the storey, the
-## core the antimatter core under a gold crown on the cage's ring, the pulse ring violet and gold,
-## and a guard drone circling over the tower (the escort).
+## core the antimatter core under a gold crown on the cage's ring, and the pulse ring violet and
+## gold.
 static func build_emp_tower(p: Parts, level: int) -> void:
 	var m := p.body
 	var plinth := 0.3 if level < 4 else float(EMP_PLINTHS[level - 4])
@@ -1301,7 +1255,6 @@ static func build_emp_tower(p: Parts, level: int) -> void:
 		m.box(Vector3(0.86, 0.04, 0.86), Vector3(0, top + 0.62, 0), Parts.FILIGREE)
 		# The gold crown on the cage's ring, over the core.
 		_crown(m, cage + Vector3(0, 0.68, 0), 0.44, 8, 0.16)
-		Parts.escort_drone(p, EMP_ESCORT_RADIUS, cage.y + EMP_ESCORT_LIFT, 0.8, Vector3.ZERO, ESCORT_SCALE)
 
 
 ## From L4 a mount lifts the gun over its capacitor banks, higher each level. L4 (Chrome): chrome
@@ -1313,8 +1266,7 @@ static func build_emp_tower(p: Parts, level: int) -> void:
 ## and across the housing's top, crystal inlays on the plinth, the capacitors capped with violet
 ## crystals swelling in turn, and a targeting ring hovering over the gun, turning. L7 (Crown): gold
 ## filigree round the plinth, the mount and the barrel's collars, the breech the antimatter core
-## glowing light violet in gold rings, a gold crown on the muzzle, and a spotter drone circling
-## above (the escort).
+## glowing light violet in gold rings, and a gold crown on the muzzle.
 static func build_railgun(p: Parts, level: int) -> void:
 	var m := p.body
 	var plinth := 0.34 if level < 4 else float(RAIL_PLINTHS[level - 4])
@@ -1414,7 +1366,6 @@ static func build_railgun(p: Parts, level: int) -> void:
 	for k: int in 2:
 		Parts.torus(m, 0.22, 0.035, 20, 8, _at(breech, Vector3(0, 0, 0.27 * k), aim), Parts.GOLD_ROUND, along)
 	_crown(m, _at(root, Vector3(0, 0.26, length - 0.1), aim), 0.2, 5, 0.18)
-	Parts.escort_drone(p, RAIL_ESCORT_RADIUS, ring_y + RAIL_ESCORT_LIFT, 0.8, Vector3.ZERO, ESCORT_SCALE)
 
 
 ## From L3 the emitter stands higher each level on a taller tripod. L3 (Chrome): chrome plinth,
@@ -1426,7 +1377,7 @@ static func build_railgun(p: Parts, level: int) -> void:
 ## points round the lens and violet crystal studs on the rings. L5 a focus ring hovering round the
 ## beam, turning about it. L6 (Crown): gold filigree round the plinth and on the cowl, the
 ## antimatter core glowing light violet in the lens, in a gold crown, and in a broad band round the
-## cowl, where the camera sees it, and a guard drone circling above (the escort).
+## cowl, where the camera sees it.
 static func build_ion_beam(p: Parts, level: int) -> void:
 	var m := p.body
 	var plinth := 0.2 if level < 3 else float(ION_PLINTHS[level - 3])
@@ -1510,7 +1461,6 @@ static func build_ion_beam(p: Parts, level: int) -> void:
 		return
 	_plinth_filigree(m, 0.78, plinth)
 	_ion_crown(m, _at(lens, Vector3(0, 0.02, 0), aim), 0.36, 5, 0.24, aim)
-	Parts.escort_drone(p, ION_ESCORT_RADIUS, head.y + ION_ESCORT_LIFT, 0.9, Vector3.ZERO, ESCORT_SCALE)
 
 
 ## From L3 the barrel grows longer each level and stands steeper, so it climbs higher within the
@@ -1521,8 +1471,7 @@ static func build_ion_beam(p: Parts, level: int) -> void:
 ## bunker, crystal inlays on the plinth's corners, the rings banded and the bunker's lamps and the
 ## cells' caps violet, and an uplink ring hovering round the barrel, turning about it. L5 (Crown):
 ## gold filigree round the plinth and on the rings' collars, the antimatter core glowing light
-## violet in the breech, a gold crown round the muzzle, and the uplink shuttle, a hover skiff,
-## circling above the bunker (the escort).
+## violet in the breech, and a gold crown round the muzzle.
 static func build_orbital_cannon(p: Parts, level: int) -> void:
 	var m := p.body
 	var plinth := 0.32 if level < 3 else float(ORBITAL_PLINTHS[level - 3])
@@ -1636,7 +1585,6 @@ static func build_orbital_cannon(p: Parts, level: int) -> void:
 	gun.prism(0.3, 0.3, 0.04, 20, window, BRIGHT_CORE, Parts.facing(back))
 	gun.tube(0.3, 0.36, 0.05, 20, window, Parts.GOLD_ROUND, Parts.facing(back))
 	_ion_crown(gun, _at(barrel, Vector3(0, length + 0.32, 0), aim), 0.45, 8, 0.26, aim)
-	Parts.escort_skiff(p, ORBITAL_ESCORT_RADIUS, ORBITAL_ESCORT_HEIGHT, 0.5, Vector3.ZERO, ORBITAL_SKIFF_SCALE)
 
 
 # --- Shared parts --------------------------------------------------------------------
