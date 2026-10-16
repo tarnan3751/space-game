@@ -54,7 +54,7 @@ const MODELS := {
 	"hangar": [5, 10],
 	"cadet_academy": [3, 10],
 	"fabricator": [3, 10],
-	"heavy_fabricator": [3, 3],
+	"heavy_fabricator": [3, 8],
 	"research_lab": [3, 5],
 	"nanite_foundry": [3, 4],
 	"drydock": [4, 2],
