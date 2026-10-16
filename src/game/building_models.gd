@@ -64,7 +64,7 @@ const MODELS := {
 	"plasma_mortar": [3, 8],
 	"shield_generator": [3, 8],
 	"flak_cannon": [3, 8],
-	"arc_tower": [3, 4],
+	"arc_tower": [3, 8],
 	"cloaked_sentry": [2, 3],
 	"gravity_well": [2, 3],
 	"emp_tower": [3, 3],

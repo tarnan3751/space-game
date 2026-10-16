@@ -193,6 +193,15 @@ const SHIELD_RING := 0.5
 const SHIELD_RING_DROP := 0.32
 const SHIELD_ESCORT_RADIUS := 1.38
 const SHIELD_ESCORT_LIFT := 0.45
+## The arc tower from L5, by level from L5: the plinth's height, the coil's and the twin coils';
+## the L7 discharge ring's distance out from the sphere; the L8 guard drone's round and its height
+## over the sphere's top.
+const ARC_PLINTHS := [0.36, 0.4, 0.56, 0.6]
+const ARC_HEIGHTS := [1.85, 2.05, 2.3, 2.5]
+const ARC_TWINS := [0.85, 1.0, 1.1, 1.2]
+const ARC_RING := 0.18
+const ARC_ESCORT_RADIUS := 1.1
+const ARC_ESCORT_LIFT := 0.15
 
 
 ## From L6 the head rides a mount that lifts it a little more each level, on a taller plinth.
@@ -865,22 +874,35 @@ static func _neck(h: float, rise: float) -> float:
 	return lerpf(0.4, 0.3, (h - 0.26) / (rise - 0.26))
 
 
+## From L5 the coil stands taller every level, more insulator skirts up it, and the twin coils
+## grow. L5 (Chrome): chrome plinth, drum and skirts, a cyan crest along the gold corona and on the
+## twin's, a cyan band round the drum. L6 a second twin coil on the right, in the third cell's
+## place, its own arc to the sphere. L7 (Obsidian): a taller plinth with glowing violet vein panels
+## on its faces the camera sees, the drum and skirts obsidian with a violet band round every second
+## skirt's lip, crystal crests on the coronas, the arcs between the coils violet, and a discharge
+## ring hovering round the sphere, turning. L8 (Crown): gold filigree round the plinth and the same
+## skirts' lips, the sphere the antimatter core in a gold corona ring, and a guard drone circling
+## over the crown (the escort).
 static func build_arc_tower(p: Parts, level: int) -> void:
 	var m := p.body
-	var top := _plinth(m, 3, 1.1, 0.3)
-	Parts.drum(m, 0.62, 0.24, 0.06, 20, Vector3(0, top, 0), SHELL_MID)
-	var height := 0.85 + 0.2 * mini(level, 3)
+	var plinth := 0.3 if level < 5 else float(ARC_PLINTHS[level - 5])
+	var obsidian := p.tier >= Parts.Tier.OBSIDIAN
+	var plate := _by_tier(p.tier, SHELL_MID, Parts.CHROME_ROUND, Parts.OBSIDIAN_ROUND)
+	var skirt := _by_tier(p.tier, SHELL, Parts.CHROME_ROUND, Parts.OBSIDIAN_ROUND)
+	var top := _plinth(m, 3, 1.1, plinth, ARMOUR, _by_tier(p.tier, Parts.GUNMETAL, Parts.CHROME_ROUND, Parts.OBSIDIAN_ROUND))
+	Parts.drum(m, 0.62, 0.24, 0.06, 20, Vector3(0, top, 0), plate)
+	var height := 0.85 + 0.2 * mini(level, 3) if level < 5 else float(ARC_HEIGHTS[level - 5])
 	var foot := Vector3(0, top + 0.24, 0)
-	var crown := _coil(m, foot, height, 0.5, p.tier >= Parts.Tier.GOLD)
+	var crown := _coil(m, foot, height, 0.5, p.tier >= Parts.Tier.GOLD, skirt)
 	var sphere := 0.28 + 0.03 * level
 	var centre := crown + Vector3(0, sphere * 0.85, 0)
-	m.orb(sphere, 16, 8, centre, ARC_PULSE)
+	m.orb(sphere, 16, 8, centre, BRIGHT_CORE if level >= 8 else ARC_PULSE)
 	# Arcs climb the coil from skirt to skirt on the side facing the viewer, then leap from the
-	# corona to the sphere.
+	# corona to the sphere. From L5 they zigzag over the front, so the taller coil's arcs show.
 	var skirts := _skirts(height)
 	var strip := 0
 	for i: int in skirts - 1:
-		var degrees := 20.0 + 32.0 * i
+		var degrees := 20.0 + 32.0 * (i if level < 5 else i % 3)
 		Parts.arc(m, foot + _skirt_rim(height, 0.5, i, degrees), foot + _skirt_rim(height, 0.5, i + 1, degrees + 28.0),
 			3, 0.04, ARC_SPARK.phased(strip / 6.0))
 		strip += 1
@@ -896,17 +918,51 @@ static func build_arc_tower(p: Parts, level: int) -> void:
 			m.orb(0.05, 8, 4, tip, ARC_BLINK.phased(Parts.chase(k, 4)))
 	if level >= 3:
 		var cells: Array[float] = [45.0, 225.0, 315.0]
+		if level >= 6:
+			cells = [45.0, 225.0]
 		for k: int in cells.size():
 			_cell(m, Parts.around(1.42, cells[k], Parts.PAD_HEIGHT), 0.42, ARC_PULSE.phased(0.25 + k / 3.0))
+	# The crest along a corona: cyan from the Chrome tier, violet crystal from the Obsidian tier.
+	var crest := FOCUS if obsidian else Parts.CYAN_STRIP
 	if level >= 4:
-		var twin := Parts.around(1.38, 135.0, Parts.PAD_HEIGHT)
-		Parts.drum(m, 0.26, 0.16, 0.04, 16, twin, SHELL_MID)
-		var twin_crown := _coil(m, twin + Vector3(0, 0.16, 0), 0.85, 0.26, true)
-		var twin_centre := twin_crown + Vector3(0, 0.17, 0)
-		m.orb(0.2, 16, 8, twin_centre, ARC_PULSE.phased(0.5))
-		# An arc jumps between the twin spheres.
-		var jump := (centre - twin_centre).normalized()
-		Parts.arc(m, twin_centre + jump * 0.18, centre - jump * (sphere - 0.02), 6, 0.07, ARC_SPARK.phased(0.95))
+		var twins: Array[float] = [135.0]
+		if level >= 6:
+			twins.append(315.0)
+		var twin_height := 0.85 if level < 5 else float(ARC_TWINS[level - 5])
+		for k: int in twins.size():
+			var twin := Parts.around(1.38, twins[k], Parts.PAD_HEIGHT)
+			Parts.drum(m, 0.26, 0.16, 0.04, 16, twin, plate)
+			var twin_crown := _coil(m, twin + Vector3(0, 0.16, 0), twin_height, 0.26, true, skirt)
+			var twin_centre := twin_crown + Vector3(0, 0.17, 0)
+			m.orb(0.2, 16, 8, twin_centre, ARC_PULSE.phased(0.5 + 0.25 * k))
+			# An arc jumps between the twin spheres.
+			var jump := (centre - twin_centre).normalized()
+			Parts.arc(m, twin_centre + jump * 0.18, centre - jump * (sphere - 0.02), 6 if level < 5 else 8, 0.07,
+				(VIOLET_ARC if obsidian else ARC_SPARK).phased(0.95 - 0.4 * k))
+			if level >= 5:
+				Parts.torus(m, 0.2, 0.025, 12, 4, twin_crown + Vector3(0, 0.01, 0), crest)
+	if level < 5:
+		return
+	Parts.torus(m, 0.4, 0.03, 20, 6, crown + Vector3(0, 0.05, 0), crest)
+	# Round the drum, a glowing band over a red armour band: outer walls only, the drum behind them.
+	m.lathe(PackedVector2Array([Vector2(0.632, 0), Vector2(0.632, 0.06)]), 20, Vector3(0, top + 0.1, 0),
+		Parts.VEINS if obsidian else Parts.CYAN_STRIP)
+	m.lathe(PackedVector2Array([Vector2(0.635, 0), Vector2(0.635, 0.07)]), 20, Vector3(0, top + 0.01, 0), ARMOUR_ROUND)
+	if level >= 7:
+		_plinth_panels(m, 1.1, plinth)
+		# A violet band round every second skirt's lip (gold filigree at the Crown): a band on each
+		# would stripe the tall coil busily.
+		for i: int in range(0, skirts, 2):
+			var t := float(i) / skirts
+			var rim := lerpf(0.5, 0.31, t)
+			m.lathe(PackedVector2Array([Vector2(rim + 0.012, 0), Vector2(rim + 0.012, 0.04)]), 16,
+				foot + Vector3(0, height * t + 0.065, 0), Parts.FILIGREE if level >= 8 else Parts.CORE_GLOW)
+		var ring := p.moving(centre - Vector3(0, 0.035, 0), Motion.spin(Vector3.UP, 0.7))
+		_hover_ring(ring, sphere + ARC_RING, sphere + ARC_RING + 0.14, p.tier)
+	if level >= 8:
+		_plinth_filigree(m, 1.1, plinth)
+		Parts.torus(m, sphere - 0.01, 0.035, 20, 6, centre - Vector3(0, 0.035, 0), Parts.GOLD_ROUND)
+		Parts.escort_drone(p, ARC_ESCORT_RADIUS, centre.y + sphere + ARC_ESCORT_LIFT, 0.8, Vector3.ZERO, ESCORT_SCALE)
 
 
 static func build_cloaked_sentry(p: Parts, level: int) -> void:
@@ -1260,8 +1316,10 @@ static func _sentry_gun(m: LowPolyMesh, pos: Vector3, yaw: float) -> void:
 
 
 ## A tesla coil standing on `base`: a dark column `height` tall stacked with white insulator
-## skirts `flare` wide at the foot, crowned with a corona ring. Returns the crown's centre.
-static func _coil(m: LowPolyMesh, base: Vector3, height: float, flare: float, gold: bool) -> Vector3:
+## skirts `flare` wide at the foot (`skirt`: chrome or obsidian at the high tiers), crowned with a
+## corona ring. Returns the crown's centre.
+static func _coil(m: LowPolyMesh, base: Vector3, height: float, flare: float, gold: bool,
+		skirt: Surf = SHELL) -> Vector3:
 	m.prism(flare * 0.4, flare * 0.28, height, 16, base, ARC_CURRENT)
 	var skirts := _skirts(height)
 	for i: int in skirts:
@@ -1270,7 +1328,7 @@ static func _coil(m: LowPolyMesh, base: Vector3, height: float, flare: float, go
 		m.lathe(PackedVector2Array([
 			Vector2(lerpf(flare, flare * 0.62, t), 0), Vector2(lerpf(flare, flare * 0.62, t), 0.05),
 			Vector2(column, 0.09),
-		]), 16, base + Vector3(0, height * t + 0.06, 0), SHELL)
+		]), 16, base + Vector3(0, height * t + 0.06, 0), skirt)
 	var crown := base + Vector3(0, height, 0)
 	# A small coil's corona is a tiny ring, and takes fewer faces.
 	var big := flare >= 0.4
