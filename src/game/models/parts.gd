@@ -351,70 +351,79 @@ static var TROOPER_LIMB := Surf.make(MaterialKit.Layer.HULL, MaterialKit.HULL_MI
 static var TROOPER_HELMET := Surf.make(MaterialKit.Layer.HULL, MaterialKit.HULL_LIGHT, 1.0, Surf.LIT, true)
 
 
-## A small quadrotor guard drone, a third the size of the drone bay's, orbiting the footprint's
-## centre `radius` out and `height` up at `rate` radians a second (a spin about +Y), its nose to
-## its heading and its rotors a blur. About 0.12 across from its centre: keep `radius` plus that
-## within the extent. Returns the moving part.
-static func escort_drone(p: Parts, radius: float, height: float, rate: float) -> LowPolyMesh:
-	var s := p.moving(Vector3(0, height, 0), Motion.spin(Vector3.UP, rate))
+## A small quadrotor guard drone, a third the size of the drone bay's (times `scale`), orbiting
+## the footprint's centre (or `centre` on the ground) `radius` out and `height` up at `rate`
+## radians a second (a spin about +Y), its nose to its heading and its rotors a blur. About 0.12
+## times `scale` across from its centre: keep its round within the extent. Returns the moving
+## part.
+static func escort_drone(p: Parts, radius: float, height: float, rate: float,
+		centre: Vector3 = Vector3.ZERO, scale: float = 1.0) -> LowPolyMesh:
+	var s := p.moving(centre + Vector3(0, height, 0), Motion.spin(Vector3.UP, rate))
 	var at := Vector3(radius, 0, 0)
+	var z := scale
 	var heading := Vector3(0, 180.0 if rate > 0.0 else 0.0, 0)
 	s.lathe(PackedVector2Array([
-		Vector2(0, -0.025), Vector2(0.04, -0.025), Vector2(0.07, -0.008), Vector2(0.065, 0.015), Vector2(0, 0.025),
+		Vector2(0, -0.025) * z, Vector2(0.04, -0.025) * z, Vector2(0.07, -0.008) * z, Vector2(0.065, 0.015) * z,
+		Vector2(0, 0.025) * z,
 	]), 10, at, HULL_LIGHT_ROUND)
-	s.dome(0.03, 0.025, 8, 2, at + Vector3(0, 0.02, 0), GLASS)
-	s.box(Vector3(0.04, 0.018, 0.02), at + LowPolyMesh.turn(Vector3(0, -0.01, 0.065), heading), ESCORT_EYE, heading)
+	s.dome(0.03 * z, 0.025 * z, 8, 2, at + Vector3(0, 0.02, 0) * z, GLASS)
+	s.box(Vector3(0.04, 0.018, 0.02) * z, at + LowPolyMesh.turn(Vector3(0, -0.01, 0.065) * z, heading), ESCORT_EYE, heading)
 	for k: int in 4:
 		var degrees := 45.0 + 90.0 * k
-		var hub := at + around(0.1, degrees, 0.005)
-		s.box(Vector3(0.07, 0.016, 0.02), at + around(0.065, degrees, -0.003), HULL_MID, Vector3(0, -degrees, 0))
-		s.disc(0.035, 8, hub, ESCORT_ROTOR.phased(0.9 if k % 2 == 0 else 0.1))
+		var hub := at + around(0.1, degrees, 0.005) * z
+		s.box(Vector3(0.07, 0.016, 0.02) * z, at + around(0.065, degrees, -0.003) * z, HULL_MID, Vector3(0, -degrees, 0))
+		s.disc(0.035 * z, 8, hub, ESCORT_ROTOR.phased(0.9 if k % 2 == 0 else 0.1))
 	return s
 
 
-## A hover skiff patrolling round the footprint's centre `radius` out and `height` up at `rate`
-## radians a second: a chamfered hull with a glass canopy, two engine pods and a glowing
-## underside, bobbing as it flies. About 0.3 from its centre to its engines' ends: keep `radius`
-## plus that within the extent. Returns the moving part.
-static func escort_skiff(p: Parts, radius: float, height: float, rate: float) -> LowPolyMesh:
-	var s := p.moving(Vector3(0, height, 0), Motion.spin(Vector3.UP, rate))
+## A hover skiff patrolling round the footprint's centre (or `centre` on the ground) `radius` out
+## and `height` up at `rate` radians a second: a chamfered hull with a glass canopy, two engine
+## pods and a glowing underside, bobbing as it flies, `scale` times its own size. About 0.3 times
+## `scale` from its centre to its engines' ends: keep its round within the extent. Returns the
+## moving part.
+static func escort_skiff(p: Parts, radius: float, height: float, rate: float,
+		centre: Vector3 = Vector3.ZERO, scale: float = 1.0) -> LowPolyMesh:
+	var s := p.moving(centre + Vector3(0, height, 0), Motion.spin(Vector3.UP, rate))
 	var at := Vector3(radius, 0, 0)
+	var z := scale
 	var heading := Vector3(0, 180.0 if rate > 0.0 else 0.0, 0)
-	s.box(Vector3(0.16, 0.012, 0.3), at + Vector3(0, -0.012, 0), SKIFF_GLOW, heading)
-	s.box_chamfered(Vector3(0.18, 0.07, 0.34), 0.025, at, SKIFF_HULL, heading)
-	s.dome(0.06, 0.05, 10, 3, at + LowPolyMesh.turn(Vector3(0, 0.07, 0.04), heading), SKIFF_CANOPY)
+	s.box(Vector3(0.16, 0.012, 0.3) * z, at + Vector3(0, -0.012, 0) * z, SKIFF_GLOW, heading)
+	s.box_chamfered(Vector3(0.18, 0.07, 0.34) * z, 0.025 * z, at, SKIFF_HULL, heading)
+	s.dome(0.06 * z, 0.05 * z, 10, 3, at + LowPolyMesh.turn(Vector3(0, 0.07, 0.04) * z, heading), SKIFF_CANOPY)
 	for side: float in [-1.0, 1.0]:
-		var pod := at + LowPolyMesh.turn(Vector3(side * 0.11, 0.02, -0.14), heading)
-		s.prism(0.035, 0.03, 0.14, 10, pod, SKIFF_ENGINE, heading + Vector3(-90, 0, 0))
-		s.disc(0.028, 10, pod + LowPolyMesh.turn(Vector3(0, 0, -0.141), heading), SKIFF_GLOW, heading + Vector3(-90, 0, 0))
+		var pod := at + LowPolyMesh.turn(Vector3(side * 0.11, 0.02, -0.14) * z, heading)
+		s.prism(0.035 * z, 0.03 * z, 0.14 * z, 10, pod, SKIFF_ENGINE, heading + Vector3(-90, 0, 0))
+		s.disc(0.028 * z, 10, pod + LowPolyMesh.turn(Vector3(0, 0, -0.141) * z, heading), SKIFF_GLOW, heading + Vector3(-90, 0, 0))
 	return s
 
 
 ## Two troopers in the cadets' proportions, army plating over their limbs, marching a round about
-## the footprint's centre `radius` out at `height` (their feet) at `rate` radians a second, the
-## second a pace behind the first. About 0.1 across from each one's centre: keep `radius` plus
-## that within the extent. Returns the moving part.
-static func escort_troopers(p: Parts, radius: float, height: float, rate: float) -> LowPolyMesh:
-	var s := p.moving(Vector3(0, height, 0), Motion.spin(Vector3.UP, rate))
+## the footprint's centre (or `centre` on the ground) `radius` out at `height` (their feet) at
+## `rate` radians a second, the second a pace behind the first, `scale` times their own size.
+## About 0.1 times `scale` across from each one's centre: keep their round within the extent.
+## Returns the moving part.
+static func escort_troopers(p: Parts, radius: float, height: float, rate: float,
+		centre: Vector3 = Vector3.ZERO, scale: float = 1.0) -> LowPolyMesh:
+	var s := p.moving(centre + Vector3(0, height, 0), Motion.spin(Vector3.UP, rate))
 	for k: int in 2:
-		# The second trooper walks 0.3 units behind the first along the round.
-		var behind := 0.3 / radius * k * (1.0 if rate > 0.0 else -1.0)
+		# The second trooper walks a pace (0.3 units times `scale`) behind the first along the round.
+		var behind := 0.3 * scale / radius * k * (1.0 if rate > 0.0 else -1.0)
 		var at := around(radius, rad_to_deg(behind), 0.0)
 		var heading := Vector3(0, rad_to_deg(-behind) + (180.0 if rate > 0.0 else 0.0), 0)
-		_trooper(s, at, heading)
+		_trooper(s, at, heading, scale)
 	return s
 
 
-## One solid trooper standing at `foot`, facing `heading`: legs, an armoured torso, arms, a
-## helmet with a glowing visor and a rifle carried across the chest.
-static func _trooper(s: LowPolyMesh, foot: Vector3, heading: Vector3) -> void:
-	const K := 0.9
+## One solid trooper standing at `foot`, facing `heading`, `scale` times its own size: legs, an
+## armoured torso, arms, a helmet with a glowing visor and a rifle carried across the chest.
+static func _trooper(s: LowPolyMesh, foot: Vector3, heading: Vector3, scale: float) -> void:
+	var K := 0.9 * scale
 	for side: float in [-1.0, 1.0]:
 		s.box(Vector3(0.07, 0.2, 0.08) * K, foot + LowPolyMesh.turn(Vector3(side * 0.045, 0, 0) * K, heading), TROOPER_LIMB,
 			heading)
 		s.box(Vector3(0.055, 0.18, 0.065) * K, foot + LowPolyMesh.turn(Vector3(side * 0.135, 0.2, 0) * K, heading),
 			TROOPER_LIMB, heading)
-	s.box_chamfered(Vector3(0.2, 0.2, 0.12) * K, 0.02, foot + Vector3(0, 0.2, 0) * K, TROOPER_PLATE, heading)
+	s.box_chamfered(Vector3(0.2, 0.2, 0.12) * K, 0.02 * scale, foot + Vector3(0, 0.2, 0) * K, TROOPER_PLATE, heading)
 	s.dome(0.075 * K, 0.1 * K, 8, 3, foot + Vector3(0, 0.4, 0) * K, TROOPER_HELMET)
 	s.box(Vector3(0.1, 0.025, 0.02) * K, foot + LowPolyMesh.turn(Vector3(0, 0.44, 0.07) * K, heading), ESCORT_EYE, heading)
 	s.box(Vector3(0.22, 0.03, 0.03) * K, foot + LowPolyMesh.turn(Vector3(0, 0.3, 0.08) * K, heading), GUNMETAL,

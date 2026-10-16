@@ -434,14 +434,16 @@ The shared elements are named once on `Parts`, for every model batch:
 | Obsidian | `VEINS` | the veins layer in `ANTIMATTER` violet, unlit, FLOW at 0.7: energy running through veins |
 | Crown | `FILIGREE` | the bands layer in core gold at 2 repeats a unit, glossy: gold filigree over the obsidian |
 | Crown | `CORE_GLOW` | the glow layer in `CORE_GLOW_TINT` (`9B5CFF`, a saturated violet), unlit, PULSE: the antimatter core |
-| Crown | `escort_drone(p, radius, height, rate)` | a small quadrotor guard drone, a third the size of the drone bay's (about 0.12 across from its centre), its rotors unlit screen-layer blurs (FLOW_U, no hologram surface): 166 body triangles |
-| Crown | `escort_skiff(p, radius, height, rate)` | a hover skiff: a chamfered hull, a glass canopy, two engine pods and a glowing underside (PULSE), every part bobbing together (about 0.3 from its centre to its engines' ends): 170 |
-| Crown | `escort_troopers(p, radius, height, rate)` | two solid troopers in the cadets' proportions, army orange plating, a hull-light helmet with an `ENERGY` visor and a rifle, one 0.3 behind the other on the round (each about 0.1 across from its centre): 260 |
+| Crown | `escort_drone(p, radius, height, rate, centre = Vector3.ZERO, scale = 1.0)` | a small quadrotor guard drone, a third the size of the drone bay's (about 0.12 across from its centre), its rotors unlit screen-layer blurs (FLOW_U, no hologram surface): 166 body triangles |
+| Crown | `escort_skiff(p, radius, height, rate, centre = Vector3.ZERO, scale = 1.0)` | a hover skiff: a chamfered hull, a glass canopy, two engine pods and a glowing underside (PULSE), every part bobbing together (about 0.3 from its centre to its engines' ends): 170 |
+| Crown | `escort_troopers(p, radius, height, rate, centre = Vector3.ZERO, scale = 1.0)` | two solid troopers in the cadets' proportions, army orange plating, a hull-light helmet with an `ENERGY` visor and a rifle, one 0.3 behind the other on the round (each about 0.1 across from its centre): 260 |
 
 Each escort is a moving part built in its own space, the Crown tier's fourth: it spins about +Y
-through the footprint's centre at `rate` radians a second, its figure `radius` out and `height`
-up, facing its heading, and is at most 300 body triangles. A caller keeps `radius` plus the
-figure's reach within the extent. The `kit_swatches` harness scenario (`tools/harness/README.md`)
+through the footprint's centre (or through `centre`, an optional point on the ground, where the
+building's round lies off its middle) at `rate` radians a second, its figure `radius` out and
+`height` up and `scale` times its own size (an optional factor, for a big building's escort),
+facing its heading, and is at most 300 body triangles. A caller keeps the round plus
+the figure's reach within the extent. The `kit_swatches` harness scenario (`tools/harness/README.md`)
 shows every tier surface on a cube and a drum in a row, and the three escorts orbiting a 3×3 pad:
 the batches' reference.
 
