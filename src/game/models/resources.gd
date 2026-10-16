@@ -3,6 +3,12 @@ extends RefCounted
 ## the concrete foundation pad. Each carries its resource's colour (metal, crystal,
 ## antimatter) as its accent and its glow; the drone bay's is energy cyan, the HUD's drones.
 ##
+## The drone bay and the collectors are modelled to their top levels, the top one Crown tier
+## (BuildingModels.tier_of): from the Chrome tier their parts follow the level and their paint the
+## tier, chrome with cyan strips, then obsidian with violet veins and a hovering element, then gold
+## filigree, the antimatter core and an escort as the fourth moving part (docs/reference/art-style.md,
+## **Tiers**), within 5 units. The storage stops at its Gold top level for now.
+##
 ## BuildingModels calls one static build_<type>(p: Parts, level: int) per type.
 
 
@@ -781,7 +787,32 @@ static var ARC := Parts.spark(MaterialKit.ANTIMATTER)
 ## camera's corner left open) and the coils on the torus by level.
 const SIPHON_CORE := 1.3
 const SIPHON_PYLONS := [105.0, 225.0, 345.0]
-const SIPHON_COILS := [6, 9, 9]
+const SIPHON_COILS := [6, 9, 9, 12, 12, 12, 12, 12]
+## From L4 the core floats higher and grows, by level from L4: its height and its radius; the
+## pylons grow PYLON_GROWTH a level from L3's height.
+const RAISED_CORES := [1.45, 1.55, 1.7, 1.8, 1.95]
+const CORE_RADII := [0.31, 0.34, 0.36, 0.36, 0.38]
+const PYLON_GROWTH := 0.4
+## The L5 third capacitor, on the right corner past the right pylon, where the camera sees it, and
+## where its pipe meets the pedestal.
+const THIRD_CAPACITOR := Vector3(0.72, 0, -1.12)
+const THIRD_PIPE_END := Vector3(0.37, 0, -0.57)
+## The horizontal direction towards the camera (IsoCamera's yaw): the obsidian pylons' vein panels
+## go on the faces turned to it.
+const TOWARD_CAMERA := Vector3(0.70710678, 0, 0.70710678)
+## The L6 ring hovering over the core and the L8 halo over it: their heights over the core.
+const SIPHON_HOVER_LIFT := 0.55
+const HALO_LIFT := 0.95
+## The L8 guard drone's round, outside the pylons between their filigree bands.
+const SIPHON_ESCORT_RADIUS := 1.5
+const SIPHON_ESCORT_HEIGHT := 2.3
+
+## The high levels' arcs: cyan at the Chrome tier, violet from the Obsidian tier. From the Obsidian
+## tier the pylons' faces to the camera carry glowing violet vein panels (the walls' violet field:
+## the glow layer's stripes drawn a third as fine and lifted up the panel by FLOW).
+static var CYAN_ARC := Parts.spark(MaterialKit.ENERGY)
+static var VIOLET_ARC := Parts.spark(Parts.CORE_GLOW_TINT)
+static var VEIN_PANEL := Surf.make(MaterialKit.Layer.GLOW, Parts.CORE_GLOW_TINT, 1.0 / 3.0, Surf.UNLIT | Surf.FLOW, false, true, 0.45)
 
 
 ## A magnetic torus turning round a pulsing violet core floating on a pedestal, wound with
@@ -789,9 +820,22 @@ const SIPHON_COILS := [6, 9, 9]
 ## crackling from their tips to the core, a capacitor piped to the pedestal.
 ## Unlocked at Command Center 4, so it looks advanced from L1. L2 adds coils, pylon armour and
 ## a second capacitor; L3 a second, larger torus tilted round the first, and gold trim.
+##
+## From L4 the pylons grow PYLON_GROWTH a level, their heads aimed down at the core, which floats
+## higher and grows. L4 (Chrome): chrome pylons with cyan strips up them, a chrome torus with twelve
+## coils, cyan arcs. L5 two cyan rings round each pylon and a third capacitor on the right
+## corner. L6 (Obsidian): obsidian pylons with glowing violet vein panels and violet rings, an
+## obsidian ring hovering over the core, violet arcs. L7 crystal inlays at the pylons' feet and
+## crystal crowns on their heads. L8 (Crown): gold filigree bands round the pylons, a halo glowing over the core (its crown),
+## the loudest arcs (a second from each tip to the halo, and one between each two tips), and a
+## guard drone orbiting round the pylons as the escort.
 static func build_antimatter_siphon(p: Parts, level: int) -> void:
 	var m := p.body
 	var gold := p.tier >= Parts.Tier.GOLD
+	var chrome := p.tier >= Parts.Tier.CHROME
+	var obsidian := p.tier >= Parts.Tier.OBSIDIAN
+	var core_y := SIPHON_CORE if level < 4 else float(RAISED_CORES[level - 4])
+	var core_radius := 0.27 if level < 4 else float(CORE_RADII[level - 4])
 	Parts.foundation(m, 3)
 	var ground := Parts.PAD_HEIGHT
 	m.lathe(PackedVector2Array([
@@ -804,13 +848,20 @@ static func build_antimatter_siphon(p: Parts, level: int) -> void:
 		var degrees := 30.0 + 60.0 * k
 		m.box(Vector3(0.1, 0.16, 0.04), Parts.around(0.44, degrees, ground + 0.42), ANTIMATTER_GLOW, Vector3(-8, 90.0 - degrees, 0))
 	var cap := ground + 0.78
-	m.prism(0.1, 0.08, SIPHON_CORE - cap, 16, Vector3(0, cap, 0), Parts.GUNMETAL)
-	m.orb(0.27, 16, 8, Vector3(0, SIPHON_CORE, 0), SIPHON_CORE_GLOW)
+	m.prism(0.1, 0.08, core_y - cap, 16, Vector3(0, cap, 0), Parts.GUNMETAL)
+	m.orb(core_radius, 16, 8, Vector3(0, core_y, 0), SIPHON_CORE_GLOW)
 
+	var arc := ARC
+	if obsidian:
+		arc = VIOLET_ARC
+	elif chrome:
+		arc = CYAN_ARC
+	var core := Vector3(0, core_y + 0.1, 0)
+	var tips: Array[Vector3] = []
 	for k: int in SIPHON_PYLONS.size():
-		var tip := _field_pylon(m, SIPHON_PYLONS[k], level, gold)
-		var core := Vector3(0, SIPHON_CORE + 0.1, 0)
-		Parts.arc(m, tip, core + (tip - core).normalized() * 0.2, 4, 0.05, ARC.phased(k / 3.0))
+		var tip := _field_pylon(m, SIPHON_PYLONS[k], level, gold, p.tier, core)
+		tips.append(tip)
+		Parts.arc(m, tip, core + (tip - core).normalized() * (0.2 + core_radius - 0.27), 4, 0.05, arc.phased(k / 3.0))
 
 	# Capacitors piped to the pedestal.
 	_capacitor(m, Vector3(0.95, ground, 0.95), gold)
@@ -820,9 +871,30 @@ static func build_antimatter_siphon(p: Parts, level: int) -> void:
 		_capacitor(m, Vector3(-1.0, ground, 0.55), gold)
 		Parts.pipe_run(m, PackedVector3Array([Vector3(-0.84, ground + 0.26, 0.47), Vector3(-0.58, ground + 0.32, 0.32)]),
 			0.06, Parts.GUNMETAL, 8)
+	if level >= 5:
+		_capacitor(m, THIRD_CAPACITOR + Vector3(0, ground, 0), gold)
+		var inward := (THIRD_PIPE_END - THIRD_CAPACITOR).normalized()
+		Parts.pipe_run(m, PackedVector3Array([THIRD_CAPACITOR + inward * 0.17 + Vector3(0, ground + 0.26, 0),
+			THIRD_PIPE_END + Vector3(0, ground + 0.32, 0)]), 0.06, Parts.GUNMETAL, 8)
+	if level >= 6:
+		# The obsidian ring hovering over the core, bobbing.
+		var hover := Vector3(0, core_y + SIPHON_HOVER_LIFT, 0)
+		m.ring(0.38, 0.52, 0.05, 24, hover, HOVER_RING)
+		m.lathe(PackedVector2Array([Vector2(0.5, 0.052), Vector2(0.4, 0.052)]), 24, hover, HOVER_VEINS)
+		m.lathe(PackedVector2Array([Vector2(0.525, 0.008), Vector2(0.525, 0.042)]), 24, hover, HOVER_RIM)
+	if level >= 8:
+		# The halo over the core: a glowing ring in a gold one, the siphon's crown; arcs from each tip
+		# to it and from tip to tip.
+		var halo := Vector3(0, core_y + HALO_LIFT, 0)
+		Parts.torus(m, 0.3, 0.045, 24, 8, halo, Parts.CORE_GLOW)
+		m.ring(0.36, 0.42, 0.06, 24, halo + Vector3(0, 0.015, 0), Parts.GOLD_ROUND)
+		for k: int in tips.size():
+			var to_halo := halo + Vector3(0, 0.045, 0)
+			Parts.arc(m, tips[k], to_halo + (tips[k] - to_halo).normalized() * 0.45, 4, 0.05, arc.phased(fposmod(k / 3.0 + 0.5, 1.0)))
+			Parts.arc(m, tips[k], tips[(k + 1) % tips.size()], 6, 0.06, arc.phased(fposmod(k / 3.0 + 0.17, 1.0)))
 
-	var s := p.moving(Vector3(0, SIPHON_CORE, 0), Motion.spin(Vector3.UP, 1.4))
-	Parts.torus(s, 0.72, 0.12, 24, 10, Vector3(0, -0.12, 0), Parts.HULL_LIGHT_ROUND)
+	var s := p.moving(Vector3(0, core_y, 0), Motion.spin(Vector3.UP, 1.4))
+	Parts.torus(s, 0.72, 0.12, 24, 10, Vector3(0, -0.12, 0), Parts.CHROME_ROUND if chrome else Parts.HULL_LIGHT_ROUND)
 	var coils: int = SIPHON_COILS[level - 1]
 	for k: int in coils:
 		var degrees := 360.0 * k / coils
@@ -833,25 +905,65 @@ static func build_antimatter_siphon(p: Parts, level: int) -> void:
 		var tilt := Vector3(12, 0, 0)
 		Parts.torus(s, 1.05, 0.07, 24, 10, -LowPolyMesh.turn(Vector3(0, 0.07, 0), tilt),
 			Parts.GOLD_ROUND if gold else Parts.HULL_MID_ROUND, tilt)
+	if level >= 8:
+		Parts.escort_drone(p, SIPHON_ESCORT_RADIUS, SIPHON_ESCORT_HEIGHT, 0.7)
 
 
 ## A field pylon on the pedestal's rim: a column on a foot with an antimatter band, its
 ## emitter head leaning in towards the torus with a glowing tip. Returns the tip's centre.
-static func _field_pylon(m: LowPolyMesh, degrees: float, level: int, gold: bool) -> Vector3:
+## From L4 it grows PYLON_GROWTH a level and its head aims down at `core`; its column is chrome
+## with a cyan strip up its outer face, from the Obsidian tier obsidian with a glowing violet vein
+## panel on each face turned to the camera; from L5 two glowing rings round it (cyan, violet from
+## the Obsidian tier); from L7 a crystal inlaid in its foot and a crown of crystals on its head,
+## at L8 two gold filigree bands round it.
+static func _field_pylon(m: LowPolyMesh, degrees: float, level: int, gold: bool, tier: int, core: Vector3) -> Vector3:
 	var yaw := Vector3(0, 90.0 - degrees, 0)
 	var foot := Parts.around(1.22, degrees, Parts.PAD_HEIGHT)
-	var height := 1.3 + 0.08 * level
+	var height := 1.3 + 0.08 * level if level < 4 else 1.54 + PYLON_GROWTH * (level - 3)
+	var column := Parts.HULL_LIGHT
+	if tier >= Parts.Tier.OBSIDIAN:
+		column = Parts.OBSIDIAN
+	elif tier >= Parts.Tier.CHROME:
+		column = Parts.CHROME
 	m.box_chamfered(Vector3(0.32, 0.12, 0.32), 0.04, foot, Parts.HULL_DARK, yaw)
-	m.box_chamfered(Vector3(0.18, height, 0.18), 0.04, foot, Parts.HULL_LIGHT, yaw)
+	m.box_chamfered(Vector3(0.18, height, 0.18), 0.04, foot, column, yaw)
 	m.box(Vector3(0.2, 0.1, 0.2), foot + Vector3(0, height * 0.62, 0), ANTIMATTER_ACCENT, yaw)
 	if level >= 2:
-		m.box_chamfered(Vector3(0.24, 0.42, 0.24), 0.04, foot + Vector3(0, 0.12, 0), PYLON_ARMOUR, yaw)
+		m.box_chamfered(Vector3(0.24, 0.42, 0.24), 0.04, foot + Vector3(0, 0.12, 0), _rig_armour(tier, PYLON_ARMOUR), yaw)
+	if level >= 4 and tier < Parts.Tier.OBSIDIAN:
+		m.box(Vector3(0.06, height - 0.75, 0.02), foot + LowPolyMesh.turn(Vector3(0, 0.6, 0.095), yaw), _rig_strip(tier), yaw)
+	elif level >= 4:
+		# A glowing violet vein panel on each face turned to the camera.
+		for normal: Vector3 in [Vector3.BACK, Vector3.FORWARD, Vector3.RIGHT, Vector3.LEFT]:
+			if LowPolyMesh.turn(normal, yaw).dot(TOWARD_CAMERA) > 0.2:
+				var size := Vector3(0.12, height - 0.77, 0.02) if normal.x == 0.0 else Vector3(0.02, height - 0.77, 0.12)
+				m.box(size, foot + LowPolyMesh.turn(normal * 0.1 + Vector3(0, 0.62, 0), yaw), VEIN_PANEL, yaw)
+	if level >= 5:
+		# Two glowing rings round the column, between the accent band and the filigree's places.
+		for ring: float in [0.42, 0.78]:
+			m.box(Vector3(0.22, 0.05, 0.22), foot + Vector3(0, height * ring, 0),
+				Parts.CORE_GLOW if tier >= Parts.Tier.OBSIDIAN else Parts.CYAN_STRIP, yaw)
+	if level >= 7:
+		m.prism(0.07, 0.07, 0.04, 4, foot + LowPolyMesh.turn(Vector3(0, 0.06, 0.165), yaw), INLAY.phased(degrees / 360.0),
+			Vector3(90, yaw.y, 0))
+	if level >= 8:
+		for band: float in [0.3, 0.85]:
+			m.box(Vector3(0.24, 0.06, 0.24), foot + Vector3(0, height * band, 0), Parts.FILIGREE, yaw)
 	var head := foot + Vector3(0, height, 0)
 	m.box_chamfered(Vector3(0.24, 0.12, 0.24), 0.04, head, Parts.GOLD_TRIM if gold else Parts.HULL_MID, yaw)
+	if level >= 7:
+		# A crown of crystals on the head's outer half, leaning out.
+		for k: int in 3:
+			var lean := Parts.facing(LowPolyMesh.turn(Vector3((k - 1) * 0.35, 1, 0.3), yaw))
+			m.cone(0.045, 0.2 - 0.05 * absf(k - 1), 8, head + LowPolyMesh.turn(Vector3((k - 1) * 0.07, 0.12, 0.06), yaw),
+				INLAY.phased(fposmod(degrees / 360.0 + k / 3.0, 1.0)), lean)
 	var tilt := yaw + Vector3(-50, 0, 0)
+	var neck := head + Vector3(0, 0.08, 0)
+	if level >= 4:
+		tilt = Parts.facing(core - neck)
 	var inward := LowPolyMesh.turn(Vector3.UP, tilt)
-	m.prism(0.08, 0.06, 0.26, 12, head + Vector3(0, 0.08, 0), Parts.HULL_MID_ROUND, tilt)
-	var tip := head + Vector3(0, 0.08, 0) + inward * 0.3
+	m.prism(0.08, 0.06, 0.26, 12, neck, Parts.HULL_MID_ROUND, tilt)
+	var tip := neck + inward * 0.3
 	m.orb(0.07 + 0.015 * level, 10, 4, tip, ANTIMATTER_GLOW)
 	return tip
 

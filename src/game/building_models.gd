@@ -47,7 +47,7 @@ const MODELS := {
 	"drone_bay": [2, 3],
 	"metal_extractor": [3, 10],
 	"crystal_harvester": [3, 10],
-	"antimatter_siphon": [3, 3],
+	"antimatter_siphon": [3, 8],
 	"metal_silo": [3, 5],
 	"crystal_silo": [3, 5],
 	"antimatter_vault": [3, 3],

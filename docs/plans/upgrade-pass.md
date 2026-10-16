@@ -210,7 +210,7 @@ model-table rows and proves budgets, reach and motion in the gallery, rendered):
 | --- | --- | --- |
 | M1 Core | Command Center 6–10 (landed) | 5 |
 | M2 Walls | Barrier Wall 6–10, junctions, `wall_junctions` to ten (landed) | 5 |
-| M3 Collectors | Drone Bay, Extractor, Harvester, Siphon | 17 |
+| M3 Collectors | Drone Bay, Extractor, Harvester, Siphon (landed) | 17 |
 | M4 Storages | Metal Silo, Crystal Silo, Vault | 15 |
 | M5 Army A | Hangar, Cadet Academy, Fabricator, Heavy Fabricator | 20 |
 | M6 Army B | Research Lab, Nanite Foundry, Drydock, Alliance Beacon | 18 |
