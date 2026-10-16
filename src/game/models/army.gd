@@ -12,9 +12,10 @@ extends RefCounted
 ## Fabricator and the Nanite Foundry eight, the Drydock and the Alliance Beacon seven, through the
 ## higher tiers (docs/reference/art-style.md, **Tiers**): chrome with cyan strips, then obsidian
 ## veined violet with crystal inlays and a hovering ring, then gold filigree over the obsidian and
-## the antimatter core glowing, with, on the hangar and the academy, a robot of the building's own
-## as the fourth moving part. The army's orange stays its accent through them, and the foundry's
-## goo stays green. The surfaces follow the tier (_plating, _strip, _glow, _trim), the parts the level.
+## the antimatter core glowing; at the top levels the hangar's marshaller bot and the drydock's
+## welder bots, robots of their own, and the academy's marching troopers are among the moving
+## parts. The army's orange stays its accent through them, and the foundry's goo stays green. The
+## surfaces follow the tier (_plating, _strip, _glow, _trim), the parts the level.
 ##
 ## BuildingModels calls one static build_<type>(p: Parts, level: int) per type. Each builds
 ## its level as a run of additions (`if level >= 3:` adds the second bay), so the levels of a
@@ -141,9 +142,11 @@ static var GOO_BRIGHT_SWIRL := Surf.make(MaterialKit.Layer.GLASS, MaterialKit.NA
 	Surf.UNLIT | Surf.FLOW_U, false, true, 0.65)
 static var HOVER_CRYSTAL := Surf.make(MaterialKit.Layer.CRYSTAL, MaterialKit.CRYSTAL, 1.0, Surf.UNLIT | Surf.PULSE | Surf.BOB,
 	false, true, 0.6)
-## The drydock's: the welders' sparks cyan, then crystal (and the crystal arcs off them).
+## The drydock's: the welders' sparks cyan, then crystal (and the crystal arcs off them); the
+## welder bots' weld beam, too thin for an outline.
 static var CYAN_SPARK_ARC := Parts.spark(MaterialKit.ENERGY)
 static var CRYSTAL_SPARK_ARC := Parts.spark(MaterialKit.CRYSTAL)
+static var WELD_BEAM := Surf.make(MaterialKit.Layer.GLOW, MaterialKit.ENERGY, 1.0, Surf.UNLIT, true, false)
 ## Filigree for thin parts at Crown (the drydock's gantry posts, the beacon's legs): Parts.FILIGREE's
 ## bands at about a third the repeats, so a thin part reads as banded gold, not as dashes.
 static var FILIGREE_LEG := Surf.make(MaterialKit.Layer.BANDS, MaterialKit.CORE_GOLD, 0.7, Surf.GLOSSY)
@@ -1501,9 +1504,10 @@ static func _vat(m: LowPolyMesh, foot: Vector3, radius: float, height: float, ti
 ## welders' sparks cyan, the reactor glowing through a port on the near flank; L4 a fourth gantry;
 ## L5 obsidian plates veined violet along the hull's spine and a broad violet band glowing on the
 ## chrome flank the camera sees, an obsidian cradle, crystal arcs crackling from the welders onto
-## the hull; L6 the gantries taller and the plating further aft again; L7 the ship complete, gold
-## filigree gantries, the antimatter reactor's light violet in its port, along the near flank, in
-## a band round the stern and under a gold-ringed blister, and gold fins.
+## the hull; L6 a welder bot working low along the near flank, sliding to and fro; L7 the ship
+## complete, gold filigree gantries, the antimatter reactor's light violet in its port, along the
+## near flank, in a band round the stern and under a gold-ringed blister, gold fins, and a second
+## welder bot working high along the flank, sliding the other way.
 static func build_drydock(p: Parts, level: int) -> void:
 	var m := p.body
 	var g := Parts.PAD_HEIGHT
@@ -1647,6 +1651,22 @@ static func build_drydock(p: Parts, level: int) -> void:
 	m.box_chamfered(Vector3(0.5, 0.45, 0.4), 0.05, booth, _plating(p.tier, Parts.HULL_LIGHT))
 	m.box_chamfered(Vector3(0.4, 0.16, 0.03), 0.01, booth + Vector3(0, 0.24, 0.2), Parts.GLASS)
 	Parts.mast(m, booth + Vector3(0.12, 0.45, -0.08), 0.35, 0.05, GLOW)
+	if level >= 6:
+		# Welder bots working along the hull's flank to the camera (+Z), clear of the gantries'
+		# beams and welders, sliding along it over its fat middle: from 6 one low, its torch up at
+		# the lower hull; at 7 a second, high, its torch down at the upper, running the other way.
+		# Their sparks land on a radius set between the middle's and the slide's ends', so they stay
+		# on the hull.
+		var middle := -0.45
+		var hull := _hull_radius(profile, middle - stern) * scale - 0.03
+		var welders: Array[Vector3] = [Vector3(0.95, -20.0, 0.0)]
+		if level >= 7:
+			welders.append(Vector3(1.95, 35.0, 0.5))
+		for spec: Vector3 in welders:
+			var at := Vector3(middle, spec.x, 0.98)
+			var angle := deg_to_rad(spec.y)
+			var hit := Vector3(middle, axis_y + hull * sin(angle), hull * cos(angle))
+			_welder(p, at, hit - at, spec.z)
 
 
 ## The engine bank on the drydock's stern from 3 (_drydock's), `stern` the hull's aft end on its
@@ -1710,6 +1730,31 @@ static func _hull_strip(m: LowPolyMesh, profile: PackedVector2Array, stern: Vect
 		var at := lerpf(along.x, along.y, k / 3.0)
 		section.append(Vector2(_hull_radius(profile, at) * scale + proud, at - along.x))
 	m.lathe(section, 24, stern + Vector3(along.x, 0, 0), surface, Vector3(0, 0, -90), degrees.x, degrees.y)
+
+
+## A welder bot of the drydock's from 6, hovering at `at` on the hull's near flank, drawn at 1.4
+## times its size so it reads at the gameplay zoom: a compact cream body banded hazard with orange
+## shoulders, so it pops against the chrome hull, one big cyan lens eye on the face to the camera,
+## two gunmetal arms reaching from its back to nozzles aimed at `hit` (on the hull, relative to
+## `at`), and a short cyan weld beam from between them to a flickering spark there. A moving part,
+## it slides 0.8 either way along the hull every 6 seconds from `phase`.
+static func _welder(p: Parts, at: Vector3, hit: Vector3, phase: float) -> void:
+	const K := 1.4
+	var bot := p.moving(at, Motion.slide(Vector3.RIGHT, 0.8, 6.0, phase))
+	bot.box_chamfered(Vector3(0.3, 0.2, 0.24) * K, 0.05 * K, Vector3(0, -0.1, 0) * K, Parts.HULL_LIGHT)
+	bot.box(Vector3(0.32, 0.05, 0.2) * K, Vector3(0, 0.02, -0.01) * K, Parts.HAZARD)
+	for side: float in [-1.0, 1.0]:
+		bot.box_chamfered(Vector3(0.07, 0.09, 0.2) * K, 0.02 * K, Vector3(side * 0.18, -0.06, 0) * K, ORANGE)
+	bot.prism(0.085 * K, 0.085 * K, 0.03 * K, 16, Vector3(0, 0, 0.115) * K, Parts.GUNMETAL, Vector3(90, 0, 0))
+	bot.disc(0.065 * K, 16, Vector3(0, 0, 0.146) * K, CYAN_LENS, Vector3(90, 0, 0))
+	var aim := hit.normalized()
+	var root := aim * 0.2 * K
+	for side: float in [-1.0, 1.0]:
+		var tip := root + Vector3(side * 0.04, 0, 0) * K
+		Parts.pipe(bot, Vector3(side * 0.1, -0.03, -0.1) * K, tip, 0.025 * K, Parts.GUNMETAL, 8, false)
+		bot.cone(0.035 * K, 0.06 * K, 8, tip, Parts.GUNMETAL, Parts.facing(aim))
+	Parts.pipe(bot, root + aim * 0.05 * K, hit, 0.018, WELD_BEAM, 6, false)
+	bot.orb(0.06, 8, 3, hit, SPARK.phased(phase))
 
 
 ## A welding point on the hull: a glowing arc flashing, `phase` into its blink, with hot sparks
