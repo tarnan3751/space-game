@@ -6,8 +6,9 @@ extends RefCounted
 ## The drone bay and the collectors are modelled to their top levels, the top one Crown tier
 ## (BuildingModels.tier_of): from the Chrome tier their parts follow the level and their paint the
 ## tier, chrome with cyan strips, then obsidian with violet veins and a hovering element, then gold
-## filigree, the antimatter core and an escort as the fourth moving part (docs/reference/art-style.md,
-## **Tiers**), within 5 units. So are the storages: the metal and crystal silos to L10, the
+## filigree, the antimatter core and a robot of their own as the fourth moving part, but for the
+## drone bay and the siphon, which have none (docs/reference/art-style.md, **Tiers**), within 5
+## units. So are the storages: the metal and crystal silos to L10, the
 ## antimatter vault to L8.
 ##
 ## BuildingModels calls one static build_<type>(p: Parts, level: int) per type.
@@ -1152,15 +1153,19 @@ const TWIN_TANKS := [Vector3(-0.56, 0, 0.56), Vector3(0.56, 0, -0.56)]
 ## axis, towards the camera.
 const PUMP := Vector3(0.38, 0, 0.38)
 const PUMP_FACING := Vector3(0.70710678, 0, 0.70710678)
-## The L9 gauge ring's lift over the tanks' shells and its radius, over the deck between them;
-## the L10 hover skiff's round over them.
+## The L9 gauge ring's lift over the tanks' shells and its radius, over the deck between them.
 const GAUGE_RING_LIFT := 0.56
 const GAUGE_RING_RADIUS := 0.5
 ## The L7 beacon mast's height over the deck: its beacon clears the L9 gauge ring,
 ## which turns round the mast.
 const BEACON_MAST := 0.8
-const SILO_SKIFF_RADIUS := 1.15
-const SILO_SKIFF_HEIGHT := 4.1
+## The L10 security bot's patrol: a tight round at the tanks' mid-height in the open corner between
+## them towards the camera, over the pump, since a round about the middle at that height would
+## pass through the tanks (they reach 1.45 out).
+const SILO_GUARD_CENTRE := Vector3(0.85, 0, 0.85)
+const SILO_GUARD_RADIUS := 0.3
+const SILO_GUARD_HEIGHT := 2.6
+const SILO_GUARD_RATE := 0.4
 
 
 ## A squat riveted tank in plate bands on a round plinth, with an access ladder up its lit
@@ -1176,7 +1181,8 @@ const SILO_SKIFF_HEIGHT := 4.1
 ## tanks, metal-lit lenses on the gauges and an obsidian pump housing; L9 an obsidian gauge ring
 ## hovering over the deck between the tanks, turning; L10 gold filigree bands, gold rims and
 ## railings, the violet antimatter core glowing in a gold cage on the pump at the pipe's junction,
-## gold-capped vents, and a hover skiff circling over the tanks as its escort.
+## gold-capped vents, and a security bot patrolling between the tanks at their mid-height as its
+## escort.
 static func build_metal_silo(p: Parts, level: int) -> void:
 	var m := p.body
 	var gold := p.tier >= Parts.Tier.GOLD
@@ -1217,7 +1223,7 @@ static func build_metal_silo(p: Parts, level: int) -> void:
 	if level >= 9:
 		_gauge_ring(p, Vector3(0, deck + GAUGE_RING_LIFT, 0), GAUGE_RING_RADIUS, p.tier)
 	if level >= 10:
-		Parts.escort_skiff(p, SILO_SKIFF_RADIUS, SILO_SKIFF_HEIGHT, 0.4)
+		Parts.escort_guard(p, SILO_GUARD_RADIUS, SILO_GUARD_HEIGHT, SILO_GUARD_RATE, SILO_GUARD_CENTRE)
 
 
 ## One metal tank standing at `base`: plinth, banded shell, gauge, ladder, domed top with its
@@ -1400,10 +1406,11 @@ const PANEL_ROW := 0.2
 const GROWN_SILO_RADIUS := [0.96, 0.96, 1.0, 1.0, 1.0]
 const GROWN_PANEL_ROW := [0.32, 0.32, 0.36, 0.36, 0.36]
 const GROWN_ROWS := [5, 6, 6, 6, 6]
-## The L10 mega crystal's height on the lid, and the escort drone's round about the container.
+## The L10 mega crystal's height on the lid, and the security bot's round about the container.
 const MEGA_CRYSTAL := 1.1
-const SILO_DRONE_RADIUS := 1.4
-const SILO_DRONE_HEIGHT := 1.7
+const CRYSTAL_GUARD_RADIUS := 1.38
+const CRYSTAL_GUARD_HEIGHT := 2.0
+const CRYSTAL_GUARD_RATE := 0.5
 
 
 ## A tall hexagonal container of glass panels shimmering with the crystal inside, framed by
@@ -1417,7 +1424,7 @@ const SILO_DRONE_HEIGHT := 1.7
 ## the panels deeper pink and taller, crystal inlays round the plinth; L9 a crystal crown hovering
 ## over the finial, turning the other way; L10 a gold filigree frame and violet light bars, a mega
 ## crystal on the lid lit from within by the violet core in a gold cradle, a gold finial over it
-## with the crown hovering round the crystal, and an escort drone circling the container.
+## with the crown hovering round the crystal, and a security bot patrolling round the container.
 static func build_crystal_silo(p: Parts, level: int) -> void:
 	var m := p.body
 	var gold := p.tier >= Parts.Tier.GOLD
@@ -1572,7 +1579,7 @@ static func _grown_crystal_silo(p: Parts, level: int) -> void:
 	Parts.pipe_run(m, PackedVector3Array([pump + Vector3(0.14, 0.3, -0.14), Parts.around(radius - 0.05, 150, base + 0.18)]),
 		0.065, Parts.GUNMETAL, 12)
 	if crown:
-		Parts.escort_drone(p, SILO_DRONE_RADIUS, SILO_DRONE_HEIGHT, 0.6)
+		Parts.escort_guard(p, CRYSTAL_GUARD_RADIUS, CRYSTAL_GUARD_HEIGHT, CRYSTAL_GUARD_RATE)
 
 
 ## The crystal silo's frame by tier from L6: chrome, obsidian from the Obsidian tier, gold
@@ -1632,14 +1639,16 @@ const VAULT_ROUND := [Vector2(-1, -1), Vector2(1, -1), Vector2(1, 1), Vector2(-1
 ## From L4: the core's radius by level from L4, its lift over its cradle, and at L8 the gold
 ## pedestal raising the cradle off the lid's cap, so the core clears the front pylon's cap; the
 ## containment rings' radii about it (the L7 second ring wider, a gimbal round the first); the L8
-## escort drone's round, over the pylons' caps and the halo.
+## security bot's round, the other way from the rings, over the pylons' caps and their arcs (lower,
+## it would pass through the corner pylons) and outside the rings.
 const VAULT_CORE_RADII := [0.2, 0.24, 0.26, 0.28, 0.3]
 const VAULT_CORE_LIFT := 0.12
 const VAULT_PEDESTAL := 0.5
 const CONTAINMENT_RADIUS := 0.46
 const OUTER_CONTAINMENT_RADIUS := 0.64
-const VAULT_DRONE_RADIUS := 1.2
-const VAULT_DRONE_HEIGHT := 3.6
+const VAULT_GUARD_RADIUS := 1.25
+const VAULT_GUARD_HEIGHT := 3.3
+const VAULT_GUARD_RATE := -0.5
 
 
 ## A heavy chamfered armoured cube on a skirt, violet glow seams with current flowing round it
@@ -1655,8 +1664,8 @@ const VAULT_DRONE_HEIGHT := 3.6
 ## containment ring hovering round the core, turning (a moving part), and violet arcs; L7 a second,
 ## wider ring tilted the other way, counter-turning, a gyroscope round the core; L8 gold filigree
 ## over the pylons' heads and round the lid, the core raised on a gold pedestal clear of the pylons'
-## caps, in the violet core's glow under a halo, the loudest arcs (doubled between the tips) and an
-## escort drone circling over the pylons' caps and the halo.
+## caps, in the violet core's glow under a halo, the loudest arcs (doubled between the tips) and a
+## security bot patrolling over the pylons' caps.
 static func build_antimatter_vault(p: Parts, level: int) -> void:
 	var m := p.body
 	var gold := p.tier >= Parts.Tier.GOLD
@@ -1745,7 +1754,7 @@ static func build_antimatter_vault(p: Parts, level: int) -> void:
 		m.lathe(PackedVector2Array([Vector2(0.725, 0.0), Vector2(0.725, 0.08)]), 24, Vector3(0, top + 0.01, 0), Parts.FILIGREE)
 		# The halo over the core.
 		Parts.torus(m, core_radius + 0.08, 0.04, 24, 6, core + Vector3(0, core_radius + 0.22, 0), Parts.CORE_GLOW)
-		Parts.escort_drone(p, VAULT_DRONE_RADIUS, VAULT_DRONE_HEIGHT, -0.7)
+		Parts.escort_guard(p, VAULT_GUARD_RADIUS, VAULT_GUARD_HEIGHT, VAULT_GUARD_RATE)
 
 
 ## The vault's lid by tier: hull mid, chrome from the Chrome tier, obsidian from the Obsidian tier.
