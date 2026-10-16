@@ -247,9 +247,20 @@ const PUMPJACK_PIN := 0.7
 const PUMPJACK_LENGTH := 0.62
 ## The L9 collar hovering round the derrick, this far under the crown block's foot.
 const COLLAR_DROP := 0.4
-## The L10 hover skiff's round, hauling ore round the rig over the hoppers and the stacks.
-const SKIFF_RADIUS := 1.33
-const SKIFF_HEIGHT := 2.5
+## The L10 ore hauler's track over the first hopper's conveyor, across the camera's view: where
+## its middle is at either end, along the line from the drill to that hopper (the near end inside
+## the derrick, between its legs, over the drill's auger; the far end over the hopper), and how
+## high; and how far the track lies to the side of the belt's line, away from the derrick's leg it
+## passes.
+const HAULER_NEAR := 0.66
+const HAULER_FAR := 1.2
+const HAULER_NEAR_HEIGHT := 1.3
+const HAULER_FAR_HEIGHT := 1.55
+const HAULER_ASIDE := 0.05
+## Seconds for a round trip, drill to hopper and back, and the hauler's size, so it reads at the
+## gameplay zoom.
+const HAULER_PERIOD := 5.0
+const HAULER_SCALE := 1.35
 ## The L10 antimatter core on the engine house's roof, clear of its stacks.
 const HOUSE_CORE := Vector3(0.62, 0, 0.27)
 
@@ -263,6 +274,8 @@ static var HOVER_VEINS := Surf.make(MaterialKit.Layer.VEINS, MaterialKit.ANTIMAT
 static var HOVER_RIM := Surf.make(MaterialKit.Layer.GLOW, Parts.CORE_GLOW_TINT, 1.0, Surf.UNLIT | Surf.PULSE | Surf.BOB, true, true,
 	0.7)
 static var INLAY := Surf.make(MaterialKit.Layer.CRYSTAL, MaterialKit.CRYSTAL, 1.0, Surf.UNLIT | Surf.PULSE)
+## The L10 ore hauler's thrusters, pulsing.
+static var HAULER_THRUST := Surf.make(MaterialKit.Layer.GLOW, MaterialKit.ENERGY, 1.0, Surf.UNLIT | Surf.PULSE, true)
 ## The Crown tier's antimatter core where it is the model's crown (the extractor's crown and engine
 ## house, the harvester's mega-shard): the glow layer in a light violet, unlit and steady, so it is
 ## the brightest thing on the model where CORE_GLOW's pulse would dim it.
@@ -285,8 +298,8 @@ static var BRIGHT_CORE := Surf.make(MaterialKit.Layer.GLOW, CORE_LIGHT, 1.0, Sur
 ## hopper. The ore is the metal accent at every level, as on the silos. L9 an obsidian collar
 ## hovering round the derrick under its crown. L10 (Crown): gold filigree on the braces, the crown
 ## block, the hoppers and the engine house, the antimatter core glowing on a gold mount over the
-## crown and in a gold housing on the engine house's roof, and a hover skiff hauling ore round the
-## rig over the hoppers and the stacks as the escort.
+## crown and in a gold housing on the engine house's roof, and an ore hauler shuttling glowing ore
+## from the drill to the first hopper over its conveyor as the escort.
 static func build_metal_extractor(p: Parts, level: int) -> void:
 	var m := p.body
 	var gold := p.tier >= Parts.Tier.GOLD
@@ -399,7 +412,44 @@ static func build_metal_extractor(p: Parts, level: int) -> void:
 	if level >= 7:
 		_pumpjack(p, p.tier)
 	if level >= 10:
-		Parts.escort_skiff(p, SKIFF_RADIUS, SKIFF_HEIGHT, 0.5)
+		_ore_hauler(p)
+
+
+## The L10 ore hauler: a squat hover-hauler shuttling (a slide) on a track climbing over the first
+## hopper's conveyor, from inside the derrick over the drill's auger, where it loads, up to over
+## the hopper, where it tips; it lingers at either end, as the slide eases. Built facing along its
+## track towards the hopper: a chamfered hull banded in gold filigree under a violet core lamp, an
+## open gold-lipped bucket at its front heaped with glowing ore, and two thrusters glowing under it.
+static func _ore_hauler(p: Parts) -> void:
+	var hopper: Vector3 = HOPPERS[0]
+	var along := (hopper - DRILL).normalized()
+	var aside := Vector3(-along.z, 0, along.x) * HAULER_ASIDE
+	var near := DRILL + along * HAULER_NEAR + aside + Vector3(0, HAULER_NEAR_HEIGHT, 0)
+	var far := DRILL + along * HAULER_FAR + aside + Vector3(0, HAULER_FAR_HEIGHT, 0)
+	var s := p.moving((near + far) * 0.5, Motion.slide(far - near, near.distance_to(far) * 0.5, HAULER_PERIOD))
+	var heading := Vector3(0, rad_to_deg(atan2(along.x, along.z)), 0)
+	var z := HAULER_SCALE
+	s.box_chamfered(Vector3(0.26, 0.13, 0.26) * z, 0.035 * z, LowPolyMesh.turn(Vector3(0, -0.05, -0.06) * z, heading),
+		Parts.HULL_MID, heading)
+	s.box(Vector3(0.27, 0.035, 0.27) * z, LowPolyMesh.turn(Vector3(0, 0.0, -0.06) * z, heading), Parts.FILIGREE, heading)
+	s.box_chamfered(Vector3(0.16, 0.05, 0.12) * z, 0.02 * z, LowPolyMesh.turn(Vector3(0, 0.08, -0.1) * z, heading),
+		Parts.HULL_LIGHT, heading)
+	s.orb(0.04 * z, 10, 4, LowPolyMesh.turn(Vector3(0, 0.14, -0.1) * z, heading), BRIGHT_CORE)
+	# The bucket: a floor, two cheeks and a front lip, rimmed gold, heaped with ore.
+	s.box(Vector3(0.24, 0.03, 0.15) * z, LowPolyMesh.turn(Vector3(0, -0.07, 0.14) * z, heading), Parts.GUNMETAL, heading)
+	for side: float in [-1.0, 1.0]:
+		s.box_chamfered(Vector3(0.03, 0.12, 0.15) * z, 0.01 * z, LowPolyMesh.turn(Vector3(side * 0.12, -0.07, 0.14) * z, heading),
+			Parts.GOLD_TRIM, heading)
+	s.box_chamfered(Vector3(0.24, 0.1, 0.03) * z, 0.01 * z, LowPolyMesh.turn(Vector3(0, -0.07, 0.22) * z, heading),
+		Parts.GOLD_TRIM, heading)
+	s.pyramid(0.2 * z, 0.1 * z, LowPolyMesh.turn(Vector3(0, -0.04, 0.14) * z, heading), NUGGET, heading)
+	s.box_chamfered(Vector3(0.07, 0.06, 0.07) * z, 0.02 * z, LowPolyMesh.turn(Vector3(0.05, 0.0, 0.11) * z, heading),
+		NUGGET.phased(0.5), heading + Vector3(0, 30, 0))
+	# The thrusters: a nozzle under each side of the hull, a glow on its mouth.
+	for side: float in [-1.0, 1.0]:
+		var nozzle := LowPolyMesh.turn(Vector3(side * 0.08, -0.05, -0.1) * z, heading)
+		s.prism(0.045 * z, 0.035 * z, 0.04 * z, 10, nozzle, Parts.GUNMETAL, Vector3(180, 0, 0))
+		s.disc(0.03 * z, 10, nozzle - Vector3(0, 0.041, 0) * z, HAULER_THRUST, Vector3(180, 0, 0))
 
 
 ## The collectors' armour by tier: obsidian from the Obsidian tier, chrome at the Chrome tier,
