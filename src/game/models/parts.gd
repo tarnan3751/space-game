@@ -264,9 +264,10 @@ const ARC_RADIUS := 0.02
 static var SMOKE := Surf.make(MaterialKit.Layer.GLOW, MaterialKit.HULL_LIGHT, 1.0, Surf.HOLO | Surf.BOB, true)
 
 
-## A crackling arc's surface: a glow in `tint` that flickers and shakes.
+## A crackling arc's surface: a glow in `tint` that flickers and shakes at the LIGHTNING rates,
+## the same slow crackle on every arc.
 static func spark(tint: Color) -> Surf:
-	return Surf.make(MaterialKit.Layer.GLOW, tint, 1.0, Surf.UNLIT | Surf.FLICKER | Surf.JITTER)
+	return Surf.make(MaterialKit.Layer.GLOW, tint, 1.0, Surf.UNLIT | Surf.FLICKER | Surf.JITTER | Surf.LIGHTNING)
 
 
 ## A current: the pipe layer's ribbed bands glowing in `tint` and flowing at the FLOW speed

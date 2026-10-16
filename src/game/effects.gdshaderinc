@@ -21,6 +21,7 @@ const int FLAG_FLOW_U = 64;
 const int FLAG_BOB = 128;
 const int FLAG_JITTER = 256;
 const int FLAG_HOLO = 512;
+const int FLAG_LIGHTNING = 1024;
 
 // PULSE: the colour swells between PULSE_LOW and 1 on a sine of PULSE_PERIOD seconds.
 const float PULSE_PERIOD = 1.6;
@@ -40,6 +41,12 @@ const float BOB_HEIGHT = 0.08;
 // JITTER: each vertex moves up to JITTER_REACH units, to a new spot JITTER_RATE times a second.
 const float JITTER_RATE = 20.0;
 const float JITTER_REACH = 0.04;
+// LIGHTNING: with FLICKER and JITTER, a lightning arc's slower crackle, the same on every arc: a
+// new on/off draw LIGHTNING_FLICKER_RATE times a second, on LIGHTNING_ON of the time, and a new
+// shake LIGHTNING_JITTER_RATE times a second.
+const float LIGHTNING_FLICKER_RATE = 7.0;
+const float LIGHTNING_ON = 0.6;
+const float LIGHTNING_JITTER_RATE = 5.0;
 
 int surf_flags(vec2 uv2) {
 	return int(uv2.y + 0.5);
@@ -62,14 +69,17 @@ float effect_hash(vec3 p) {
 	return fract((p.x + p.y) * p.z);
 }
 
-// Where a vertex of a part goes, in the mesh's own space: BOB lifts it along world Y, JITTER
-// shakes it, and FLICKER collapses the whole part to the origin while it is off, so it draws
-// nothing (a discard would cost every fragment of the shared material its early depth test).
-// `model` turns only about axes and scales uniformly, so its inverse is its transpose over the
-// scale squared.
+// Where a vertex of a part goes, in the mesh's own space: BOB lifts it along world Y, JITTER shakes
+// it, and FLICKER collapses the whole part to the origin while it is off, so it draws nothing (a
+// discard would cost every fragment of the shared material its early depth test); LIGHTNING slows
+// FLICKER and JITTER to the lightning rates. `model` turns only about axes and scales uniformly, so
+// its inverse is its transpose over the scale squared.
 vec3 effect_vertex(vec3 vertex, int flags, float phase, mat4 model) {
+	bool lightning = has_flag(flags, FLAG_LIGHTNING);
+	float flicker_rate = lightning ? LIGHTNING_FLICKER_RATE : FLICKER_RATE;
+	float flicker_on = lightning ? LIGHTNING_ON : FLICKER_ON;
 	if (has_flag(flags, FLAG_FLICKER)
-			&& effect_hash(vec3(floor(anim_time * FLICKER_RATE), phase * 97.0, 7.0)) >= FLICKER_ON) {
+			&& effect_hash(vec3(floor(anim_time * flicker_rate), phase * 97.0, 7.0)) >= flicker_on) {
 		return vec3(0.0);
 	}
 	vec3 moved = vertex;
@@ -78,7 +88,7 @@ vec3 effect_vertex(vec3 vertex, int flags, float phase, mat4 model) {
 		moved += transpose(mat3(model)) * vec3(0.0, lift, 0.0) / dot(model[0].xyz, model[0].xyz);
 	}
 	if (has_flag(flags, FLAG_JITTER)) {
-		vec3 cell = floor(vertex * 1000.0) + floor(anim_time * JITTER_RATE);
+		vec3 cell = floor(vertex * 1000.0) + floor(anim_time * (lightning ? LIGHTNING_JITTER_RATE : JITTER_RATE));
 		vec3 shake = vec3(effect_hash(cell), effect_hash(cell + 17.0), effect_hash(cell + 41.0)) * 2.0 - 1.0;
 		moved += shake * JITTER_REACH;
 	}

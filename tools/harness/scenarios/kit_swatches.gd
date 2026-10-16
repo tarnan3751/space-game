@@ -5,20 +5,24 @@ extends HarnessScenario
 ## gunmetal, gold trim, chrome; cyan strip, obsidian, veins, filigree, core glow), each a chamfered
 ## cube and a drum beside it (on the surface's smooth version where it has one), and before the
 ## rows a 3x3 pad with the three escorts (Parts.escort_drone, escort_skiff, escort_troopers)
-## orbiting it.
+## orbiting it. Left of the pad, the shared effects: a lightning arc between two posts on
+## Parts.spark (the slow LIGHTNING crackle) beside a cluster of point sparks on plain FLICKER (the
+## fast one).
 ##
 ## It logs each swatch by index with its layer and flags, and checks that every swatch's layer is
 ## within the kit, that each escort is at most ESCORT_TRIANGLES body triangles and stays within
 ## the pad's extent (half its footprint plus 0.15) all the way round, and that the escorts move.
 ## It moves them itself, as the effects rig does (Motion.tick() first, then Motion.transform_at).
 ## Rendered, it frames the rows and the pad at ZOOM_SIZE (the closest zoom) and screenshots them,
-## then again a second later, so FLOW, PULSE and the orbits show.
+## then again 0.3 and 1.0 seconds later, so FLOW, PULSE, the flickers and the orbits show.
 
 const SPACING := 1.9
 ## The two rows of swatches and the pad, along the view's down direction on the ground.
 const ROWS := [-1.6, 1.0]
 const PER_ROW := 5
 const PAD_AHEAD := 4.8
+## The effects pieces beside the pad, along the view's across direction.
+const SIDE_ACROSS := 3.4
 const ZOOM_SIZE := 10.0
 const ESCORT_TRIANGLES := 300
 const PAD_SIZE := 3
@@ -78,6 +82,18 @@ func run(main: MainScript) -> void:
 	root.add_child(pad_node)
 	_collect_movers(pad_node)
 
+	var sparks := Parts.new()
+	for side: float in [-1.0, 1.0]:
+		Parts.drum(sparks.body, 0.08, 0.7, 0.03, 12, across * side * 0.45, Parts.GUNMETAL)
+	Parts.arc(sparks.body, -across * 0.45 + Vector3(0, 0.65, 0), across * 0.45 + Vector3(0, 0.65, 0), 6, 0.06,
+		Parts.spark(MaterialKit.ENERGY))
+	var point := Surf.make(MaterialKit.Layer.GLOW, MaterialKit.HAZARD, 1.0, Surf.UNLIT | Surf.FLICKER, true, false)
+	for k: int in 8:
+		sparks.body.orb(0.05, 8, 3, Parts.around(0.2, 45.0 * k, 0.25 + 0.06 * (k % 3)) - down * 0.6, point.phased(k / 8.0))
+	var sparks_node := BuildingModels.instantiate(sparks)
+	sparks_node.position = down * PAD_AHEAD - across * SIDE_ACROSS
+	root.add_child(sparks_node)
+
 	var update := _update_movers
 	main.get_tree().process_frame.connect(update)
 	var before: Array[Transform3D] = []
@@ -97,7 +113,9 @@ func run(main: MainScript) -> void:
 	await main.get_tree().create_timer(SETTLE_SECONDS).timeout
 	await frames(SETTLE_FRAMES)
 	await screenshot("swatches")
-	await main.get_tree().create_timer(1.0).timeout
+	await main.get_tree().create_timer(0.3).timeout
+	await screenshot("swatches-soon")
+	await main.get_tree().create_timer(0.7).timeout
 	await screenshot("swatches-later")
 	main.get_tree().process_frame.disconnect(update)
 	root.queue_free()

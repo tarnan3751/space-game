@@ -300,10 +300,10 @@ phase = 0.0)` says how a part is painted: a `MaterialKit.Layer`, an sRGB tint, t
 per world unit, the flags, whether the part is smooth shaded, whether it is outlined, and the
 phase of its animation. The flags are bits, combined with `|`: `Surf.LIT` (0), `Surf.UNLIT` (1,
 emissive), `Surf.GLOSSY` (2, with the cel specular), and the effects in **Animation** (`PULSE`,
-`BLINK`, `FLICKER`, `FLOW`, `FLOW_U`, `BOB`, `JITTER`, `HOLO`). A `Surf` is shared and never
-changed once made: make one per look, keep it in a `static var`, and pass it to every part that
-looks so; `surf.phased(phase)` returns a copy with another phase, for lamps that chase or sparks
-that flicker apart. A phase is stored at 1/254 steps (**Animation**).
+`BLINK`, `FLICKER`, `FLOW`, `FLOW_U`, `BOB`, `JITTER`, `HOLO`, `LIGHTNING`). A `Surf` is shared and
+never changed once made: make one per look, keep it in a `static var`, and pass it to every part
+that looks so; `surf.phased(phase)` returns a copy with another phase, for lamps that chase or
+sparks that flicker apart. A phase is stored at 1/254 steps (**Animation**).
 
 `Parts` (`models/parts.gd`) names the common ones: `CONCRETE_PAD`, `HULL_LIGHT`, `HULL_MID`,
 `HULL_DARK`, `GUNMETAL` (smooth), `HAZARD`, `GOLD_TRIM` (glossy), `GLASS` (glossy, smooth),
@@ -472,7 +472,7 @@ job; a helper is added, never renamed or removed.
 | `dome_seam(m, radius, height, pos, degrees, surf)` | a seam up a dome of `radius` and `height` standing on `pos`, at `degrees` round it: a chain of thin struts just proud of the surface, from its foot to within 0.15 of the axis |
 | `on_sphere(radius, at)` | the point `radius` from a sphere's centre at `around()` angle `at.x` and elevation `at.y` (degrees) |
 | `chase(k, count)` | the BLINK phase of lamp `k` of `count` lit in turn, lamp 0 first: a chase |
-| `spark(tint)`, `current(tint, phase)` | new surfaces: a crackling arc's (unlit glow, FLICKER and JITTER, so never inked) and a current's (the pipe layer's bands, unlit, FLOW at `phase`: above 0.5 towards a pipe's far end) |
+| `spark(tint)`, `current(tint, phase)` | new surfaces: a crackling arc's (unlit glow, FLICKER and JITTER at the LIGHTNING rates, so never inked) and a current's (the pipe layer's bands, unlit, FLOW at `phase`: above 0.5 towards a pipe's far end) |
 | `arc(m, from, to, segments, kink, surf)` | a crackling arc on a `spark` surface: `segments` three-sided tubes of `ARC_RADIUS` (0.02), the corners between them kinked `kink` to either side in turn, so JITTER has corners to shake; give each arc its own phase |
 | `puffs(m, mouth, phase, count = 3, sides = 10, rings = 4)`, `SMOKE` | `count` hologram smoke puffs (`SMOKE`: HOLO and BOB, pale `HULL_LIGHT` smoke, as HULL_MID is too faint on the violet ground), orbs of `sides` and `rings`, over a stack's `mouth`, growing as they rise, each bobbing out of step from `phase` |
 
@@ -629,6 +629,7 @@ of a mesh animates alike.
 | `BOB` | 128 | the part rises and falls 0.08 along world Y on a sine of period 2.4 s: floating cores, holograms |
 | `JITTER` | 256 | each vertex jumps up to 0.04 in a pseudo-random direction (a hash of its position and the time step), 20 times a second; corners shared by faces move together. With UNLIT and FLICKER, a crackling arc: build it of short segments so there are corners to shake |
 | `HOLO` | 512 | a hologram (below) |
+| `LIGHTNING` | 1024 | with FLICKER and JITTER, a lightning arc's slow crackle, one speed on every arc: on or off 7 times a second (`LIGHTNING_FLICKER_RATE`), on about 60 % of the time (`LIGHTNING_ON`), and a new shake 5 times a second (`LIGHTNING_JITTER_RATE`) instead of a spark's 24 and 20. `Parts.spark()` carries it, so every arc built on it crackles alike; point sparks (welding, cutting, flares, grids, the construction drone's) are made without it and keep the fast rates |
 
 Effects compose: UNLIT + PULSE, UNLIT + FLICKER + JITTER, FLOW + PULSE. `anim_time` wraps every
 hour (**One clock**, above); BLINK, PULSE and BOB cycle evenly into the hour, FLOW and the

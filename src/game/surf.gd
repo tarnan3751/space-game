@@ -31,6 +31,9 @@ const BOB := 128
 const JITTER := 256
 ## A transparent, unlit, phasing hologram, drawn on a surface of its own. Never outlined.
 const HOLO := 512
+## With FLICKER and JITTER: a lightning arc's slow crackle, at the LIGHTNING rates instead of a
+## spark's fast ones.
+const LIGHTNING := 1024
 ## The flags whose parts are never outlined, whatever `outline` says.
 const NO_OUTLINE := FLICKER | JITTER | HOLO
 
