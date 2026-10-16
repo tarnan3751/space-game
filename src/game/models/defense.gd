@@ -5,13 +5,14 @@ extends RefCounted
 ## and railgun cyan, EMP yellow. Levels add barrels, armour, coils or capacitors to the same
 ## weapon; the Gold tier (Parts.tier) adds gold trim. The laser turret, the missile battery, the
 ## plasma mortar, the flak cannon, the shield generator, the arc tower, the cloaked sentry, the
-## gravity well and the EMP tower go on to their tops through the high tiers: chrome with cyan
-## strips, then obsidian with glowing violet vein panels on the faces the camera sees and a
-## hovering ring, then gold filigree, the antimatter core, a crown and an escort; the plinth keeps
-## its octagon and its red belt, plated in the tier's chrome or obsidian (the cloaked sentry, which
-## has no plinth, rises on a hex skirt banded in red). Where the core is the weapon's heart (the
-## shield's orb, the arc tower's sphere, the well's core, the EMP's emitter) it glows steady and
-## light violet at the Crown (BRIGHT_CORE).
+## gravity well, the EMP tower, the railgun, the ion beam and the orbital cannon go on to their
+## tops through the high tiers: chrome with cyan strips, then obsidian with glowing violet vein
+## panels on the faces the camera sees and a hovering ring, then gold filigree, the antimatter
+## core, a crown and an escort; the plinth keeps its octagon and its red belt, plated in the tier's
+## chrome or obsidian (the cloaked sentry, which has no plinth, rises on a hex skirt banded in
+## red). Where the core is the weapon's heart (the shield's orb, the arc tower's sphere, the well's
+## core, the EMP's emitter, the railgun's and the orbital cannon's breech, the ion beam's lens) it
+## glows steady and light violet at the Crown (BRIGHT_CORE).
 ##
 ## They animate (docs/reference/art-style.md, **Animation**): heads scan and barrels recoil as
 ## moving parts, emitters pulse, lamps blink in chases, currents flow along conduits, and arcs
@@ -262,6 +263,19 @@ const ION_CELL := 1.06
 const ION_FOCUS_OFF := 1.0
 const ION_ESCORT_RADIUS := 0.85
 const ION_ESCORT_LIFT := 1.6
+## The orbital cannon from L3, by level from L3: the plinth's height, the barrel's length and its
+## lean from the vertical (steeper as it grows, so the muzzle stays over the footprint); the L5
+## skiff's round, its height and its size (as large as the round allows within the extent).
+const ORBITAL_PLINTHS := [0.32, 0.46, 0.5]
+const ORBITAL_LENGTHS := [2.0, 2.2, 2.35]
+const ORBITAL_PITCHES := [35.0, 31.0, 28.0]
+## From L3 the accelerator rings' places up the barrel, and from L4 the uplink ring's between the
+## second and the third, as shares of the barrel between its first coil's place and its muzzle.
+const ORBITAL_BANDS := [0.08, 0.42, 0.84]
+const ORBITAL_RING_AT := 0.63
+const ORBITAL_ESCORT_RADIUS := 1.72
+const ORBITAL_ESCORT_HEIGHT := 2.4
+const ORBITAL_SKIFF_SCALE := 1.75
 
 
 ## From L6 the head rides a mount that lifts it a little more each level, on a taller plinth.
@@ -1499,17 +1513,28 @@ static func build_ion_beam(p: Parts, level: int) -> void:
 	Parts.escort_drone(p, ION_ESCORT_RADIUS, head.y + ION_ESCORT_LIFT, 0.9, Vector3.ZERO, ESCORT_SCALE)
 
 
+## From L3 the barrel grows longer each level and stands steeper, so it climbs higher within the
+## footprint, one clean mass with three bold accelerator rings in place of the coils. L3 (Chrome):
+## chrome plinth, bunker, breech and barrel, the rings chrome banded in cyan, the pad's cells
+## ribbed chrome. L4 (Obsidian): a taller plinth with glowing violet vein panels on its faces the
+## camera sees, the bunker, breech, barrel and cells obsidian, veins round the plinth's top and the
+## bunker, crystal inlays on the plinth's corners, the rings banded and the bunker's lamps and the
+## cells' caps violet, and an uplink ring hovering round the barrel, turning about it. L5 (Crown):
+## gold filigree round the plinth and on the rings' collars, the antimatter core glowing light
+## violet in the breech, a gold crown round the muzzle, and the uplink shuttle, a hover skiff,
+## circling above the bunker (the escort).
 static func build_orbital_cannon(p: Parts, level: int) -> void:
 	var m := p.body
-	var top := _plinth(m, 4, 1.78, 0.32)
-	Parts.drum(m, 1.38, 0.24, 0.07, 8, Vector3(0, top, 0), DENSE, Parts.OCTAGON)
+	var plinth := 0.32 if level < 3 else float(ORBITAL_PLINTHS[level - 3])
+	var top := _plinth(m, 4, 1.78, plinth, ARMOUR, _by_tier(p.tier, Parts.GUNMETAL, Parts.CHROME_ROUND, Parts.OBSIDIAN_ROUND))
+	Parts.drum(m, 1.38, 0.24, 0.07, 8, Vector3(0, top, 0), _by_tier(p.tier, DENSE, Parts.CHROME, Parts.OBSIDIAN), Parts.OCTAGON)
 	m.ring(1.34, 1.42, 0.07, 8, Vector3(0, top, 0), HAZARD_FINE, Parts.OCTAGON)
 	var bunker := top + 0.24
-	Parts.drum(m, 1.0, 0.16, 0.05, 24, Vector3(0, bunker, 0), SHELL_MID)
+	Parts.drum(m, 1.0, 0.16, 0.05, 24, Vector3(0, bunker, 0), _by_tier(p.tier, SHELL_MID, Parts.CHROME_ROUND, Parts.OBSIDIAN_ROUND))
 	var deck := bunker + 0.16
 	var yaw := SCREEN_RIGHT + 12.0
 	var heading := Vector3(0, yaw, 0)
-	var aim := Vector3(47, yaw, 0)
+	var aim := Vector3(47.0 if level < 3 else float(ORBITAL_PITCHES[level - 3]), yaw, 0)
 	var trunnion := Vector3(0, deck + 0.36, 0)
 	for side: float in [-1.0, 1.0]:
 		var cheek := LowPolyMesh.turn(Vector3(side * 0.6, 0, 0), heading)
@@ -1520,41 +1545,56 @@ static func build_orbital_cannon(p: Parts, level: int) -> void:
 	# The block's foot sits 0.3 down in the deck and the elevation slides it a further 0.06 through
 	# the deck's top, between the cheeks, which hide where it meets the deck: by construction.
 	var gun := p.moving(trunnion, Motion.swing(LowPolyMesh.turn(Vector3.RIGHT, heading), 4.0, 9.0))
-	gun.box_chamfered(Vector3(0.96, 0.95, 0.96), 0.08, LowPolyMesh.turn(Vector3(0, -0.45, 0), aim), Parts.HULL_LIGHT, aim)
-	var length := 1.2 + 0.15 * level
+	gun.box_chamfered(Vector3(0.96, 0.95, 0.96), 0.08, LowPolyMesh.turn(Vector3(0, -0.45, 0), aim),
+		_by_tier(p.tier, Parts.HULL_LIGHT, Parts.CHROME, Parts.OBSIDIAN), aim)
+	var length := 1.2 + 0.15 * level if level < 3 else float(ORBITAL_LENGTHS[level - 3])
 	var barrel := LowPolyMesh.turn(Vector3(0, 0.5, 0), aim)
 	gun.lathe(PackedVector2Array([
 		Vector2(0.42, 0), Vector2(0.42, 0.22), Vector2(0.32, 0.36), Vector2(0.3, length),
-	]), 24, barrel, Parts.GUNMETAL, aim)
+	]), 24, barrel, _by_tier(p.tier, Parts.GUNMETAL, Parts.CHROME_ROUND, Parts.OBSIDIAN_ROUND), aim)
 	gun.lathe(PackedVector2Array([
 		Vector2(0.3, 0), Vector2(0.42, 0.06), Vector2(0.42, 0.34), Vector2(0.26, 0.38), Vector2(0.22, 0.3),
-	]), 24, _at(barrel, Vector3(0, length, 0), aim), SHELL, aim)
+	]), 24, _at(barrel, Vector3(0, length, 0), aim), _by_tier(p.tier, SHELL, Parts.CHROME_ROUND, Parts.OBSIDIAN_ROUND), aim)
 	gun.disc(0.22, 20, _at(barrel, Vector3(0, length + 0.3, 0), aim), BORE_ION, aim)
 	gun.tube(0.42, 0.44, 0.08, 24, _at(barrel, Vector3(0, length + 0.12, 0), aim), GOLD if p.tier >= Parts.Tier.GOLD else ARMOUR_ROUND,
 		aim)
 	gun.ring(0.5, 0.53, 0.1, 24, _at(barrel, Vector3(0, length + 0.44, 0), aim), ION_HOLO, aim)
-	# The coils swell one after another up the barrel: the current running to the muzzle.
-	var coils := 2 + level
-	for i: int in coils:
-		var at := 0.5 + (length - 0.7) * i / (coils - 1)
-		Parts.torus(gun, 0.315, 0.04, 24, 10, _at(barrel, Vector3(0, at, 0), aim), ION_PULSE.phased(Parts.chase(i, coils)),
-			aim)
+	# The coils swell one after another up the barrel: the current running to the muzzle. From L3
+	# they give way to three bold accelerator rings, a collar in the tier's plate (gold filigree at
+	# the Crown) under a glowing band (cyan, violet from the Obsidian tier), swelling in turn.
+	if level < 3:
+		var coils := 2 + level
+		for i: int in coils:
+			var at := 0.5 + (length - 0.7) * i / (coils - 1)
+			Parts.torus(gun, 0.315, 0.04, 24, 10, _at(barrel, Vector3(0, at, 0), aim), ION_PULSE.phased(Parts.chase(i, coils)),
+				aim)
+	else:
+		var collar := Parts.FILIGREE if p.tier >= Parts.Tier.CROWN else _by_tier(p.tier, Parts.CHROME_ROUND, Parts.CHROME_ROUND,
+			Parts.OBSIDIAN_ROUND)
+		var band := Parts.CORE_GLOW if p.tier >= Parts.Tier.OBSIDIAN else Parts.CYAN_STRIP
+		for k: int in ORBITAL_BANDS.size():
+			var at := _at(barrel, Vector3(0, 0.5 + (length - 0.7) * float(ORBITAL_BANDS[k]), 0), aim)
+			gun.tube(0.29, 0.4, 0.14, 24, at, collar, aim)
+			Parts.torus(gun, 0.4, 0.05, 24, 10, _at(at, Vector3(0, 0.02, 0), aim), band.phased(Parts.chase(k, 3)), aim)
 	if level >= 2:
 		Parts.torus(m, 1.0, 0.04, 24, 10, Vector3(0, deck - 0.04, 0), GOLD if p.tier >= Parts.Tier.GOLD else SHELL_MID)
+	# The radar mast and dish stay chrome from the Chrome tier up, a bright mark on the dark
+	# Obsidian and Crown bunkers, as the missile battery's and the flak cannon's do.
 	var mast := Parts.around(1.3, 135.0, top + 0.24)
-	m.prism(0.08, 0.06, 0.9, 16, mast, Parts.GUNMETAL)
+	m.prism(0.08, 0.06, 0.9, 16, mast, _by_tier(p.tier, Parts.GUNMETAL, Parts.CHROME_ROUND, Parts.CHROME_ROUND))
 	var radar := p.moving(mast + Vector3(0, 0.9, 0), Motion.spin(Vector3.UP, 0.8))
 	var dish_aim := Vector3(55, SCREEN_RIGHT + 60.0, 0)
 	radar.lathe(PackedVector2Array([
 		Vector2(0.08, 0), Vector2(0.48, 0.16), Vector2(0.45, 0.2), Vector2(0, 0.06),
-	]), 24, Vector3.ZERO, SHELL, dish_aim)
+	]), 24, Vector3.ZERO, _by_tier(p.tier, SHELL, Parts.CHROME_ROUND, Parts.CHROME_ROUND), dish_aim)
 	var feed := LowPolyMesh.turn(Vector3(0, 0.06, 0), dish_aim)
 	var horn := LowPolyMesh.turn(Vector3(0, 0.42, 0), dish_aim)
 	radar.prism(0.02, 0.02, feed.distance_to(horn), 8, feed, Parts.ROD, Parts.facing(horn - feed))
 	radar.orb(0.06, 12, 6, horn, ION_PULSE)
 	# Lights round the bunker's lower tier blink in a chase.
 	for k: int in 8:
-		m.orb(0.07, 8, 3, Parts.around(1.2, 22.5 + 45.0 * k, bunker + 0.01), ION_BLINK.phased(Parts.chase(k, 8)))
+		m.orb(0.07, 8, 3, Parts.around(1.2, 22.5 + 45.0 * k, bunker + 0.01),
+			(CORE_BLINK if p.tier >= Parts.Tier.OBSIDIAN else ION_BLINK).phased(Parts.chase(k, 8)))
 	for degrees: float in [45.0, 315.0]:
 		m.box_chamfered(Vector3(0.5, 0.18, 0.04), 0.01, Parts.around(1.3, degrees, top + 0.05), VENT,
 			Vector3(0, 90.0 - degrees, 0))
@@ -1562,7 +1602,41 @@ static func build_orbital_cannon(p: Parts, level: int) -> void:
 	if level >= 2:
 		cells.append_array([135.0, 225.0])
 	for k: int in cells.size():
-		_cell(m, Parts.around(2.2, cells[k], Parts.PAD_HEIGHT), 0.4, ION_PULSE.phased(k / 4.0))
+		var cell := Parts.around(2.2, cells[k], Parts.PAD_HEIGHT)
+		if level < 3:
+			_cell(m, cell, 0.4, ION_PULSE.phased(k / 4.0))
+		else:
+			# From L3 the cells take the tier's ribbed plate and glow.
+			Parts.drum(m, 0.17, 0.4, 0.03, 16, cell, _by_tier(p.tier, RIBBED, CHROME_RIBBED, OBSIDIAN_RIBBED))
+			Parts.drum(m, 0.102, 0.06, 0.02, 16, cell + Vector3(0, 0.4, 0),
+				(Parts.CORE_GLOW if p.tier >= Parts.Tier.OBSIDIAN else Parts.CYAN_STRIP).phased(k / 4.0))
+	if level < 4:
+		return
+	_plinth_panels(m, 1.78, plinth)
+	# Veins round the plinth's top and the bunker's lower tier, and round the bunker's side.
+	m.ring(1.44, 1.66, 0.012, 8, Vector3(0, top, 0), Parts.VEINS, Parts.OCTAGON)
+	m.ring(1.02, 1.3, 0.012, 8, Vector3(0, bunker, 0), Parts.VEINS, Parts.OCTAGON)
+	m.ring(0.995, 1.015, 0.09, 24, Vector3(0, bunker + 0.02, 0), VEIN_PANEL)
+	# Crystal inlays on the plinth's corners the camera sees.
+	for degrees: float in [-22.5, 22.5, 67.5, 112.5]:
+		m.prism(0.11, 0.11, 0.06, 4, Parts.around(1.58, degrees, top), INLAY.phased(fposmod(degrees, 90.0) / 90.0),
+			Vector3(90, 90.0 - degrees, 0))
+	var along := LowPolyMesh.turn(Vector3.UP, aim)
+	# The uplink ring hovers between the second and the third accelerator ring.
+	var uplink := p.moving(trunnion + _at(barrel, Vector3(0, 0.5 + (length - 0.7) * ORBITAL_RING_AT, 0), aim),
+		Motion.spin(along, 0.5))
+	_ion_focus(uplink, 0.62, 0.78, aim, p.tier)
+	if level < 5:
+		return
+	_plinth_filigree(m, 1.78, plinth)
+	# The antimatter core: light violet in a gold rim on the breech block's back, where the camera
+	# sees it; a gold crown round the muzzle.
+	var back := LowPolyMesh.turn(Vector3(0, 0, -1), aim)
+	var window := LowPolyMesh.turn(Vector3(0, 0.03, -0.48), aim)
+	gun.prism(0.3, 0.3, 0.04, 20, window, BRIGHT_CORE, Parts.facing(back))
+	gun.tube(0.3, 0.36, 0.05, 20, window, Parts.GOLD_ROUND, Parts.facing(back))
+	_ion_crown(gun, _at(barrel, Vector3(0, length + 0.32, 0), aim), 0.45, 8, 0.26, aim)
+	Parts.escort_skiff(p, ORBITAL_ESCORT_RADIUS, ORBITAL_ESCORT_HEIGHT, 0.5, Vector3.ZERO, ORBITAL_SKIFF_SCALE)
 
 
 # --- Shared parts --------------------------------------------------------------------
@@ -1679,9 +1753,10 @@ static func _rail_cell(m: LowPolyMesh, pos: Vector3, height: float, step: int, t
 	else:
 		m.cone(0.08, 0.2, 8, pos + Vector3(0, height, 0), FOCUS.phased(phase))
 
-## The ion beam's focus ring from L5, built about its own centre and turned by `rot` so it rings
-## the beam: _hover_ring's obsidian, its glowing violet face, its veined rim (gold at the Crown)
-## and four red sights round its inner edge, bobbing together.
+## A hovering ring built about its own centre and turned by `rot` so it rings a beam or a barrel
+## (the ion beam's focus ring from L5, the orbital cannon's uplink ring from L4): _hover_ring's
+## obsidian, its glowing violet face, its veined rim (gold at the Crown) and four red sights round
+## its inner edge, bobbing together.
 static func _ion_focus(s: LowPolyMesh, inner: float, outer: float, rot: Vector3, tier: int) -> void:
 	s.ring(inner, outer, 0.07, 24, Vector3.ZERO, HOVER, rot)
 	s.lathe(PackedVector2Array([Vector2(outer - 0.02, 0.072), Vector2(inner + 0.02, 0.072)]), 24, Vector3.ZERO, HOVER_RIM, rot)

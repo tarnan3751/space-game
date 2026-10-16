@@ -216,7 +216,7 @@ model-table rows and proves budgets, reach and motion in the gallery, rendered):
 | M6 Army B | Research Lab, Nanite Foundry, Drydock, Alliance Beacon (landed) | 18 |
 | M7 Turrets A | Laser, Missile Battery, Plasma Mortar, Flak Cannon (landed) | 18 |
 | M8 Turrets B | Shield, Arc Tower, Cloaked Sentry, Gravity Well, EMP Tower (landed) | 18 |
-| M9 Heavy guns | Railgun, Ion Beam, Orbital Cannon | 11 |
+| M9 Heavy guns | Railgun, Ion Beam, Orbital Cannon (landed) | 11 |
 | M10 Traps | the four traps (landed) | 11 |
 
 **Phase 3, the maxed base**: the template base at Command Center 10 counts (fit proven,
