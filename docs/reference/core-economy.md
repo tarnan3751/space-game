@@ -159,10 +159,10 @@ upgrade. `seconds_left(id)` is `finish_at - now`, floored at 0.
 
 ### Save and load
 
-`to_dict()` returns the save, version 1:
+`to_dict()` returns the save, version 2 (`SAVE_VERSION`), with the field it was laid out on:
 
 ```
-{"version": 1, "now": int, "next_id": int,
+{"version": 2, "grid": {"width": int, "height": int}, "now": int, "next_id": int,
  "resources": {res: int}, "remainders": {res: int},
  "buildings": [{"id", "type", "cell": [x, y], "level", "target_level", "finish_at"}, ...]}
 ```
@@ -175,7 +175,12 @@ everything is converted with `int()`). A building whose type the catalog no long
 footprint overlaps another or overflows the grid (a data change since the save), is dropped
 rather than corrupt the grid. `_next_id` becomes the larger of the saved value and the highest
 loaded id plus one. `last_added_id` is not saved. Missing keys take defaults (`now` 0, `next_id`
-1, amounts 0), so a save written by an older shape still loads.
+1, amounts 0), so a save written by an older shape still loads. A version 1 save, or one with no
+version, was laid out on the 40×40 field (`V1_FIELD`): before the fit check each of its buildings
+moves by half the field's growth since, `(grid_size - V1_FIELD) / 2` floored at zero per axis,
+(4, 4) on 48×48, so the base stays centred; a field that did not grow (the fixture's 10×10) moves
+nothing. A version 2 save loads where it was; its `grid` is recorded for later migrations, not
+read.
 
 `main.gd` calls `advance_to(now)` on the loaded state, which is the offline progress.
 

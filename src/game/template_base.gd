@@ -74,7 +74,8 @@ static func build(catalog: Catalog, grid: Vector2i, now: int) -> Dictionary:
 		amounts[res] = 0
 		remainders[res] = 0
 	var data := {
-		"version": 1,
+		"version": BaseState.SAVE_VERSION,
+		"grid": {"width": grid.x, "height": grid.y},
 		"now": now,
 		"next_id": template._buildings.size() + 1,
 		"resources": amounts,

@@ -1,6 +1,6 @@
 # Space Game — project overview
 
-Last updated: 2026-10-14. Snapshot taken at milestone 1 (offline base), save format version 1.
+Last updated: 2026-10-14. Snapshot taken at milestone 1 (offline base), save format version 2.
 
 This file answers three questions: what the project is meant to become, how far along it is, and
 what has been decided. It is written for a human reader and for an AI agent picking up the
@@ -78,7 +78,7 @@ an attack log, revenge and shields.
 | Command Center gates | Built | `requires_cc` per level; `max_count` per CC level |
 | Grid occupancy | Built | `BaseGrid`; footprints; a move may overlap its own old spot |
 | Seeded RNG | Built | `SeededRng`, xorshift32; sequence frozen by test; used for scenery today |
-| Save and load | Built | `user://base.json`, version 1; offline progress on load; buildings that no longer fit are dropped |
+| Save and load | Built | `user://base.json`, version 2 (records the field; a version 1 base is centred on a grown field); offline progress on load; buildings that no longer fit are dropped |
 | Camera | Built | Fixed isometric orthographic; pan, pinch and wheel zoom; focus clamped to the grid |
 | Touch input | Built | Tap, drag, two-finger pinch and pan; trackpad gestures; HUD gets touches first |
 | Placement | Built | Ghost with valid/invalid footprint, Place/Cancel; select; drag the selected building to move; walls painted by tapping and dragging until Done; the camera scrolls while a drag nears the screen edge |
@@ -109,7 +109,8 @@ for the real numbers).
 - **Models are built in code** (`BuildingModels`, from `LowPolyMesh` parts painted from the
   generated material kit); imported models in `assets/` may replace them later, keeping the
   model contract in `docs/reference/art-style.md`.
-- **The save is local and unversioned beyond `"version": 1`**; the server will hold the base
+- **The save is local, at `"version": 2`** (one migration: version 1 bases are centred on the
+  grown field); the server will hold the base
   later and nothing below `main.gd` changes.
 - `hp`, `damage`, `range_cells`, `fire_ms`, `hidden`, `targets` and `capacity` in
   `data/buildings.json` are display-only: the HUD's info panel shows each where it exists, and

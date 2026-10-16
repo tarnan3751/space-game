@@ -25,5 +25,12 @@ static func catalog() -> Catalog:
 	)
 
 
+## The fixture catalog on a field of `size`, its rules otherwise unchanged.
+static func catalog_with_grid(size: Vector2i) -> Catalog:
+	var rules: Dictionary = JSON.parse_string(FileAccess.get_file_as_string(RULES))
+	rules["grid"] = {"width": size.x, "height": size.y}
+	return Catalog.from_json(JSON.stringify(rules), FileAccess.get_file_as_string(BUILDINGS))
+
+
 static func new_base(start_time: int = 0) -> BaseState:
 	return BaseState.create_new(catalog(), start_time)

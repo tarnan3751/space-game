@@ -243,7 +243,8 @@ line) replaces it, which is how the gate and the harness keep off the real save.
 
 ```json
 {
-  "version": 1,
+  "version": 2,
+  "grid": { "width": 40, "height": 40 },
   "now": 1760400000,
   "next_id": 4,
   "resources": { "metal": 750, "crystal": 600, "antimatter": 0 },
@@ -258,5 +259,10 @@ Saved every 10 ticks (10 s) and when the window closes or the app is paused. On 
 of unknown types or that no longer fit are dropped, missing keys take defaults (a resource the
 save does not list, such as antimatter in a save from before it existed, starts at 0), and the
 state is advanced to the current time for offline progress. An unreadable file starts a new
-base. A change to this shape keeps old saves loading or bumps `version` with a migration
+base.
+
+`grid` is the field the base was laid out on (`rules.json`'s `grid`), from version 2. A version
+1 save has none: every version 1 save was laid out on the 40×40 field, so `BaseState.from_dict`
+moves its buildings by half the field's growth since (floored at zero), (4, 4) on 48×48, and the
+base stays centred; the next save is version 2. A save with no `version` reads as version 1. A change to this shape keeps old saves loading or bumps `version` with a migration
 (`CLAUDE.md`, **Agent workflow**, tier A).

@@ -11,6 +11,10 @@ extends RefCounted
 signal changed
 
 const SECONDS_PER_HOUR := 3600
+## The save's shape (to_dict). Version 2 records the field it was laid out on; every version 1
+## save was laid out on V1_FIELD, and from_dict centres it on a field that has grown since.
+const SAVE_VERSION := 2
+const V1_FIELD := Vector2i(40, 40)
 
 const ERR_UNKNOWN_OP := "unknown_op"
 const ERR_UNKNOWN_TYPE := "unknown_type"
@@ -258,7 +262,8 @@ func to_dict() -> Dictionary:
 		resource_data[res] = resources[res]
 		remainder_data[res] = _remainders[res]
 	return {
-		"version": 1,
+		"version": SAVE_VERSION,
+		"grid": {"width": catalog.grid_size.x, "height": catalog.grid_size.y},
 		"now": now,
 		"next_id": _next_id,
 		"resources": resource_data,
@@ -267,9 +272,14 @@ func to_dict() -> Dictionary:
 	}
 
 
-## Rebuilds a base from to_dict() output (works on JSON-parsed data, floats included).
+## Rebuilds a base from to_dict() output (works on JSON-parsed data, floats included). A version
+## 1 save (or one with no version) was laid out on V1_FIELD: its buildings move by half the
+## field's growth since, so the base stays centred; a field that did not grow moves nothing.
 static func from_dict(base_catalog: Catalog, data: Dictionary) -> BaseState:
 	var state := BaseState.new(base_catalog)
+	var shift := Vector2i.ZERO
+	if int(data.get("version", 1)) < 2:
+		shift = ((base_catalog.grid_size - V1_FIELD) / 2).max(Vector2i.ZERO)
 	state.now = int(data.get("now", 0))
 	state._next_id = int(data.get("next_id", 1))
 	var resource_data: Dictionary = data.get("resources", {})
@@ -279,6 +289,7 @@ static func from_dict(base_catalog: Catalog, data: Dictionary) -> BaseState:
 		state._remainders[res] = int(remainder_data.get(res, 0))
 	for entry: Variant in data.get("buildings", []):
 		var building := BuildingState.from_dict(entry)
+		building.cell += shift
 		if not base_catalog.has_type(building.type):
 			continue
 		# Data changes (a bigger footprint, a smaller grid) can make an old save overlap

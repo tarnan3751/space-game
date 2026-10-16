@@ -26,7 +26,8 @@ report several problems: `assert_eq(actual, expected, message)` is strict about 
 float 5.0 differ), `assert_true`, `assert_false`.
 
 Logic tests build their state from the fixture catalog, never `data/`: `const Fixtures :=
-preload("res://test/support/fixtures.gd")`, then `Fixtures.catalog()` or
+preload("res://test/support/fixtures.gd")`, then `Fixtures.catalog()`,
+`Fixtures.catalog_with_grid(size)` (the same rules on another field) or
 `Fixtures.new_base(start_time)` (`data-format.md` describes the fixture base). The one
 exception is `test_catalog.gd`, whose `test_shipped_*` tests load the real `data/` on purpose:
 the data is valid, the start layout fits, every level's price fits the storage a base can reach
@@ -36,7 +37,7 @@ when that level unlocks, and no curve (cost, `build_seconds`, `hp`, `produces`, 
 | File | Covers |
 | --- | --- |
 | `test/core/test_base_grid.gd` | Bounds, occupancy, own cells counting as free. |
-| `test/core/test_base_state.gd` | Start layout, place and its refusals, the Command Center level checked before the limit, instant buildings, walls, timers, upgrades and their rules, moves, bad commands, the `changed` signal, the clock going backwards, the save round trip, a save from before the third resource, dropping buildings that no longer fit. |
+| `test/core/test_base_state.gd` | Start layout, place and its refusals, the Command Center level checked before the limit, instant buildings, walls, timers, upgrades and their rules, moves, bad commands, the `changed` signal, the clock going backwards, the save round trip, a save from before the third resource, a version 1 save centred on a grown field (`Fixtures.catalog_with_grid`) and left in place on one that did not grow, dropping buildings that no longer fit. |
 | `test/core/test_catalog.gd` | The shipped data (validity, start layout, affordability, curves, final levels at the top Command Center, counts), int conversion, level, count, resource, category and display-field lookups, one validation message per rule, the dev cheats (every level free and one second at most, nothing else changed; a base building what it could not afford). |
 | `test/core/test_production.gd` | Production starting at completion, carried remainders, tick-size independence, storage caps, caps rising when a silo finishes, busy buildings not producing, a third resource. |
 | `test/core/test_seeded_rng.gd` | The frozen sequences for seeds 1 and 12345, range bounds, the zero seed. **These expected values never change.** |

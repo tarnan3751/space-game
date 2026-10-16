@@ -195,7 +195,61 @@ func test_save_from_before_the_third_resource_loads() -> void:
 	var saved := state.to_dict()
 	assert_eq(saved["resources"], {"metal": 400, "crystal": 300, "antimatter": 0})
 	assert_eq(saved["remainders"], {"metal": 0, "crystal": 1800, "antimatter": 0})
-	assert_eq(saved["version"], 1)
+	assert_eq(saved["version"], 2)
+
+
+func test_version_1_save_is_centred_on_a_grown_field() -> void:
+	# A version 1 save was laid out on 40x40; on 48x48 every building moves by (4, 4), the two at
+	# the old field's far edge included, and nothing else changes.
+	var catalog := Fixtures.catalog_with_grid(Vector2i(48, 48))
+	var data := _version_1_save()
+	var state := BaseState.from_dict(catalog, data)
+	assert_eq(state.buildings.size(), 4)
+	var cells: Array[Vector2i] = [Vector2i(4, 4), Vector2i(7, 4), Vector2i(42, 42), Vector2i(43, 40)]
+	for id: int in range(1, 5):
+		assert_eq(state.buildings[id].cell, cells[id - 1], "building %d" % id)
+	assert_eq(state.grid.occupant_at(Vector2i(43, 43)), 3, "the extractor covers its shifted footprint")
+	assert_eq(state.grid.occupant_at(Vector2i(43, 40)), 4)
+	assert_eq(state.grid.occupant_at(Vector2i(39, 36)), 0, "the wall's old cell is free")
+	var saved := state.to_dict()
+	assert_eq(saved["version"], 2)
+	assert_eq(saved["grid"], {"width": 48, "height": 48})
+	assert_eq(saved["now"], 100)
+	assert_eq(saved["next_id"], 5)
+	assert_eq(saved["resources"], {"metal": 400, "crystal": 300, "antimatter": 7})
+	assert_eq(saved["remainders"], {"metal": 0, "crystal": 1800, "antimatter": 0})
+	var extractor: Dictionary = (saved["buildings"] as Array)[2]
+	assert_eq(extractor, {"id": 3, "type": "extractor", "cell": [42, 42], "level": 1, "target_level": 2,
+		"finish_at": 150})
+
+
+func test_save_with_no_version_loads_as_version_1() -> void:
+	var catalog := Fixtures.catalog_with_grid(Vector2i(48, 48))
+	var data := _version_1_save()
+	data.erase("version")
+	var state := BaseState.from_dict(catalog, data)
+	assert_eq(state.buildings[1].cell, Vector2i(4, 4))
+	assert_eq(state.buildings[3].cell, Vector2i(42, 42))
+
+
+func test_version_2_save_loads_where_it_was() -> void:
+	var catalog := Fixtures.catalog_with_grid(Vector2i(48, 48))
+	var state := BaseState.from_dict(catalog, _version_1_save())
+	var json := JSON.stringify(state.to_dict())
+	var restored := BaseState.from_dict(catalog, JSON.parse_string(json))
+	assert_eq(JSON.stringify(restored.to_dict()), json)
+	assert_eq(restored.buildings[3].cell, Vector2i(42, 42))
+
+
+func test_version_1_save_on_a_field_that_did_not_grow_stays_put() -> void:
+	# The fixture's field is 10x10, smaller than a version 1 save's: nothing moves.
+	var data := {"version": 1, "buildings": [
+		{"id": 1, "type": "command_center", "cell": [0, 0], "level": 1, "target_level": 1, "finish_at": 0},
+		{"id": 2, "type": "drone_bay", "cell": [9, 9], "level": 1, "target_level": 1, "finish_at": 0},
+	]}
+	var state := BaseState.from_dict(Fixtures.catalog(), data)
+	assert_eq(state.buildings[1].cell, Vector2i(0, 0))
+	assert_eq(state.buildings[2].cell, Vector2i(9, 9))
 
 
 func test_counts_follow_place_move_and_upgrade() -> void:
@@ -270,6 +324,22 @@ func test_a_base_without_a_command_center_reads_as_level_one() -> void:
 	assert_eq(state.count_of(Catalog.HQ_TYPE), 0)
 	assert_eq(state.cc_level(), 1)
 	assert_eq(state.builders_free(), 1)
+
+
+## A version 1 save: the fixture's Command Center and drone bay in its corner, an extractor
+## upgrading in the old 40x40 field's far corner and a wall on its right edge.
+func _version_1_save() -> Dictionary:
+	return {
+		"version": 1, "now": 100, "next_id": 5,
+		"resources": {"metal": 400, "crystal": 300, "antimatter": 7},
+		"remainders": {"metal": 0, "crystal": 1800, "antimatter": 0},
+		"buildings": [
+			{"id": 1, "type": "command_center", "cell": [0, 0], "level": 1, "target_level": 1, "finish_at": 0},
+			{"id": 2, "type": "drone_bay", "cell": [3, 0], "level": 1, "target_level": 1, "finish_at": 0},
+			{"id": 3, "type": "extractor", "cell": [38, 38], "level": 1, "target_level": 2, "finish_at": 150},
+			{"id": 4, "type": "wall", "cell": [39, 36], "level": 1, "target_level": 1, "finish_at": 0},
+		],
+	}
 
 
 func _place(type: String, x: int, y: int) -> Dictionary:
