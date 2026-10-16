@@ -218,7 +218,7 @@ the toon's and the holograms' (its fence); the background is a sky (`BG_SKY`) dr
 `ShaderMaterial`; no vertex of a rock or of the rubble lies within the perimeter's reach out of the
 field (its own vertices' farthest, beside the sides and in the corners' quadrants, the corner
 pylons' footings included), which the rocks' placement rule does not ensure; the terrain's
-triangles are within 38,000; no
+triangles are within 40,000; no
 vertex of an outcrop lies within 4 units of the field; along each side of the field, 3.8 units out,
 at 40 evenly spaced points, the terrain's heights spread by more than 0.1 (the ground is uneven)
 and never pass 0.4 (it stays low by the curb), and the distance out at which its relief is full

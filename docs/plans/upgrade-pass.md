@@ -160,12 +160,13 @@ At the counts above a maxed base owns about 130 buildings and 250 walls: 1,100 c
 the 40×40 field, and the template base needs about 46 rows with its fences. Options:
 
 - **48×48 (recommended).** 48% fill (Clash is near 60% of 44×44). Pylon spacing stays
-  symmetric (12 plates a side). The template fits with today's gap rule (about 39 rows). The
+  symmetric (12 plates a side). The template fits with today's gap rule (46 of the 48 rows at the Command Center 10 counts). The
   start layout moves to the centre (22, 22); old saves get a **version 2** migration that
   shifts cells by (4, 4) so a base stays centred (tier A, a plan first); the field's tile hash
   is re-checked for 12×12 tiles (no identical neighbours), the scenery constants for mesas and
-  craters re-checked against the wider field, the camera's widest zoom raised, the scenarios'
-  cell constants moved.
+  craters re-checked against the wider field, the widest zoom kept at 44, which shows the whole
+  perimeter at 16:9 with a tight margin (4:3 tablets clip the side corners and are not a target),
+  the scenarios' cell constants moved.
 - 44×44: 57% fill, 11 plates a side; the template just fits (about 43 rows) and has no room
   for a later type.
 - Keep 40×40: the counts at 8–10 drop by about a fifth and walls cap at 200, and the template

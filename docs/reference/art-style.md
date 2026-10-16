@@ -116,7 +116,7 @@ deep space (`SPACE`, `0D0B1A`) with one faint band of nebula haze, `TERRAIN` vio
 over it, broken into clouds by two octaves of value noise, and a sparse field of small hard-edged
 stars, about 0.8 % of the sky, white and pale cyan (`ENERGY` mixed 55 % towards white): dots of two sizes and, the largest, four-pointed
 comic sparkles. Nothing moves. The terrain
-ring hides it at every zoom on screens up to about 2.98:1, so it shows only beyond the ring on
+ring hides it at every zoom on screens up to about 2.87:1, so it shows only beyond the ring on
 wider screens (**Environment**). The camera is orthographic, and for one the renderer hands the
 sky shader the direction `basis * (x, y, -1)` at a point x, y world units from the view's middle,
 so the shader draws the sky on the view's plane (`view_basis`, from `IsoCamera`'s fixed angle,
@@ -925,8 +925,8 @@ One `LowPolyMesh`, about 7,800 triangles on its toon surface and 450 on its holo
 and its outline. The body casts a shadow (the pylons are real masses; the transparent fence casts
 none); the outline does not.
 
-**The terrain ring**: one indexed mesh from the field's edge to ±100, on a lattice of points 1
-unit apart within 50 of the centre and 2 apart beyond. A cell beside smaller ones fans out from
+**The terrain ring**: one indexed mesh from the field's edge to ±104, on a lattice of points 1
+unit apart within 54 of the centre and 2 apart beyond: 80 and 30 beyond the field's edge. A cell beside smaller ones fans out from
 the point in the middle of its edge, so no point lies on another cell's edge. Its
 height function is flat out to 2.4 (`TERRAIN_FLAT`), about a unit past the kerb's outer face (1.45
 out), so the ground under the kerb and the corner footings is flat. From there
@@ -940,7 +940,10 @@ shapes:
 - ridged dunes, 0.3 high beside the field and growing from where the relief is full to 5 units high
   20 out, whose flanks fall into the mid band on their shadow side;
 - three to five craters, radius 6 to 12, each a flat floor 0.18 radii deep, a wall steepening to
-  a rim 0.15 radii high and a gentler outer slope, in ground flattened round it;
+  a rim 0.15 radii high and a gentler outer slope, in ground flattened round it; three of the
+  four drawn place today, at −33, 47 and 153 degrees round the field (on the 40×40 field the third
+  lay at 140 degrees: the wider fine reach of the 48×48 field admits the 153-degree candidate the
+  smaller one refused, which then crowds the 140-degree one out);
 - two irregular flat-topped mesas towards the far edge of the view, 4 to 6 above the dunes' crests,
   with jagged rims, rough steep walls and feet that run out into the ground (below);
 - a meandering dry channel running out from near the field, away from the mesas.
@@ -1013,9 +1016,10 @@ space, by the slope of the smooth normal:
   `sun_across` exactly as on the field. A tile's variant and whether it is mirrored come from its
   cell hash (offsets 95 and 79), but its quarter-turn count from its place: (column mod 2) +
   2 × (row mod 2) − variant, mod 4 (`field_marks`' `turn_by_place`, as on the field). Tiles touching along a side or at a corner differ in (column mod 2, row mod 2), so two
-  with the same variant never share a turn: over the ring's 35×35 tiles, none of the 4,692
+  with the same variant never share a turn: over the ring's 36×36 tiles, none of the 4,970
   touching pairs shares variant and orientation (checked on the development Mac's GPU, as the
-  field's were; hash picks alone, at the best offsets, left 101).
+  field's were; hash picks alone, at the best offsets, left 101 on
+  the 40×40 field's ring).
 - **Wind ripples**, across slopes of 14 to 26 degrees (in full from 18 to 22): ridges
   along the height's contours, so they run across the slope, perpendicular to its fall. Each
   period (0.6 units on a 22-degree slope, about 0.75 at 16 degrees and 0.4 at 28, wandering by up
@@ -1041,25 +1045,26 @@ space, by the slope of the smooth normal:
 The noise-chosen dust drifts the tint once had are gone: they were soft single-tone blobs.
 
 At the widest zoom the ring fills the view with the focus anywhere on the grid on every aspect up
-to about 2.98:1, measured by marching the rays from the screen's corners over the terrain with the
+to about 2.87:1 (2.98:1 on the 40×40 field: the ring's outer edge rises on noise laid in world
+units, which the larger field moved), measured by marching the rays from the screen's corners over the terrain with the
 focus at each corner of its bounds (a 19.5:9 phone is 2.17:1, and the `environment` scenario checks
 1560x720). Beyond that the sky (**Light and shading**) shows first along the bottom of the screen,
 where the rays pass under the ring's raised outer edge.
 
 **The scenery**:
 
-- **Rocks**: 80 chamfered chunks drawn, 0.8 to 5 units across and most of them small, of five to seven
+- **Rocks**: 88 chamfered chunks drawn, 0.8 to 5 units across and most of them small, of five to seven
   sides, a shoulder ring, a chamfer and a low peak, flat shaded, sides in `ROCK` and chamfers and
   tops in `ROCK_LIT`; about a quarter of those over 1.6 units across carry a smaller rock on top.
   Each sits on the lowest ground under it. A rock whose footprint meets a mesa (within its
   fillet's outer edge) is left out, built into a mesh that is thrown away so that the rest keep
-  their places: six today, which the `environment` scenario checks by every rock vertex lying
+  their places: nine today, which the `environment` scenario checks by every rock vertex lying
   outside the mesas' reach. One mesh with its outline; the body casts shadows.
   Their rule keeps a rock only its radius plus 1.5 outside the field, which does not by itself
   keep it off the perimeter; that clearance is checked (the `environment` scenario), not enforced.
-- **Rubble**: 36 more rocks of the same make, 0.3 to 0.8 units across, strewn beside the curb
+- **Rubble**: 44 more rocks of the same make, 0.3 to 0.8 units across, strewn beside the curb
   between 2.4 and 7.4 units outside the field (`RUBBLE_ROCKS`, `RUBBLE_ROCK_RADIUS`,
-  `RUBBLE_ROCK_OUT`), nine along each side, each in a stretch of the side of its own at a random
+  `RUBBLE_ROCK_OUT`), eleven along each side, each in a stretch of the side of its own at a random
   distance out, so they spread evenly, form no line, and none comes within about half a unit of
   the curb's outer face, the nearest centres about a unit past it. Each keeps clear of the craters,
   the mesas, the channel, the other rocks and the outcrops, and rests on the lowest ground under it, sunk by a fifth of its radius. They are in
@@ -1073,10 +1078,11 @@ where the rays pass under the ring's raised outer edge.
 
 **Budgets**: the field 1 draw; the perimeter, the terrain, the rocks and the outcrops a body and an
 outline each, the perimeter's body two surfaces (its fence a hologram) and drawn into the shadow
-map. The terrain is 35,794 triangles on 19,561 points, its outline 36,274 with the mesas' fins
-(the `environment` scenario allows the body 38,000), the rocks about 3,600 (about 1,100 of them
-the rubble) and the outcrops about 900. It is
-all built once, in about 110 ms on the development Mac (88 to 97 warm before the perimeter's
+map. The terrain is 38,522 triangles on 20,950 points, its outline 39,002 with the mesas' fins
+(the `environment` scenario allows the body 40,000), the rocks about 4,200 (about 1,350 of them
+the rubble) and the outcrops about 800. It is
+all built once, in about 135 ms on the development Mac (112 to 138 on the 40×40 field, measured
+side by side; 88 to 97 warm before the perimeter's
 pylons and fence added about 22, and 74 to 79 before a half-unit lattice round the mesas, since
 gone, and the rock texture,
 each measured side by side; the kit's build and the field and rock textures' loads and mipmaps

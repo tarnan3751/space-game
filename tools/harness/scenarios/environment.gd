@@ -29,7 +29,7 @@ extends HarnessScenario
 ## perimeter, the crater, the outcrop and the mesa the camera's bounds are widened, as a player
 ## cannot centre the view off the field).
 
-const TERRAIN_BUDGET := 38000
+const TERRAIN_BUDGET := 40000
 ## How closely the mesas' geometry lies on terrain_height, at its points and at these weights of
 ## each triangle's corners.
 const MESA_FIT := 0.02

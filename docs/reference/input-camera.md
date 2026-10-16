@@ -224,7 +224,7 @@ same landscape. How each looks is in `art-style.md`, **Environment**:
   cells and one at each corner, `CORNER_PYLON_OUT` (0.9) further out on a concrete footing, and a low rail-and-hologram fence
   between them (`art-style.md`, **Environment**); its body casts a shadow.
 - **The terrain**: one smooth-shaded, indexed `ArrayMesh` from the field's edge out to
-  ±`TERRAIN_EXTENT` (100), on a lattice of 1 unit within `TERRAIN_FINE_REACH` (50) of the centre
+  ±`TERRAIN_EXTENT` (104), on a lattice of 1 unit within `TERRAIN_FINE_REACH` (54) of the centre
   and of `TERRAIN_COARSE` (2) beyond, drawn by `terrain.gdshader` (`MaterialKit.terrain()`,
   given the ground's field texture), whose inner edge lies on the field's at y = 0, so the two
   meet with no seam; it is flat out to `TERRAIN_FLAT` (2.4), past the kerb, reaches its relief
@@ -237,10 +237,10 @@ same landscape. How each looks is in `art-style.md`, **Environment**:
   shadows and casts none. `terrain_height(x, z)` is its height function, which the harness
   marches the view's rays over, and `blend_end(x, z)` how far out from the field its relief is full
   there, which the harness checks wanders along each side. At the widest zoom it fills the view
-  with the focus anywhere on the grid on every aspect up to about 2.98:1 (a 19.5:9 phone is
+  with the focus anywhere on the grid on every aspect up to about 2.87:1 (a 19.5:9 phone is
   2.17:1); beyond that the sky shows.
-- **The rocks**: `ROCK_COUNT` (80) chamfered rocks, some stacked, on the terrain clear of the
-  curb (those that would meet a mesa left out), and `RUBBLE_ROCKS` (36) small ones strewn round the field 2.4 to 7.4 units out, all in one
+- **The rocks**: `ROCK_COUNT` (88) chamfered rocks, some stacked, on the terrain clear of the
+  curb (those that would meet a mesa left out), and `RUBBLE_ROCKS` (44) small ones strewn round the field 2.4 to 7.4 units out, all in one
   mesh with its outline.
 - **The outcrops**: six to ten clusters of glowing crystal shards in one mesh with its outline,
   never within `OUTCROP_GAP` (4) of the field.

@@ -22,9 +22,11 @@ const SCENERY_SEED := 7
 const GRID_LINES := 0.0
 const GRID_LINES_PLACING := 0.45
 ## The terrain reaches TERRAIN_EXTENT from the centre in x and z, on a lattice of 1 unit within
-## TERRAIN_FINE_REACH of the centre and of TERRAIN_COARSE beyond.
-const TERRAIN_EXTENT := 100.0
-const TERRAIN_FINE_REACH := 50.0
+## TERRAIN_FINE_REACH of the centre and of TERRAIN_COARSE beyond: 80 and 30 beyond the 48x48
+## field's edge, which a larger field moves both by (the fine reach less half the field even, so
+## the lattices meet).
+const TERRAIN_EXTENT := 104.0
+const TERRAIN_FINE_REACH := 54.0
 const TERRAIN_COARSE := 2
 ## Outside the field the ground stays flat out to TERRAIN_FLAT, about a unit past the kerb's outer
 ## face (CURB_GAP + CURB_WIDTH), so the kerb and the corner footings stand on flat ground, and
@@ -110,13 +112,13 @@ const CRATER_FLOOR := 0.75
 const SUN_ACROSS := Vector2(-0.5, 0.866)
 ## The rocks: how many, their radii (world units, most of them small), and how many in a hundred
 ## of those over 0.8 in radius carry a smaller rock on top.
-const ROCK_COUNT := 80
+const ROCK_COUNT := 88
 const ROCK_SMALLEST := 0.4
 const ROCK_LARGEST := 2.5
 const ROCK_STACKED := 25
 ## The rubble beside the curb: how many small rocks, their radii, and how far outside the field
 ## they lie, spread evenly round its four sides.
-const RUBBLE_ROCKS := 36
+const RUBBLE_ROCKS := 44
 const RUBBLE_ROCK_RADIUS := Vector2(0.15, 0.4)
 const RUBBLE_ROCK_OUT := Vector2(2.4, 7.4)
 ## The crystal outcrops: how many clusters, shards in each, the shards' lengths, and how close any
@@ -1016,8 +1018,8 @@ func _mesa_reach(k: int) -> float:
 
 
 ## Places the terrain's features from `rng`, inside the fine lattice: two mesas towards the far
-## edge of the view (up the screen, -x and -z), off its diagonal so that they show at the widest
-## zoom, their flat tops 4 to 6 above the dunes' crests; three to five craters well clear of the
+## edge of the view (up the screen, -x and -z), 34 to 46 from the centre (about 10 to 22 beyond
+## the 48x48 field's edge), off its diagonal so that they show at the widest zoom, their flat tops 4 to 6 above the dunes' crests; three to five craters well clear of the
 ## field and of each other; and the channel's course, away from the mesas.
 func _place_features(rng: SeededRng) -> void:
 	var half := Vector2(grid_size) * 0.5
@@ -1026,7 +1028,7 @@ func _place_features(rng: SeededRng) -> void:
 			break
 		var angle := deg_to_rad(225.0 + rng.range_int(15, 45) * (1 if rng.range_int(0, 1) == 0 else -1))
 		var radius := rng.range_int(50, 75) / 10.0
-		var at := Vector2(cos(angle), sin(angle)) * rng.range_int(300, 420) / 10.0
+		var at := Vector2(cos(angle), sin(angle)) * rng.range_int(340, 460) / 10.0
 		var height := rng.range_int(40, 60) / 10.0
 		var phases := Vector2(rng.range_int(0, 359), rng.range_int(0, 359)) * TAU / 360.0
 		var out := _out_of_field(at.x, at.y)
