@@ -439,11 +439,14 @@ The shared elements are named once on `Parts`, for every model batch:
 | Crown | `escort_troopers(p, radius, height, rate, centre = Vector3.ZERO, scale = 1.0)` | two solid troopers in the cadets' proportions, army orange plating, a hull-light helmet with an `ENERGY` visor and a rifle, each `TROOPER_HEIGHT` (0.8) tall so it reads as a soldier at the gameplay zoom, one 0.5 behind the other on the round (each about 0.26 from its centre to its arms): 260 |
 | Crown | `escort_guard(p, radius, height, rate, centre = Vector3.ZERO, scale = 1.0)` | the security bot, a robust hover sentinel unlike the drone and the skiff: a chunky chamfered cream `HULL_LIGHT` body wider than tall (0.36 across its travel, 0.18 tall, 0.26 long), a `GOLD_TRIM` lip round its foot, a `HULL_DARK` chest plate under one wide red visor strip (the glow layer in `DEFENCE`, unlit, PULSE), two stubby chamfered `GUNMETAL` weapon pods on its shoulders with `ENERGY` glow tips, a short gunmetal antenna nub with a red tip and a thin `ENERGY` thruster skirt glowing round its lower edge under the lip (unlit, PULSE), where the 45° camera sees it; every part bobs together; no rotors, canopy, saucer or hazard bands (about 0.3 from its centre to its pods' ends): 274 |
 
-Each escort is a moving part built in its own space, the Crown tier's fourth: it spins about +Y
-through the footprint's centre (or through `centre`, an optional point on the ground, where the
-building's round lies off its middle) at `rate` radians a second, its figure `radius` out and
-`height` up and `scale` times its own size (an optional factor, for a big building's escort),
-facing its heading, and is at most 300 body triangles. A caller keeps the round plus
+A robot is a moving part spent only where the building's story needs it, tailored to that
+building: its look, its motion and what it does belong there. A generic escort on a building is a
+review failure, and no robot flies above a defence building. Each escort is built in its own
+space, a Crown model's fourth moving part: it spins about +Y through the footprint's centre (or
+through `centre`, an optional point on the ground, where the building's round lies off its
+middle) at `rate` radians a second (a negative rate orbits the other way), its figure `radius`
+out and `height` up and `scale` times its own size (an optional factor, for a big building's
+escort), facing its heading, and is at most 300 body triangles. A caller keeps the round plus
 the figure's reach within the extent. The `kit_swatches` harness scenario (`tools/harness/README.md`)
 shows every tier surface on a cube and a drum in a row, the four escorts orbiting a 3×3 pad, and
 beside it a lightning arc, fast point sparks and a stack's rising smoke: the batches' reference.
@@ -759,7 +762,8 @@ show at gameplay zoom (camera size 24) is not a step.
   mast; spare triangle budget is never a reason to add detail.
 - **Animation never drops.** The set of effect kinds (**Surface effects**) and the moving parts
   never shrink from one level to the next. A Crown level may trade pulsing violet for static gold
-  where its own core glows harder.
+  where its own core glows harder. Removing a generic escort to replace it with a tailored robot,
+  or with nothing on the types the owner excluded, does not count as a drop.
 
 ### The clash rule
 
