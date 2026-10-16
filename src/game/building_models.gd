@@ -6,12 +6,13 @@ extends RefCounted
 ## on the ground, +Y up, fitting inside size x size cells.
 ##
 ## A model is a Node3D holding the static body's MeshInstance3D and its ink outline's, and up
-## to Parts.MAX_MOVING moving parts: each a Node3D at its pivot carrying the MOVE_META meta (its
-## Motion), which BuildingView moves while the building is finished and idle, with the part's
-## mesh and its outline under it. So a model has at most eight MeshInstance3D, half of them at
-## most outlines (OUTLINE_META), which cast no shadow; a part with nothing to outline (only
-## hologram, flicker or jitter parts) has none. The meshes are built once per type, level and
-## tier and shared; the nodes are per view. A level above a type's models shows its top model.
+## to Parts.max_moving(tier) moving parts (three, four at Crown, the fourth its escort): each a
+## Node3D at its pivot carrying the MOVE_META meta (its Motion), which BuildingView moves while
+## the building is finished and idle, with the part's mesh and its outline under it. So a model
+## has at most eight MeshInstance3D (ten at Crown), half of them at most outlines (OUTLINE_META),
+## which cast no shadow; a part with nothing to outline (only hologram, flicker or jitter parts)
+## has none. The meshes are built once per type, level and tier and shared; the nodes are per
+## view. A level above a type's models shows its top model.
 ##
 ## Each category shares a look: every building but a wall stands on the concrete foundation pad
 ## (Parts.foundation) in its category's accent colour (docs/reference/art-style.md), and walls

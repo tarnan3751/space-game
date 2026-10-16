@@ -8,16 +8,16 @@ extends HarnessScenario
 ## in a WIDE window, then each band, framed on its buildings but the walls, with the fence under
 ## it (the Command Center's with the first category's), in even parts
 ## PART_CELLS wide at most, each centred and at BAND_ZOOM or as far out as it takes for the part
-## and its models to fill no more than FILL of the screen, so none runs under the HUD or off the
+## and its models, as tall as the band's tallest, to fill no more than FILL of the screen, so none
+## runs under the HUD or off the
 ## screen; each again a second later where a part turns. The first shot waits until the
 ## "Template base" toast, which covers the Command Center's antenna, has faded.
 
 const WIDE := Vector2i(1560, 720)
 const BAND_ZOOM := 16.0
 const PART_CELLS := 16
-## The share of the screen a band part may fill, and the height its models are allowed for.
+## The share of the screen a band part may fill (its models framed at the band's tallest).
 const FILL := 0.7
-const MODEL_HEIGHT := 4.0
 ## How long the moving parts are sampled, and how many frames apart.
 const MOVE_SAMPLE_SECONDS := 1.5
 const MOVE_SAMPLE_FRAMES := 4
@@ -73,6 +73,7 @@ func run(main: MainScript) -> void:
 	# Each band's footprints, the walls' left out (they are the fences), and every turning part
 	# with its pose.
 	var bands := {}
+	var tallest := {}
 	var turning := []
 	for view: BuildingView in main.base_view.views.values():
 		var building: BuildingState = state.buildings[view.building_id]
@@ -81,6 +82,7 @@ func run(main: MainScript) -> void:
 		var foot := Rect2i(building.cell, Vector2i.ONE * view.footprint_size)
 		if building.type != PlacementController.PAINT_TYPE:
 			bands[band] = (bands.get(band, foot) as Rect2i).merge(foot)
+			tallest[band] = maxf(float(tallest.get(band, 0.0)), view.site_height())
 		turning.append_array(view.find_children("*", "Node3D", true, false).filter(
 			func(node: Node) -> bool: return node.has_meta(BuildingModels.MOVE_META)))
 	# A part may hold still for a while (a hammer's hold) or come back to its first pose on a
@@ -104,28 +106,30 @@ func run(main: MainScript) -> void:
 	for band: String in catalog.categories:
 		# The band with the fence under it.
 		var box: Rect2i = (bands[band] as Rect2i).grow_side(SIDE_BOTTOM, 1)
+		var height: float = tallest[band]
+		say("band %s: tallest model %.2f" % [band, height])
 		var parts := ceili(box.size.x / float(PART_CELLS))
 		for i: int in parts:
 			var part := Rect2i(box.position.x + box.size.x * i / parts, box.position.y, 0, box.size.y)
 			part.end.x = box.position.x + box.size.x * (i + 1) / parts
 			var name := "band-%s-%d" % [band, i + 1] if parts > 1 else "band-" + band
 			var at := main.base_view.cell_to_world(part.position, 0) + Vector3(part.size.x, 0, part.size.y) * 0.5
-			await _shot(main, name, at, _fit(main, part))
+			await _shot(main, name, at, _fit(main, part, height))
 			if turning.any(func(mover: Node3D) -> bool:
 					return part.has_point(main.base_view.world_to_cell(mover.global_position))):
 				await main.get_tree().create_timer(1.0).timeout
 				await screenshot(name + "-later")
 
 
-## The camera size at which `part`, MODEL_HEIGHT tall, fills FILL of the screen; BAND_ZOOM at
-## the least.
-func _fit(main: MainScript, part: Rect2i) -> float:
+## The camera size at which `part`, `height` tall, fills FILL of the screen; BAND_ZOOM at the
+## least.
+func _fit(main: MainScript, part: Rect2i, height: float) -> float:
 	var screen := main.get_viewport().get_visible_rect().size
 	var corner := main.base_view.cell_to_world(part.position, 0)
 	var box := Rect2(main.camera.unproject_position(corner), Vector2.ZERO)
 	for x: int in [0, part.size.x]:
 		for z: int in [0, part.size.y]:
-			for y: float in [0.0, MODEL_HEIGHT]:
+			for y: float in [0.0, height]:
 				box = box.expand(main.camera.unproject_position(corner + Vector3(x, y, z)))
 	return maxf(BAND_ZOOM, main.camera.size * maxf(box.size.x / screen.x, box.size.y / screen.y) / FILL)
 

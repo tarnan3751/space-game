@@ -8,13 +8,15 @@ extends HarnessScenario
 ## The overview's line also says the render thread's CPU time for the frame, measured on the
 ## root viewport.
 ##
-## Checks every model: one to four body MeshInstance3D (the static body, up to three moving
-## parts), each with an outline instance beside it on the ink material casting no shadow unless
-## all its parts are ones never outlined (Surf.NO_OUTLINE); every vertex's kit layer (UV2.x)
-## within the kit; the body triangles, both surfaces, within the art style's budget for its
-## footprint (docs/reference/art-style.md, **Budgets**); and its reach in x and z (the body's
-## bounds, each moving part's over its whole motion) within its footprint plus EXTENT_SLACK.
-## Nothing checks the height.
+## Checks every model, built for its level's tier (BuildingModels.tier_of): one body
+## MeshInstance3D and up to Parts.max_moving(tier) more (the moving parts), each with an outline
+## instance beside it on the ink material casting no shadow unless all its parts are ones never
+## outlined (Surf.NO_OUTLINE); every vertex's kit layer (UV2.x) within the kit; the body
+## triangles, both surfaces, within the art style's budget for its footprint and tier
+## (docs/reference/art-style.md, **Budgets**); its reach in x and z (the body's bounds, each
+## moving part's over its whole motion) within its footprint plus EXTENT_SLACK; and its top (the
+## body's bounds, each moving part's over its whole motion) within its height cap,
+## CC_HEIGHT_CAP for the Command Center and HEIGHT_CAP for every other type.
 ##
 ## Rows follow the catalog's categories: "core" (the Command Center), then catalog.categories
 ## in tab order. The views hang under a Node3D of the scenario's own under main, not under
@@ -22,10 +24,20 @@ extends HarnessScenario
 ## hidden meanwhile. The whole roster does not fit on the grid at once, so rows that do not fit
 ## start a new page.
 
-## Body triangles a model may have, by footprint size; a wall piece has WALL_BUDGET.
-const BUDGETS := {1: 600, 2: 2000, 3: 3000, 4: 5000, 5: 5000}
+## Body triangles a model may have, by footprint size, then by Parts.Tier (Base, Gold, Chrome,
+## Obsidian, Crown); a wall piece has WALL_BUDGETS by tier.
+const BUDGETS := {
+	1: [600, 600, 840, 1080, 1320],
+	2: [2000, 2000, 2800, 3600, 4400],
+	3: [3000, 3000, 4200, 5400, 6600],
+	4: [5000, 5000, 7000, 9000, 11000],
+	5: [5000, 5000, 7000, 9000, 11000],
+}
 const WALL_TYPE := "barrier_wall"
-const WALL_BUDGET := 250
+const WALL_BUDGETS := [250, 250, 300, 350, 400]
+## How tall a model may stand (world units, at its scale): the Command Center, every other type.
+const CC_HEIGHT_CAP := 7.0
+const HEIGHT_CAP := 5.0
 ## How far past its footprint's edge (world units) a model may reach in x or z.
 const EXTENT_SLACK := 0.15
 ## Degrees between the angles a swinging part's reach is sampled at.
@@ -155,12 +167,15 @@ func _categories(main: MainScript) -> PackedStringArray:
 func _check_budget(catalog: Catalog, entry: Dictionary) -> void:
 	var type: String = entry["type"]
 	var size: int = entry["size"]
-	var limit: int = WALL_BUDGET if entry["type"] == WALL_TYPE else BUDGETS[mini(size, 5)]
+	var cap := CC_HEIGHT_CAP if type == Catalog.HQ_TYPE else HEIGHT_CAP
 	for level: int in range(1, int(entry["levels"]) + 1):
 		var tier := BuildingModels.tier_of(catalog, type, level)
+		var limits: Array = WALL_BUDGETS if type == WALL_TYPE else BUDGETS[mini(size, 5)]
+		var limit: int = limits[tier]
 		var model := BuildingModels.create(type, level, size, tier)
 		var bodies := _bodies(model)
 		var reach := _reach(model, bodies)
+		var top := _top(model, bodies)
 		var bound := size * 0.5 + EXTENT_SLACK
 		var triangles := 0
 		var outlined := 0
@@ -182,10 +197,48 @@ func _check_budget(catalog: Catalog, entry: Dictionary) -> void:
 					outlined += 1
 		model.free()
 		var over := "" if reach <= bound else ", over by %.2f" % (reach - bound)
-		check(bodies.size() >= 1 and bodies.size() <= 1 + Parts.MAX_MOVING and outlined == need_outline
-			and top_layer < MaterialKit.LAYERS.size() and triangles <= limit and reach <= bound,
-			"%s %d: %d body instance(s), %d of %d outlined, top kit layer %d, %d triangles (limit %d), reach %.2f (limit %.2f%s)"
-			% [type, level, bodies.size(), outlined, need_outline, top_layer, triangles, limit, reach, bound, over])
+		check(bodies.size() >= 1 and bodies.size() <= 1 + Parts.max_moving(tier) and outlined == need_outline
+			and top_layer < MaterialKit.LAYERS.size() and triangles <= limit and reach <= bound and top <= cap,
+			"%s %d: %d body instance(s), %d of %d outlined, top kit layer %d, %d triangles (limit %d), reach %.2f (limit %.2f%s), %s tier, top %.2f (cap %.1f)"
+			% [type, level, bodies.size(), outlined, need_outline, top_layer, triangles, limit, reach, bound, over,
+			str(Parts.Tier.keys()[tier]).to_lower(), top, cap])
+
+
+## How high a model stands, in world units, times the model's scale: the static body's bounds,
+## and each moving part's over its whole motion (_moving_top).
+func _top(model: Node3D, bodies: Array[MeshInstance3D]) -> float:
+	var top := 0.0
+	for body: MeshInstance3D in bodies:
+		if body.get_parent() == model:
+			top = maxf(top, body.mesh.get_aabb().end.y)
+		else:
+			var node := body.get_parent() as Node3D
+			top = maxf(top, _moving_top(body.mesh, node.get_meta(BuildingModels.MOVE_META) as Motion, node.position))
+	return top * model.scale.y
+
+
+## A moving part's highest point over its whole motion: its bounds' corners turned about the
+## axis every SWING_STEP degrees (a whole turn for a SPIN, -amplitude to +amplitude for a SWING),
+## or at both ends of a SLIDE.
+func _moving_top(mesh: Mesh, motion: Motion, pivot: Vector3) -> float:
+	var box := mesh.get_aabb()
+	var poses: Array[Transform3D] = []
+	match motion.kind:
+		Motion.Kind.SPIN, Motion.Kind.SWING:
+			var sweep := TAU if motion.kind == Motion.Kind.SPIN else 2.0 * deg_to_rad(absf(motion.amplitude))
+			var steps := maxi(1, ceili(rad_to_deg(sweep) / SWING_STEP))
+			var start := 0.0 if motion.kind == Motion.Kind.SPIN else -deg_to_rad(absf(motion.amplitude))
+			for k: int in steps + 1:
+				poses.append(Transform3D(Basis(motion.axis, start + sweep * k / steps), pivot))
+		_:
+			var shift := motion.axis * motion.amplitude
+			poses.append(Transform3D(Basis.IDENTITY, pivot + shift))
+			poses.append(Transform3D(Basis.IDENTITY, pivot - shift))
+	var top := -INF
+	for at: Transform3D in poses:
+		for corner: int in 8:
+			top = maxf(top, (at * box.get_endpoint(corner)).y)
+	return top
 
 
 ## How far a model reaches from its centre in x or z, in world units, times the model's scale:

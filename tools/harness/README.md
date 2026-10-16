@@ -151,19 +151,24 @@ zoom (camera size 10), where outlines, bands and textures can be read; all are f
 every model in it has its footprint's corners and its top on the screen and outside the Build
 button. The frame rate is only meaningful when
 nothing else is loading the machine.
-In both modes it checks every model: one to four body `MeshInstance3D` (the static body and up
-to three moving parts), each with an outline instance beside it on `MaterialKit.ink()` that casts
+In both modes it checks every model, built for its level's tier (`BuildingModels.tier_of`): one
+body `MeshInstance3D` and up to `Parts.max_moving(tier)` more (the moving parts: three, four at
+Crown), each with an outline instance beside it on `MaterialKit.ink()` that casts
 no shadow, unless every vertex of it carries a flag that is never outlined (`Surf.NO_OUTLINE`:
 FLICKER, JITTER, HOLO); no vertex's kit layer (`UV2.x`) beyond the kit's last; the body
-triangles, every surface counted, within the budget for its footprint
-(`docs/reference/art-style.md`, **Budgets**: 600 for 1x1, 2,000 for 2x2, 3,000 for 3x3, 5,000
-for 4x4 and 5x5, 250 for a wall piece); and its reach in x and z within half its footprint plus
+triangles, every surface counted, within the budget for its footprint and tier
+(`docs/reference/art-style.md`, **Budgets**: at Base and Gold 600 for 1x1, 2,000 for 2x2, 3,000
+for 3x3, 5,000 for 4x4 and 5x5, 250 for a wall piece, rising at Chrome, Obsidian and Crown); its
+reach in x and z within half its footprint plus
 0.15 units (`EXTENT_SLACK`): the static body's bounds, and each moving part's reach over its
 whole motion, at the model's scale. A SPIN part's vertices sweep circles about its axis (each
 reaches its circle's centre's offset plus its radius, plus the pivot's offset from the centre);
 a SWING part's bounds are turned every 5 degrees from -amplitude to +amplitude, both ends
-included; a SLIDE part's are shifted to both ends. A failure says by how much it reaches over;
-nothing checks the height.
+included; a SLIDE part's are shifted to both ends. A failure says by how much it reaches over.
+And its top within its height cap, 7 units for the Command Center and 5 for every other type:
+the body's bounds, and each moving part's bounds' corners over its whole motion (turned every 5
+degrees through a SPIN's whole turn or a SWING's range, shifted to a SLIDE's ends). Each model's
+line names its tier, its budget and its top.
 
 `scenarios/effects.gd` is the animation rig (`docs/reference/art-style.md`, **Animation**): a
 test part for each surface effect and each kind of moving part, built with `LowPolyMesh` and
@@ -290,7 +295,7 @@ do not show, those steps' extra ink triangles, an L3 beside an L5 inking and the
 checks every piece's body is the same whatever its lower mask. It screenshots the pattern at the closest
 zoom (level 1 also with the paint brush beside it). It checks that a wall's own model,
 which the brush and the gallery show, is the lone post, and that every piece of every level
-and mask is within the 250 body triangles of a wall piece. Last, it selects the cross's centre,
+and mask is within its level's tier's budget for a wall piece (250 at Base and Gold). Last, it selects the cross's centre,
 which stays merged with no gold outline (its own model, whose outlines turn gold, stays hidden),
 and lifts it: the mesh drops it and its neighbours' joints, its own post shows, and carried back
 and dropped it rejoins the cross; screenshots show it selected and in the air.
@@ -331,6 +336,7 @@ the gap cannot hide it. Once the "Template base" toast has faded (2.5 seconds af
 it screenshots the whole base at the widest zoom in a 1560x720 window, then each category's
 band with the fence under it (the Command Center's with the first category's; the walls are the
 fences, so they are left out of the Defence band's frame), a band wider than 16 cells in even parts, each part centred and at camera
-size 16 or as far out as it takes for the part, with 4 units of model height, to fill no more
+size 16 or as far out as it takes for the part, as tall as the band's tallest model (each
+view's `site_height()`, said in the log), to fill no more
 than 70% of the screen, so none runs under the HUD or off the screen; each part again a second
 later where a part turns in it, to compare the two.

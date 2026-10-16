@@ -10,8 +10,8 @@ extends HarnessScenario
 ## so an L5's low slab is lower than an L1 segment). STEPS names the walls that must, or must
 ## not, show a step's extra ink triangles at levels 3 and 5, an L5 beside an L3 among them. A
 ## wall's own model, which the brush and the gallery show, is the lone post, every piece of
-## every level is within PIECE_TRIANGLES, and every piece's body is the same whatever its lower
-## mask.
+## every level is within PIECE_TRIANGLES for its level's tier, and every piece's body is the
+## same whatever its lower mask.
 ## Last, the cross's centre is selected, which leaves it merged with no gold outline, then
 ## lifted: it leaves the mesh and its neighbours' masks, shows its own post, and rejoins when
 ## dropped back.
@@ -42,8 +42,9 @@ const STEPS: Array[Array] = [
 const CLOSE_UP_SIZE := 10.0
 
 var _catalog: Catalog
-## The art style's budget for one wall piece's body.
-const PIECE_TRIANGLES := 250
+## The art style's budget for one wall piece's body, by Parts.Tier (Base, Gold, Chrome,
+## Obsidian, Crown).
+const PIECE_TRIANGLES := [250, 250, 300, 350, 400]
 
 
 func run(main: MainScript) -> void:
@@ -80,8 +81,8 @@ func run(main: MainScript) -> void:
 					differs.append("%d/%d" % [mask, lower])
 		check(differs.is_empty(), "level %d pieces' bodies are the same whatever the lower mask (%s)" % [
 			level, ", ".join(differs)])
-		check(most <= PIECE_TRIANGLES, "level %d pieces have at most %d triangles (limit %d)" % [
-			level, most, PIECE_TRIANGLES])
+		var limit: int = PIECE_TRIANGLES[_tier(level)]
+		check(most <= limit, "level %d pieces have at most %d triangles (limit %d)" % [level, most, limit])
 
 	placement.begin_place(WALL)
 	var cells: Array[Vector2i] = []

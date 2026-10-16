@@ -1,7 +1,7 @@
 class_name Parts
 extends RefCounted
 ## A building model while it is built (BuildingModels.create): its tier, the static body, up
-## to MAX_MOVING moving parts (moving()), and what the per-category model files
+## to max_moving(tier) moving parts (moving()), and what the per-category model files
 ## (src/game/models/) share: the helpers, the common surfaces, and SURFACES, the table that
 ## paints the colour names the models were first written with onto the material kit
 ## (docs/reference/art-style.md).
@@ -56,8 +56,10 @@ static var GOLD_ROUND := Surf.make(MaterialKit.Layer.FLAT, MaterialKit.CORE_GOLD
 
 static var _surfs: Dictionary[String, Surf] = {}
 
-## Moving parts a model may have.
-const MAX_MOVING := 3
+## Moving parts a model of `model_tier` may have: three, and at Crown a fourth for its escort.
+static func max_moving(model_tier: int) -> int:
+	return 4 if model_tier >= Tier.CROWN else 3
+
 
 ## The level's Tier, set before the builder runs: a builder reads it, never the level, for
 ## the tier's surfaces (`p.tier >= Parts.Tier.GOLD` for gold trim).
@@ -72,7 +74,7 @@ var motions: Array[Motion] = []
 ## A new moving part, which moves about `pivot` as `motion` says: build it in its own space,
 ## with the pivot at its origin.
 func moving(pivot: Vector3, motion: Motion) -> LowPolyMesh:
-	assert(movers.size() < MAX_MOVING, "a model has at most %d moving parts" % MAX_MOVING)
+	assert(movers.size() < max_moving(tier), "a model has at most %d moving parts" % max_moving(tier))
 	var mesh := LowPolyMesh.new()
 	movers.append(mesh)
 	pivots.append(pivot)

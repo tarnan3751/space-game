@@ -287,10 +287,10 @@ of the finished model, and it frees itself after its climb. `drone()` returns th
 (null when none), for the harness. `BaseView.clear()` frees the drones with the views.
 
 `BuildingModels.create(type, level, size, tier)` returns a `Node3D` holding the static body and its
-ink outline, and up to three moving parts (the model table in `art-style.md` names each
+ink outline, and up to three moving parts, four at the Crown tier (the model table in `art-style.md` names each
 type's: dishes, radars and gyro rings that spin, heads and launchers that scan, press arms,
 doors and cranes that slide) with their outlines, each under a pivot node carrying `MOVE_META`:
-at most eight `MeshInstance3D`, half of them at most outlines that cast no shadow
+at most eight `MeshInstance3D` (ten at Crown), half of them at most outlines that cast no shadow
 (`art-style.md`, **Animation**).
 The models are built in code, one per type and level of the 33-type roster, each type's in its
 category's file under `src/game/models/` but the wall's, which has a file of its own
@@ -298,7 +298,7 @@ category's file under `src/game/models/` but the wall's, which has a file of its
 models are built for and its level count. A level above that shows the top model, a catalog size
 other than the footprint scales the model, and an unknown type gets a hull block with a hazard
 stripe and one warning. `tier_of(catalog, type, level)` is the tier a level is built for
-(`art-style.md`, **Models**), which every caller passes. Meshes are built once per type, level
+(`art-style.md`, **Tiers**), which every caller passes. Meshes are built once per type, level
 and tier and cached in a static dictionary, so a level shown as its type's top model is painted
 for its own tier; the nodes are per view. `create_scaffold(size)` is one cached, outlined model in
 hazard stripes; `create_drone()` and `create_drone_effect(part)` build and cache the

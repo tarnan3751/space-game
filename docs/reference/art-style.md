@@ -189,7 +189,7 @@ The field's and the terrain's roles, and rock, are in their own table below.
 
 A building uses hull light or hull mid for its main mass, gunmetal or hull dark for mechanical
 parts, its category accent on one or two surfaces, and one emissive element in its accent colour.
-From the Gold tier, the levels unlocked at Command Center 5 (**Models**), every type adds core gold
+From the Gold tier, the levels unlocked at Command Center 5 (**Tiers**), every type adds core gold
 trim (edges, rings, caps), so a building of that band reads as such from across the base. Under the warm key light every lit colour leans warm.
 
 The field's and the terrain's roles are picked so that, under the warm key light and over their
@@ -358,32 +358,55 @@ level: int)` in its category's file under `src/game/models/` (`core.gd`, `resour
 `army.gd`, `defense.gd`, `traps.gd`), but for the wall, a defence type whose builder has a file
 of its own (`walls.gd`); `MODELS` gives each type the footprint its
 models are built for and its level count. `Parts` holds the model while it is built: `tier`, the
-level's theme (`Parts.Tier`: `BASE`, `GOLD`, `CHROME`, `OBSIDIAN`, `CROWN`), set before the
-builder runs from `BuildingModels.tier_of(catalog, type, level)`, which maps the Command Center
-level the level requires (`requires_cc`, 1 when it has none; for the Command Center its own
-level) through `tier_for_cc`: 1 to 4 Base, 5 Gold, 6 and 7 Chrome, 8 and 9 Obsidian, 10 Crown.
-A builder picks the tier's surfaces from it (`p.tier >= Parts.Tier.GOLD` for gold trim) and its
-parts from the level, so a level's geometry never depends on the data. So gold follows the band,
-not the top level: every level unlocked at Command Center 5 wears it (the Drydock's, the EMP
-Tower's, the Railgun's, the Ion Beam's and the Orbital Cannon's from L1, the Flak Cannon's and
-the Arc Tower's from L3, and on the Heavy Fabricator's L3 its stacks' mouths too, as on the
-Fabricator's L5), and the Drone Bay's L1, the Proximity Mine's L3 and the Gravity Trap's L2,
-which require less than Command Center 5, are Base: their gold parts are hull-mid there. `body` (a
-`LowPolyMesh`), up to three moving parts (`moving(pivot, motion)`, **Animation**), and the shared
-helpers. A model is a `Node3D` with the body's `MeshInstance3D` and its outline's beside it, and
-a `Node3D` per moving part at its pivot carrying `MOVE_META` (its `Motion`), with the part's mesh
-and its outline under it. That is at most **eight** `MeshInstance3D`: the body and up to three
+level's theme (**Tiers**), set before the builder runs; `body` (a `LowPolyMesh`), up to three
+moving parts, four at Crown (`moving(pivot, motion)`, **Animation**), and the shared helpers. A
+model is a `Node3D` with the body's `MeshInstance3D` and its outline's beside it, and a `Node3D`
+per moving part at its pivot carrying `MOVE_META` (its `Motion`), with the part's mesh and its
+outline under it. That is at most **eight** `MeshInstance3D`, ten at Crown: the body and its
 moving parts, each with an outline (`OUTLINE_META`, no shadow); a moving part made only of
 parts that are never outlined has no outline instance. Meshes are built once per type, level
 and tier and cached; `BuildingModels.instantiate(parts)` assembles an uncached model from parts a caller
 built itself (the `effects` rig). The contract any model keeps, built or imported:
 origin at the footprint centre on the ground, +Y up, fitting inside `size × size` cells.
 
-The `model_gallery` harness scenario lays out every type and level and checks each: one to four
-body instances, each with its outline instance on the ink material casting no shadow unless all
-its parts are never outlined, every layer within the kit, and the body triangles (both surfaces)
-and the extent over every moving part's whole motion within the budgets below. Its detail shots
-at the closest zoom are where a model is judged.
+The `model_gallery` harness scenario lays out every type and level and checks each, built for
+its level's tier: one body instance and up to `Parts.max_moving(tier)` more, each with its outline
+instance on the ink material casting no shadow unless all its parts are never outlined, every
+layer within the kit, the body triangles (both surfaces) within its footprint's and tier's budget,
+and the extent and the height over every moving part's whole motion within the bounds below. Its
+detail shots at the closest zoom are where a model is judged.
+
+### Tiers
+
+A level's **tier** (`Parts.Tier`: `BASE`, `GOLD`, `CHROME`, `OBSIDIAN`, `CROWN`) is its theme,
+set by the Command Center band it is unlocked in, so every type's levels of one band share a
+look and a maxed base shares one too. `BuildingModels.tier_of(catalog, type, level)` takes the
+Command Center level the level requires (`requires_cc` in the data, 1 when it has none) through
+`tier_for_cc`, the one mapping; the Command Center alone takes its own level, since its level k
+requires k − 1 (its level 5, which requires 4, is Gold; its level 10 is Crown). Every caller of
+`create`, `BuildingView.setup` and `WallModels.piece` passes it (a required parameter).
+
+| Tier | Levels requiring CC | Look | Shared elements |
+| --- | --- | --- | --- |
+| Base | 1–4 | hull-light masses, the category accent, gunmetal machinery | — |
+| Gold | 5 | core-gold trim on rims, caps and crowns | gold trim |
+| Chrome | 6–7 | polished chrome plating with brushed highlights, cyan light strips; more mass, a second storey or mast; stronger emissives | chrome plates, cyan strips, a chrome cap on the signature element |
+| Obsidian | 8–9 | dark obsidian armour veined with violet antimatter energy (FLOW), crystal inlays; hovering parts (rings, plates) on HOLO or BOB; taller | obsidian plates, violet veins, one hovering element |
+| Crown | 10 | an obsidian base under gold filigree, a violet antimatter core glowing in the body, a crowning element (spire, halo, banner or beacon beam) and an escort, a fourth moving part that patrols or orbits | gold filigree, antimatter core, crown, escort |
+
+The rule: **surfaces follow the tier, geometry follows the level.** A builder picks the tier's
+surfaces from `p.tier` (`p.tier >= Parts.Tier.GOLD` for gold trim, so a higher tier keeps the
+gold below it) and its parts from the level, so a level's geometry never depends on the data; a
+gold part a level adds stays on its level test, painted by the tier. Every level unlocked at
+Command Center 5 is therefore Gold tier, the band's cohesion, and the progression within the
+band is geometry: gold follows the band, not the top level, so the Drydock 1, EMP Tower 1–2,
+Railgun 1–2, Ion Beam 1, Orbital Cannon 1, Flak Cannon 3, Arc Tower 3 and the Heavy Fabricator
+3's stacks wear it. The Drone Bay 1, the Proximity Mine's L3 and the Gravity Trap's L2, which
+require less than Command Center 5, are Base: the booth's roof is hull mid and the traps' gold
+rings hull-mid casing there (the Drone Bay gains its gold again at its top level, in its batch).
+The Command Center's gold ring round its dome is its signature at every level, not tier trim.
+Meshes are cached by type, level and tier, so a level above a type's modelled top, which shows
+its top model, is painted for its own tier.
 
 ### Shared shapes
 
@@ -582,8 +605,8 @@ wall piece (**Walls**), and keeps its look on a placement ghost (**View states**
 ### Moving parts
 
 `Parts.moving(pivot, motion) -> LowPolyMesh` makes a moving part: build it in its own space,
-the pivot at its origin, as the parts of the body are built. A model has at most three
-(`Parts.MAX_MOVING`, asserted). `Motion` (`src/game/motion.gd`) says how it moves:
+the pivot at its origin, as the parts of the body are built. A model has at most three, four at
+Crown, the fourth its escort (`Parts.max_moving(tier)`, asserted). `Motion` (`src/game/motion.gd`) says how it moves:
 
 | Constructor | Motion |
 | --- | --- |
@@ -606,8 +629,9 @@ work per frame.
 
 ### Budget and checks
 
-A building is at most eight instances: the body, its outline, and up to three moving parts with
-their outlines. The `model_gallery` scenario checks every model against it (**Models**), and a
+A building is at most eight instances, ten at Crown: the body, its outline, and up to three
+moving parts (four at Crown) with their outlines. The `model_gallery` scenario checks every model
+against it (**Models**), and a
 moving part's reach over its whole motion against the extent (**Modelling vocabulary and
 budgets**): a spin's circle about its axis, a swing's bounds every 5 degrees from -amplitude to
 +amplitude, both ends included, a slide's at both ends.
@@ -618,12 +642,24 @@ every kind of motion, in two rows on the field, checked headless and screenshott
 
 ## Modelling vocabulary and budgets
 
-- **Budgets**, body triangles (outlines repeat them and are not counted): 4×4 and 5×5 up to
-  5,000; 3×3 up to 3,000; 2×2 up to 2,000; 1×1 traps up to 600; one wall piece up to 250. They are
-  mobile ceilings, not targets: spend triangles where a silhouette or a curve needs them.
+- **Budgets**, body triangles (outlines repeat them and are not counted), by footprint and tier
+  (**Tiers**). They are mobile ceilings, not targets: spend triangles where a silhouette or a
+  curve needs them. Draw calls, not triangles, are the phone's cost, so a Crown model's fourth
+  moving part is spent only where the type's story needs it.
+
+  | Footprint | Base / Gold | Chrome | Obsidian | Crown |
+  | --- | --- | --- | --- | --- |
+  | 1×1 trap | 600 | 840 | 1,080 | 1,320 |
+  | 2×2 | 2,000 | 2,800 | 3,600 | 4,400 |
+  | 3×3 | 3,000 | 4,200 | 5,400 | 6,600 |
+  | 4×4, 5×5 | 5,000 | 7,000 | 9,000 | 11,000 |
+  | wall piece | 250 | 300 | 350 | 400 |
 - **Extent**: in x and z a model stays within its footprint plus 0.15 units: the static body's
   bounds, and every moving part's reach over its whole motion (a turning head or dish must clear
-  the footprint at every angle, a swinging arm at both ends of its swing). Height is free. The gallery checks it on every type and level.
+  the footprint at every angle, a swinging arm at both ends of its swing). The gallery checks it on every type and level.
+- **Height**: at most 7 units for the Command Center and 5 for every other type, the body's top
+  and every moving part's over its whole motion (the camera's scene top is 13, and the
+  construction drone hovers 3.5 above a site). The gallery checks it on every type and level.
 - Every box edge gets a chamfer (0.04 to 0.08 units). Cylinders have 16 to 24 sides, domes 16
   sides and 6 to 8 rings, rings and dishes 24 segments, all smooth. Parts under about 0.3 across
   may use 10 to 12 sides when smooth, and under 0.15 as few as 8; small light domes 3 rings.
@@ -634,11 +670,17 @@ every kind of motion, in two rows on the field, checked headless and screenshott
   ladders), one signature element that names the type from across the base, one accent surface
   and one emissive element.
 - Levels: each adds mass or height within the footprint, more armour (the plate layer), one more
-  greeble and a stronger emissive; the top level adds core gold trim. Levels 1 to 5 of a type
-  read as one building growing, never as five buildings.
+  greeble and a stronger emissive; its tier sets its theme (**Tiers**): gold trim from the Gold
+  tier, then the Chrome, Obsidian and Crown looks. Every level of a type reads as one building
+  growing, never as separate buildings.
 - Moving parts (radar dishes, turbines, gyros, press arms, recoiling barrels): three per
-  building at most (**Animation**).
-- Scale: a size-2 building stands 1.2 to 2.0 units tall, a 4×4 Command Center up to 3.2.
+  building at most, four at Crown, the fourth the escort (**Animation**).
+- Scale: at Base and Gold a size-2 building stands 1.2 to 2.0 units tall, a 3×3 about 1.6 to 2.2,
+  a 4×4 Command Center up to 3.2. Chrome may grow to 1.3 times the type's Gold height, Obsidian
+  1.6 and Crown 2, within the height caps above. Verticality goes to the Command Center (stacked
+  storeys, and a spire from 8), the Alliance Beacon, the Research Lab, the Hangar's control tower,
+  the Antimatter Siphon's pylons, the Metal Silo, the Railgun, the Shield Generator, the Orbital
+  Cannon and the Drydock's gantry; the rest grow in mass and detail.
 - Walls connect: a post plus a half-segment towards each orthogonal neighbour that is also a
   wall, meeting at the cell boundary, so neighbours of different levels each draw their own
   (**Walls**).
@@ -698,7 +740,8 @@ to an L2 post) it is a short dark mark over the post's cap.
 `piece(level, tier, mask, lower_mask = 0)` builds a piece on first use for its level's tier (the
 crown is gold from the Gold tier, `CAP` gunmetal below it) and keeps its body and outline arrays
 (`to_arrays`, `to_outline_arrays`), cached by tier, level, mask and lower mask (a higher level
-shows level 5's, built for its own tier); every piece stays within the 250 body triangles of a wall piece
+shows level 5's, built for its own tier); every piece stays within its tier's budget for a wall
+piece (250 at Base and Gold)
 (`wall_junctions` checks all 80 masks and levels, that each piece's body is the same whatever
 its lower mask, and the merged outline against its pieces' with their steps). `build_barrier_wall`, which `BuildingModels.create("barrier_wall", level, 1, tier)` dispatches
 to, is the lone post (mask 0): the paint brush, a lifted wall and the gallery show it.
@@ -1022,13 +1065,17 @@ and 91 on traps, the cards' pictures included (110, 94 and 73 on a walls tab whi
 tabs; 100, 86 and 68 before the pictures). The pictures cost one 160×160 render per type, one a
 frame, the first time the panel opens, each read back into a 100 KB texture (about 3 MB for
 today's menu), and nothing per frame once every type is cached and the preview's viewport is
-freed (`hud.md`, **Pictures**). The model gallery's overview is 552 draw calls on page 1 and 275
-on page 2 with every type animated (565 and 217 before the Cadet Academy's levels moved rows
-between the pages; 362 and 158 before the animation pass, when nine types had one spinner each;
-381 and 177 with the build bar, 375 and 171 before the environment, 294 and 157 before the kit):
-every moving part is two more draws and a shadow draw, and every mesh with holograms one more.
-The render thread's CPU time on the development Mac is about 1.2 to 1.5 ms a frame on page 1 (74
-of the 121 models at once) and 0.4 to 0.7 ms on page 2, measured with the gallery's own line; it
+freed (`hud.md`, **Pictures**). The model gallery lays out 259 models (every type to its ten-level
+data, a level above a type's modelled top showing its top model) over three pages, whose
+overviews are 527, 680 and 566 draw calls with every type animated (76, 83 and 100 models at
+once); with two pages and 121 models it was 552 and 275 (565 and 217 before the Cadet Academy's
+levels moved rows between the pages; 362 and 158 before the animation pass, when nine types had
+one spinner each; 381 and 177 with the build bar, 375 and 171 before the environment, 294 and
+157 before the kit): every moving part is two more draws and a shadow draw, and every mesh with
+holograms one more. The render thread's CPU time on the development Mac is about 0.7 to 0.9 ms a
+frame on page 1, 0.9 to 1.3 ms on page 2 and 0.9 to 1.1 ms on page 3, measured with the
+gallery's own line over two runs (with two pages, 1.2 to 1.5 ms on page 1, 74 of the 121 models,
+and 0.4 to 0.7 ms on page 2); it
 does not move with the shadow's filter (0, 2 or 4 measure the same within that noise), since PCF
 costs on the GPU: 13 shadow taps a fragment near a shadow edge (fewer where the first taps
 agree), and the penumbra's dot screen a few more instructions in `light()`. The shadow map,
@@ -1038,7 +1085,7 @@ mipmaps too, and the ground and the terrain share it; the terrain's rock texture
 RGBA8 image, is about 1.4 MB with its mipmaps. The terrain's shader has two samplers (the field
 texture and the rock texture) and takes three texture reads a fragment (the field's marks and
 the rock texture along x and along z), with five value noises. Keep `_process` free of
-allocation, and keep every building to its eight instances (**Animation**); a busy building adds
+allocation, and keep every building to its eight instances, ten at Crown (**Animation**); a busy building adds
 its construction drone's four. The shader effects cost a few integer tests and a sine or two a
 vertex and a fragment, and no draw; a moving part costs two draws (its body and its outline)
 plus the body's shadow draw, and a mesh with HOLO parts one more draw in the transparent pass.
