@@ -156,13 +156,19 @@ static var FILIGREE_LEG := Surf.make(MaterialKit.Layer.BANDS, MaterialKit.CORE_G
 static var VIOLET_LAMP := Surf.make(MaterialKit.Layer.GLOW, Parts.CORE_GLOW_TINT, 1.0, Surf.UNLIT | Surf.BLINK, true)
 static var CRYSTAL_ORB := Surf.make(MaterialKit.Layer.CRYSTAL, MaterialKit.CRYSTAL, 1.0, Surf.UNLIT | Surf.PULSE | Surf.BOB, true)
 static var BRIGHT_ORB := Surf.make(MaterialKit.Layer.GLOW, Color("c9a2ff"), 1.0, Surf.UNLIT | Surf.BOB, true)
+## The hangar's marshaller bot, every part bobbing together: its hull, hazard shoulders,
+## gunmetal arms and thruster, orange cap, its visor glowing cyan, its wands a hot orange light
+## with no ink, so they glow rather than read as sticks.
+static var MARSHAL_HULL := Surf.make(MaterialKit.Layer.HULL, MaterialKit.HULL_LIGHT, 2.0, Surf.BOB, false, true, 0.2)
+static var MARSHAL_HAZARD := Surf.make(MaterialKit.Layer.HAZARD, Color.WHITE, 2.0, Surf.BOB, false, true, 0.2)
+static var MARSHAL_METAL := Surf.make(MaterialKit.Layer.PLATE, MaterialKit.GUNMETAL, 1.0, Surf.BOB, true, true, 0.2)
+static var MARSHAL_VISOR := Surf.make(MaterialKit.Layer.GLOW, MaterialKit.ENERGY, 1.0, Surf.UNLIT | Surf.BOB, true, true, 0.2)
+static var MARSHAL_CAP := Surf.make(MaterialKit.Layer.PLATE, MaterialKit.ARMY, 1.0, Surf.BOB, true, true, 0.2)
+static var MARSHAL_WAND := Surf.make(MaterialKit.Layer.GLOW, MaterialKit.ARMY.lerp(Color.WHITE, 0.25), 1.0,
+	Surf.UNLIT | Surf.BOB, true, false, 0.2)
 
-
-## The L10 escort skiff's round: its centre on the ground, towards the apron, and its radius, so
-## the skiff, at 1.5 times the helpers' size, flies out over the apron and the bays and clears the
-## tower by about 0.1.
-const SKIFF_CENTRE := Vector3(-0.2, 0, 0.4)
-const SKIFF_ROUND := 1.5
+## Where the L10 marshaller hovers: on the apron before the main door, over the lamps.
+const MARSHAL_AT := Vector3(-1.0, 0.65, 1.85)
 
 
 ## A long vaulted hangar: the main bay with its striped door, the control tower in the back
@@ -179,8 +185,8 @@ const SKIFF_ROUND := 1.5
 ## the tower; L9 a landing ring hovering over the skiff, obsidian rimmed in violet, and a second
 ## gallery; L10 an obsidian roof under gold filigree ribs with the antimatter core glowing in
 ## broad bands along its crests, filigree banners on the bays' gables and bands up the tower, a
-## violet core beacon on a gold spire atop it, and a big hover skiff circling out over the apron
-## and the bays as its escort.
+## violet core beacon on a gold spire atop it, and a marshaller bot hovering on the apron before
+## the main door, rocking as it waves its glowing wands, as its escort.
 static func build_hangar(p: Parts, level: int) -> void:
 	var m := p.body
 	var g := Parts.PAD_HEIGHT
@@ -247,9 +253,28 @@ static func build_hangar(p: Parts, level: int) -> void:
 			m.prism(0.14, 0.14, 0.04, 4, tower + face * 0.475 + Vector3(0, 0.15, 0), INLAY,
 				Vector3(90, 90.0 * face.x, 0))
 	if level >= 10:
-		# A skiff half again the helpers' size, its round set out over the apron so it passes
-		# over the bays and the apron and clears the tower.
-		Parts.escort_skiff(p, SKIFF_ROUND, 3.3, 0.45, SKIFF_CENTRE, 1.5)
+		_marshaller(p, MARSHAL_AT + Vector3(0, g, 0))
+
+
+## The hangar's marshaller from 10, hovering at `at` before the main door, facing the apron (+Z):
+## a stubby hover-bot, its hull striped hazard over the shoulders, a cyan visor across its face
+## under an orange cap, a thruster under it, holding two glowing orange wands angled up and out,
+## drawn at 1.8 times its size so it reads at the gameplay zoom. A moving part, it rocks
+## 20 degrees either way about the vertical through its middle as it waves ships in; every part
+## bobs together.
+static func _marshaller(p: Parts, at: Vector3) -> void:
+	const K := 1.8
+	var bot := p.moving(at, Motion.swing(Vector3.UP, 20.0, 2.5))
+	bot.box_chamfered(Vector3(0.32, 0.28, 0.24) * K, 0.06 * K, Vector3(0, -0.14, 0) * K, MARSHAL_HULL)
+	bot.box(Vector3(0.24, 0.07, 0.02) * K, Vector3(0, 0.02, 0.12) * K, MARSHAL_VISOR)
+	bot.dome(0.1 * K, 0.07 * K, 10, 2, Vector3(0, 0.14, 0) * K, MARSHAL_CAP)
+	bot.prism(0.08 * K, 0.06 * K, 0.07 * K, 10, Vector3(0, -0.21, 0) * K, MARSHAL_METAL)
+	for side: float in [-1.0, 1.0]:
+		bot.box_chamfered(Vector3(0.1, 0.1, 0.2) * K, 0.03 * K, Vector3(side * 0.19, 0.0, 0) * K, MARSHAL_HAZARD)
+		var hand := Vector3(side * 0.34, 0.16, 0.06) * K
+		Parts.beam(bot, Vector3(side * 0.22, 0.05, 0.02) * K, hand, 0.05 * K, MARSHAL_METAL, 0.015 * K)
+		var up := Vector3(side * 0.45, 1.0, 0.15).normalized()
+		bot.prism(0.05 * K, 0.04 * K, 0.34 * K, 8, hand, MARSHAL_WAND, Parts.facing(up))
 
 
 ## The apron from 6 (_hangar's): two rows of lamps before the main door chasing apart, chrome
