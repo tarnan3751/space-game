@@ -1159,13 +1159,13 @@ const GAUGE_RING_RADIUS := 0.5
 ## The L7 beacon mast's height over the deck: its beacon clears the L9 gauge ring,
 ## which turns round the mast.
 const BEACON_MAST := 0.8
-## The L10 security bot's patrol: a tight round at the tanks' mid-height in the open corner between
-## them towards the camera, over the pump, since a round about the middle at that height would
-## pass through the tanks (they reach 1.45 out).
-const SILO_GUARD_CENTRE := Vector3(0.85, 0, 0.85)
-const SILO_GUARD_RADIUS := 0.3
-const SILO_GUARD_HEIGHT := 2.6
-const SILO_GUARD_RATE := 0.4
+## The L10 security bot's patrol: the crystal silo's round about the middle, over the tanks'
+## shoulders, since lower it would pass through the tanks (they reach 1.45 out). The far tank's
+## gold vent cap (3.67) is the highest point under the round: the bot's skirt clears it by 0.07 at
+## its bob's low point, the domes' tops (3.45) by 0.3, and the gauge ring and beacon mast inside.
+const SILO_GUARD_RADIUS := 1.38
+const SILO_GUARD_HEIGHT := 3.95
+const SILO_GUARD_RATE := 0.5
 
 
 ## A squat riveted tank in plate bands on a round plinth, with an access ladder up its lit
@@ -1181,7 +1181,7 @@ const SILO_GUARD_RATE := 0.4
 ## tanks, metal-lit lenses on the gauges and an obsidian pump housing; L9 an obsidian gauge ring
 ## hovering over the deck between the tanks, turning; L10 gold filigree bands, gold rims and
 ## railings, the violet antimatter core glowing in a gold cage on the pump at the pipe's junction,
-## gold-capped vents, and a security bot patrolling between the tanks at their mid-height as its
+## gold-capped vents, and a security bot patrolling round the silo over the tanks' domes as its
 ## escort.
 static func build_metal_silo(p: Parts, level: int) -> void:
 	var m := p.body
@@ -1223,7 +1223,7 @@ static func build_metal_silo(p: Parts, level: int) -> void:
 	if level >= 9:
 		_gauge_ring(p, Vector3(0, deck + GAUGE_RING_LIFT, 0), GAUGE_RING_RADIUS, p.tier)
 	if level >= 10:
-		Parts.escort_guard(p, SILO_GUARD_RADIUS, SILO_GUARD_HEIGHT, SILO_GUARD_RATE, SILO_GUARD_CENTRE)
+		Parts.escort_guard(p, SILO_GUARD_RADIUS, SILO_GUARD_HEIGHT, SILO_GUARD_RATE)
 
 
 ## One metal tank standing at `base`: plinth, banded shell, gauge, ladder, domed top with its
