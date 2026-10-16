@@ -279,8 +279,8 @@ static var INLAY := Surf.make(MaterialKit.Layer.CRYSTAL, MaterialKit.CRYSTAL, 1.
 ## The L10 ore hauler's thrusters, pulsing.
 static var HAULER_THRUST := Surf.make(MaterialKit.Layer.GLOW, MaterialKit.ENERGY, 1.0, Surf.UNLIT | Surf.PULSE, true)
 ## The Crown tier's antimatter core where it is the model's crown (the extractor's crown and engine
-## house, the harvester's mega-shard): the glow layer in a light violet, unlit and steady, so it is
-## the brightest thing on the model where CORE_GLOW's pulse would dim it.
+## house): the glow layer in a light violet, unlit and steady, so it is the brightest thing on the
+## model where CORE_GLOW's pulse would dim it.
 const CORE_LIGHT := Color("c9a2ff")
 static var BRIGHT_CORE := Surf.make(MaterialKit.Layer.GLOW, CORE_LIGHT, 1.0, Surf.UNLIT, true)
 
@@ -651,13 +651,19 @@ const HOVER_HEIGHT := 1.5
 ## The L10 mega-shard's core band: its foot's height over the pad, clear of the hovering ring at
 ## the top of its bob.
 const CROWN_BAND := 1.68
-## The L10 guard drone's round, over the gantry.
-const HARVESTER_ESCORT_RADIUS := 1.0
-const HARVESTER_ESCORT_HEIGHT := 3.5
+## The L10 collector's round about the mega-shard, outside the pylons' lamps and inside the
+## gantry's legs, over the lamps and under the hovering ring and the beams; its turn, the other way
+## from the laser ring's; its size; and the phase its parts bob and pulse on together.
+const COLLECTOR_RADIUS := 1.08
+const COLLECTOR_HEIGHT := 1.3
+const COLLECTOR_RATE := -0.5
+const COLLECTOR_SCALE := 1.2
+const COLLECTOR_PHASE := 0.4
 
 ## The high levels' own: the emitters' beams and lenses, cyan at the Chrome tier and violet from the
-## Obsidian tier, the beams white-hot over their tint so they read against the crystal; the L8 chips
-## hovering round the mega-shard. The L10 mega-shard is BRIGHT_CORE.
+## Obsidian tier, the beams white-hot over their tint so they read against the crystal; the
+## L8 chips hovering round the mega-shard; and the L10 collector's hull, gold claw, violet eye, the
+## cut shard it carries and its thruster, all bobbing together.
 const HOT_VIOLET := Color("e4d2ff")
 const HOT_CYAN := Color("bcf6ff")
 static var CYAN_BEAM := Surf.make(MaterialKit.Layer.GLOW, HOT_CYAN, 1.0, Surf.UNLIT, true, false)
@@ -665,6 +671,16 @@ static var VIOLET_BEAM := Surf.make(MaterialKit.Layer.GLOW, HOT_VIOLET, 1.0, Sur
 static var CYAN_LENS := Surf.make(MaterialKit.Layer.GLOW, MaterialKit.ENERGY, 1.0, Surf.UNLIT, true)
 static var VIOLET_LENS := Surf.make(MaterialKit.Layer.GLOW, Parts.CORE_GLOW_TINT, 1.0, Surf.UNLIT, true)
 static var CHIP := Surf.make(MaterialKit.Layer.CRYSTAL, MaterialKit.CRYSTAL, 1.0, Surf.GLOSSY | Surf.PULSE | Surf.BOB)
+static var COLLECTOR_HULL := Surf.make(MaterialKit.Layer.HULL, MaterialKit.HULL_LIGHT, 1.0, Surf.LIT | Surf.BOB, true, true,
+	COLLECTOR_PHASE)
+static var COLLECTOR_GOLD := Surf.make(MaterialKit.Layer.FLAT, MaterialKit.CORE_GOLD, 1.0, Surf.GLOSSY | Surf.BOB, true, true,
+	COLLECTOR_PHASE)
+static var COLLECTOR_EYE := Surf.make(MaterialKit.Layer.GLOW, Parts.CORE_GLOW_TINT, 1.0, Surf.UNLIT | Surf.PULSE | Surf.BOB, true,
+	true, COLLECTOR_PHASE)
+static var COLLECTOR_SHARD := Surf.make(MaterialKit.Layer.CRYSTAL, MaterialKit.CRYSTAL, 1.5, Surf.GLOSSY | Surf.PULSE | Surf.BOB,
+	false, true, COLLECTOR_PHASE)
+static var COLLECTOR_THRUST := Surf.make(MaterialKit.Layer.GLOW, MaterialKit.ENERGY, 1.0, Surf.UNLIT | Surf.BOB, true, true,
+	COLLECTOR_PHASE)
 
 
 ## A laser cutting gantry over a cluster of pulsing crystal shards on a rock bed, a laser ring
@@ -680,9 +696,10 @@ static var CHIP := Surf.make(MaterialKit.Layer.CRYSTAL, MaterialKit.CRYSTAL, 1.0
 ## power box. L8 (Obsidian): obsidian containment set with crystal inlays and pylons veined violet,
 ## violet beams aimed at a crowning mega-shard in the cluster's middle with three crystal chips
 ## hovering round it, and violet vein conduits up the gantry's legs. L9 an obsidian ring hovering
-## over the cluster. L10 (Crown): the gantry's beam in gold filigree, the mega-shard lit violet from
-## within on a gold collar, gold-capped pylons, gold filigree round the containment, and a guard
-## drone circling over the gantry as the escort.
+## over the cluster. L10 (Crown): the gantry's beam in gold filigree, a pulsing core band and a gold
+## collar round the mega-shard, gold-capped pylons, gold filigree round the containment, and a
+## collector, a hover-bot carrying a cut shard in its claw, circling the mega-shard low under the
+## beams as the escort.
 static func build_crystal_harvester(p: Parts, level: int) -> void:
 	var m := p.body
 	var gold := p.tier >= Parts.Tier.GOLD
@@ -803,16 +820,16 @@ static func build_crystal_harvester(p: Parts, level: int) -> void:
 		m.lathe(PackedVector2Array([Vector2(HOVER_OUTER - 0.02, 0.062), Vector2(HOVER_INNER + 0.02, 0.062)]), 24, hover, HOVER_VEINS)
 		m.lathe(PackedVector2Array([Vector2(HOVER_OUTER + 0.005, 0.01), Vector2(HOVER_OUTER + 0.005, 0.05)]), 24, hover, HOVER_RIM)
 	if level >= 10:
-		Parts.escort_drone(p, HARVESTER_ESCORT_RADIUS, HARVESTER_ESCORT_HEIGHT, -0.8)
+		_collector(p.moving(Vector3(0, COLLECTOR_HEIGHT, 0), Motion.spin(Vector3.UP, COLLECTOR_RATE)))
 
 
 ## The mega-shard crowning the cluster from L8, standing where the first shard stood, with three
-## crystal chips hovering round its middle, under the beams; at L10 it glows violet from within
-## (BRIGHT_CORE), a pulsing core band and a gold collar round it over the hovering ring.
+## crystal chips hovering round its middle, under the beams; at L10 a pulsing core band and a gold
+## collar round it over the hovering ring.
 static func _mega_shard(m: LowPolyMesh, level: int, crown: bool) -> void:
 	var foot := Vector3(0, Parts.PAD_HEIGHT + 0.12, 0)
 	var height := MEGA_HEIGHT + MEGA_GROWTH * (level - 8)
-	_shard(m, foot, height, MEGA_RADIUS, Vector3(0, 0, 0), BRIGHT_CORE if crown else CRYSTAL_SHARD)
+	_shard(m, foot, height, MEGA_RADIUS, Vector3(0, 0, 0), CRYSTAL_SHARD)
 	if crown:
 		# Over the hovering ring: a pulsing core band round the shard under a gold collar.
 		var band := Vector3(0, CROWN_BAND, 0)
@@ -821,6 +838,32 @@ static func _mega_shard(m: LowPolyMesh, level: int, crown: bool) -> void:
 	for k: int in 3:
 		m.orb(0.07, 4, 2, foot + Parts.around(MEGA_RADIUS + 0.12, 30.0 + 120.0 * k, height * (0.4 + 0.05 * k)),
 			CHIP.phased(k / 3.0))
+
+
+## The L10 collector, in its own space about the mega-shard's axis: a hover-bot COLLECTOR_RADIUS
+## out, its nose to its heading, a round hull banded gold with a violet eye, a gold claw under its
+## nose holding a cut shard, glowing and pulsing, and a thruster glowing under its tail; every part
+## bobs together.
+static func _collector(s: LowPolyMesh) -> void:
+	var at := Vector3(COLLECTOR_RADIUS, 0, 0)
+	var z := COLLECTOR_SCALE
+	var heading := Vector3(0, 180.0 if COLLECTOR_RATE > 0.0 else 0.0, 0)
+	s.lathe(PackedVector2Array([
+		Vector2(0, -0.07) * z, Vector2(0.08, -0.07) * z, Vector2(0.12, -0.02) * z, Vector2(0.12, 0.03) * z,
+		Vector2(0.08, 0.075) * z, Vector2(0, 0.085) * z,
+	]), 12, at, COLLECTOR_HULL)
+	s.lathe(PackedVector2Array([Vector2(0.123, -0.015) * z, Vector2(0.123, 0.02) * z]), 12, at, COLLECTOR_GOLD)
+	s.box(Vector3(0.12, 0.035, 0.03) * z, at + LowPolyMesh.turn(Vector3(0, 0.025, 0.1) * z, heading), COLLECTOR_EYE, heading)
+	for side: float in [-1.0, 1.0]:
+		var root := at + LowPolyMesh.turn(Vector3(side * 0.05, -0.05, 0.05) * z, heading)
+		var grip := at + LowPolyMesh.turn(Vector3(side * 0.055, -0.17, 0.05) * z, heading)
+		s.strut(root, grip, 0.025 * z, COLLECTOR_GOLD)
+		s.box(Vector3(0.03, 0.025, 0.025) * z, grip - Vector3(0, 0.0125, 0) * z + LowPolyMesh.turn(Vector3(-side * 0.015, 0, 0) * z,
+			heading), COLLECTOR_GOLD, heading)
+	s.lathe(PackedVector2Array([
+		Vector2(0, -0.09) * z, Vector2(0.045, -0.035) * z, Vector2(0.045, 0.035) * z, Vector2(0, 0.09) * z,
+	]), 6, at + LowPolyMesh.turn(Vector3(0, -0.16, 0.05) * z, heading), COLLECTOR_SHARD)
+	s.disc(0.04 * z, 10, at + LowPolyMesh.turn(Vector3(0, -0.072, -0.05) * z, heading), COLLECTOR_THRUST, Vector3(180, 0, 0))
 
 
 ## A crystal shard: a six-sided column with a pointed tip, tilted, its facets glowing within.
