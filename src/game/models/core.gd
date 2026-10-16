@@ -93,11 +93,18 @@ const CORE_BAND := 0.32
 ## on floor A's roof at MAST_RADIUS instead, and the pylon on the steps at the pad's edge.
 const MAST_RADIUS := 1.55
 const PYLON_RADIUS := 1.75
-## The wing the second comms dish (L6) stands on, across the dome from the first dish's pylon.
+## The wing the second comms dish (L6) stands on, across the dome from the first dish's pylon,
+## and at L10, where it stands still, the way it is aimed (degrees about Y): towards the camera.
 const WING_DISH := 135.0
-## The L10 hover skiff's round: out past the dish pylon, between the dishes' heights.
-const SKIFF_RADIUS := 1.85
-const SKIFF_HEIGHT := 3.0
+const WING_DISH_AIM := -135.0
+## The L10 security bots' round, between the tower's conduits and the dish's pylon, and their
+## heights: one low over floor D, one high under the dome, flying opposite ways.
+const GUARD_RADIUS := 1.39
+const GUARD_LOW := 2.65
+const GUARD_HIGH := 3.4
+## Where the masts stop at L10 (the deck's second 0.06 higher), under the low bot's round, which
+## passes over them.
+const MAST_TOP_CROWN := 2.2
 
 
 ## A broad two-tier stepped foundation under a tall hull-light drum with pilasters and two
@@ -122,10 +129,12 @@ const SKIFF_HEIGHT := 3.0
 ## the dome's gold ring and the spire grown on an obsidian shaft, 5.2; L9 a second mid floor, D,
 ## with a lit band, a second containment ring round it, its current running the other way,
 ## violet arcs from the spire to the dome's gold ring and a station orbiting the hologram, 6.0;
-## L10 gold filigree over the floors, the storeys and the wing caps, filigree banners on the
-## wings, the antimatter core glowing in a glass band at the tower's foot, a crown spire with a
-## hologram beam up to 6.94 and a hover skiff circling the tower as its escort. Each level keeps
-## its height as the floors grow under the tower: its storeys are squeezed (TOWER_STOREYS).
+## L10 gold filigree round the feet of floors B and D and of the storeys and over the wing caps,
+## filigree banners on the wings, the antimatter core glowing in a glass band at the tower's
+## foot, a crown spire with a hologram beam up to 6.94, the wing dish standing still, aimed at
+## the camera, and two security bots circling the tower as its escort, one low and one high,
+## opposite ways. Each level keeps its height as the floors grow under the tower: its storeys are
+## squeezed (TOWER_STOREYS).
 static func build_command_center(p: Parts, level: int) -> void:
 	var m := p.body
 	var gold := p.tier >= Parts.Tier.GOLD
@@ -245,6 +254,8 @@ static func build_command_center(p: Parts, level: int) -> void:
 		var yaw := Vector3(0, 90.0 - degrees, 0)
 		var lamp := (GOLD_MAST_LAMP if gold else MAST_LAMP).phased(0.5 * k)
 		var top := DECK + 0.14 + base_apex - 0.56 + 0.12 * k
+		if level >= 10:
+			top = MAST_TOP_CROWN + 0.06 * k
 		if level < 6:
 			var foot := Parts.around(1.47, degrees, DECK)
 			m.box_chamfered(Vector3(0.18, 0.14, 0.18), 0.04, foot, Parts.HULL_DARK, yaw)
@@ -268,7 +279,7 @@ static func build_command_center(p: Parts, level: int) -> void:
 		var section := Parts.CHROME_ROUND if chrome else Parts.HULL_MID_ROUND
 		m.prism(0.09, 0.075, lift, 16, joint, section)
 		m.ring(0.085, 0.13, 0.07, 16, joint - Vector3(0, 0.035, 0), section)
-	_comms_dish(p.moving(pylon + Vector3(0, 0.16 + pylon_height + lift, 0), Motion.spin(Vector3.UP, 0.8)), gold)
+	_comms_dish(p.moving(pylon + Vector3(0, 0.16 + pylon_height + lift, 0), Motion.spin(Vector3.UP, Parts.DISH_RATE)), gold)
 	if level >= 6:
 		_wing_dish(p, gold)
 	if level >= 8:
@@ -286,7 +297,8 @@ static func build_command_center(p: Parts, level: int) -> void:
 			Parts.arc(m, Parts.around(0.08, degrees, apex + 0.95), Parts.around(1.06, degrees, dome_base + 0.09), 6, 0.06,
 				ARC.phased(k / 4.0))
 	if level >= 10:
-		Parts.escort_skiff(p, SKIFF_RADIUS, SKIFF_HEIGHT, 0.45)
+		Parts.escort_guard(p, GUARD_RADIUS, GUARD_LOW, 0.5)
+		Parts.escort_guard(p, GUARD_RADIUS, GUARD_HIGH, -0.4)
 
 
 ## The hangar door facing the camera: a block off the drum with a roll-up door framed in
@@ -466,7 +478,8 @@ static func _wing(m: LowPolyMesh, degrees: float, level: int, tier: int) -> void
 	if level >= 4:
 		var foot := Parts.around(1.62, degrees, roof.y)
 		m.box_chamfered(Vector3(0.16, 0.1, 0.16), 0.03, foot, Parts.HULL_DARK, yaw)
-		Parts.mast(m, foot + Vector3(0, 0.1, 0), 1.0, 0.07, (GOLD_MAST_LAMP if gold else MAST_LAMP).phased(fposmod(0.25 + degrees / 360.0, 1.0)))
+		var height := MAST_TOP_CROWN - foot.y - 0.1 if level >= 10 else 1.0
+		Parts.mast(m, foot + Vector3(0, 0.1, 0), height, 0.07, (GOLD_MAST_LAMP if gold else MAST_LAMP).phased(fposmod(0.25 + degrees / 360.0, 1.0)))
 	if level >= 6:
 		_wing_cap(m, block, degrees, yaw, level, tier)
 
@@ -503,15 +516,22 @@ static func _wing_cap(m: LowPolyMesh, block: Vector3, degrees: float, yaw: Vecto
 
 
 ## The second comms dish from L6, two thirds the size, on the WING_DISH wing's cap behind its
-## mast, over the floors and the second containment ring, turning the other way on its own pylon.
+## mast, over the floors and the second containment ring, turning the other way on its own pylon;
+## at L10, where the security bots take the moving parts, built into the body lower, its
+## turntable at 1.97, and aimed at the camera: its top (about 2.36) stays 0.16 under the low bot's
+## skirt at rest (2.525) and 0.08 under it at the bob's low point.
 static func _wing_dish(p: Parts, gold: bool) -> void:
 	var m := p.body
 	var yaw := Vector3(0, 90.0 - DOOR_FACING, 0)
 	var foot := Parts.around(1.58, WING_DISH, DECK + 0.9) + LowPolyMesh.turn(Vector3(0, 0, -0.36), yaw)
 	m.box_chamfered(Vector3(0.2, 0.08, 0.2), 0.03, foot, Parts.HULL_DARK, yaw)
-	var height := 2.45 - foot.y - 0.08
+	var height := (1.97 if p.tier >= Parts.Tier.CROWN else 2.45) - foot.y - 0.08
 	m.prism(0.08, 0.06, height, 16, foot + Vector3(0, 0.08, 0), Parts.HULL_MID_ROUND)
-	_comms_dish(p.moving(foot + Vector3(0, 0.08 + height, 0), Motion.spin(Vector3.UP, -0.6)), gold, 0.65)
+	var turntable := foot + Vector3(0, 0.08 + height, 0)
+	if p.tier >= Parts.Tier.CROWN:
+		_comms_dish(m, gold, 0.65, turntable, WING_DISH_AIM)
+	else:
+		_comms_dish(p.moving(turntable, Motion.spin(Vector3.UP, -0.6)), gold, 0.65)
 
 
 ## The ring of rooms round the drum's foot, `radius` round (from L6 grown into floor A): a low
@@ -529,12 +549,15 @@ static func _rooms(m: LowPolyMesh, gold: bool, radius: float, inner: float) -> v
 
 
 ## The comms dish on its turntable, tilted up, with a glowing feed horn; it turns round the pylon.
-## `size` scales it (the L6 wing dish's).
-static func _comms_dish(s: LowPolyMesh, gold: bool, size: float = 1.0) -> void:
-	s.prism(0.16 * size, 0.14 * size, 0.08 * size, 16, Vector3.ZERO, Parts.HULL_DARK_ROUND)
-	s.box_chamfered(Vector3(0.1, 0.22, 0.14) * size, 0.03 * size, Vector3(0, 0.06, 0) * size, Parts.HULL_DARK)
-	var tilt := Vector3(-35, 0, 0)
-	var bowl := Vector3(0, 0.22, 0.04) * size
+## `size` scales it (the L6 wing dish's); `at` and `yaw` (degrees) place and aim it when it is
+## built into the body (the L10 wing dish's).
+static func _comms_dish(s: LowPolyMesh, gold: bool, size: float = 1.0, at: Vector3 = Vector3.ZERO,
+		yaw: float = 0.0) -> void:
+	var turn := Vector3(0, yaw, 0)
+	s.prism(0.16 * size, 0.14 * size, 0.08 * size, 16, at, Parts.HULL_DARK_ROUND)
+	s.box_chamfered(Vector3(0.1, 0.22, 0.14) * size, 0.03 * size, at + Vector3(0, 0.06, 0) * size, Parts.HULL_DARK, turn)
+	var tilt := Vector3(-35, yaw, 0)
+	var bowl := at + LowPolyMesh.turn(Vector3(0, 0.22, 0.04) * size, turn)
 	Parts.dish(s, 0.46 * size, 0.18 * size, bowl, Parts.GOLD_ROUND if gold else Parts.HULL_LIGHT_ROUND, tilt)
 	var axis := LowPolyMesh.turn(Vector3.UP, tilt)
 	s.strut(bowl + axis * 0.05 * size, bowl + axis * 0.38 * size, 0.04 * size, Parts.ROD)
