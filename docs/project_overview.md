@@ -71,7 +71,7 @@ an attack log, revenge and shields.
 | Area | Status | Notes |
 | --- | --- | --- |
 | Catalog and game data | Built | `data/rules.json`, `data/buildings.json`; validated on load; all numbers ints |
-| Building roster | Built | 33 types: the Command Center (levels 1–5) and 32 more in four build-menu categories; metal, crystal and antimatter (from CC 4); one development-scale curve, checked by tests for affordability and for never going down; the build menu has a tab per category |
+| Building roster | Built | 33 types: the Command Center (levels 1–10) and 32 more in four build-menu categories, each with the levels and counts of the upgrade pass's level map (`docs/plans/upgrade-pass.md` §3; a level above a type's modelled top shows its top model); metal, crystal and antimatter (from CC 4); one development-scale curve, checked by tests for affordability and for never going down; the build menu has a tab per category |
 | Base state: place, move, upgrade | Built | Commands through `BaseState.apply`; `check_*` for the UI; error codes |
 | Timers and builders | Built | Construction and upgrade timers; drone bays supply builders; instant builds skip the builder check |
 | Economy | Built | Per-hour integer rates; remainders carried in resource-seconds; storage caps; busy buildings don't produce |

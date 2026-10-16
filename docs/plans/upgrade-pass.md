@@ -36,9 +36,12 @@ from three shared `Parts` helpers (drone, skiff, trooper pair) so they look alik
 
 Implementation: `Parts.tier` (BASE, GOLD, CHROME, OBSIDIAN, CROWN), derived from the level's
 `requires_cc` by one mapping in `BuildingModels`, replaces every per-file `level >= N` gold
-literal. Existing models render identically after the refactor (the gallery's triangle counts
-are the proof), except the two trap tops that were gold at Command Center 4 (Proximity Mine 3,
-Gravity Trap 2), which become Base and get their gold at their new Command Center 5 level.
+literal. The Command Center's tier is set by its own level (its level k requires Command
+Center k−1 by its own rule), every other type's by its level's `requires_cc`. Existing models
+render identically after the refactor (the gallery's triangle counts are the proof), except
+the two trap tops that were gold at Command Center 4 (Proximity Mine 3, Gravity Trap 2), which
+become Base; their next levels (Command Center 6 and 7) are Chrome, so those two types have no
+gold tier.
 
 ## 3. The level map
 
@@ -53,10 +56,10 @@ level requires Command Center 10, so every maxed building is Crown tier.
 | drone_bay | 1,1,1,1,1,2,2,2,2,3 | 2,3,4,5,5,5,5,5,5,5 | 2 |
 | metal_extractor | 1,2,3,4,5,6,7,8,9,10 | 2,3,4,5,6,6,6,7,7,7 | 5 |
 | crystal_harvester | 1,2,3,4,5,6,7,8,9,10 | 2,3,4,5,6,6,6,7,7,7 | 5 |
-| antimatter_siphon | 0,0,0,1,3,4,5,6,7,8 | 0,0,0,1,2,2,3,3,3,3 | 5 |
+| antimatter_siphon | 0,0,0,2,3,4,5,6,7,8 | 0,0,0,1,2,2,3,3,3,3 | 5 |
 | metal_silo | 1,2,3,4,5,6,7,8,9,10 | 1,2,3,4,4,4,4,4,4,4 | 5 |
 | crystal_silo | 1,2,3,4,5,6,7,8,9,10 | 1,2,3,4,4,4,4,4,4,4 | 5 |
-| antimatter_vault | 0,0,0,1,3,4,5,6,7,8 | 0,0,0,1,2,2,2,2,2,2 | 5 |
+| antimatter_vault | 0,0,0,2,3,4,5,6,7,8 | 0,0,0,1,2,2,2,2,2,2 | 5 |
 | hangar | 1,2,3,4,5,6,7,8,9,10 | 1,1,2,2,3,3,4,4,4,4 | 5 |
 | cadet_academy | 1,2,3,4,5,6,7,8,9,10 | 1,2,2,3,4,4,4,4,4,4 | 5 |
 | fabricator | 0,2,3,4,5,6,7,8,9,10 | 0,1,2,2,2,2,3,3,3,3 | 5 |
@@ -78,7 +81,7 @@ level requires Command Center 10, so every maxed building is Crown tier.
 | ion_beam | 0,0,0,0,2,3,3,4,5,6 | 0,0,0,0,1,1,1,2,2,2 | 4 |
 | orbital_cannon | 0,0,0,0,2,2,3,3,4,5 | 0,0,0,0,1,1,1,1,1,1 | 3 |
 | barrier_wall | 1,2,3,4,5,6,7,8,9,10 | 25,50,75,100,150,175,200,225,250,250 | 5 |
-| proximity_mine | 0,2,2,3,3,4,4,5,5,6 | 0,2,4,6,6,6,6,6,6,6 | 3 |
+| proximity_mine | 0,1,2,3,3,4,4,5,5,6 | 0,2,4,6,6,6,6,6,6,6 | 3 |
 | grav_trap | 0,0,1,2,2,2,3,3,4,5 | 0,0,2,4,6,6,6,6,6,6 | 3 |
 | flak_mine | 0,0,0,2,3,3,4,4,4,5 | 0,0,0,2,4,4,4,5,5,5 | 2 |
 | mega_mine | 0,0,0,0,2,3,3,4,4,5 | 0,0,0,0,2,2,3,3,4,4 | 3 |
@@ -121,8 +124,9 @@ Rules, applied by the data brief and checked by the shipped-data tests:
   (Command Center plus silos); antimatter 5k, 10k, 20k, 40k, 80k.
 - Costs rise about ×2.2 per level from today's top values; army and defences metal plus a
   quarter crystal; antimatter on every Crown level (and on Obsidian levels of army, defence
-  and trap types), 1,000–20,000 at the top. Every price fits reachable storage at its level's
-  `requires_cc`.
+  and trap types), 1,000–20,000 at the top. The Barrier Wall pays no antimatter at any level
+  (metal only); traps pay a reduced band, 100–500 on Obsidian levels and 500–2,000 on Crown
+  levels. Every price fits reachable storage at its level's `requires_cc`.
 - The Command Center: levels 6–10 cost 60k/25k, 150k/60k, 350k/150k + 1k antimatter,
   800k/350k + 3k, 2M/800k + 10k (metal/crystal), in 75, 90, 105, 120, 150 minutes.
 - Production per hour continues ×1.4 a level; silo storage ×1.8; vault ×2; Hangar and Beacon
@@ -174,7 +178,7 @@ review, one landing.
   the template framing by band height, the contract text in `art-style.md`.
 - **B2 Economy to ten levels**: the Command Center 6–10, every type's new levels and
   ten-entry `max_count`, the data-format reference (table, curve, reachable storage). Levels
-  above a type's modelled top show its top model until its batch lands.
+  above a type's modelled top show its top model until its batch lands. Landed.
 - **A1 The field** (tier A for the save migration): as §6 decides.
 
 **Phase 2, models, two lanes at a time, in roughly this order** (each batch also writes its
