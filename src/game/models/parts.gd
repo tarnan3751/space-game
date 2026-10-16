@@ -54,6 +54,27 @@ static var HULL_MID_ROUND := Surf.make(MaterialKit.Layer.HULL, MaterialKit.HULL_
 static var HULL_DARK_ROUND := Surf.make(MaterialKit.Layer.HULL, MaterialKit.HULL_DARK, 1.0, Surf.LIT, true)
 static var GOLD_ROUND := Surf.make(MaterialKit.Layer.FLAT, MaterialKit.CORE_GOLD, 1.0, Surf.GLOSSY, true)
 
+## The high tiers' shared surfaces (docs/reference/art-style.md, **Tiers**), named once for every
+## model batch. Chrome: polished plating, pale cyan-white on the chrome layer and glossy, flat and smooth,
+## and its cyan light strips, pulsing. Obsidian: dark glassy armour, flat and smooth, and the
+## violet energy veins running through it (FLOW along V). Crown: gold filigree on the bands layer
+## over the obsidian, and the antimatter core glowing in the body. Gold keeps GOLD_TRIM and
+## GOLD_ROUND. Shared: never change one.
+## Chrome's tint: a cool pale cyan-white, so polished plating parts from the cream hull-light.
+const CHROME_TINT := Color("e6f4ff")
+## Obsidian's tint: a deep ink violet, so the dark layer reads as violet glass, not a void.
+const OBSIDIAN_TINT := Color("8a6ad8")
+## The antimatter core's glow: a saturated violet, so it pops where ANTIMATTER reads pale.
+const CORE_GLOW_TINT := Color("9b5cff")
+static var CHROME := Surf.make(MaterialKit.Layer.CHROME, CHROME_TINT, 1.0, Surf.GLOSSY)
+static var CHROME_ROUND := Surf.make(MaterialKit.Layer.CHROME, CHROME_TINT, 1.0, Surf.GLOSSY, true)
+static var CYAN_STRIP := Surf.make(MaterialKit.Layer.GLOW, MaterialKit.ENERGY, 1.0, Surf.UNLIT | Surf.PULSE, true)
+static var OBSIDIAN := Surf.make(MaterialKit.Layer.OBSIDIAN, OBSIDIAN_TINT, 1.0, Surf.GLOSSY)
+static var OBSIDIAN_ROUND := Surf.make(MaterialKit.Layer.OBSIDIAN, OBSIDIAN_TINT, 1.0, Surf.GLOSSY, true)
+static var VEINS := Surf.make(MaterialKit.Layer.VEINS, MaterialKit.ANTIMATTER, 1.0, Surf.UNLIT | Surf.FLOW, true, true, 0.7)
+static var FILIGREE := Surf.make(MaterialKit.Layer.BANDS, MaterialKit.CORE_GOLD, 2.0, Surf.GLOSSY)
+static var CORE_GLOW := Surf.make(MaterialKit.Layer.GLOW, CORE_GLOW_TINT, 1.0, Surf.UNLIT | Surf.PULSE, true)
+
 static var _surfs: Dictionary[String, Surf] = {}
 
 ## Moving parts a model of `model_tier` may have: three, and at Crown a fourth for its escort.
@@ -309,3 +330,92 @@ static func puffs(m: LowPolyMesh, mouth: Vector3, phase: float, count: int = 3, 
 	for k: int in count:
 		m.orb(0.06 + 0.025 * k, sides, rings, mouth + Vector3(0.02 * k, 0.12 + 0.17 * k, 0),
 			SMOKE.phased(fposmod(phase + 0.3 * k, 1.0)))
+
+
+# --- Escorts: the Crown tier's fourth moving part (docs/reference/art-style.md, **Tiers**) ---
+
+## The escorts' surfaces: the drone's hull, eye and rotor blurs (unlit screen-layer discs whose
+## segments run round, so no hologram surface); the skiff's hull, canopy, engines and glowing
+## underside, all bobbing together; the troopers' army plating, limbs, helmets and visors.
+static var ESCORT_EYE := Surf.make(MaterialKit.Layer.GLOW, MaterialKit.ENERGY, 1.0, Surf.UNLIT, true)
+static var ESCORT_ROTOR := Surf.make(MaterialKit.Layer.SCREEN, MaterialKit.ENERGY, 4.0, Surf.UNLIT | Surf.FLOW_U, false,
+	true, 0.9)
+static var SKIFF_HULL := Surf.make(MaterialKit.Layer.HULL, MaterialKit.HULL_LIGHT, 2.0, Surf.BOB, false, true, 0.3)
+static var SKIFF_CANOPY := Surf.make(MaterialKit.Layer.GLASS, MaterialKit.CORE_GLASS, 1.0, Surf.GLOSSY | Surf.BOB, true,
+	true, 0.3)
+static var SKIFF_ENGINE := Surf.make(MaterialKit.Layer.PLATE, MaterialKit.GUNMETAL, 1.0, Surf.BOB, true, true, 0.3)
+static var SKIFF_GLOW := Surf.make(MaterialKit.Layer.GLOW, MaterialKit.ENERGY, 1.0, Surf.UNLIT | Surf.PULSE | Surf.BOB,
+	true, true, 0.3)
+static var TROOPER_PLATE := Surf.make(MaterialKit.Layer.PLATE, MaterialKit.ARMY, 2.0)
+static var TROOPER_LIMB := Surf.make(MaterialKit.Layer.HULL, MaterialKit.HULL_MID, 2.0)
+static var TROOPER_HELMET := Surf.make(MaterialKit.Layer.HULL, MaterialKit.HULL_LIGHT, 1.0, Surf.LIT, true)
+
+
+## A small quadrotor guard drone, a third the size of the drone bay's, orbiting the footprint's
+## centre `radius` out and `height` up at `rate` radians a second (a spin about +Y), its nose to
+## its heading and its rotors a blur. About 0.12 across from its centre: keep `radius` plus that
+## within the extent. Returns the moving part.
+static func escort_drone(p: Parts, radius: float, height: float, rate: float) -> LowPolyMesh:
+	var s := p.moving(Vector3(0, height, 0), Motion.spin(Vector3.UP, rate))
+	var at := Vector3(radius, 0, 0)
+	var heading := Vector3(0, 180.0 if rate > 0.0 else 0.0, 0)
+	s.lathe(PackedVector2Array([
+		Vector2(0, -0.025), Vector2(0.04, -0.025), Vector2(0.07, -0.008), Vector2(0.065, 0.015), Vector2(0, 0.025),
+	]), 10, at, HULL_LIGHT_ROUND)
+	s.dome(0.03, 0.025, 8, 2, at + Vector3(0, 0.02, 0), GLASS)
+	s.box(Vector3(0.04, 0.018, 0.02), at + LowPolyMesh.turn(Vector3(0, -0.01, 0.065), heading), ESCORT_EYE, heading)
+	for k: int in 4:
+		var degrees := 45.0 + 90.0 * k
+		var hub := at + around(0.1, degrees, 0.005)
+		s.box(Vector3(0.07, 0.016, 0.02), at + around(0.065, degrees, -0.003), HULL_MID, Vector3(0, -degrees, 0))
+		s.disc(0.035, 8, hub, ESCORT_ROTOR.phased(0.9 if k % 2 == 0 else 0.1))
+	return s
+
+
+## A hover skiff patrolling round the footprint's centre `radius` out and `height` up at `rate`
+## radians a second: a chamfered hull with a glass canopy, two engine pods and a glowing
+## underside, bobbing as it flies. About 0.3 from its centre to its engines' ends: keep `radius`
+## plus that within the extent. Returns the moving part.
+static func escort_skiff(p: Parts, radius: float, height: float, rate: float) -> LowPolyMesh:
+	var s := p.moving(Vector3(0, height, 0), Motion.spin(Vector3.UP, rate))
+	var at := Vector3(radius, 0, 0)
+	var heading := Vector3(0, 180.0 if rate > 0.0 else 0.0, 0)
+	s.box(Vector3(0.16, 0.012, 0.3), at + Vector3(0, -0.012, 0), SKIFF_GLOW, heading)
+	s.box_chamfered(Vector3(0.18, 0.07, 0.34), 0.025, at, SKIFF_HULL, heading)
+	s.dome(0.06, 0.05, 10, 3, at + LowPolyMesh.turn(Vector3(0, 0.07, 0.04), heading), SKIFF_CANOPY)
+	for side: float in [-1.0, 1.0]:
+		var pod := at + LowPolyMesh.turn(Vector3(side * 0.11, 0.02, -0.14), heading)
+		s.prism(0.035, 0.03, 0.14, 10, pod, SKIFF_ENGINE, heading + Vector3(-90, 0, 0))
+		s.disc(0.028, 10, pod + LowPolyMesh.turn(Vector3(0, 0, -0.141), heading), SKIFF_GLOW, heading + Vector3(-90, 0, 0))
+	return s
+
+
+## Two troopers in the cadets' proportions, army plating over their limbs, marching a round about
+## the footprint's centre `radius` out at `height` (their feet) at `rate` radians a second, the
+## second a pace behind the first. About 0.1 across from each one's centre: keep `radius` plus
+## that within the extent. Returns the moving part.
+static func escort_troopers(p: Parts, radius: float, height: float, rate: float) -> LowPolyMesh:
+	var s := p.moving(Vector3(0, height, 0), Motion.spin(Vector3.UP, rate))
+	for k: int in 2:
+		# The second trooper walks 0.3 units behind the first along the round.
+		var behind := 0.3 / radius * k * (1.0 if rate > 0.0 else -1.0)
+		var at := around(radius, rad_to_deg(behind), 0.0)
+		var heading := Vector3(0, rad_to_deg(-behind) + (180.0 if rate > 0.0 else 0.0), 0)
+		_trooper(s, at, heading)
+	return s
+
+
+## One solid trooper standing at `foot`, facing `heading`: legs, an armoured torso, arms, a
+## helmet with a glowing visor and a rifle carried across the chest.
+static func _trooper(s: LowPolyMesh, foot: Vector3, heading: Vector3) -> void:
+	const K := 0.9
+	for side: float in [-1.0, 1.0]:
+		s.box(Vector3(0.07, 0.2, 0.08) * K, foot + LowPolyMesh.turn(Vector3(side * 0.045, 0, 0) * K, heading), TROOPER_LIMB,
+			heading)
+		s.box(Vector3(0.055, 0.18, 0.065) * K, foot + LowPolyMesh.turn(Vector3(side * 0.135, 0.2, 0) * K, heading),
+			TROOPER_LIMB, heading)
+	s.box_chamfered(Vector3(0.2, 0.2, 0.12) * K, 0.02, foot + Vector3(0, 0.2, 0) * K, TROOPER_PLATE, heading)
+	s.dome(0.075 * K, 0.1 * K, 8, 3, foot + Vector3(0, 0.4, 0) * K, TROOPER_HELMET)
+	s.box(Vector3(0.1, 0.025, 0.02) * K, foot + LowPolyMesh.turn(Vector3(0, 0.44, 0.07) * K, heading), ESCORT_EYE, heading)
+	s.box(Vector3(0.22, 0.03, 0.03) * K, foot + LowPolyMesh.turn(Vector3(0, 0.3, 0.08) * K, heading), GUNMETAL,
+		heading + Vector3(0, 70, 0))

@@ -190,6 +190,18 @@ a second and ten frames, screenshots it at 0.0, 0.3 and 0.9 seconds, and checks 
 region of the screen (1.5 units square round it) changed between the first two shots, or between
 any two for the flickering parts, which can be off in two shots.
 
+`scenarios/kit_swatches.gd` is the tiers' reference (`docs/reference/art-style.md`, **Tiers**):
+on the field, the base's own views hidden, a row of ten swatches across the screen, each a
+chamfered cube and a drum beside it (the surface's smooth version where it has one), in the order
+Base hull-light, plate, gunmetal, gold trim, chrome, cyan strip, obsidian, veins, filigree, core
+glow, and before them a 3x3 pad with the three escorts (`Parts.escort_drone`, `escort_skiff`,
+`escort_troopers`) orbiting it, which the scenario moves itself as the effects rig does. It logs
+each swatch by index with its layer and flags and checks that every swatch's layer is within the
+kit, that each escort is at most 300 body triangles and reaches no further round the pad than
+its extent (1.65), and that the escorts move. Rendered, it frames the row and the pad at the
+closest zoom (camera size 10) and screenshots them, then again a second later, so FLOW, PULSE and
+the orbits show.
+
 `scenarios/view_states.gd` checks the comic style's view states on a fresh base, each with a
 close-up screenshot: the selected Command Center's outlines in gold (and the override cleared on
 deselecting), the placement ghost's body tinted valid on a free spot and invalid on the Command

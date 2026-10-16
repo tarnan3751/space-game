@@ -1,5 +1,5 @@
 extends SceneTree
-## Draws the material kit: the 17 layers of the Texture2DArray every building and the rocks are
+## Draws the material kit: the 20 layers of the Texture2DArray every building and the rocks are
 ## painted from (docs/reference/art-style.md, **The material kit**), saved as
 ## assets/textures/kit/<index>_<name>.png; the field texture the buildable ground and the terrain's
 ## marks are drawn from, assets/textures/field.png (**The field**); and the rock texture the
@@ -70,9 +70,10 @@ const ROCK_PLATES := Vector2i(2, 3)
 const LAYERS := [
 	"flat", "hull", "hull_dense", "plate", "vent", "pipe", "grating", "concrete",
 	"hazard", "solar", "glass", "glow", "screen", "crystal", "rock", "regolith", "bands",
+	"chrome", "obsidian", "veins",
 ]
-## The field's and the rock texture's seeds, fixed where the sixteen layers left them so a new
-## layer does not redraw them.
+## The field's and the rock texture's seeds, fixed where the first sixteen layers left them so a
+## new layer does not redraw them.
 const FIELD_SEED := SEED + 16
 const ROCK_SEED := SEED + 17
 const INK := Color("1b1a2e")
@@ -413,6 +414,121 @@ func _draw_regolith() -> void:
 		_disc(spot - SUN * radius * 0.55, radius * 0.9, _grey(0.78))
 		_disc(spot, radius, _grey(0.88))
 		_disc(spot + SUN * radius * 0.3, radius * 0.5, _grey(1.0))
+
+
+## Polished chrome plating: near-white plates brushed in streaks along U, in bands two to four
+## pixels high from 0.86 to 1.0 with strokes of white and of 0.76 over them, so the brushing shows at
+## the closest zoom; a lit chamfer along each plate's top edge and a shaded one along its bottom,
+## parted by ink seams, no rivets. Tinted pale cyan-white and GLOSSY, it reads polished.
+func _draw_chrome() -> void:
+	_fill(_grey(0.9))
+	var top := 0
+	while top < SIZE:
+		var band := _rng.range_int(2, 4)
+		_rect(0, top, SIZE, band, _grey(0.86 + _rng.range_int(0, 14) / 100.0))
+		top += band
+	# Brushed strokes along U over the bands, half of them bright, half dark.
+	for i: int in 260:
+		var at := Vector2(_rng.range_int(0, SIZE - 1), _rng.range_int(0, SIZE - 1))
+		var light := _rng.range_int(0, 2) == 0
+		_line(at, at + Vector2(_rng.range_int(24, 110), 0), 1.5, _grey(1.0 if light else 0.76))
+	# Two rows of plates, the lower row's seams staggered.
+	for row: int in 2:
+		var y := row * 128
+		_rect(0, y + 2, SIZE, 4, _grey(1.0))
+		_rect(0, y + 122, SIZE, 4, _grey(0.76))
+		_line(Vector2(0, y), Vector2(SIZE, y), INK_WIDTH, INK)
+		for x: int in [0, 160] if row == 0 else [64, 192]:
+			_line(Vector2(x, y), Vector2(x, y + 128), INK_WIDTH, INK)
+			_rect(x + 2, y + 2, 3, 124, _grey(1.0))
+	_grain(0.01, 1)
+
+
+## Obsidian armour: a dark glassy ground (about 0.38, so a tint stays dark) in large faint facets
+## (a wrapped Voronoi diagram, each facet a tone of its own, a pale glint along the edge facing the
+## light), parted by hairline ink cracks. GLOSSY, it reads as volcanic glass.
+func _draw_obsidian() -> void:
+	var seeds := PackedVector2Array()
+	var tones := PackedFloat32Array()
+	for gy: int in 3:
+		for gx: int in 3:
+			seeds.append(Vector2(gx * 85 + _rng.range_int(10, 75), gy * 85 + _rng.range_int(10, 75)))
+			tones.append(0.32 + _rng.range_int(0, 12) / 100.0)
+	for y: int in SIZE:
+		for x: int in SIZE:
+			var p := Vector2(x + 0.5, y + 0.5)
+			var nearest := 0
+			var second := 0
+			var best := INF
+			var next := INF
+			for s: int in seeds.size():
+				var distance := _wrapped(seeds[s] - p).length_squared()
+				if distance < best:
+					next = best
+					second = nearest
+					best = distance
+					nearest = s
+				elif distance < next:
+					next = distance
+					second = s
+			var to_near := _wrapped(seeds[nearest] - p)
+			var to_second := _wrapped(seeds[second] - p)
+			# Distance from p to the bisector between the two nearest seeds.
+			var edge := (to_second.length_squared() - to_near.length_squared()) / (2.0 * (to_second - to_near).length())
+			var glint := 0.18 * clampf(1.0 - absf(edge - 4.0) / 3.0, 0.0, 1.0) * clampf(-to_near.dot(SUN) / 40.0, 0.0, 1.0)
+			var tone := tones[nearest] + glint
+			_rgb[y * SIZE + x] = _grey(tone).lerp(INK, clampf(1.5 - edge, 0.0, 1.0))
+	_grain(0.015, 1)
+	for i: int in 5:
+		_crack(Vector2(_rng.range_int(0, SIZE - 1), _rng.range_int(0, SIZE - 1)), _rng.range_int(3, 6), 1.0, INK,
+			Vector2i(8, 18))
+
+
+## Energy veins: a dark ground (about 0.35) with bright branching channels running along V, the
+## axis FLOW scrolls, their emission (A) beaded with pulses a quarter of the repeat apart, so a FLOW
+## surface on it reads as energy running through the veins; the ground does not glow.
+func _draw_veins() -> void:
+	_fill(_grey(0.35))
+	_grain(0.03, 32)
+	# Every run as (from, to, width), its ink rims drawn under all the cores so joints stay open.
+	var runs: Array[Array] = []
+	for trunk: int in 4:
+		var at := Vector2(trunk * 64 + _rng.range_int(8, 56), 0)
+		var points := PackedVector2Array([at])
+		# A trunk meanders down the whole repeat and ends where it began, so it tiles.
+		var start_x := at.x
+		for step: int in 8:
+			var y := 32.0 * (step + 1)
+			var x := start_x if step == 7 else points[step].x + _rng.range_int(-14, 14)
+			points.append(Vector2(x, y))
+		for k: int in points.size() - 1:
+			runs.append([points[k], points[k + 1], 5.0])
+		# Two branches setting off down and to the side, thinner, ending in the ground.
+		for b: int in 2:
+			var from := points[_rng.range_int(1, 6)]
+			var side := -1.0 if b == 0 else 1.0
+			var mid := from + Vector2(side * _rng.range_int(10, 20), _rng.range_int(16, 26))
+			runs.append([from, mid, 3.0])
+			runs.append([mid, mid + Vector2(side * _rng.range_int(4, 12), _rng.range_int(14, 22)), 2.0])
+	for run: Array in runs:
+		var width: float = run[2]
+		_line(run[0], run[1], width + 2.0, INK)
+	for run: Array in runs:
+		_vein(run[0], run[1], run[2])
+
+
+## The core of one straight run of a vein from `from` to `to`, `width` across: bright, its emission
+## beaded along V with a pulse every 64 pixels (four a repeat).
+func _vein(from: Vector2, to: Vector2, width: float) -> void:
+	var half := width * 0.5
+	var low := Vector2(minf(from.x, to.x), minf(from.y, to.y)) - Vector2(half + 1, half + 1)
+	var high := Vector2(maxf(from.x, to.x), maxf(from.y, to.y)) + Vector2(half + 1, half + 1)
+	for py: int in range(floori(low.y), ceili(high.y)):
+		for px: int in range(floori(low.x), ceili(high.x)):
+			var p := Vector2(px + 0.5, py + 0.5)
+			var d := p.distance_to(Geometry2D.get_closest_point_to_segment(p, from, to))
+			var bead := 0.5 + 0.5 * cos(TAU * fposmod(p.y, 64.0) / 64.0)
+			_paint(px, py, _grey(lerpf(0.8, 1.0, bead)), half + 0.5 - d, lerpf(0.45, 1.0, bead))
 
 
 ## Broad bands across V for a flow to carry: each repeat a band a third of it at 1.0 on 0.62,

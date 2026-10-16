@@ -22,7 +22,7 @@ camera and the views' wiring are in `input-camera.md`.
 | `src/game/base_view.gd` | builds the ground, the perimeter, the terrain ring, the rocks and the outcrops (**Environment**) |
 | `src/game/building_models.gd`, `src/game/models/` | the dispatcher and one model file per category, `Parts` in `models/parts.gd` |
 | `src/game/construction_drone.gd`, `src/game/models/drone.gd` | the builder drone over a busy site, its flight and its laser (**Construction drone**) |
-| `assets/textures/kit/` | the seventeen layers, committed PNGs |
+| `assets/textures/kit/` | the twenty layers, committed PNGs |
 | `assets/textures/field.png` | the field texture, a committed PNG |
 | `assets/textures/terrain_rock.png` | the terrain's rock texture, a committed PNG |
 | `tools/gen_textures.gd` | the generator that draws them |
@@ -236,8 +236,8 @@ pylons `HULL_MID` with `ENERGY` lamps and `HAZARD` beacons, its fence `ENERGY`; 
 
 ## The material kit
 
-One `Texture2DArray` of seventeen 256×256 RGBA8 layers. RGB is the albedo: near-white greys (0.78
-to 1.0; the bands layer's ground is 0.62) with ink-coloured lines for the layers a tint multiplies, real colours for the fixed ones,
+One `Texture2DArray` of twenty 256×256 RGBA8 layers. RGB is the albedo: near-white greys (0.78
+to 1.0; the bands layer's ground is 0.62, the obsidian's about 0.38 and the veins' 0.35) with ink-coloured lines for the layers a tint multiplies, real colours for the fixed ones,
 which are tinted white. A is the emission mask. Ink lines are about 3 px; rivets are 5 px discs
 with a 1 px highlight. Every layer tiles seamlessly.
 
@@ -260,6 +260,9 @@ with a 1 px highlight. Every layer tiles seamlessly.
 | 14 | `rock` | four big plates in three tones with faint seams, three bold ink cracks | yes |
 | 15 | `regolith` | dust: large soft blobs in two tones, two pebbles, no ink (unused since the terrain took its own shader) | yes |
 | 16 | `bands` | a broad band across V, a third of the repeat, at 1.0 on 0.62 (darker than the other layers' greys, so the band reads as a pulse), ink-edged on its leading side (towards smaller V, where a FLOW below 0.5 carries it); emission 1.0. For a beam or a conduit, where a flow reads as pulses travelling | yes |
+| 17 | `chrome` | polished plating: near-white (about 0.9) plates brushed in fine streaks along U, a lit chamfer along each plate's top and a shaded one along its bottom, ink seams, no rivets. GLOSSY, tinted white or pale cyan (`Parts.CHROME`) | yes |
+| 18 | `obsidian` | dark glassy armour (about 0.38, so a tint stays dark): large faint facets, each a tone of its own with a pale glint along its edge towards the light, hairline ink cracks. GLOSSY (`Parts.OBSIDIAN`) | yes |
+| 19 | `veins` | a dark ground (0.35) with bright branching channels running along V, ink-rimmed, their emission beaded with a pulse every quarter of the repeat, so a FLOW surface on it reads as energy running through the veins (`Parts.VEINS`); the ground does not glow | yes |
 
 At the default UV scale a layer covers one world unit. Large surfaces take `hull` or `plate`:
 `hull_dense` is for parts under a unit, and on a large one it aliases into a checker at the widest
@@ -407,6 +410,38 @@ rings hull-mid casing there (the Drone Bay gains its gold again at its top level
 The Command Center's gold ring round its dome is its signature at every level, not tier trim.
 Meshes are cached by type, level and tier, so a level above a type's modelled top, which shows
 its top model, is painted for its own tier.
+
+**The style at every tier** (`docs/plans/upgrade-pass.md`, §2a): every level is drawn in the
+comic style above, chunky readable masses, a few big shapes before many small ones, bold
+saturated accents, ink outlines and glows that pop. The tiers change the palette, never the
+style: **Chrome** is bright white with a cool cyan cast and cyan light strips, never grey or dull;
+**Obsidian** is ink-black glass kept vibrant by saturated violet veins, bright glints and gold or
+cyan accents, at least a third of a model's visible surface bright or glowing, never a muddy or
+realistic metal; **Crown** is the loudest, gold filigree, a violet core, a crown and an escort,
+bigger and bolder than anything below it. A level that reads grim, grey, realistic or cluttered
+fails its review whatever its budgets say; the rendered gallery shots are judged for this first.
+
+The shared elements are named once on `Parts`, for every model batch:
+
+| Tier | Surface or helper | What |
+| --- | --- | --- |
+| Gold | `GOLD_TRIM`, `GOLD_ROUND` | core gold on the flat layer, glossy; flat and smooth |
+| Chrome | `CHROME`, `CHROME_ROUND` | the chrome layer in `CHROME_TINT` (`E6F4FF`, a cool pale cyan-white, so it parts from the cream hull-light), glossy; flat and smooth |
+| Chrome | `CYAN_STRIP` | the glow layer in `ENERGY` cyan, unlit, PULSE: light strips |
+| Obsidian | `OBSIDIAN`, `OBSIDIAN_ROUND` | the obsidian layer in `OBSIDIAN_TINT` (`8A6AD8`, a deep ink violet, so it reads as dark violet glass), glossy; flat and smooth |
+| Obsidian | `VEINS` | the veins layer in `ANTIMATTER` violet, unlit, FLOW at 0.7: energy running through veins |
+| Crown | `FILIGREE` | the bands layer in core gold at 2 repeats a unit, glossy: gold filigree over the obsidian |
+| Crown | `CORE_GLOW` | the glow layer in `CORE_GLOW_TINT` (`9B5CFF`, a saturated violet), unlit, PULSE: the antimatter core |
+| Crown | `escort_drone(p, radius, height, rate)` | a small quadrotor guard drone, a third the size of the drone bay's (about 0.12 across from its centre), its rotors unlit screen-layer blurs (FLOW_U, no hologram surface): 166 body triangles |
+| Crown | `escort_skiff(p, radius, height, rate)` | a hover skiff: a chamfered hull, a glass canopy, two engine pods and a glowing underside (PULSE), every part bobbing together (about 0.3 from its centre to its engines' ends): 170 |
+| Crown | `escort_troopers(p, radius, height, rate)` | two solid troopers in the cadets' proportions, army orange plating, a hull-light helmet with an `ENERGY` visor and a rifle, one 0.3 behind the other on the round (each about 0.1 across from its centre): 260 |
+
+Each escort is a moving part built in its own space, the Crown tier's fourth: it spins about +Y
+through the footprint's centre at `rate` radians a second, its figure `radius` out and `height`
+up, facing its heading, and is at most 300 body triangles. A caller keeps `radius` plus the
+figure's reach within the extent. The `kit_swatches` harness scenario (`tools/harness/README.md`)
+shows every tier surface on a cube and a drum in a row, and the three escorts orbiting a 3×3 pad:
+the batches' reference.
 
 ### Shared shapes
 
@@ -1079,8 +1114,8 @@ and 0.4 to 0.7 ms on page 2); it
 does not move with the shadow's filter (0, 2 or 4 measure the same within that noise), since PCF
 costs on the GPU: 13 shadow taps a fragment near a shadow edge (fewer where the first taps
 agree), and the penumbra's dot screen a few more instructions in `light()`. The shadow map,
-1024² at 16 bits, is 2 MB. The kit's texture array, seventeen 256×256 RGBA8 layers, is about 5.7
-MB with its mipmaps; the field texture, one 1024×1024 RGBA8 image, is about 5.3 MB with its
+1024² at 16 bits, is 2 MB. The kit's texture array, twenty 256×256 RGBA8 layers, is about 6.7
+MB with its mipmaps (5.7 with seventeen); the field texture, one 1024×1024 RGBA8 image, is about 5.3 MB with its
 mipmaps too, and the ground and the terrain share it; the terrain's rock texture, one 512×512
 RGBA8 image, is about 1.4 MB with its mipmaps. The terrain's shader has two samplers (the field
 texture and the rock texture) and takes three texture reads a fragment (the field's marks and
