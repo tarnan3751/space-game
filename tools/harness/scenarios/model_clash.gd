@@ -1,0 +1,341 @@
+extends HarnessScenario
+## The clash rule's check (docs/reference/art-style.md, **The clash rule**): no moving part of a
+## model crosses another over its whole motion, rigid and with BOB applied. Headless; it takes no
+## screenshots.
+##
+## For every type and level in the catalog, built for its level's tier (BuildingModels.tier_of) as
+## the gallery builds it, each moving part (a node carrying BuildingModels.MOVE_META) and the
+## static body are read back from their meshes, every surface, holograms included, in the model's
+## own space. Two parts cross when an edge of one's triangles crosses a triangle of the other
+## (Geometry3D.segment_intersects_triangle), tested only inside the overlap of their posed bounds
+## and through a spatial hash of CELL-sized cells.
+##
+## - Every pair of moving parts is posed together on the clock, as BuildingView poses them
+##   (Motion.transform_at): sampled every pair step (the smaller part's step: a SPIN's
+##   SPIN_STEP degrees, a SWING's period over SWING_SAMPLES, a SLIDE's over SLIDE_SAMPLES) over the
+##   longer part's cycle, or the turn of one SPIN against another about a parallel axis, at most
+##   PAIR_WINDOW seconds. Any crossing fails the model.
+## - Every moving part against the static body: a SPIN every SPIN_STEP degrees, a SWING at
+##   SWING_POSES poses from -amplitude to +amplitude, a SLIDE at SLIDE_POSES. Counted per part as
+##   the poses at which it touches the body, never failed: a built-in mount (a pivot sunk in the
+##   body) is the one allowed contact, and telling a mount from a clash is the review's judgment.
+## - A second pass with BOB applied, where either side has BOB vertices: each such vertex lifted
+##   along Y by BOB_HEIGHT * sin(TAU * (t / BOB_PERIOD + phase)), as effects.gdshaderinc lifts it
+##   (its flag the bit Surf.BOB of UV2.y, its phase round(alpha * 255) / 254 of the vertex
+##   colour), on the clock with the parts' poses, at least BOB_SAMPLES samples a BOB period over
+##   at least one. Pairs fail on a crossing; the body's are counted.
+##
+## Each model with moving parts gets one line: its parts and motions, its pair crossings and its
+## poses touching the body per part.
+
+## Degrees a SPIN turns between samples.
+const SPIN_STEP := 10.0
+## Poses of a SWING and of a SLIDE against the body, both ends included.
+const SWING_POSES := 9
+const SLIDE_POSES := 5
+## Samples a cycle of a SWING and of a SLIDE on the clock (a SMOOTH swing's 16 give nine poses).
+const SWING_SAMPLES := 16
+const SLIDE_SAMPLES := 8
+## The longest stretch of the clock a pair is sampled over, in seconds.
+const PAIR_WINDOW := 60.0
+## As effects.gdshaderinc: BOB's lift and period.
+const BOB_HEIGHT := 0.08
+const BOB_PERIOD := 2.4
+const BOB_SAMPLES := 8
+## The spatial hash's cell, in model units, and the slack round an overlap.
+const CELL := 0.25
+const SLACK := 0.001
+
+
+## A part read back from its mesh: its triangles' corners (three a triangle) in its own space,
+## its distinct edges as pairs of corner indices, the corners that BOB with their phases.
+class Shape:
+	var points := PackedVector3Array()
+	var edges := PackedInt32Array()
+	var bob := PackedInt32Array()
+	var phases := PackedFloat32Array()
+	var box := AABB()
+	var motion: Motion
+	var pivot := Vector3.ZERO
+
+
+## Where the last crossing _edges_cross found is, in the model's space.
+var _hit := Vector3.ZERO
+
+
+func run(main: MainScript) -> void:
+	var catalog: Catalog = main.state.catalog
+	var models := 0
+	var moving := 0
+	var pairs := 0
+	var crossings := 0
+	for type: String in catalog.types():
+		for level: int in range(1, catalog.max_level(type) + 1):
+			var tier := BuildingModels.tier_of(catalog, type, level)
+			var model := BuildingModels.create(type, level, catalog.size_of(type), tier)
+			var lift := BOB_HEIGHT / model.scale.y
+			var body := Shape.new()
+			var parts: Array[Shape] = []
+			for child: Node in model.get_children():
+				if child is MeshInstance3D and not child.has_meta(BuildingModels.OUTLINE_META):
+					_read((child as MeshInstance3D).mesh, body)
+				elif child.has_meta(BuildingModels.MOVE_META):
+					var part := Shape.new()
+					part.motion = child.get_meta(BuildingModels.MOVE_META)
+					part.pivot = (child as Node3D).position
+					for grandchild: Node in child.get_children():
+						if grandchild is MeshInstance3D and not grandchild.has_meta(BuildingModels.OUTLINE_META):
+							_read((grandchild as MeshInstance3D).mesh, part)
+					parts.append(part)
+			model.free()
+			models += 1
+			if parts.is_empty():
+				continue
+			moving += parts.size()
+			var pair_hits := PackedStringArray()
+			for i: int in parts.size():
+				for j: int in range(i + 1, parts.size()):
+					pairs += 1
+					var at := _pair_crossing(parts[i], parts[j], 0.0)
+					var with_bob := ""
+					if at < 0.0 and (not parts[i].bob.is_empty() or not parts[j].bob.is_empty()):
+						at = _pair_crossing(parts[i], parts[j], lift)
+						with_bob = " with BOB"
+					if at >= 0.0:
+						pair_hits.append("parts %d and %d at %.2f s%s, at %s" % [i + 1, j + 1, at, with_bob, _hit])
+			crossings += pair_hits.size()
+			var touching := PackedStringArray()
+			var motions := PackedStringArray()
+			for i: int in parts.size():
+				motions.append("%d %s" % [i + 1, str(Motion.Kind.keys()[parts[i].motion.kind]).to_lower()])
+				touching.append("%d %s" % [i + 1, _body_contact(parts[i], body, lift)])
+			check(pair_hits.is_empty(), "%s %d: %d moving part(s) (%s), %s; against the body: %s" % [type,
+				level, parts.size(), ", ".join(motions), "no pair crossing" if pair_hits.is_empty()
+				else "pairs crossing: " + ", ".join(pair_hits), ", ".join(touching)])
+	say("%d models, %d moving parts, %d pairs, %d crossing" % [models, moving, pairs, crossings])
+
+
+## Adds a mesh's triangles, every surface, to `shape`, with its distinct edges and its BOB corners.
+func _read(mesh: Mesh, shape: Shape) -> void:
+	var seen := {}
+	for surface: int in mesh.get_surface_count():
+		var arrays := mesh.surface_get_arrays(surface)
+		var vertices: PackedVector3Array = arrays[Mesh.ARRAY_VERTEX]
+		var uv2s: PackedVector2Array = arrays[Mesh.ARRAY_TEX_UV2]
+		var colours: PackedColorArray = arrays[Mesh.ARRAY_COLOR]
+		var base := shape.points.size()
+		shape.points.append_array(vertices)
+		for k: int in vertices.size():
+			if (roundi(uv2s[k].y) & Surf.BOB) != 0:
+				shape.bob.append(base + k)
+				shape.phases.append(roundf(colours[k].a * 255.0) / 254.0)
+		for k: int in range(0, vertices.size(), 3):
+			# A bobbing triangle's edges stay apart from a still one's along the same corners.
+			var bobs := (roundi(uv2s[k].y) & Surf.BOB) != 0
+			for side: int in 3:
+				var a := base + k + side
+				var b := base + k + (side + 1) % 3
+				var key := [shape.points[a], shape.points[b], bobs] if _before(shape.points[a], shape.points[b]) \
+					else [shape.points[b], shape.points[a], bobs]
+				if not seen.has(key):
+					seen[key] = true
+					shape.edges.append(a)
+					shape.edges.append(b)
+	shape.box = AABB(shape.points[0], Vector3.ZERO)
+	for point: Vector3 in shape.points:
+		shape.box = shape.box.expand(point)
+
+
+func _before(a: Vector3, b: Vector3) -> bool:
+	return a.x < b.x or (a.x == b.x and (a.y < b.y or (a.y == b.y and a.z < b.z)))
+
+
+## The first sampled time at which two moving parts cross on the clock, with BOB's `lift` (0 for
+## the rigid pass), or -1.
+func _pair_crossing(a: Shape, b: Shape, lift: float) -> float:
+	var step := minf(_step(a.motion), _step(b.motion))
+	var window := maxf(_cycle(a.motion), _cycle(b.motion))
+	if a.motion.kind == Motion.Kind.SPIN and b.motion.kind == Motion.Kind.SPIN \
+			and absf(a.motion.axis.dot(b.motion.axis)) > 0.999:
+		var relative := absf(a.motion.rate * a.motion.axis.dot(b.motion.axis) - b.motion.rate)
+		if relative > 0.0001:
+			window = maxf(window, TAU / relative)
+	if lift > 0.0:
+		step = minf(step, BOB_PERIOD / BOB_SAMPLES)
+		window = maxf(window, BOB_PERIOD)
+	window = minf(window, PAIR_WINDOW)
+	for k: int in ceili(window / step) + 1:
+		var t := k * step
+		var at_a := a.motion.transform_at(t, a.pivot)
+		var at_b := b.motion.transform_at(t, b.pivot)
+		var box_a := (at_a * a.box).grow(lift + SLACK)
+		var box_b := (at_b * b.box).grow(lift + SLACK)
+		if not box_a.intersects(box_b):
+			continue
+		if _crosses(_posed(a, at_a, t, lift), a.edges, _posed(b, at_b, t, lift), b.edges,
+				box_a.intersection(box_b)):
+			return t
+	return -1.0
+
+
+## How many of a moving part's poses touch the static body, rigid, and with BOB where either side
+## has it: "a of n" or "a of n, b of m with BOB".
+func _body_contact(part: Shape, body: Shape, lift: float) -> String:
+	var poses := _poses(part.motion, part.pivot)
+	var swept := AABB()
+	for k: int in poses.size():
+		swept = (poses[k] * part.box) if k == 0 else swept.merge(poses[k] * part.box)
+	var near := _within(body, swept.grow(2.0 * lift + SLACK))
+	var rigid := 0
+	for at: Transform3D in poses:
+		if not near.edges.is_empty() and _crosses(_posed(part, at, 0.0, 0.0), part.edges, near.points, near.edges,
+				(at * part.box).grow(SLACK)):
+			rigid += 1
+	if part.bob.is_empty() and near.bob.is_empty():
+		return "%d of %d" % [rigid, poses.size()]
+	var step := minf(_step(part.motion), BOB_PERIOD / BOB_SAMPLES)
+	var count := ceili(maxf(_cycle(part.motion), BOB_PERIOD) / step) + 1
+	var bobbing := 0
+	for k: int in count:
+		var t := k * step
+		var at := part.motion.transform_at(t, part.pivot)
+		if not near.edges.is_empty() and _crosses(_posed(part, at, t, lift), part.edges,
+				_posed(near, Transform3D.IDENTITY, t, lift), near.edges, (at * part.box).grow(lift + SLACK)):
+			bobbing += 1
+	return "%d of %d, %d of %d with BOB" % [rigid, poses.size(), bobbing, count]
+
+
+## The body's triangles whose bounds meet `region`, as a shape of their own.
+func _within(body: Shape, region: AABB) -> Shape:
+	var near := Shape.new()
+	var bobbing := {}
+	for k: int in body.bob.size():
+		bobbing[body.bob[k]] = body.phases[k]
+	var seen := {}
+	for k: int in range(0, body.points.size(), 3):
+		var box := AABB(body.points[k], Vector3.ZERO).expand(body.points[k + 1]).expand(body.points[k + 2])
+		if not box.grow(SLACK).intersects(region):
+			continue
+		var base := near.points.size()
+		for corner: int in 3:
+			near.points.append(body.points[k + corner])
+			if bobbing.has(k + corner):
+				near.bob.append(base + corner)
+				near.phases.append(bobbing[k + corner])
+		for side: int in 3:
+			var a := base + side
+			var b := base + (side + 1) % 3
+			var key := [near.points[a], near.points[b], bobbing.has(k)] if _before(near.points[a], near.points[b]) \
+				else [near.points[b], near.points[a], bobbing.has(k)]
+			if not seen.has(key):
+				seen[key] = true
+				near.edges.append(a)
+				near.edges.append(b)
+	return near
+
+
+## A part's poses against the body: a SPIN every SPIN_STEP degrees round a whole turn, a SWING at
+## SWING_POSES and a SLIDE at SLIDE_POSES from -amplitude to +amplitude.
+func _poses(motion: Motion, pivot: Vector3) -> Array[Transform3D]:
+	var poses: Array[Transform3D] = []
+	match motion.kind:
+		Motion.Kind.SPIN:
+			for k: int in roundi(360.0 / SPIN_STEP):
+				poses.append(Transform3D(Basis(motion.axis, deg_to_rad(SPIN_STEP * k)), pivot))
+		Motion.Kind.SWING:
+			for k: int in SWING_POSES:
+				var angle := deg_to_rad(motion.amplitude) * (2.0 * k / (SWING_POSES - 1) - 1.0)
+				poses.append(Transform3D(Basis(motion.axis, angle), pivot))
+		_:
+			for k: int in SLIDE_POSES:
+				poses.append(Transform3D(Basis.IDENTITY,
+					pivot + motion.axis * motion.amplitude * (2.0 * k / (SLIDE_POSES - 1) - 1.0)))
+	return poses
+
+
+## Seconds between a part's samples on the clock.
+func _step(motion: Motion) -> float:
+	match motion.kind:
+		Motion.Kind.SPIN:
+			return deg_to_rad(SPIN_STEP) / maxf(absf(motion.rate), 0.0001)
+		Motion.Kind.SWING:
+			return motion.period / SWING_SAMPLES
+		_:
+			return motion.period / SLIDE_SAMPLES
+
+
+## Seconds a part takes to come back to a pose: a SPIN's turn, a SWING's or a SLIDE's period.
+func _cycle(motion: Motion) -> float:
+	if motion.kind == Motion.Kind.SPIN:
+		return minf(TAU / maxf(absf(motion.rate), 0.0001), PAIR_WINDOW)
+	return motion.period
+
+
+## A shape's corners placed by `at`, each BOB corner lifted along Y at time `t` (no lift when
+## `lift` is 0).
+func _posed(shape: Shape, at: Transform3D, t: float, lift: float) -> PackedVector3Array:
+	var points := at * shape.points
+	if lift > 0.0:
+		for k: int in shape.bob.size():
+			points[shape.bob[k]].y += lift * sin(TAU * (t / BOB_PERIOD + shape.phases[k]))
+	return points
+
+
+## Whether an edge of `a` crosses a triangle of `b` or an edge of `b` one of `a`, both posed,
+## looking only inside `region`.
+func _crosses(a: PackedVector3Array, a_edges: PackedInt32Array, b: PackedVector3Array,
+		b_edges: PackedInt32Array, region: AABB) -> bool:
+	var region_grown := region.grow(SLACK)
+	var a_cells := _hash(a, region_grown)
+	if a_cells.is_empty():
+		return false
+	var b_cells := _hash(b, region_grown)
+	if b_cells.is_empty():
+		return false
+	return _edges_cross(a, a_edges, b, b_cells, region_grown) or _edges_cross(b, b_edges, a, a_cells, region_grown)
+
+
+## The triangles of `points` whose bounds meet `region`, by the CELL-sized cells their bounds
+## cover there.
+func _hash(points: PackedVector3Array, region: AABB) -> Dictionary:
+	var cells := {}
+	for k: int in range(0, points.size(), 3):
+		var box := AABB(points[k], Vector3.ZERO).expand(points[k + 1]).expand(points[k + 2])
+		if not box.grow(SLACK).intersects(region):
+			continue
+		var clip := box.grow(SLACK).intersection(region)
+		var low := Vector3i((clip.position / CELL).floor())
+		var high := Vector3i((clip.end / CELL).floor())
+		for x: int in range(low.x, high.x + 1):
+			for y: int in range(low.y, high.y + 1):
+				for z: int in range(low.z, high.z + 1):
+					var cell := Vector3i(x, y, z)
+					if not cells.has(cell):
+						cells[cell] = []
+					(cells[cell] as Array).append(k)
+	return cells
+
+
+## Whether an edge of `points` within `region` crosses one of the hashed triangles of `others`.
+func _edges_cross(points: PackedVector3Array, edges: PackedInt32Array, others: PackedVector3Array,
+		cells: Dictionary, region: AABB) -> bool:
+	for e: int in range(0, edges.size(), 2):
+		var from := points[edges[e]]
+		var to := points[edges[e + 1]]
+		var box := AABB(from, Vector3.ZERO).expand(to)
+		if not box.grow(SLACK).intersects(region):
+			continue
+		var clip := box.grow(SLACK).intersection(region)
+		var low := Vector3i((clip.position / CELL).floor())
+		var high := Vector3i((clip.end / CELL).floor())
+		for x: int in range(low.x, high.x + 1):
+			for y: int in range(low.y, high.y + 1):
+				for z: int in range(low.z, high.z + 1):
+					var tris: Array = cells.get(Vector3i(x, y, z), [])
+					for k: int in tris:
+						var hit: Variant = Geometry3D.segment_intersects_triangle(from, to, others[k], others[k + 1],
+							others[k + 2])
+						if hit != null:
+							_hit = hit
+							return true
+	return false

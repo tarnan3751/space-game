@@ -171,6 +171,27 @@ the body's bounds, and each moving part's bounds' corners over its whole motion 
 degrees through a SPIN's whole turn or a SWING's range, shifted to a SLIDE's ends). Each model's
 line names its tier, its budget and its top.
 
+`scenarios/model_clash.gd` is the clash rule's check (`docs/reference/art-style.md`, **The clash
+rule**), headless, with no screenshots. For every type and level in the catalog, built for its
+level's tier as the gallery builds it, it reads back the static body and each moving part (each
+node carrying `BuildingModels.MOVE_META`), every surface, holograms included, and tests whether
+an edge of one's triangles crosses a triangle of the other (`Geometry3D.segment_intersects_triangle`),
+only inside the overlap of their posed bounds and through a spatial hash of 0.25-unit cells. Every
+pair of moving parts is posed together on the clock, as `BuildingView` poses them
+(`Motion.transform_at`): sampled at the smaller step of the two (a SPIN every 10 degrees, a
+SWING's period over 16, a SLIDE's over 8) over the longer cycle, or the turn of one SPIN
+against another about a parallel axis, at most 60 seconds; any crossing fails the model, its
+line naming the pair, the time and the point. Each moving part is also posed against the body,
+a SPIN every 10 degrees, a SWING at nine poses and a SLIDE at five from -amplitude to
++amplitude, and the poses at which it touches the body are counted on its line but never
+failed: a built-in mount, a pivot sunk in the body, is allowed contact, and telling a mount
+from a clash is the review's call. A second pass applies BOB wherever either side has it, each
+flagged vertex lifted along Y as `effects.gdshaderinc` lifts it (0.08 times the sine of the
+2.4-second period plus its phase), on the clock with the parts' poses, at least eight samples a
+BOB period: a pair crossing there fails too, and the body's are counted. The last line says the
+models, moving parts and pairs and how many pairs crossed: every model of the roster passes, with
+no pair crossing. The whole roster takes about half a minute.
+
 `scenarios/effects.gd` is the animation rig (`docs/reference/art-style.md`, **Animation**): a
 test part for each surface effect and each kind of moving part, built with `LowPolyMesh` and
 `Parts` and assembled by `BuildingModels.instantiate`, in two rows across the screen with the
