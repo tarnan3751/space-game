@@ -52,7 +52,7 @@ const MODELS := {
 	"crystal_silo": [3, 10],
 	"antimatter_vault": [3, 8],
 	"hangar": [5, 10],
-	"cadet_academy": [3, 5],
+	"cadet_academy": [3, 10],
 	"fabricator": [3, 5],
 	"heavy_fabricator": [3, 3],
 	"research_lab": [3, 5],

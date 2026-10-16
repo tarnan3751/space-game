@@ -99,6 +99,19 @@ static var HOVER_RIM := Surf.make(MaterialKit.Layer.GLOW, Parts.CORE_GLOW_TINT, 
 ## the brightest thing on the model where CORE_GLOW's pulse would dim it (as the collectors'
 ## BRIGHT_CORE in resources.gd).
 static var BRIGHT_CORE := Surf.make(MaterialKit.Layer.GLOW, Color("c9a2ff"), 1.0, Surf.UNLIT, true)
+## The academy's: a violet panel whose coarse stripes rise as the walls' fields do; the
+## searchlight's lens and beam in cyan; the drill grid violet; the drill drone's glass and eye,
+## bobbing with the hovering obsidian (HOVER's phase).
+static var VIOLET_PANEL := Surf.make(MaterialKit.Layer.GLOW, Parts.CORE_GLOW_TINT, 1.0 / 3.0, Surf.UNLIT | Surf.FLOW, false,
+	true, 0.45)
+static var CYAN_LENS := Surf.make(MaterialKit.Layer.GLOW, MaterialKit.ENERGY, 1.0, Surf.UNLIT | Surf.PULSE, true)
+static var CYAN_BEAM := Surf.make(MaterialKit.Layer.GLOW, MaterialKit.ENERGY, 1.0, Surf.HOLO, true)
+static var VIOLET_GRID := Surf.make(MaterialKit.Layer.GLOW, Parts.CORE_GLOW_TINT, 1.0, Surf.UNLIT | Surf.FLICKER)
+static var DRONE_GLASS := Surf.make(MaterialKit.Layer.GLASS, MaterialKit.CORE_GLASS, 1.0, Surf.GLOSSY | Surf.BOB, true, true,
+	0.6)
+static var DRONE_EYE := Surf.make(MaterialKit.Layer.GLOW, MaterialKit.ENERGY, 1.0, Surf.UNLIT | Surf.BOB, true, true, 0.6)
+## The Crown cadet's halo: BRIGHT_CORE's light violet, solid, bobbing out of step with the cadet.
+static var BRIGHT_HALO := Surf.make(MaterialKit.Layer.GLOW, Color("c9a2ff"), 1.0, Surf.UNLIT | Surf.BOB, true, true, 0.5)
 
 
 ## The L10 escort skiff's round: its centre on the ground, towards the apron, and its radius, so
@@ -301,6 +314,13 @@ static func _glow(tier: int) -> Surf:
 	return VIOLET_RIB if tier >= Parts.Tier.OBSIDIAN else Parts.CYAN_STRIP
 
 
+## A trim by tier: gold filigree at Crown, gold trim from the Gold tier, `base` below it.
+static func _trim(tier: int, base: Surf) -> Surf:
+	if tier >= Parts.Tier.CROWN:
+		return Parts.FILIGREE
+	return Parts.GOLD_TRIM if tier >= Parts.Tier.GOLD else base
+
+
 ## A dish on a stub at `foot`, turned to the right of the view, with a glowing feed. One that
 ## `sweeps` stands on a taller stub, clear of the roof, and swings to and fro about it.
 static func _roof_dish(p: Parts, foot: Vector3, radius: float, sweeps: bool) -> void:
@@ -418,18 +438,32 @@ static func _vault(p: Parts, back: Vector3, width: float, length: float, wall: f
 ## plinth's pulsing lens and the finial lamp blinks; from 2 the pod's gimbal rings spin, from 3
 ## the lecture room's board scrolls and the drill grid flickers, from 4 the tower's searchlight
 ## sweeps the yard. At 5 the cadet salutes under a hologram halo and the pennant's crest glows.
+##
+## From 6 the watchtower grows taller at each level and its searchlight is cyan: L6 a chrome hall
+## with a cyan band between its window rows, a chrome plinth, lecture room and tower with cyan
+## strips up it, a second simulator pod behind the plinth's left (its rings still) and a second
+## column of target posts in front of it, a post more at each level to 8; L7 a third storey on
+## the hall, a cyan window band across it;
+## L8 an obsidian hall and tower, violet vein strips down the hall's front, the third storey's
+## band glowing violet, the drill grid violet and crystal shards on the tower; L9 a drill drone
+## hovering over the yard, an obsidian saucer rimmed in violet over a hologram scan cone; L10
+## gold filigree on the hall's trims and round the plinth, the band glowing the antimatter core's
+## light violet, a gold ring round the cadet's feet and a solid light-violet halo over it, a violet
+## core beacon on the tower, and two troopers marching round a gold parade circle in the yard's
+## front corner as its escort.
 static func build_cadet_academy(p: Parts, level: int) -> void:
 	var m := p.body
 	var g := Parts.PAD_HEIGHT
 	var gold := p.tier >= Parts.Tier.GOLD
+	var chrome := p.tier >= Parts.Tier.CHROME
+	var obsidian := p.tier >= Parts.Tier.OBSIDIAN
 	Parts.foundation(m, 3)
 	# The hall along the back, its front face at z = front.
 	var height := 0.75 if level < 2 else 1.0
 	var front := -0.62
-	m.box_chamfered(Vector3(2.6, height, 0.7), 0.06, Vector3(0, g, front - 0.35), Parts.HULL_LIGHT)
+	m.box_chamfered(Vector3(2.6, height, 0.7), 0.06, Vector3(0, g, front - 0.35), _plating(p.tier, Parts.HULL_LIGHT))
 	var roof := g + height
-	m.box_chamfered(Vector3(2.62, 0.08, 0.1), 0.02, Vector3(0, roof - 0.08, front),
-		Parts.GOLD_TRIM if gold else DARK_PLATE)
+	m.box_chamfered(Vector3(2.62, 0.08, 0.1), 0.02, Vector3(0, roof - 0.08, front), _trim(p.tier, DARK_PLATE))
 	# The orange roller door between hazard posts, a glow strip over it.
 	m.box_chamfered(Vector3(0.5, 0.5, 0.06), 0.02, Vector3(0, g, front), ROLLER)
 	m.box(Vector3(0.5, 0.05, 0.04), Vector3(0, g + 0.53, front + 0.01), GLOW)
@@ -449,6 +483,24 @@ static func build_cadet_academy(p: Parts, level: int) -> void:
 		# Armour plates round the hall's front corners.
 		for side: float in [-1.0, 1.0]:
 			m.box_chamfered(Vector3(0.1, height - 0.12, 0.4), 0.03, Vector3(side * 1.3, g, front - 0.16), ARMOUR)
+	if level >= 6:
+		# A band of light between the window rows; from the Obsidian tier vein strips down the
+		# front between the windows.
+		m.box(Vector3(2.4, 0.05, 0.02), Vector3(0, g + 0.48, front + 0.005), _glow(p.tier))
+		if obsidian:
+			for x: float in [-1.2, -0.9, -0.6, 0.6, 0.9, 1.2]:
+				m.box(Vector3(0.06, height - 0.12, 0.02), Vector3(x, g + 0.03, front + 0.006), Parts.VEINS)
+	if level >= 7:
+		# The third storey, a broad window band across its front.
+		m.box_chamfered(Vector3(2.5, 0.4, 0.66), 0.05, Vector3(0, roof, front - 0.35), _plating(p.tier, Parts.HULL_LIGHT))
+		var band := Parts.CYAN_STRIP
+		if p.tier >= Parts.Tier.CROWN:
+			band = BRIGHT_CORE
+		elif obsidian:
+			band = VIOLET_PANEL
+		m.box(Vector3(2.2, 0.16, 0.02), Vector3(0, roof + 0.1, front - 0.015), band)
+		m.box_chamfered(Vector3(2.54, 0.07, 0.1), 0.02, Vector3(0, roof + 0.33, front - 0.03), _trim(p.tier, DARK_PLATE))
+		roof += 0.4
 	# The roof: a vent (on the lecture room from 3) and the loudspeaker horn facing the yard.
 	var horn := Vector3(0.55, roof, -0.85)
 	m.prism(0.03, 0.025, 0.26, 8, horn, Parts.GUNMETAL)
@@ -458,7 +510,7 @@ static func build_cadet_academy(p: Parts, level: int) -> void:
 	if level >= 3:
 		# The lecture room: a glass band and a scrolling screen board on its front, antennas on top.
 		var room := Vector3(-0.45, roof, -1.02)
-		m.box_chamfered(Vector3(1.5, 0.45, 0.52), 0.05, room, Parts.HULL_LIGHT)
+		m.box_chamfered(Vector3(1.5, 0.45, 0.52), 0.05, room, Parts.CHROME if chrome else Parts.HULL_LIGHT)
 		m.box_chamfered(Vector3(0.8, 0.12, 0.03), 0.01, room + Vector3(-0.28, 0.24, 0.26), Parts.GLASS)
 		m.box_chamfered(Vector3(0.42, 0.26, 0.04), 0.015, room + Vector3(0.42, 0.1, 0.27), SCREEN_FLOW.phased(0.7))
 		m.box_chamfered(Vector3(0.36, 0.12, 0.26), 0.04, room + Vector3(-0.4, 0.45, -0.03), VENT)
@@ -476,10 +528,11 @@ static func build_cadet_academy(p: Parts, level: int) -> void:
 	m.box_chamfered(Vector3(2.6, 0.08, 0.1), 0.02, Vector3(0, g, 1.27), Parts.HAZARD)
 	if level >= 3:
 		# The drill grid flickering on the yard's floor.
+		var grid := VIOLET_GRID if obsidian else DRILL_GRID
 		for i: int in 4:
-			_line(m, Vector2(1.4, 0.03), Vector3(-0.15, yard + 0.003, -0.35 + 0.4 * i), DRILL_GRID.phased(i / 8.0))
+			_line(m, Vector2(1.4, 0.03), Vector3(-0.15, yard + 0.003, -0.35 + 0.4 * i), grid.phased(i / 8.0))
 			_line(m, Vector2(0.03, 1.2), Vector3(-0.85 + 0.47 * i, yard + 0.003, 0.25),
-				DRILL_GRID.phased((i + 4) / 8.0))
+				grid.phased((i + 4) / 8.0))
 	# The target posts down the left side, their silhouettes blinking on in turn.
 	var posts := 3 if level < 4 else 4
 	for i: int in posts:
@@ -489,13 +542,28 @@ static func build_cadet_academy(p: Parts, level: int) -> void:
 		var lit := TARGET.phased(Parts.chase(i, posts))
 		m.box(Vector3(0.02, 0.22, 0.18), foot + Vector3(0, 0.36, 0), lit)
 		m.box(Vector3(0.02, 0.09, 0.09), foot + Vector3(0, 0.6, 0), lit)
+	if level >= 6:
+		# A second column of posts in front of the second pod, a post more at each level to 8.
+		var more := mini(level - 4, 4)
+		for i: int in more:
+			var foot := Vector3(-0.78, yard, 0.2 + 0.25 * i)
+			m.box_chamfered(Vector3(0.16, 0.06, 0.16), 0.02, foot, _plating(p.tier, Parts.GUNMETAL))
+			m.prism(0.025, 0.02, 0.3, 8, foot + Vector3(0, 0.06, 0), Parts.ROD)
+			var lit := TARGET.phased(Parts.chase(more - 1 - i, more))
+			m.box(Vector3(0.02, 0.22, 0.18), foot + Vector3(0, 0.36, 0), lit)
+			m.box(Vector3(0.02, 0.09, 0.09), foot + Vector3(0, 0.6, 0), lit)
 	# The parade plinth: an armoured octagon with a rim and a projector lens, the cadet over it.
 	var plinth := Vector3(0, yard, 0.3)
-	Parts.drum(m, 0.32, 0.2, 0.05, 8, plinth, ARMOUR, Parts.OCTAGON)
+	Parts.drum(m, 0.32, 0.2, 0.05, 8, plinth, Parts.CHROME if chrome else ARMOUR, Parts.OCTAGON)
 	var top := plinth + Vector3(0, 0.2, 0)
 	Parts.drum(m, 0.34, 0.05, 0.02, 8, top - Vector3(0, 0.04, 0), Parts.GOLD_TRIM if gold else Parts.HULL_LIGHT,
 		Parts.OCTAGON)
 	m.dome(0.1, 0.05, 10, 3, top + Vector3(0, 0.01, 0), GLOW_PULSE)
+	if level >= 10:
+		# Filigree round the plinth, a gold ring round the cadet's feet.
+		m.lathe(PackedVector2Array([Vector2(0.33, 0), Vector2(0.33, 0.08)]), 8, plinth + Vector3(0, 0.05, 0), Parts.FILIGREE,
+			Parts.OCTAGON)
+		Parts.torus(m, 0.2, 0.025, 16, 6, top + Vector3(0, 0.01, 0), GOLD_ROUND)
 	_cadet(p, top + Vector3(0, 0.14, 0), level)
 	# The flagpole in the front corner, its finial lamp blinking, the pennant flying over the yard.
 	var pole := Vector3(-1.15, yard, 1.08)
@@ -508,14 +576,27 @@ static func build_cadet_academy(p: Parts, level: int) -> void:
 	if level >= 2:
 		_simulator(p, Vector3(0.92, yard, -0.05))
 	if level >= 4:
-		_watchtower(p, Vector3(1.0, roof, -1.0))
+		_watchtower(p, Vector3(1.0, roof, -1.0), level)
+	if level >= 6:
+		# The second pod behind the plinth's left, so the yard's front stays open.
+		_simulator(p, Vector3(-0.62, yard, -0.25), false)
+	if level >= 9:
+		_drill_drone(m, Vector3(-0.35, yard + 1.05, 0.95))
+	if level >= 10:
+		# A gold parade circle inlaid in the yard's front corner, nearest the camera, the core
+		# glowing at its middle, and the two troopers marching round it.
+		var parade := Vector3(0.65, yard, 0.88)
+		m.disc(0.2, 24, parade + Vector3(0, 0.003, 0), Parts.FILIGREE)
+		m.disc(0.09, 16, parade + Vector3(0, 0.006, 0), BRIGHT_CORE)
+		Parts.escort_troopers(p, 0.28, yard, 0.5, parade)
 
 
 ## The hologram cadet standing to attention, its feet on `foot`, built facing +Z: boots and legs,
 ## a chunky torso, arms at its sides, a round head under a peaked cap, all bobbing together. A
 ## moving part, it turns slowly about the vertical through its feet, a hologram's showcase turn.
-## At the top level its right arm salutes and a halo floats over it out of step. A hologram is
-## never inked, so its boxes go without chamfers, and the part has no outline.
+## From 5 its right arm salutes and a halo floats over it out of step, at Crown a solid one in the
+## core's light violet. A hologram is never inked, so its boxes go without chamfers, and the part
+## has no outline but the Crown halo's.
 static func _cadet(p: Parts, foot: Vector3, level: int) -> void:
 	const K := 1.3
 	var m := p.moving(foot, Motion.spin(Vector3.UP, 0.5))
@@ -527,7 +608,10 @@ static func _cadet(p: Parts, foot: Vector3, level: int) -> void:
 		var elbow := Vector3(-0.24, 0.38, 0.05) * K
 		m.strut(Vector3(-0.12, 0.37, 0) * K, elbow, 0.06 * K, HOLOGRAM)
 		m.strut(elbow, Vector3(-0.06, 0.5, 0.07) * K, 0.055 * K, HOLOGRAM)
-		m.ring(0.09 * K, 0.12 * K, 0.02, 12, Vector3(0, 0.64, 0) * K, HOLOGRAM.phased(0.5))
+		if p.tier >= Parts.Tier.CROWN:
+			m.ring(0.09 * K, 0.13 * K, 0.035, 12, Vector3(0, 0.64, 0) * K, BRIGHT_HALO)
+		else:
+			m.ring(0.09 * K, 0.12 * K, 0.02, 12, Vector3(0, 0.64, 0) * K, HOLOGRAM.phased(0.5))
 	else:
 		m.box(Vector3(0.06, 0.19, 0.07) * K, Vector3(-0.145, 0.2, 0) * K, HOLOGRAM)
 	m.orb(0.07 * K, 12, 4, Vector3(0, 0.47, 0) * K, HOLOGRAM)
@@ -570,46 +654,82 @@ static func _line(m: LowPolyMesh, size: Vector2, pos: Vector3, surface: Surf) ->
 
 
 ## The flight simulator standing on `foot`: a dark pod with a pulsing canopy on a stub, held in
-## two gimbal rings that spin about a tilted axis. Tilted 45 degrees, the rings never come within
-## 0.19 of the stub.
-static func _simulator(p: Parts, foot: Vector3) -> void:
+## two gimbal rings that spin about a tilted axis, unless it `spins` not (the second pod's are
+## part of the body). Tilted 45 degrees, the rings never come within 0.19 of the stub. Its base
+## and rings are chrome from the Chrome tier.
+static func _simulator(p: Parts, foot: Vector3, spins: bool = true) -> void:
 	var m := p.body
-	Parts.drum(m, 0.2, 0.1, 0.03, 16, foot, ARMOUR_ROUND)
+	var plated := Parts.CHROME_ROUND if p.tier >= Parts.Tier.CHROME else ARMOUR_ROUND
+	Parts.drum(m, 0.2, 0.1, 0.03, 16, foot, plated)
 	m.prism(0.06, 0.05, 0.26, 8, foot + Vector3(0, 0.1, 0), Parts.GUNMETAL)
 	var centre := foot + Vector3(0, 0.54, 0)
 	m.orb(0.22, 16, 6, centre, Parts.HULL_DARK_ROUND)
 	var view := Vector3(0.5, 0.25, 0.85).normalized()
 	m.dome(0.12, 0.05, 16, 3, centre + view * 0.205, CAB_GLASS, Parts.facing(view))
-	var rings := p.moving(centre, Motion.spin(Vector3(0.2, 1, 0.1), 0.9))
+	var rings := p.moving(centre, Motion.spin(Vector3(0.2, 1, 0.1), 0.9)) if spins else m
+	var at := Vector3.ZERO if spins else centre
 	for spec: Array in [[0.36, Vector3(45, 0, 0)], [0.3, Vector3(0, 0, -45)]]:
 		var radius: float = spec[0]
 		var tilt: Vector3 = spec[1]
-		rings.tube(radius - 0.035, radius, 0.04, 24, -LowPolyMesh.turn(Vector3(0, 0.02, 0), tilt),
-			ARMOUR_ROUND, tilt)
+		rings.tube(radius - 0.035, radius, 0.04, 24, at - LowPolyMesh.turn(Vector3(0, 0.02, 0), tilt),
+			plated, tilt)
 
 
 ## The watchtower on the hall's roof at `foot`: an armoured base, a round shaft, a cab with
-## pulsing glass under a crown (gold at the top level), a small dish on its flank, and the
+## pulsing glass under a crown (gold from the Gold tier), a small dish on its flank, and the
 ## searchlight on the crown sweeping the yard, its lens pulsing and a hologram beam out of it.
-static func _watchtower(p: Parts, foot: Vector3) -> void:
+## From 6 its shaft grows 0.15 a level with light strips up it, its beam longer and both cyan;
+## the tier plates it; from 8 crystal shards on its crown, at 10 a core beacon.
+static func _watchtower(p: Parts, foot: Vector3, level: int) -> void:
 	var m := p.body
-	m.box_chamfered(Vector3(0.36, 0.08, 0.36), 0.03, foot, ARMOUR)
-	m.prism(0.13, 0.11, 0.6, 16, foot + Vector3(0, 0.08, 0), MID_ROUND)
-	var cab := foot + Vector3(0, 0.68, 0)
-	m.box_chamfered(Vector3(0.36, 0.2, 0.36), 0.04, cab, ARMOUR)
+	var grown := 0.15 * maxi(level - 5, 0)
+	m.box_chamfered(Vector3(0.36, 0.08, 0.36), 0.03, foot, _plating(p.tier, ARMOUR))
+	m.prism(0.13, 0.11, 0.6 + grown, 16, foot + Vector3(0, 0.08, 0), _plating(p.tier, MID_ROUND, true))
+	if level >= 6:
+		for k: int in 4:
+			var degrees := 45.0 + 90.0 * k
+			m.box(Vector3(0.04, 0.5 + grown, 0.02), foot + Parts.around(0.12, degrees, 0.13), _strip(p.tier),
+				Vector3(0, 90.0 - degrees, 0))
+	var cab := foot + Vector3(0, 0.68 + grown, 0)
+	m.box_chamfered(Vector3(0.36, 0.2, 0.36), 0.04, cab, _plating(p.tier, ARMOUR))
 	m.box_chamfered(Vector3(0.28, 0.08, 0.02), 0.01, cab + Vector3(0, 0.07, 0.18), CAB_GLASS)
 	m.box_chamfered(Vector3(0.02, 0.08, 0.28), 0.01, cab + Vector3(0.18, 0.07, 0), CAB_GLASS)
 	m.box_chamfered(Vector3(0.4, 0.05, 0.4), 0.02, cab + Vector3(0, 0.2, 0),
 		Parts.GOLD_TRIM if p.tier >= Parts.Tier.GOLD else DARK_PLATE)
 	var aim := Vector3(-0.6, 0.75, 0.2)
 	Parts.dish(m, 0.13, 0.05, cab + Vector3(-0.2, 0.08, 0), HULL_ROUND, Parts.facing(aim))
+	if level >= 8:
+		for z: float in [-0.13, 0.13]:
+			m.cone(0.05, 0.2, 8, cab + Vector3(0.13, 0.25, z), INLAY.phased(0.5 + z), Parts.facing(Vector3(0.3, 1, z)))
+	if level >= 10:
+		_crown_beacon(m, cab + Vector3(-0.13, 0.25, -0.13), 0.4)
 	var light := p.moving(cab + Vector3(0, 0.25, 0), Motion.swing(Vector3.UP, 25.0, 6.0))
 	light.prism(0.05, 0.05, 0.06, 8, Vector3.ZERO, Parts.GUNMETAL)
 	var beam := Vector3(-1.0, -1.9, 1.3).normalized()
 	var lamp := Vector3(0, 0.12, 0)
+	var cyan := p.tier >= Parts.Tier.CHROME
 	Parts.drum(light, 0.08, 0.14, 0.02, 12, lamp - beam * 0.06, Parts.GUNMETAL, Parts.facing(beam))
-	light.disc(0.065, 16, lamp + beam * 0.085, SEARCH_LENS, Parts.facing(beam))
-	light.prism(0.06, 0.16, 1.4, 12, lamp + beam * 0.09, SEARCH_BEAM, Parts.facing(beam))
+	light.disc(0.065, 16, lamp + beam * 0.085, CYAN_LENS if cyan else SEARCH_LENS, Parts.facing(beam))
+	light.prism(0.06, 0.16, 1.4 + grown * 0.6, 12, lamp + beam * 0.09, CYAN_BEAM if cyan else SEARCH_BEAM, Parts.facing(beam))
+
+
+## The drill drone hovering over the yard from 9, `at` its centre: an obsidian saucer rimmed in
+## violet with a glass canopy, a cyan eye to the camera and four rotor pods with violet discs,
+## over a violet hologram scan cone, every part bobbing together (HOVER's phase).
+static func _drill_drone(m: LowPolyMesh, at: Vector3) -> void:
+	m.lathe(PackedVector2Array([
+		Vector2(0, -0.05), Vector2(0.15, -0.05), Vector2(0.21, -0.01), Vector2(0.19, 0.04), Vector2(0, 0.05),
+	]), 16, at, HOVER)
+	m.lathe(PackedVector2Array([Vector2(0.215, -0.02), Vector2(0.215, 0.015)]), 16, at, HOVER_RIM)
+	m.dome(0.09, 0.08, 12, 3, at + Vector3(0, 0.045, 0), DRONE_GLASS)
+	m.box(Vector3(0.1, 0.035, 0.03), at + Parts.around(0.2, 45.0, -0.03), DRONE_EYE, Vector3(0, 45, 0))
+	for k: int in 4:
+		var degrees := 90.0 * k
+		m.box(Vector3(0.14, 0.03, 0.04), at + Parts.around(0.24, degrees, -0.015), HOVER, Vector3(0, -degrees, 0))
+		var pod := at + Parts.around(0.3, degrees, -0.03)
+		m.prism(0.07, 0.065, 0.05, 12, pod, HOVER)
+		m.disc(0.06, 12, pod + Vector3(0, 0.052, 0), HOVER_RIM)
+	m.prism(0.16, 0.04, 0.62, 12, at - Vector3(0, 0.68, 0), HOLO_VIOLET.phased(0.6))
 
 
 ## A factory block under a sawtooth roof, smokestacks on a furnace box behind it, a conveyor
