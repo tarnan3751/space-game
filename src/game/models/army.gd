@@ -68,11 +68,13 @@ static var GOO_FLOW := Surf.make(MaterialKit.Layer.GLASS, MaterialKit.NANITE_GRE
 	Surf.UNLIT | Surf.FLOW_U, true, true, 0.55)
 static var GOO_SWIRL := Surf.make(MaterialKit.Layer.GLASS, MaterialKit.NANITE_GREEN, 1.0,
 	Surf.UNLIT | Surf.FLOW_U, false, true, 0.65)
-## A bubble is the goo's green half way to white, so it flashes brighter than the goo and
-## shows as a dim green dot between flashes; too small for an outline.
-static var BUBBLE := Surf.make(MaterialKit.Layer.GLOW, MaterialKit.NANITE_GREEN.lerp(Color.WHITE, 0.5), 1.0,
-	Surf.UNLIT | Surf.BLINK, true, false)
-## The meniscus is the bubbles' glow, steady: too thin for an outline.
+## A bubble is nearly white with a hint of the goo's green, so it shows against the goo: a
+## hologram rising through it and fading; too small for an outline.
+static var BUBBLE := Surf.make(MaterialKit.Layer.GLOW, MaterialKit.NANITE_GREEN.lerp(Color.WHITE, 0.85), 1.0,
+	Surf.HOLO | Surf.RISE, true, false)
+## RISE's sideways drift over a whole climb, in world units: RISE_DRIFT in effects.gdshaderinc.
+const RISE_DRIFT := Vector3(0.12, 0.0, 0.08)
+## The meniscus is the goo's green half way to white, steady: too thin for an outline.
 static var MENISCUS := Surf.make(MaterialKit.Layer.GLOW, MaterialKit.NANITE_GREEN.lerp(Color.WHITE, 0.5), 1.0,
 	Surf.UNLIT, true, false)
 static var PIPE_FLOW := Surf.make(MaterialKit.Layer.PIPE, MaterialKit.HULL_MID, 2.0, Surf.FLOW, true, true,
@@ -1295,8 +1297,8 @@ static func _antenna(m: LowPolyMesh, foot: Vector3, height: float, foot_surf: Su
 
 ## Vats of glowing green nanite goo seen through glass bands, round a pump block, with pipes
 ## and their elbows running between them. A vat more at each level; gold rims at 4. The goo
-## laps round every vat under its bright meniscus and bubbles, the pipes and the pump's screens
-## flow, and a stirrer turns in the big vat's open top.
+## laps round every vat under its bright meniscus, bubbles rise through it, the pipes and the
+## pump's screens flow, and a stirrer turns in the big vat's open top.
 ##
 ## From 5 the vats stand taller at each level and the pump block rises to a tower: L5 chrome vats
 ## with cyan rims, a chrome pump tower and cyan pipes; L6 a sixth vat, a tall column on the right;
@@ -1428,12 +1430,11 @@ static func _goo_pipe(m: LowPolyMesh, points: PackedVector3Array, surface: Surf,
 
 ## A vat standing on `foot`, the `index`th of the foundry's: an armoured lower shell, a band of
 ## glowing goo lapping round behind glass framed by rims, a bright meniscus at its surface and
-## bubbles blinking on it, and an upper
-## shell with a chamfered lid and an orange cap. The first vat is open at the top instead, over
-## a swirl of goo for the stirrer to turn in. `glass` is the goo band's share of the height. The
-## tier paints it: gold rims from the Gold tier; chrome shells and cyan rims at the Chrome tier;
-## obsidian shells veined violet, violet rims and the goo brighter from the Obsidian tier; at
-## Crown filigree rims and gold caps.
+## bubbles rising up it, and an upper shell with a chamfered lid and an orange cap. The first vat
+## is open at the top instead, over a swirl of goo for the stirrer to turn in. `glass` is the goo
+## band's share of the height. The tier paints it: gold rims from the Gold tier; chrome shells and
+## cyan rims at the Chrome tier; obsidian shells veined violet, violet rims and the goo brighter
+## from the Obsidian tier; at Crown filigree rims and gold caps.
 static func _vat(m: LowPolyMesh, foot: Vector3, radius: float, height: float, tier: int, index: int,
 		glass: float = 0.28) -> void:
 	var band := height * 0.4
@@ -1462,9 +1463,24 @@ static func _vat(m: LowPolyMesh, foot: Vector3, radius: float, height: float, ti
 		foot + Vector3(0, band, 0), (GOO_BRIGHT if bright else GOO_FLOW).phased(0.54 + 0.01 * index))
 	m.lathe(PackedVector2Array([Vector2(radius - 0.008, lit - 0.045), Vector2(radius - 0.008, lit)]), 16,
 		foot + Vector3(0, band, 0), MENISCUS)
-	for k: int in 2:
-		m.orb(0.045, 8, 2, foot + Parts.around(radius - 0.03, 25.0 + 40.0 * k + 7.0 * index,
-			band + lit * (0.3 + 0.4 * k)), BUBBLE.phased(fposmod(0.37 * index + 0.5 * k, 1.0)))
+	# Two bubbles a vat, half a climb apart, rising up the goo's face. RISE drifts a part
+	# RISE_DRIFT sideways in world space as it climbs, so in plan a bubble rides a straight chord of
+	# the vat: it is placed so that chord runs at right angles to the vat's radius at its middle
+	# (123.7 degrees round, on the side the camera sees), the middle standing just proud of the goo
+	# and both ends, its start and 0.9 of its climb (where its fade leaves it under 0.1 alpha), just
+	# inside the shell. So it shows on the goo's face through the band and stays inside the opaque
+	# shell above it. A vat too short to keep the climb under its lid's chamfer starts them lower,
+	# in the lower shell, or, under 0.78 tall, has none.
+	const BUBBLE_SIZE := 0.035
+	var start := minf(band + 0.03, height - 0.75)
+	if start >= 0.03:
+		var drift := RISE_DRIFT * 0.9
+		var across := Vector3(-drift.z, 0, drift.x).normalized()
+		var ends := radius - BUBBLE_SIZE - 0.005
+		var middle := across * sqrt(ends * ends - drift.length_squared() * 0.25)
+		for k: int in 2:
+			m.orb(BUBBLE_SIZE, 8, 2, foot + middle - drift * 0.5 + Vector3(0, start, 0),
+				BUBBLE.phased(fposmod(0.37 * index + 0.5 * k, 1.0)))
 	var upper := band + lit
 	var top := height - upper
 	# The upper rim stands flush with the shell, so it never hides the meniscus under it.
