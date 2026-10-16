@@ -52,6 +52,28 @@ func test_shipped_curves_never_go_down() -> void:
 					"%s level %d %s goes down" % [type, level, field])
 
 
+func test_shipped_final_levels_require_the_top_command_center() -> void:
+	# Every maxed building belongs to the top tier. The Command Center's own levels each
+	# require the one below, so it is left out.
+	var catalog := Catalog.load_default()
+	assert_eq(catalog.load_error, "")
+	var top := catalog.max_level(Catalog.HQ_TYPE)
+	for type: String in catalog.types():
+		if type == Catalog.HQ_TYPE:
+			continue
+		var stats := catalog.level_stats(type, catalog.max_level(type))
+		assert_eq(int(stats.get("requires_cc", 1)), top, "%s's final level" % type)
+
+
+func test_shipped_counts_never_go_down() -> void:
+	var catalog := Catalog.load_default()
+	assert_eq(catalog.load_error, "")
+	for type: String in catalog.types():
+		for cc: int in range(2, catalog.max_cc_level() + 1):
+			assert_true(catalog.max_count(type, cc) >= catalog.max_count(type, cc - 1),
+				"%s max_count goes down at Command Center %d" % [type, cc])
+
+
 func test_json_numbers_become_ints() -> void:
 	var catalog := Fixtures.catalog()
 	assert_eq(catalog.level_stats("extractor", 1)["build_seconds"], 60)
