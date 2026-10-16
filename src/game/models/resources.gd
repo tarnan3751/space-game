@@ -253,12 +253,10 @@ const SKIFF_HEIGHT := 2.5
 ## The L10 antimatter core on the engine house's roof, clear of its stacks.
 const HOUSE_CORE := Vector3(0.62, 0, 0.27)
 
-## The high levels' own: the ore glowing crystal pink from the Obsidian tier, on the nuggets and in
-## the hoppers; the L8 ore crystals hovering over the hoppers; the L9 collar, obsidian with veins
-## across its top and a violet rim, bobbing together; and the crystal inlays on the engine house.
-static var PINK_ORE := Surf.make(MaterialKit.Layer.CRYSTAL, MaterialKit.CRYSTAL, 2.0, Surf.PULSE)
-static var PINK_NUGGET := Surf.make(MaterialKit.Layer.GLOW, MaterialKit.CRYSTAL, 1.0, Surf.UNLIT | Surf.PULSE, true)
-static var FLOATING_ORE := Surf.make(MaterialKit.Layer.CRYSTAL, MaterialKit.CRYSTAL, 1.0, Surf.GLOSSY | Surf.PULSE | Surf.BOB)
+## The high levels' own: the L8 ore crystals hovering over the hoppers, metal like all the ore; the
+## L9 collar, obsidian with veins across its top and a violet rim, bobbing together; and the
+## crystal inlays on the engine house.
+static var FLOATING_ORE := Surf.make(MaterialKit.Layer.CRYSTAL, MaterialKit.METAL, 1.0, Surf.GLOSSY | Surf.PULSE | Surf.BOB)
 static var HOVER_RING := Surf.make(MaterialKit.Layer.OBSIDIAN, Parts.OBSIDIAN_TINT, 1.0, Surf.GLOSSY | Surf.BOB, true, true, 0.7)
 static var HOVER_VEINS := Surf.make(MaterialKit.Layer.VEINS, MaterialKit.ANTIMATTER, 1.0, Surf.UNLIT | Surf.FLOW | Surf.BOB, true, true,
 	0.7)
@@ -278,17 +276,17 @@ static var BRIGHT_CORE := Surf.make(MaterialKit.Layer.GLOW, CORE_LIGHT, 1.0, Sur
 ## armour, L3 a bigger derrick with braces and a winch, L4 a second hopper and a third stack,
 ## L5 gold trim.
 ##
-## L6 (Chrome): a taller derrick in chrome, cyan strips up its legs and a second ring of braces,
-## its crown block clad in chrome; chrome hoppers, each tipping ore down a cyan-lit chute into a
-## tub. L7 a taller derrick still and a pumpjack on the right corner, its walking beam rocking out
-## of step with the crown's. L8 (Obsidian): a taller derrick, still chrome, its strips violet veins;
+## L6 (Chrome): a taller derrick in chrome, cyan strips up its legs and a second ring of braces, its
+## crown block clad in chrome; chrome hoppers, each tipping ore down a cyan-lit chute into a tub. L7
+## a taller derrick still and a pumpjack on the right corner, its walking beam rocking out of step
+## with the crown's. L8 (Obsidian): a taller derrick, still chrome, its strips violet veins;
 ## obsidian over the hoppers, the chutes' tubs, the pumpjack's frame and the engine house, crystal
-## inlays on the house, the drill's kelly veined violet, the ore glowing crystal pink, and an ore
-## crystal hovering over each hopper. L9 an obsidian collar hovering round the derrick under its
-## crown. L10 (Crown): gold filigree on the braces, the crown block, the hoppers and the engine
-## house, the antimatter core glowing on a gold mount over the crown and in a gold housing on the
-## engine house's roof, and a hover skiff hauling ore round the rig over the hoppers and the
-## stacks as the escort.
+## inlays on the house, the drill's kelly veined violet, and an ore crystal hovering over each
+## hopper. The ore is the metal accent at every level, as on the silos. L9 an obsidian collar
+## hovering round the derrick under its crown. L10 (Crown): gold filigree on the braces, the crown
+## block, the hoppers and the engine house, the antimatter core glowing on a gold mount over the
+## crown and in a gold housing on the engine house's roof, and a hover skiff hauling ore round the
+## rig over the hoppers and the stacks as the escort.
 static func build_metal_extractor(p: Parts, level: int) -> void:
 	var m := p.body
 	var gold := p.tier >= Parts.Tier.GOLD
@@ -366,8 +364,7 @@ static func build_metal_extractor(p: Parts, level: int) -> void:
 		var heading := (hopper - DRILL).normalized()
 		_hopper(m, hopper + Vector3(0, ground, 0), gold, 0.5 * k, level, p.tier)
 		_belt(m, DRILL + heading * 0.32 + Vector3(0, ground + 0.2, 0),
-			hopper - heading * 0.2 + Vector3(0, ground + HOPPER_RIM + 0.14, 0), 0.5 * k,
-			PINK_NUGGET if obsidian else NUGGET)
+			hopper - heading * 0.2 + Vector3(0, ground + HOPPER_RIM + 0.14, 0), 0.5 * k, NUGGET)
 
 	# The engine house and its stacks.
 	var house := ENGINE_HOUSE + Vector3(0, ground, 0)
@@ -433,18 +430,17 @@ static func _hopper(m: LowPolyMesh, pos: Vector3, gold: bool, phase: float, leve
 	]), 4, bin, _rig_armour(tier, Parts.HULL_MID), Vector3(0, 45, 0))
 	m.lathe(PackedVector2Array([Vector2(0.43, 0), Vector2(0.43, 0.08), Vector2(0.36, 0.08)]), 4,
 		bin + Vector3(0, 0.36, 0), Parts.GOLD_TRIM if gold else METAL_ACCENT, Vector3(0, 45, 0))
-	var obsidian := tier >= Parts.Tier.OBSIDIAN
-	m.pyramid(0.48, 0.14, bin + Vector3(0, 0.38, 0), (PINK_ORE if obsidian else METAL_ORE).phased(phase))
+	m.pyramid(0.48, 0.14, bin + Vector3(0, 0.38, 0), METAL_ORE.phased(phase))
 	if level >= 10:
 		m.lathe(PackedVector2Array([Vector2(0.43, 0), Vector2(0.43, 0.06)]), 4, bin + Vector3(0, 0.27, 0), Parts.FILIGREE,
 			Vector3(0, 45, 0))
 	if level >= 6:
 		# The chute from the bin's front face down towards the camera into a tub, its rails lit.
 		_chute(m, bin + Vector3(0, 0.12, 0.2), Vector3(pos.x, Parts.PAD_HEIGHT + 0.24, pos.z + 0.48), _rig_strip(tier),
-			(PINK_NUGGET if obsidian else NUGGET).phased(phase))
+			NUGGET.phased(phase))
 		var tub := Vector3(pos.x, Parts.PAD_HEIGHT, pos.z + 0.52)
 		m.box_chamfered(Vector3(0.3, 0.2, 0.22), 0.04, tub, _rig_armour(tier, Parts.HULL_MID))
-		m.box(Vector3(0.24, 0.04, 0.16), tub + Vector3(0, 0.18, 0), (PINK_ORE if obsidian else METAL_ORE).phased(phase + 0.25))
+		m.box(Vector3(0.24, 0.04, 0.16), tub + Vector3(0, 0.18, 0), METAL_ORE.phased(phase + 0.25))
 	if level >= 8:
 		m.orb(0.1, 4, 2, bin + Vector3(0, 0.74, 0), FLOATING_ORE.phased(phase))
 
@@ -976,11 +972,11 @@ static var GAUGE := Surf.make(MaterialKit.Layer.GLOW, MaterialKit.METAL, 1.0, Su
 static var WARNING_LAMP := Surf.make(MaterialKit.Layer.GLOW, MaterialKit.HAZARD, 1.0, Surf.UNLIT | Surf.BLINK, true)
 static var LIQUID_METAL := Surf.make(MaterialKit.Layer.PIPE, MaterialKit.METAL, 2.0, Surf.UNLIT | Surf.FLOW, true, true, 0.75)
 ## The high levels' own: the L7 catwalk lamps, chasing along each catwalk; the L8 gauge lenses in
-## crystal pink, pulsing; the L9 gauge ring hovering over the tanks, obsidian with a metal-lit dial
-## and a violet rim (gold at L10), bobbing together (their one phase is also the dial's and the
+## the metal accent, pulsing; the L9 gauge ring hovering over the tanks, obsidian with a metal-lit
+## dial and a violet rim (gold at L10), bobbing together (their one phase is also the dial's and the
 ## rim's PULSE offset).
 static var CATWALK_LAMP := Surf.make(MaterialKit.Layer.GLOW, MaterialKit.ENERGY, 1.0, Surf.UNLIT | Surf.BLINK, true)
-static var GAUGE_LENS := Surf.make(MaterialKit.Layer.CRYSTAL, MaterialKit.CRYSTAL, 1.0, Surf.UNLIT | Surf.PULSE, true)
+static var GAUGE_LENS := Surf.make(MaterialKit.Layer.CRYSTAL, MaterialKit.METAL, 1.0, Surf.UNLIT | Surf.PULSE, true)
 static var GAUGE_RING := Surf.make(MaterialKit.Layer.OBSIDIAN, Parts.OBSIDIAN_TINT, 1.0, Surf.GLOSSY | Surf.BOB, true, true, 0.7)
 static var GAUGE_TICK := Surf.make(MaterialKit.Layer.GLOW, MaterialKit.METAL, 1.0, Surf.UNLIT | Surf.PULSE | Surf.BOB, true, true, 0.7)
 static var GAUGE_RIM := Surf.make(MaterialKit.Layer.GLOW, Parts.CORE_GLOW_TINT, 1.0, Surf.UNLIT | Surf.PULSE | Surf.BOB, true, true,
@@ -1015,7 +1011,7 @@ const SILO_SKIFF_HEIGHT := 4.1
 ## tank's top, and a chrome pump on the pipe, fed by the valves, cyan-lit, its flywheel spinning (a
 ## moving part); L7 lamps chasing along the catwalks and a chrome beacon mast on the deck between
 ## the tanks, its cyan beacon pulsing; L8 obsidian armour bands veined violet, veined risers up the
-## tanks, crystal-pink lenses on the gauges and an obsidian pump housing; L9 an obsidian gauge ring
+## tanks, metal-lit lenses on the gauges and an obsidian pump housing; L9 an obsidian gauge ring
 ## hovering over the deck between the tanks, turning; L10 gold filigree bands, gold rims and
 ## railings, the violet antimatter core glowing in a gold cage on the pump at the pipe's junction,
 ## gold-capped vents, and a hover skiff circling over the tanks as its escort.
@@ -1113,7 +1109,7 @@ static func _metal_tank(m: LowPolyMesh, base: Vector3, radius: float, height: fl
 		m.box(Vector3(0.05, height * 0.84, 0.04), Parts.around(radius, degrees, 0.08) + shell,
 			Parts.CYAN_STRIP.phased(fposmod(phase + 0.25 * side, 1.0)), Vector3(0, 90.0 - degrees, 0))
 	if level >= 8:
-		# Crystal-pink lenses over the fill gauge, and a veined riser up the tank's front.
+		# Metal-lit lenses over the fill gauge, and a veined riser up the tank's front.
 		for i: int in 2:
 			m.orb(0.05, 8, 3, Parts.around(radius + 0.05, 15, 0.1 + height * (0.6 + 0.08 * i)) + shell,
 				GAUGE_LENS.phased(fposmod(phase + 0.5 * i, 1.0)))
