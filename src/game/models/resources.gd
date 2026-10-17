@@ -1663,9 +1663,9 @@ const VAULT_GUARD_RATE := -0.5
 ## obsidian pylons and skirt veined violet, crystal inlays at the pylons' feet, veins up the lid, a
 ## containment ring hovering round the core, turning (a moving part), and violet arcs; L7 a second,
 ## wider ring tilted the other way, counter-turning, a gyroscope round the core; L8 gold filigree
-## over the pylons' heads and round the lid, the core raised on a gold pedestal clear of the pylons'
-## caps, in the violet core's glow under a halo, the loudest arcs (doubled between the tips) and a
-## security bot patrolling over the pylons' caps.
+## bands round the pylons' heads and round the lid, the core raised on a gold pedestal clear of
+## the pylons' caps, in the violet core's glow under a halo, the loudest arcs (doubled between the
+## tips) and a security bot patrolling over the pylons' caps.
 static func build_antimatter_vault(p: Parts, level: int) -> void:
 	var m := p.body
 	var gold := p.tier >= Parts.Tier.GOLD
@@ -1794,8 +1794,10 @@ static func _vault_door(m: LowPolyMesh, centre: Vector3, gold: bool) -> void:
 ## A containment pylon: an armoured column on a foot with its glowing containment cell bared
 ## between two bars, under a cap whose emitter leans in towards the vault; its cell and its
 ## tip on `phase`. Returns the tip's centre. From L4 its armour is the tier's (chrome, obsidian
-## from the Obsidian tier, gold filigree over its head at the Crown) with a light seam up each face
-## of it (cyan, violet veins from the Obsidian tier); from L6 crystal inlays stand on its foot.
+## from the Obsidian tier) with a light seam up each face of it (cyan, violet veins from the
+## Obsidian tier); its cap gold from the Gold tier, obsidian on a gold lip from the Obsidian tier;
+## from L6 crystal inlays stand on its foot; at the Crown a gold filigree band rings its head's
+## foot and its emitter's horn is gold.
 static func _containment_pylon(m: LowPolyMesh, foot: Vector3, width: float, height: float, level: int, tier: int,
 		phase: float) -> Vector3:
 	var gold := tier >= Parts.Tier.GOLD
@@ -1805,14 +1807,17 @@ static func _containment_pylon(m: LowPolyMesh, foot: Vector3, width: float, heig
 		lower = Parts.OBSIDIAN
 	elif tier >= Parts.Tier.CHROME:
 		lower = Parts.CHROME
-	var upper := Parts.FILIGREE if tier >= Parts.Tier.CROWN else lower
 	m.box_chamfered(Vector3(width + 0.14, 0.12, width + 0.14), 0.04, foot, Parts.HULL_DARK)
 	m.box_chamfered(Vector3(width, height * 0.36, width), 0.04, foot, lower, square)
 	m.prism(width * 0.36, width * 0.36, height * 0.34, 16, foot + Vector3(0, height * 0.36, 0), CELL.phased(phase))
 	for side: float in [-1.0, 1.0]:
 		m.box(Vector3(0.05, height * 0.34, 0.05), foot + LowPolyMesh.turn(Vector3(side * width * 0.4, height * 0.36, 0), square),
 			Parts.ROD, square)
-	m.box_chamfered(Vector3(width, height * 0.3, width), 0.04, foot + Vector3(0, height * 0.7, 0), upper, square)
+	m.box_chamfered(Vector3(width, height * 0.3, width), 0.04, foot + Vector3(0, height * 0.7, 0), lower, square)
+	if tier >= Parts.Tier.CROWN:
+		# Under the head's seams, which start 0.05 up it.
+		m.box_chamfered(Vector3(width + 0.05, 0.08, width + 0.05), 0.02, foot + Vector3(0, height * 0.7 - 0.035, 0),
+			Parts.FILIGREE, square)
 	if level >= 4:
 		var seam := Parts.VEINS if tier >= Parts.Tier.OBSIDIAN else Parts.CYAN_STRIP.phased(phase)
 		for k: int in 4:
@@ -1826,11 +1831,17 @@ static func _containment_pylon(m: LowPolyMesh, foot: Vector3, width: float, heig
 			var corner := Vector3(side.x, 0, side.y) * (width * 0.5 + 0.02)
 			_shard(m, foot + corner + Vector3(0, 0.12, 0), 0.2, 0.05, Vector3.ZERO, PYLON_INLAY.phased(phase))
 	var cap := foot + Vector3(0, height, 0)
-	m.box_chamfered(Vector3(width + 0.08, 0.08, width + 0.08), 0.03, cap, Parts.GOLD_TRIM if gold else Parts.HULL_DARK, square)
+	if tier >= Parts.Tier.OBSIDIAN:
+		# An obsidian cap on a gold lip standing proud of it, together as tall as the gold cap.
+		m.box_chamfered(Vector3(width + 0.14, 0.04, width + 0.14), 0.012, cap, Parts.GOLD_TRIM, square)
+		m.box_chamfered(Vector3(width + 0.08, 0.04, width + 0.08), 0.02, cap + Vector3(0, 0.04, 0), lower, square)
+	else:
+		m.box_chamfered(Vector3(width + 0.08, 0.08, width + 0.08), 0.03, cap, Parts.GOLD_TRIM if gold else Parts.HULL_DARK,
+			square)
 	var inward := Vector3(-foot.x, 0, -foot.z).normalized()
 	var lean := Vector3(40, rad_to_deg(atan2(inward.x, inward.z)), 0)
 	var horn := cap + Vector3(0, 0.08, 0)
-	m.prism(0.07, 0.05, 0.24, 16, horn, Parts.HULL_MID_ROUND, lean)
+	m.prism(0.07, 0.05, 0.24, 16, horn, Parts.GOLD_ROUND if tier >= Parts.Tier.CROWN else Parts.HULL_MID_ROUND, lean)
 	var tip := horn + LowPolyMesh.turn(Vector3(0, 0.24, 0), lean)
 	m.box_chamfered(Vector3(0.1, 0.06, 0.1), 0.02, tip, PYLON_TIP.phased(phase), lean)
 	return tip + LowPolyMesh.turn(Vector3(0, 0.03, 0), lean)
