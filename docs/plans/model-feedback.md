@@ -98,14 +98,37 @@ parts (5 commits, to 3c582d2), core (3, to 76062d5), defense (5, to d204552), ar
   crystal), low round the crystal (the owner: "the lasers are angled upwards"), and finally at
   1.1× the aimed shard's height, radius 0.7 / 0.8 / 1.0 by level, each beam running down into the
   crystal at 43–53°, aimed at 0.62 of its height (0.77 at L10, over the gold collar).
-- The metal silo's guard flies a tight round in the front gap at mid-height (no round about the
-  middle clears the twin tanks); the vault's flies over the pylon caps at 3.3.
+- The metal silo's guard first flew a tight round in the front gap at mid-height (no round about
+  the middle clears the twin tanks), which the owner read as "spinning in place"; it now flies the
+  crystal silo's round (r 1.38, rate 0.5) at 3.95, the lowest height over the far tank's vent cap
+  (§4). The vault's flies over the pylon caps at 3.3.
 - The extractor's stacks keep 2 puffs below Chrome (the Base budget) and 4 from L6.
 - The dry dock's low welder arrives at L6 and the high one at L7, so L6 keeps a bold change.
-- The academy's L10 parade (troopers at scale 0.8) replaces the target posts; the plinth moves.
+- The academy's L10 parade (troopers at scale 0.8) replaced the target posts for a day; it is
+  gone again (§4) and L10 keeps L9's courtyard.
 - `Parts.puffs` defaults to 8×3 orbs so four puffs fit the fabricator's Base budget.
-- Kept for the owner to veto: the plasma mortar's balcony troopers, the academy's marching
-  cadets; the siphon lost its drone with no replacement.
+- The plasma mortar's balcony troopers and the academy's marching cadets were kept for the
+  owner to veto, and the owner vetoed both (§4); the siphon lost its drone with no replacement.
 
 Parked (memory, `model-feedback-leftovers`): a per-part RISE drift, the harness blind to RISE's
 climb and to black rendered frames, the HUD meter's steel blue against the models' teal metal.
+
+## 4. The owner's second round (2026-10-16)
+
+Five small changes after seeing the pass in the game, four lanes in parallel, each reviewed:
+
+- **No human figures yet.** "We haven't finalized the design of what the humans will look like,
+  so it's not the time for that yet." The plasma mortar's troopers are gone and its balcony is
+  an ammunition rack: an obsidian octagonal pedestal where the loader arm stands, three upright
+  plasma canisters banded gold in a gunmetal cradle beside it. The academy's marching cadets and
+  their parade ring are gone; its L10 keeps L9's courtyard (posts and plinth in place). The
+  hologram cadet on the plinth was not named and stays. `Parts.escort_troopers` stays in
+  `parts.gd` for the day the human design is settled.
+- **The metal silo's guard flies round the silo** like the crystal silo's: r 1.38, rate 0.5,
+  at 3.95, the lowest height whose skirt clears the far tank's gold vent cap (3.67) at the bob's
+  low point; a round at the body's mid-height would reach past the 1.65 bound.
+- **Four antimatter siphons** at Command Center 10 (`max_count` `[0,0,0,1,2,2,3,3,3,4]`); the
+  template base lays the fourth out by itself (113 buildings, the bands unchanged; 1,140 draw
+  calls and 1.71M primitives at the widest zoom on the Mac).
+- **The vault's pylon caps** from the Obsidian tier are obsidian slabs on a thin gold lip; at L8
+  the head is veined obsidian ringed by a gold filigree band at its foot, the emitter horn gold.
