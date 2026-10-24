@@ -169,28 +169,41 @@ it is logged), and the raid logged with the field's inputs, not its layout; then
 must start epoch 1 with every field new and the next scan wait. `main.state` is untouched.
 Headless; no screenshots.
 
+`scenarios/make_abilities.gd` drives the Foundry's HUD (`docs/reference/hud.md`, **Making panel**,
+**Research panel**) on the Template base: the Nanite Foundry selected by a tap, its info panel's
+"Stock N / C" line and Make; the making page's cards in stock 0; two abilities queued from their
+cards, paid for and shown in the queue strip with the head's time; the newest cancelled from the
+strip and refunded; the first made into the stock, on its card and on the stock line; then the
+Research Lab's research page with the abilities after the units, the Repair Swarm's level 2
+researched from its card, paid for and on the progress line, a unit's research refused while it
+runs, and the level reached. Screenshots: the info panel, the making page, the stock, the research
+page scrolled to the abilities.
+
 `scenarios/battle_view.gd` drives the battle view and its attack HUD
 (`docs/reference/battle-view.md`, `docs/reference/hud.md`, **Battle HUD**) on the debug build's
 Practice raid: the Practice raid button with the Hangars empty is refused with its toast; then the
 practice setup on the template base, given the battle scenario's army at its top levels and a seed
 other than the base's (the field checked to stand in another landscape), is opened through
-`main.open_battle` (the base's view and input out of the tree, its HUD hidden, the `BattleHud`
-shown with the first card selected and the red zone up). Through the HUD: the Ranger's card, a tap
+`main.open_battle` (the base's view and input out of the tree, its HUD hidden, the `BattleHud` shown
+with the first card selected and the red zone up). Through the HUD: the Ranger's card, a tap
 deploying one, a tap in the zone refused with "Can't deploy there", a drag over four cells deploying
 one a tick. The rest of the army goes down in the battle scenario's three groups from tick 60, each
-spread over the deploy cells within two of its point, sent live through `script_commands`.
-Rendered only, once the whole army is down, the battle is paused (`speed` 0) and measured at the
-widest zoom in a 1600×900 window, as `template_base` measures the base: the draw calls, primitives
-and render CPU a frame against the same ceilings (1,600, 2.1 million, 6 ms), with the slowest
-frame's process time, the frame rate and the units drawn. Then the top bar checked against the
-sim, the speed button to 2x, at tick 1,000 End, Keep fighting, End again and End battle, the result
-panel in the deploy bar's place, and Return. Screenshots: tick 0, the smear, ticks 200 and 1,000,
-the confirmation, the result panel and the base after it. It checks the sim's step under 5 ms on
-average and logs its longest and the tick it fell on; the result against a headless
-`BattleSim.run` of the setup with the commands the view sent (equal text, hash included); every
-unit deployed; something fallen; the base back with the toast "Practice: nothing applied", the
-camera where it was and its save as it was but for its clock. About a minute headless, under two
-rendered.
+spread over the deploy cells within two of its point, sent live through `script_commands`. Rendered
+only, once the whole army is down, the battle is paused (`speed` 0) and measured at the widest zoom
+in a 1600×900 window, as `template_base` measures the base: the draw calls, primitives and render
+CPU a frame against the same ceilings (1,600, 2.1 million, 6 ms), with the slowest frame's process
+time, the frame rate and the units drawn. At tick 200, through the abilities bar (two of each
+ability brought): the orbital strike cast on the nearest defence (its marker, its blast, the
+defence's hull down after it lands), an EMP burst on the next (disabled in the sim and dimmed), a
+repair swarm on a living unit (its dome), the cards counting down. Then the top bar checked against
+the sim, the speed button to 2x, at tick 1,000 End, Keep fighting, End again and End battle, the
+result panel in the deploy bar's place, and Return. Screenshots: tick 0, the smear, tick 200, the
+strike's marker and blast, the EMP, the swarm, tick 1,000, the confirmation, the result panel and
+the base after it. It checks the sim's step under 5 ms on average and logs its longest and the tick
+it fell on; the result against a headless `BattleSim.run` of the setup with the commands the view
+sent (equal text, hash included); every unit deployed; the result panel's abilities used; something
+fallen; the base back with the toast "Practice: nothing applied", the camera where it was and its
+save as it was but for its clock. About a minute headless, under two rendered.
 
 `scenarios/model_gallery.gd` shows every building model: one `BuildingView` per type and level
 in the catalog, laid out on the grid in rows by category (`"core"`, then

@@ -17,12 +17,17 @@ extends HarnessScenario
 ## BattleView.script_commands. Rendered only, once the whole army is down, the battle is paused
 ## (speed 0) and measured at the widest zoom in a MEASURE window (_measure): the draw calls,
 ## primitives and render CPU time a frame against the Cost ceilings, the slowest frame's process
-## time, the frame rate and the units drawn. The top bar is checked against the sim; the speed
+## time, the frame rate and the units drawn. At tick 200, through the abilities bar (two of each
+## ability brought, ABILITIES_EACH): the orbital strike on the nearest defence, its marker, its bolt
+## from the sky, its blast and its smoke a few ticks after shot and the defence's hull down; an EMP burst on the next, disabled in the sim
+## and dimmed; a repair swarm on a living unit, its dome shot; the Ranger's card selected again.
+## The top bar is checked against the sim; the speed
 ## button takes the battle to 2x; at tick 1,000 End asks (a real touch beside it, the kept Ranger
 ## selected, deploys nothing), Keep fighting goes back, End battle
 ## surrenders, and the result panel replaces the deploy bar; the battle stays until Return.
-## Screenshots: tick 0 (the red zone and the toast), the smear, tick 200, tick 1,000, the
-## confirmation, the result panel, the base after it. The sim's step time is checked against
+## Screenshots: tick 0 (the red zone and the toast), the smear, tick 200, the strike's marker,
+## bolt, blast and after, the EMP, the swarm, tick 1,000, the confirmation, the result panel (its abilities used),
+## the base after it. The sim's step time is checked against
 ## STEP_CEILING.
 ##
 ## At the end: the sim's result equals a headless BattleSim.run of the same setup with the
@@ -30,8 +35,11 @@ extends HarnessScenario
 ## was deployed and something fell; `finished` brought the base back (its view and input in the
 ## tree, its HUD shown, the toast "Practice: nothing applied", the camera where it was), and the
 ## base's save is as it was but for its clock. Last, a practice battle bringing one of every unit
-## type: the deploy bar ends left of the Build column (it scrolls), then End and Return.
+## type and every ability: both bars end left of the Build column (the deploy bar scrolls), then
+## End and Return.
 
+## Each ability brought, two of each.
+const ABILITIES_EACH := 2
 const ARMY := {"ranger": 100, "brawler": 40, "jet_trooper": 20, "hover_tank": 5, "gunship": 2}
 const LEVEL := 8
 ## The battle's seed: not BaseView.SCENERY_SEED, so the field stands in a landscape of its own.
@@ -88,7 +96,10 @@ func run(main: MainScript) -> void:
 	for unit: String in ARMY:
 		levels[unit] = LEVEL
 	setup["seed"] = SEED
-	setup["attacker"] = {"army": ARMY, "unit_levels": levels, "abilities": {}}
+	var stock := {}
+	for ability: String in catalog.ability_types():
+		stock[ability] = ABILITIES_EACH
+	setup["attacker"] = {"army": ARMY, "unit_levels": levels, "abilities": stock, "ability_levels": {}}
 	var zoom := main.camera.size
 	var focus_before := main.camera.focus
 	var error := main.open_battle(setup, true)
@@ -207,6 +218,7 @@ func run(main: MainScript) -> void:
 	_frame(main, CLOSE_ZOOM, focus)
 	await _until_tick(view, CLOSE_TICKS[1])
 	await screenshot("tick-%d" % CLOSE_TICKS[1])
+	await _cast_abilities(main, view, hud)
 	check(hud.timer_text() == "%d:%02d" % [view.sim.seconds_left() / 60, view.sim.seconds_left() % 60]
 		and hud.destruction_text() == "%d%% destruction" % view.sim.destruction_pct()
 		and hud.stars_lit() == view.sim.stars(),
@@ -238,6 +250,9 @@ func run(main: MainScript) -> void:
 	while not view.sim.is_over():
 		await frames(1)
 	await frames(4)
+	var lines := hud.result_lines()
+	check(lines.has("Abilities used") and lines.has("Orbital Strike x1") and lines.has("EMP Burst x1")
+		and lines.has("Repair Swarm x1"), "the result panel lists the abilities used")
 	check(hud.is_result_open() and not hud.deploy_bar().visible, "the result panel replaces the deploy bar: %s"
 		% ", ".join(hud.result_lines()))
 	await screenshot("end")
@@ -273,20 +288,26 @@ func run(main: MainScript) -> void:
 	await frames(4)
 	await screenshot("back")
 
-	# Every unit type brought, one each: the deploy bar scrolls rather than reach the Build column.
+	# Every unit type and every ability brought, one each: both bars stay left of the Build column,
+	# the deploy bar scrolling in what the abilities bar leaves.
 	var every := {}
 	for unit: String in catalog.unit_types():
 		every[unit] = 1
 	var wide := main.practice_setup()
-	wide["attacker"] = {"army": every, "unit_levels": {}, "abilities": {}}
+	var three := {}
+	for ability: String in catalog.ability_types():
+		three[ability] = 1
+	wide["attacker"] = {"army": every, "unit_levels": {}, "abilities": three}
 	_finished = false
 	check(main.open_battle(wide, true) == "", "a battle with one of every type opens")
 	await frames(4)
 	var bar := main.battle_hud.deploy_bar().get_global_rect()
 	var safe := Hud.safe_area(main.get_viewport())
 	var column := safe.end.x - Hud.MARGIN - Hud.BUILD_SIZE.x
-	check(bar.end.x <= column, "with %d types the deploy bar ends at x %.0f, left of the Build column at %.0f"
-		% [every.size(), bar.end.x, column])
+	var abilities := main.battle_hud.ability_bar().get_global_rect()
+	check(bar.end.x <= column and abilities.end.x <= column and abilities.position.x > bar.end.x,
+		"with %d types and %d abilities the deploy bar ends at x %.0f and the abilities bar runs from %.0f to %.0f, left of the Build column at %.0f"
+		% [every.size(), three.size(), bar.end.x, abilities.position.x, abilities.end.x, column])
 	await screenshot("every-type")
 	main.battle.finished.connect(func(_setup: Dictionary, _result: Dictionary) -> void: _finished = true)
 	main.battle_hud.end_button().pressed.emit()
@@ -297,6 +318,92 @@ func run(main: MainScript) -> void:
 		await frames(1)
 	await frames(2)
 	check(main.battle == null, "it ends and the base comes back")
+
+
+## Through the abilities bar: the strike cast on a standing defence (its marker, then its blast,
+## the defence's hull down after it lands), an EMP burst on another (it dims, disabled in the sim),
+## and a repair swarm on a living unit (its dome); each card counts down, and selecting an ability
+## lets the unit type go and hides the red zone.
+func _cast_abilities(main: MainScript, view: BattleView, hud: BattleHud) -> void:
+	var brought := view.abilities_brought()
+	check(brought.size() == 3, "the abilities bar brings %s" % ", ".join(brought))
+	for ability: String in brought:
+		check(hud.ability_card(ability).is_visible_in_tree() and hud.ability_count(ability) == "x%d" % ABILITIES_EACH,
+			"%s's card shows x%d (%s)" % [ability, ABILITIES_EACH, hud.ability_count(ability)])
+	var defences := _standing_defences(main, view)
+	check(defences.size() >= 2, "%d defences stand" % defences.size())
+	if defences.size() < 2:
+		return
+	view.speed = 1
+	# The strike.
+	var target: int = defences[0]
+	var hp := view.sim.building_hp(target)
+	hud.ability_card("orbital_strike").pressed.emit()
+	check(view.cast_ability == "orbital_strike" and view.deploy_unit == "" and view.field.deploy_strength() == 0.0,
+		"the strike's card selects it, the unit let go and the red zone hidden")
+	var at := _centre(main, view, target)
+	_frame(main, CLOSE_ZOOM, at)
+	var tick := view.sim.tick
+	view.input.tapped.emit(main.camera.unproject_position(at))
+	check(view.sim.left_to_use("orbital_strike") == ABILITIES_EACH - 1, "a tap cast the strike on the %s (id %d)"
+		% [view.building_type(target), target])
+	await _until_tick(view, tick + 4)
+	await screenshot("strike-marker")
+	await _until_tick(view, tick + 26)
+	await screenshot("strike-bolt")
+	await _until_tick(view, tick + 34)
+	await screenshot("strike-blast")
+	await _until_tick(view, tick + 41)
+	await screenshot("strike-after")
+	check(view.sim.is_destroyed(target) or view.sim.building_hp(target) < hp, "the strike landed: hull %d of %d"
+		% [view.sim.building_hp(target), hp])
+	# The EMP burst.
+	var turret: int = defences[1]
+	hud.ability_card("emp_burst").pressed.emit()
+	at = _centre(main, view, turret)
+	_frame(main, CLOSE_ZOOM, at)
+	view.input.tapped.emit(main.camera.unproject_position(at))
+	await _until_tick(view, view.sim.tick + 2)
+	check(view.sim.left_to_use("emp_burst") == ABILITIES_EACH - 1 and view.sim.building_disabled(turret)
+		and view.is_shown_disabled(turret), "the EMP burst disabled the %s (id %d), dimmed"
+		% [view.building_type(turret), turret])
+	await screenshot("emp")
+	# The repair swarm, on a living unit.
+	var unit := 0
+	for id: int in range(1, view.sim.unit_count() + 1):
+		if view.sim.unit_state(id) != BattleArmy.DEAD:
+			unit = id
+			break
+	hud.ability_card("repair_swarm").pressed.emit()
+	if unit != 0:
+		at = view.units.aim_point(unit)
+		at.y = 0.0
+		_frame(main, CLOSE_ZOOM, at)
+		view.input.tapped.emit(main.camera.unproject_position(at))
+		await _until_tick(view, view.sim.tick + 4)
+	check(view.sim.left_to_use("repair_swarm") == ABILITIES_EACH - 1, "a tap cast the swarm on unit %d" % unit)
+	await screenshot("swarm")
+	check(hud.ability_count("orbital_strike") == "x%d" % (ABILITIES_EACH - 1), "the cards count down")
+	# Back to the Rangers, as the rest of the scenario has them.
+	hud.card("ranger").pressed.emit()
+	check(view.deploy_unit == "ranger" and view.cast_ability == "", "the Ranger's card takes the selection back")
+
+
+## The standing, drawn defences, the nearest the first group's point first.
+func _standing_defences(main: MainScript, view: BattleView) -> Array[int]:
+	var found: Array[int] = []
+	var near := main.base_view.cell_to_world(POINTS[0], 1)
+	for id: int in view.sim.building_ids():
+		if not view.sim.is_destroyed(id) and view.is_revealed_defence(id):
+			found.append(id)
+	found.sort_custom(func(a: int, b: int) -> bool:
+		return _centre(main, view, a).distance_to(near) < _centre(main, view, b).distance_to(near))
+	return found
+
+
+## Building `id`'s centre on the ground.
+func _centre(_main: MainScript, view: BattleView, id: int) -> Vector3:
+	return view.building_centre(id)
 
 
 ## A real touch at `point` (a press and a release), through the input events.
