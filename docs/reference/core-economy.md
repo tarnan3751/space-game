@@ -190,9 +190,8 @@ Checks, in the order they are made:
 | `ERR_STOCK_ROOM` | `not_enough_stock_room` |
 | `ERR_NOT_ENOUGH_ABILITIES` | `not_enough_abilities` |
 
-`Hud.ERROR_TEXT` maps these to player-facing text (`hud.md`); a code it does not know shows as
-the raw code, as `not_a_foundry`, `needs_foundry_level`, `not_enough_stock_room` and
-`not_enough_abilities` do until the Foundry's HUD maps them.
+`Hud.ERROR_TEXT` maps these to player-facing text (`hud.md`, **Messages**); a code it does not
+know shows as the raw code.
 
 ### Buildings, levels and builders
 

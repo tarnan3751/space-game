@@ -89,7 +89,7 @@ so its parts — the Build button above all — draw over the panel.
 | Build button | bottom right, `MARGIN` from the safe area's corner, 128×64 | "BUILD" on gold; toggles the build panel (**Build panel**). Hidden while placing or painting. |
 | Build panel | bottom, the screen's full width | Slides up over the bottom of the screen (**Build panel**). |
 | Place bar | bottom centre | A panel holding `Cancel` and `Place` (170×72); `Place` is disabled unless the ghost is valid. While walls are painted it reads `Done` and is always enabled: there is nothing to confirm. |
-| Info panel | bottom centre, 460 wide | Title `"Name   Lv N"` with Train or Research (a finished producer or research building only) and a `Close` button; detail lines (**Info panel**); the upgrade button; a note under it. |
+| Info panel | bottom centre, 460 wide | Title `"Name   Lv N"` with Train, Make or Research (a finished producer, Foundry or research building only) and a `Close` button; detail lines (**Info panel**); the upgrade button; a note under it. |
 | Army panel | bottom, the screen's full width | Slides up in the build panel's place: a producer's training or the lab's research (**Army panel**). |
 | Toast | top centre, 96 down | A small panel with a centred line that fades out after 1.8 s over 0.6 s, then hides. |
 | Debug row | debug builds only (`OS.is_debug_build()`): the top bar's second row, right-aligned | Practice raid, which emits `practice_pressed`, Template base, which emits `template_pressed`, then Reset base, which emits `reset_pressed`, 16 apart. On a row of its own so a long top bar never runs under it. |
@@ -168,6 +168,14 @@ bulb on top, over a darker shoulder bar. An air unit (`unit_class` `air`, `HudIc
 wing mark at the box's lower right, a swept white wing with its ink outline. `show_icon(kind,
 winged)` swaps a glyph in place, redrawing only when either changed, as a queue entry does when
 the queue moves.
+
+**Ability glyphs.** An ability has no model, so the making and research cards, the making queue's
+entries and the battle's abilities bar and result panel show its glyph by its effect
+(`catalog.ability_effect`), in its effect's colour (`Hud.ABILITY_COLORS`, set by
+`Hud.show_ability_glyph`): **swarm** a cluster of seven round nanites with lighter facets in
+nanite green; **emp** a ring with eight sparks shooting out of it round a bright core in arc
+blue; **strike** a crosshair (a ring and four ticks, ink bands round a core of the colour) with a
+hazard-yellow bolt falling into it from the upper right, in defence red.
 
 **One draw call each.** The renderer draws every `draw_colored_polygon` and `draw_polyline` on
 its own, so an icon drawn with them would cost a draw call per part. `HudIcon.Pen` builds a whole
@@ -321,6 +329,7 @@ constructed), one line each, only when the level has the stat, in this order:
 | Houses 1 drone | `builders` above 0 |
 | Capacity 20 | `capacity` (army) |
 | Army housed 12 / 20 | the Hangar (`catalog.housing_type`): the base's `housing_used()` / `housing_capacity()` |
+| Stock 2 / 6 | the Nanite Foundry (`catalog.foundry_type`): the base's `stock_total()` / `foundry_capacity()` |
 | Damage 12   Range 7 | `damage` and `range_cells`; either alone when the level has only one |
 | Fires every 0.8 s | `fire_ms` |
 | Targets ground / air / air and ground | `catalog.targets_of(type)` |
@@ -341,7 +350,8 @@ note when `state.check_upgrade` fails. Pressing emits `upgrade_pressed`; `Close`
 `close_pressed`.
 
 Beside `Close`, a finished producer (a type `catalog.units_of_producer` names, at level 1 or
-more) shows **Train** and the finished research building (`catalog.research_type`) **Research**,
+more) shows **Train**, the finished Foundry (`catalog.foundry_type`) **Make** and the finished
+research building (`catalog.research_type`) **Research**,
 112×44, cyan with ink text in Bangers 22 like Place. Pressing it opens the army panel on that page
 in the info panel's place (**Army panel**).
 
@@ -353,7 +363,8 @@ slide (`_slide`, **Build panel**), and the same column kept clear on the right f
 button. Its height is its content's, with the build panel's (288 at 720p) as the minimum: the
 training page is about 308 at 720p (310 once the queue strip scrolls and shows its bar), the
 research page about 290. A header, the building's `"Name   Lv N"` in Bangers 24 with the close button (48×48,
-"X") at the right, over one of two pages. The panel stops every touch on it; its layout
+"X") at the right, over one of three pages: training, making (the training page's, its unit
+cards swapped for the ability cards) or research. The panel stops every touch on it; its layout
 containers take none. The close button slides it down and shows the building's info panel again,
 still selected. Hidden while closed.
 
@@ -378,6 +389,19 @@ queue the strip reads "Nothing in training". Tapping an entry emits
 "Refunded". Entries are made as the queue first grows that long and kept; after that a rebuild
 only sets text and swaps glyphs, and nothing is allocated per frame (**Refresh**).
 
+**Making panel.** The Foundry's page: a strip of ability cards (200×140), one per ability in
+`catalog.ability_types()` order, laid out as a training card: the stripe, the ability's glyph
+(48×48, **Ability glyphs**), its name, its make cost at its current level (`ability_level`) in its
+resources' colours and its make time (`ability_make_seconds`), then "In stock N" (`stock`). An
+ability the Foundry's finished level does not make yet (`ability_requires_foundry`) is locked:
+disabled, at 55 %, its last line "Needs Nanite Foundry L". Tapping a card emits
+`make_pressed(id, ability)`; `main.gd` queues one through `PlacementController.make` and toasts
+the error when it fails. Under the cards the training page's queue strip, its entries the queued
+abilities (`making_queue_of`) with their glyphs and names, the head's state from `making_status`
+and `making_seconds_left` ("Waiting for room": the stock is full), "Nothing being made" when
+empty; tapping an entry emits `cancel_making_pressed(id, ability)`, which cancels the newest of
+that ability (`PlacementController.cancel_making`) and toasts "Refunded".
+
 **Research panel.** Under the header a line naming the research running, "Researching Ranger to
 Lv 2: 30s left" (`research_unit`, `research_seconds_left`), or "No research running"; under it a
 strip of cards (200×164), one per unit the base has unlocked (`is_unit_unlocked`), in `units.json`
@@ -387,6 +411,14 @@ top level, "Max level" with no cost. A card whose lab level the lab lacks, or at
 at 55 % with its lab level in the warning colour, but still takes a tap. Tapping a card emits
 `research_pressed(unit)`; `main.gd` starts the research through `PlacementController.research`
 or toasts why not, in `research_error_text` (**Messages**). There is nothing to cancel.
+
+After the units' cards come the abilities', every ability in `catalog.ability_types()` order: the
+glyph, the name, "Level N", the next level's research cost and time, and "Needs Lab L", "Needs
+Nanite Foundry L" while no Foundry makes it yet (`is_ability_unlocked`), "Researching", or "Max
+level"; dimmed in the same cases. Tapping one emits `research_ability_pressed(ability)`, which
+`main.gd` sends through `PlacementController.research_ability`, toasting in `research_error_text`.
+The progress line names an ability's research too ("Researching Repair Swarm to Lv 2: …",
+`research_ability`); a unit's and an ability's share the one slot.
 
 ## Safe area
 
@@ -414,8 +446,8 @@ that inset stays until the device's safe area changes.
 `src/game/battle_hud.gd`, `BattleHud`: the attack HUD, a `CanvasLayer` `main.gd` adds beside a
 battle (`battle-view.md`) while the base's HUD is hidden. It takes the base HUD's theme
 (`Hud.ui_theme()`) and its pictures (`Hud.preview()`), reads the `BattleView` and its sim, and
-reports presses to the view (`select_unit`, `speed`, `surrender`, `leave`); it never changes the
-sim itself. Its root takes no touch and sits in the safe area (`Hud.safe_area`, fitted on a resize
+reports presses to the view (`select_unit`, `select_ability`, `speed`, `surrender`, `leave`); it
+never changes the sim itself. Its root takes no touch and sits in the safe area (`Hud.safe_area`, fitted on a resize
 and when the timer's second changes); its panels and buttons take theirs.
 
 | Part | Where | What |
@@ -424,16 +456,17 @@ and when the timer's second changes); its panels and buttons take theirs.
 | Speed and End | top right | `1x`/`2x`, toggling `BattleView.speed` through `SPEEDS`; End, which opens the confirmation |
 | Loot | top right, under them | "Loot" over a row per resource: its icon (`HudIcon`) and the amount taken so far (`loot()`, `Format.short`) in its colour |
 | Deploy bar | along the bottom from the left margin, as wide as its cards (and scrolling when they would reach the Build button's column, which stays clear), the rest of the bottom edge left to the field | a `MenuPanel` with a strip of cards (124×136), one per unit type brought in sorted order: the unit's picture (64×64, its attacker's level's tier), its name and "xN" left (`left_to_deploy`). A press selects the type (the accent fill, `TabSelected`, its text in ink) or, on the selected card, lets it go; the first card starts selected. A type run out is let go and its card shown at 55 %. Cards PASS, so a drag on one scrolls the strip |
+| Abilities bar | along the bottom, right of the deploy bar after a 16-unit gap, as wide as its cards; the deploy bar scrolls in what is left, the Build column still clear; hidden when no ability is brought | a `MenuPanel` with a card per ability brought (above 0) in the catalog's order: its glyph (**Ability glyphs**), its name and "xN" left (`left_to_use`). A press selects the ability and lets the unit type go, so the red zone hides (a unit card's press does the reverse); on the selected card it lets it go. A tap on the field then casts it at the cell, anywhere on the field (`BattleView.cast`); a drag pans. An ability run out is let go and its card shown at 55 % |
 | Confirmation | centred, over a faint ink dim across the whole screen that takes every touch while it is open, so no tap or drag beside the panel reaches the field | "End the battle?", Keep fighting (accent) and End battle, which surrenders (`BattleView.surrender`) |
-| Result panel | centred, on `ended` | "Victory!" with a star or more, else "Defeat"; the stars (64×64); "N% destruction"; the loot per resource; "Units deployed" with each type's picture and "Name xN" (the result's `deployed`), or "No units deployed"; Return, which leaves the battle (`BattleView.leave`). The deploy bar hides and Speed and End are disabled |
-| Toast | top centre | a refused deploy (`deploy_failed`): "Can't deploy there" (`blocked`), "None of those left" (`none_left`: a tap never meets it, since a card run out is let go at once, but a smear can when a frame steps several ticks and the type runs out between two), faded after a second |
+| Result panel | centred, on `ended` | "Victory!" with a star or more, else "Defeat"; the stars (64×64); "N% destruction"; the loot per resource; "Units deployed" with each type's picture and "Name xN" (the result's `deployed`), or "No units deployed"; "Abilities used" with each ability's glyph and "Name xN" (the result's `abilities_used`) when any was; Return, which leaves the battle (`BattleView.leave`). The deploy and abilities bars hide and Speed and End are disabled |
+| Toast | top centre | a refused cast (`cast_failed`): "Can't cast there" (`blocked`, off the field), "None of those left" (`none_left`); a refused deploy (`deploy_failed`): "Can't deploy there" (`blocked`), "None of those left" (`none_left`: a tap never meets it, since a card run out is let go at once, but a smear can when a frame steps several ticks and the type runs out between two), faded after a second |
 
 The top bar's text is set on the view's `stepped`, only where what it shows changed: the time,
 the destruction, the stars and each card's count are kept as ints and formatted only when one
 moves, and the loot is read (`BattleSim.loot()` builds a dictionary) only after a building has
 fallen (`BattleView.falls()`), so a refresh with nothing changed allocates nothing. Queries for
 the harness: `card(unit)`, `card_count(unit)`, `card_picture(unit)`, `timer_text()`,
-`destruction_text()`, `stars_lit()`, `loot_text(res)`, `speed_button()`, `end_button()`,
+`ability_card(ability)`, `ability_count(ability)`, `destruction_text()`, `stars_lit()`, `loot_text(res)`, `speed_button()`, `end_button()`,
 `is_confirm_open()`, `confirm_end_button()`, `keep_button()`, `is_result_open()`,
 `result_lines()`, `return_button()`, `deploy_bar()`, `toast_text()`.
 
@@ -452,6 +485,9 @@ the harness: `card(unit)`, `card_count(unit)`, `card_picture(unit)`, `timer_text
 | `train_pressed(id, unit)` | a training card | `main._on_train_pressed`: `placement.train`, an error toasted |
 | `cancel_training_pressed(id, unit)` | a queue entry | `main._on_cancel_training_pressed`: `placement.cancel_training`, "Refunded" or the error toasted |
 | `research_pressed(unit)` | a research card | `main._on_research_pressed`: `placement.research`, an error toasted in `research_error_text` |
+| `make_pressed(id, ability)` | a making card | `main._on_make_pressed`: `placement.make`, an error toasted |
+| `cancel_making_pressed(id, ability)` | a making queue entry | `main._on_cancel_making_pressed`: `placement.cancel_making`, "Refunded" or the error toasted |
+| `research_ability_pressed(ability)` | an ability's research card | `main._on_research_ability_pressed`: `placement.research_ability`, an error toasted in `research_error_text` |
 
 ## Queries for the harness
 
@@ -470,12 +506,15 @@ Practice raid (null in a release build). `train_card_picture(unit)` is a trainin
 (null until rendered); `ui_theme()` and `preview()` hand the theme and the pictures to the battle's
 HUD.
 The army: `army_meter()`, `army_meter_text()` and `army_fill()` are the army meter, its text and
-its fill; `action_button()` is the info panel's Train or Research; `army_panel()` the army panel,
-`is_training_open()` and `is_research_open()` which page it shows (open or opening),
+its fill; `action_button()` is the info panel's Train, Make or Research and `info_detail()` its
+lines; `army_panel()` the army panel, `is_training_open()`, `is_making_open()` and
+`is_research_open()` which page it shows (open or opening),
 `army_close_button()` its close button and `army_title()` its header; `train_card(unit)` and
 `train_card_info(unit)` a training card and its last line; `queue_shown()` the queued units the
 strip shows, `queue_entry(index)` an entry and `queue_head_status()` the head's state;
-`research_card(unit)`, `research_card_lines(unit)` (its level line and its last line) and
+`make_card(ability)` and `make_card_info(ability)` a making card and its last line;
+`research_card(unit)`, `research_card_lines(unit)` (its level line and its last line), the same for
+an ability (`research_ability_card(ability)`, `research_ability_card_lines(ability)`) and
 `research_line()` the research page's; `toast_text()` the toast's text while it shows.
 `MENU_OPEN_SECONDS` and `MENU_CLOSE_SECONDS` say how long to wait for a slide.
 
@@ -504,6 +543,12 @@ is none:
 | `bad_raid` | That battle does not add up |
 | `not_enough_units` | Not enough units for that battle |
 | `unknown_ability` | Unknown ability |
+| `scan_cooldown` | The scanner is still cooling down |
+| `bad_expedition` | That expedition does not add up |
+| `not_enough_abilities` | Not enough abilities for that battle |
+| `not_a_foundry` | This building does not make that |
+| `needs_foundry_level` | Needs a higher Nanite Foundry |
+| `not_enough_stock_room` | The Foundry's stock is full |
 
 `research_error_text(code)` is the research panel's: `busy` there means the lab's one research
 slot is taken, "Research already running"; any other code is `error_text(code)`.

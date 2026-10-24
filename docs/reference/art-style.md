@@ -1092,6 +1092,7 @@ only when it is the toon surface, so its holograms keep their look.
 | Placement ghost (`set_ghost(valid)`, from `PlacementController` as its spot is checked) | the body instances take `ghost_valid` or `ghost_invalid`: the toon shader with energy cyan or defence red mixed in at 0.65; the outline stays plain ink, though the ghost is lifted |
 | Under construction | the scaffold, a model like any other, outlined; a construction drone works over it, and over a building being upgraded (**Construction drone**) |
 | Hit in battle (`set_flash(on)`, from `BattleView` for a moment after each hit) | the body instances take `hit_flash`: the toon shader with white mixed in at 0.6 (`HIT_FLASH_MIX`); the outlines stay plain ink |
+| Disabled in battle (`set_disabled(on)`, from `BattleView` while an EMP burst has the building disabled) | the body instances take `disabled`: the toon shader with grey (`DISABLED_GREY`) mixed in at 0.5; a hit's flash shows over it; the outlines stay plain ink |
 
 A wall drawn by the merged wall mesh hides its own model, outlines included (`set_merged`), so a
 selected merged wall shows its footprint tile and no gold, and the merged outline stays plain ink.
@@ -1455,8 +1456,8 @@ The finished walls are one merged mesh, a fixed handful of draws however many th
 (`input-camera.md`, **Walls**).
 
 **A battle** on the maxed base with a full army (the `battle_view` scenario's 167 units, 280
-housing) is held to the same ceilings at the widest zoom: 974 draw calls (1,031 with the attack
-HUD), 2.00 million primitives
+housing) is held to the same ceilings at the widest zoom: 974 draw calls (about 1,045 with the
+attack HUD and the abilities bar), 2.00 million primitives
 and 1.6 ms of render CPU a frame on the development Mac, the units in their far versions
 (`battle-view.md`, **Cost**). Every unit of a type is three draws (one MultiMesh for the body, one
 for its outline, the body's shadow), every effect kind one.

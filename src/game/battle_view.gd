@@ -23,6 +23,11 @@ extends Node3D
 ## texel a cell, BaseView.set_deploy_mask), a tap on the field deploys one there, and a drag deploys
 ## one on every cell it crosses, one a tick at most (Clash's smear); with none selected a drag pans.
 ## A refusal is told through `deploy_failed`, and a refusal for the zone flashes the red brighter.
+## With an ability selected instead (select_ability, the abilities bar), the red zone hides, a tap
+## casts it at the cell (anywhere on the field), a drag pans, and a refusal is told through
+## `cast_failed`. The abilities' effects come from the sim's ABILITY and STRIKE_LAND events: a
+## swarm's dome, an EMP's ring and the defences it disabled dimmed until they wake, a strike's
+## marker until it lands and its blast and smoke.
 ##
 ## main.gd makes it, adds it in place of the base's view with its BattleHud, and frees both on
 ## `finished`, which leave() emits (the result panel's Return) with the setup and the sim's result;

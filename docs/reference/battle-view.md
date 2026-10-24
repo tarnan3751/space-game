@@ -27,7 +27,8 @@ the game's tick advances it and saves it as ever.
 Until the sector map exists (step 6) the only battle is the debug build's **Practice raid** (the
 HUD's debug row, `hud.md`): `practice_setup()` is the template base (`TemplateBase`, as the
 `battle` harness scenario builds it) defending with its resources, the Hangars' army at its
-researched levels attacking, and a seed from the clock, so each practice stands in a landscape of
+researched levels attacking with the Foundry's stock (`attacker.abilities`, every ability above 0)
+at its levels (`attacker.ability_levels`), and a seed from the clock, so each practice stands in a landscape of
 its own. With no units it is refused ("Train some units first"). Its result is never applied:
 `finished` returns to the base with the toast "Practice: nothing applied", and the save and the
 real base are untouched.
@@ -121,16 +122,30 @@ a frame:
 | `REVEAL` | the sentry shown, a red flash |
 | `FALL` | the rubble or the wall's strip, a burst of dust |
 | `DEATH` | the unit's fade |
+| `ABILITY` | by the ability's effect (`catalog.ability_effect`, the event's source its place in `ability_types()` plus one): a **swarm** a nanite-green hologram dome over its radius (`DOME_HEIGHT` of it high) fading out until its `land_tick`; an **EMP** an arc-blue ring as wide as its radius, and every drawn defence the sim now has disabled (`building_disabled`) dimmed grey (`BuildingView.set_disabled`, the shared `MaterialKit.disabled`, under a hit's flash) until a step finds it awake or fallen; a **strike** a pulsing red ring on the ground as wide as its radius or wider than the footprint under it, the same crosshair standing up facing the camera over the top of the tallest building it will hit, and in the last ten ticks before it lands a bright column falling from the sky (`SKY`, 8 units up) onto its point; all until its `land_tick` |
+| `STRIKE_LAND` | the marker, the crosshair and the bolt end; a white-hot fireball (`BattleEffects.Timed`'s POP, an opaque unlit dome, `FIREBALL_SHARE` of the radius) pops over `STRIKE_BLAST_SECONDS` (0.6 s) from half the height of what it hit, so it shows over it, inside an orange ring 1.6 times the radius and a hotter disc, both lasting as long; pale smoke rises and swells from the landing for `SMOKE_SECONDS` (1.1 s), timed from it (not the RISE surface on the global clock), and fades |
 
 Bolts are unlit glow orbs stretched along their flight, tinted per instance (`use_colors`);
 impacts are hologram discs that grow and fade by their custom data's w (`holo.gdshader`); bars are
-unshaded quads facing the fixed camera, drawn over everything. None casts a shadow or has an
+unshaded quads facing the fixed camera, drawn over everything; the abilities' domes, crosshairs
+and smoke are white holograms the instance colour tints, faded by the custom data's w, each kind
+one MultiMesh (`BattleEffects.Timed`). None casts a shadow or has an
 outline (sparks and arcs never do, `art-style.md`).
 
 ## Input, deploying and the camera
 
 The view has a `WorldInput` of its own (main's is out of the tree): a pinch, the wheel or a
 two-finger pan zooms and pans the base's `IsoCamera`, bounded to the field.
+
+- **Casting.** `select_ability(ability)` (the abilities bar) sets `cast_ability` and lets the unit
+  type go, so the red zone hides; `select_unit` with a type lets the ability go. With an ability
+  selected a tap casts it at the cell under it (`cast(ability, cell)`, the sim's `ability`
+  command at the current tick), anywhere on the field, buildings included; a refusal is emitted as
+  `cast_failed(code)`. A drag pans. `abilities_brought()` lists the abilities brought above 0.
+- **Queries** for the HUD and the harness: `building_type(id)`, `building_centre(id)` (on the
+  ground), `is_revealed_defence(id)` (a drawn defence not hidden now), `is_shown_disabled(id)` (an
+  EMP's grey on it), `cast_ability` and `deploy_unit` (what is selected), `cast(ability, cell)`,
+  `select_ability(ability)`, `select_unit(unit)`, `abilities_brought()`, `units_brought()`.
 
 - **Selecting.** `select_unit(unit)` (the deploy bar's cards) sets `deploy_unit`, the type a tap or
   a drag deploys; "" selects none. While one is selected the ground shows the deploy mask: a
@@ -159,8 +174,9 @@ shows changed (`hud.md`, **Battle HUD**).
 
 Measured by the `battle_view` scenario (`tools/harness/README.md`) in a 1600×900 window at the
 widest zoom (camera size 44), the battle paused once the whole scripted army (the battle scenario's
-167 units, 280 housing) is down, the template base standing: 974 draw calls (1,031 with the
-attack HUD over it), 2.00 million primitives and 1.6 ms of render CPU a frame, 174 fps, against the maxed base's ceilings
+167 units, 280 housing) is down, the template base standing: 974 draw calls without the HUD and
+about 1,045 with the attack HUD and the abilities bar over it, 2.00 million primitives and about
+1.6 to 1.9 ms of render CPU a frame, 155 to 185 fps, against the maxed base's ceilings
 (`art-style.md`, **Cost**: 1,600, 2.1 million, 6 ms). The units in their near versions would have
 been 2.40 million primitives (2.12 million without their shadows). The sim's step averages about
 0.2 to 0.4 ms a tick over the battle; the longest is a tick of four full path searches

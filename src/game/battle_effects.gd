@@ -4,7 +4,8 @@ extends Node3D
 ## battle's worth of them costs a fixed handful of draws: the bolts in flight (defences' red,
 ## units' cyan, shells on an arc), the impacts (expanding hologram discs that fade), the arc
 ## tower's lightning (the LIGHTNING surface on a kinked strip), the scorch marks mines leave, the
-## strips fallen walls leave, and the health bars. A shield generator's pool draws as a faint
+## strips fallen walls leave, the health bars, and the abilities' (a repair swarm's dome, an
+## orbital strike's crosshair until it lands and its smoke after; each a Timed list). A shield generator's pool draws as a faint
 ## hologram dome of its own while it is up, flickering when it absorbs.
 ##
 ## BattleView feeds it from the sim's events and its own clock (seconds of battle shown, which a

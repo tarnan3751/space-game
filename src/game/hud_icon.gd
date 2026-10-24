@@ -1,8 +1,9 @@
 class_name HudIcon
 extends Control
 ## A HUD badge drawn in code, vector, from no asset file: the icon at the left end of each
-## meter, the drone at the centre of the drone ring (`DroneRing`), and the unit glyphs of the
-## training and research panels (docs/reference/hud.md, **Top bar**, **Unit glyphs**). Each part of a silhouette is a flat fill in the
+## meter, the drone at the centre of the drone ring (`DroneRing`), the unit glyphs of the queue
+## strip and the abilities' glyphs (docs/reference/hud.md, **Top bar**, **Unit glyphs**, **Ability
+## glyphs**). Each part of a silhouette is a flat fill in the
 ## icon's colour, with a lighter highlight facet and a 2.5 px ink outline, over a 2 px ink
 ## offset shadow under the whole icon. The shapes are laid out in a 40-unit box, scaled to
 ## the rect they are painted into. A control draws only when it is built or resized, and the
