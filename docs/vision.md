@@ -72,8 +72,9 @@ The army buildings already in the roster take these roles:
 The unit roster (eleven types in `data/units.json`: three humans on foot, six piloted machines,
 two autonomous; `docs/reference/data-format.md`), training as a timed queue per producer,
 housing as the sum of the Hangars' capacity and research in the lab are built in core
-(step 3, 2026-10-24; `docs/reference/core-economy.md`). The roster's names and numbers are
-provisional until the owner keeps or vetoes them. Defences and traps
+(step 3, 2026-10-24; `docs/reference/core-economy.md`). The owner kept the roster's names;
+its numbers stay development-scale until the retune. Deployed units are spent (the owner,
+2026-10-24): Clash's model. Defences and traps
 already carry `targets` (ground, air, both), so the roster's ground/air split is fixed by the
 data that exists.
 
@@ -189,7 +190,5 @@ Not planned, so an agent that meets one of these stops and reports rather than b
 
 - **The name.** "Space Game" is a placeholder.
 - **The phone target** (device and frame rate), to be fixed before step 5.
-- **Whether deployed units are spent** (Clash's model) or survive with repairs: with the
-  owner; nothing built yet assumes either. The roster's names are provisional until the owner
-  keeps or vetoes them.
-- **The humanoid design**: the study of §4.
+- **The phone measurement** itself, which needs a device in hand; the target is fixed before
+  step 5 and the budgets are set against it on the development Mac until then.

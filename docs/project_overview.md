@@ -228,5 +228,3 @@ in one second at most (`Catalog.apply_dev_cheats`; `-- --no-cheats` for the real
   checked against shared golden test cases, or run headless Godot for that too. Decide in step 5.
 - **The name.** "Space Game" is a placeholder.
 - **The phone target** (device and frame rate), to fix before step 5 measures a battle.
-- **Whether deployed units are spent** (Clash's model, the step 3 plan's recommendation) or
-  survive with repairs: with the owner. Nothing built in step 3 depends on it.
