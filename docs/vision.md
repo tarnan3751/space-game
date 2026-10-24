@@ -69,9 +69,11 @@ The army buildings already in the roster take these roles:
 | Nanite Foundry | Makes the abilities the attacker uses in battle: a repair swarm, an EMP burst, an orbital strike and the like. |
 | Alliance Beacon | Holds borrowed units. Reserved for Milestone 4; it does nothing in Milestone 2. |
 
-The unit roster itself (which machines, which crewed and which autonomous, which are ground
-and which air, how many housing units each takes, their stats) is designed in the step 3 plan,
-along with training as a timed queue of commands and the housing rule. Defences and traps
+The unit roster (eleven types in `data/units.json`: three humans on foot, six piloted machines,
+two autonomous; `docs/reference/data-format.md`), training as a timed queue per producer,
+housing as the sum of the Hangars' capacity and research in the lab are built in core
+(step 3, 2026-10-24; `docs/reference/core-economy.md`). The roster's names and numbers are
+provisional until the owner keeps or vetoes them. Defences and traps
 already carry `targets` (ground, air, both), so the roster's ground/air split is fixed by the
 data that exists.
 
@@ -187,6 +189,7 @@ Not planned, so an agent that meets one of these stops and reports rather than b
 
 - **The name.** "Space Game" is a placeholder.
 - **The phone target** (device and frame rate), to be fixed before step 5.
-- **The unit roster and the housing rule**, and whether deployed units are spent (Clash's
-  model) or survive with repairs: the step 3 plan.
+- **Whether deployed units are spent** (Clash's model) or survive with repairs: with the
+  owner; nothing built yet assumes either. The roster's names are provisional until the owner
+  keeps or vetoes them.
 - **The humanoid design**: the study of §4.

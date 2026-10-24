@@ -128,7 +128,7 @@ data/            rules.json, buildings.json, units.json: game data shared with t
 docs/            project_overview.md (scope, status, roadmap, decisions); vision.md (the design the
                  roadmap builds towards); reference/ (one file per area); plans/ (one record per pass)
 scenes/          main.tscn only
-src/core/        catalog, base_state, building_state, base_grid, seeded_rng
+src/core/        catalog, base_state, building_state, training_queue, base_grid, seeded_rng
 src/game/        main, template_base, iso_camera, world_input, placement_controller, base_view,
                  building_view, construction_drone, building_models, wall_mesh, low_poly_mesh, surf,
                  motion, material_kit, hud, hud_icon, drone_ring, format, model_preview, toon.gdshader,
@@ -158,7 +158,9 @@ server/          Nakama TypeScript runtime later (.gdignore keeps Godot out)
 - Godot 3 → 4: `Spatial`→`Node3D`, `instance()`→`instantiate()`, `yield`→`await`,
   `export`→`@export`, `connect("sig", self, "m")`→`sig.connect(m)`, `PoolStringArray`→`PackedStringArray`,
   `set_shader_param`→`set_shader_parameter`.
-- Packed arrays are passed by value; return them instead of filling an argument.
+- Packed arrays are passed by reference in Godot 4: one returned from a getter, or held in a
+  member, shares its buffer with whoever holds it (verified on 4.7.2 by the army review), so
+  sort or change a `duplicate()`, and hand out copies of core state, never the member itself.
 - Integer division is intentional in core, so that warning is turned off in `project.godot`.
 - Comparing a Vector3 Variant with `null`: use `typeof(x) == TYPE_VECTOR3` instead.
 - A method named `log` shadows the built-in `log(float)` and fails to parse; pick another name.
