@@ -89,7 +89,7 @@ emits `changed`. A failed command changes nothing and charges nothing. The ops, 
 | `{"op": "train", "id": int, "unit": String, "count": int}` | `check_train(id, unit, count)` | Pays `count` times the unit's `train_cost` at its current level and queues `count` of it at producer `id`. `count` is optional (1); all or nothing. |
 | `{"op": "cancel_training", "id": int, "unit": String}` | `check_cancel_training(id, unit)` | Removes the newest queued `unit` from producer `id`'s queue and refunds its `train_cost` at the level it was paid for, up to storage. |
 | `{"op": "research", "unit": String}` | `check_research(unit)` | Pays the unit's next level's `research_cost` and starts its research, `research_seconds` long. |
-| `{"op": "raid_result", "battle": {...}, "result": {...}}` | `check_raid_result(command)` | Spends the units deployed, adds the loot up to storage and keeps the raid (**Raids**). |
+| `{"op": "raid_result", "battle": {...}, "result": {...}, "expedition": {"epoch", "index"}}` | `check_raid_result(command)` | Spends the units deployed, adds the loot up to storage and keeps the raid (**Raids**). `expedition` is optional: with it, a raid with a star clears that field of the sector (**Expeditions**). |
 | `{"op": "scan"}` | `check_scan()` | Starts the sector's next epoch: new fields, none cleared, the snapshot retaken (**Expeditions**). |
 
 `"cell"` may also be a `Vector2i`; anything else becomes `(-1, -1)` and fails as `blocked`.
@@ -126,7 +126,12 @@ Checks, in the order they are made:
   loot entry a known resource and a whole amount, and `deployed` counts the battle's deploy
   commands exactly (a unit for each, no other); `unknown_unit` for a deployed unit the catalog
   does not have; `not_enough_units` when a count exceeds the army's; `unknown_ability` unless
-  `abilities_used` is empty, an entry at zero included (step 4b).
+  `abilities_used` is empty, an entry at zero included (step 4b). With `expedition`, after the
+  shapes and before the units: `bad_expedition` unless it is an object whose `epoch` is the
+  sector's and whose `index` is a field (0 to the field count less one) not cleared this epoch,
+  and the battle's `seed` and `defender` are the field's as `OutpostGenerator.generate` lays it
+  out (the defender compared as JSON with sorted keys after `Catalog.ints`, so a command parsed
+  from JSON matches).
 - `check_scan()`: `scan_cooldown` while `scan_seconds_left()` is above 0.
 - Level requirements (`_check_level_requirements(stats)`): `needs_command_center_level` when
   `requires_cc` (default 1) exceeds `cc_level()`; `no_free_builder` when `build_seconds > 0`
@@ -155,6 +160,7 @@ Checks, in the order they are made:
 | `ERR_NOT_ENOUGH_UNITS` | `not_enough_units` |
 | `ERR_UNKNOWN_ABILITY` | `unknown_ability` |
 | `ERR_SCAN_COOLDOWN` | `scan_cooldown` |
+| `ERR_BAD_EXPEDITION` | `bad_expedition` |
 
 `Hud.ERROR_TEXT` maps these to player-facing text (`hud.md`).
 
@@ -252,7 +258,10 @@ battle's setup with its accepted commands (the result's `commands`), `result` th
 owner's call), the rest stay housed; the loot is added up to `capacity(res)`, never removing
 what is there; abilities are refused until step 4b makes them. The raid is kept, `battle` and
 `result` with the time it was applied, the oldest dropped beyond `RAID_LOG_SIZE`, so a server
-can replay the inputs later. `apply` runs `_resume_training()` after it, as after every
+can replay the inputs later. An expedition's raid is kept without its `battle.defender`, which
+the field's inputs lay out again, and with `"expedition": {"seed", "epoch", "index", "cc",
+"capacity"}`, the sector's seed, epoch and snapshot and the field's index (a Command Center 10
+outpost is about 18 KB of compact JSON, 38 KB as the save prints it; its inputs about 150 bytes). `apply` runs `_resume_training()` after it, as after every
 command, so a trained unit waiting for room is housed in the room the raid freed.
 
 ### Expeditions
@@ -260,7 +269,9 @@ command, so a trained unit waiting for room is housed in the room the raid freed
 The base's `sector` (`expeditions.md`) holds what its expedition fields are derived from. A
 field is never stored: `OutpostGenerator.generate(catalog, state, index)` lays it out from the
 sector's seed, epoch and snapshot (the Command Center level and capacity when the epoch began),
-so the fields stay the same while the base grows, until the next `scan`. `scan` is free the first
+so the fields stay the same while the base grows, until the next `scan`. A raid that names a
+field (`raid_result` with `expedition`) must be that field's battle, and with a star clears it
+for the rest of the epoch; without a star it stays open. `scan` is free the first
 time (epoch 0) and then once every `rules.expedition.scan_seconds` from the last; it advances
 the epoch, clears nothing cleared and retakes the snapshot. A catalog without `rules.expedition`
 has no fields and no cooldown.

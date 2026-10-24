@@ -192,9 +192,9 @@ Traps never block, are never targets and never count for destruction.
   `produces` of it (so a collector counts as an hour of its output), rounded down, the rest one
   by one to the lowest ids. A building's share is taken when it falls; one that stands keeps it.
   The cap by the attacker's storage is applied by `raid_result`.
-- An outpost (step 6) supplies `defender.resources` from its loot profile, sized so that
-  `loot_pct` of it is the profile's target; a loot deposit is a building carrying `storage` of
-  its resource, so it takes its share by the same rule.
+- An expedition's outpost (`expeditions.md`) supplies `defender.resources` from its loot
+  profile, sized so that `loot_pct` of it is the profile's target; a loot deposit is a storage
+  building of the outpost outside its walls, so it takes its share by the same rule.
 
 ## The result
 

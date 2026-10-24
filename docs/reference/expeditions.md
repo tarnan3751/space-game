@@ -47,6 +47,28 @@ the snapshot, `from_dict` migrates an older save, `{"op": "scan"}` (`check_scan`
 last (the first scan is free), and `sector_fields()` and `scan_seconds_left()` are the map's
 queries. `OutpostGenerator.generate(catalog, state, index)` lays out a field of the base's sector.
 
+## The expedition flow
+
+1. The map reads `state.sector_fields()` and `state.scan_seconds_left()`.
+2. The game lays out the chosen field, `OutpostGenerator.generate(catalog, state, index)`, and
+   builds the battle, `OutpostGenerator.battle_setup(field, army, state.unit_levels)`, for
+   `BattleSim` (the view, step 5).
+3. When the battle ends, `PlacementController` applies `{"op": "raid_result", "battle": the
+   setup with the accepted commands, "result": the rest of the result, "expedition": {"epoch":
+   state.sector.epoch, "index": index}}`. The check lays the field out again and refuses
+   (`bad_expedition`) a battle that is not that field's, a field of another epoch, one out of
+   range or one already cleared. Applied, the deployed units are spent and the loot comes home
+   as for any raid; with a star the field is cleared for the epoch. The raid is logged without
+   its defender, with the field's inputs instead (`core-economy.md`, **Raids**).
+4. `{"op": "scan"}` starts the next epoch once the cooldown allows.
+
+`check_raid_result` with the expedition key lays the field out again (10 to 25 ms for a hard
+Command Center 10 field on the development Mac), and `apply` runs the same check, so the game
+layer should call `apply` directly and read its code rather than check and then apply, or accept
+two layouts.
+
+There is no expedition cost in this step: the army spent is the cost and the scan the gate.
+
 ## The outpost generator
 
 `OutpostGenerator.generate_field(catalog, sector_seed, epoch, index, player_cc, capacity)` lays

@@ -16,7 +16,8 @@ extends RefCounted
 ## Raids: a battle (BattleSim, src/core/battle) is applied through raid_result: the units deployed
 ## are spent and the loot comes home, up to storage. The base trusts the result and keeps the
 ## battle's inputs with it in `raids`, the last RAID_LOG_SIZE of them, so a server can replay
-## them later.
+## them later. An expedition's raid names its field (`expedition`): the battle must be that
+## field's, a star clears it, and the log keeps the field's inputs instead of its layout.
 ##
 ## Expeditions (src/core/expedition): the base keeps a sector of fields (Sector), laid out by
 ## OutpostGenerator against the snapshot of the base taken at the epoch's scan; `scan` starts the
@@ -57,6 +58,7 @@ const ERR_BAD_RAID := "bad_raid"
 const ERR_NOT_ENOUGH_UNITS := "not_enough_units"
 const ERR_UNKNOWN_ABILITY := "unknown_ability"
 const ERR_SCAN_COOLDOWN := "scan_cooldown"
+const ERR_BAD_EXPEDITION := "bad_expedition"
 
 ## training_status(): nothing queued; the head training; the head stopped with time left while
 ## the producer is busy (constructing or upgrading); the head finished and waiting for room in
@@ -140,7 +142,8 @@ static func create_new(base_catalog: Catalog, start_time: int) -> BaseState:
 ##   {"op": "train",   "id": int,      "unit": String, "count": int}   (count optional, 1)
 ##   {"op": "cancel_training", "id": int, "unit": String}
 ##   {"op": "research", "unit": String}
-##   {"op": "raid_result", "battle": {seed, attacker, defender, commands}, "result": {...}}
+##   {"op": "raid_result", "battle": {seed, attacker, defender, commands}, "result": {...},
+##    "expedition": {"epoch": int, "index": int}}   (expedition optional)
 ##   {"op": "scan"}
 func apply(command: Dictionary, at_time: int) -> String:
 	advance_to(at_time)
@@ -268,7 +271,8 @@ func check_research(unit: String) -> String:
 ## Everything about applying a battle's result (BattleSim.result(), less its `commands`, which
 ## the battle carries): the shapes, every deployed unit known and its count no more than the army
 ## has, and `abilities_used` empty, zero counts included (abilities come in step 4b). `deployed` must count the battle's deploy
-## commands exactly.
+## commands exactly. With `expedition`, the field must be one of this epoch's, not cleared, and
+## the battle's seed and defender must be what the field lays out (checked by laying it out).
 func check_raid_result(command: Dictionary) -> String:
 	var battle: Variant = command.get("battle")
 	var result: Variant = command.get("result")
@@ -308,6 +312,10 @@ func check_raid_result(command: Dictionary) -> String:
 	for unit: String in counted:
 		if not deployed_dict.has(unit):
 			return ERR_BAD_RAID
+	if command.has("expedition"):
+		var error := _check_expedition(command["expedition"], battle_dict)
+		if error != "":
+			return error
 	for unit: Variant in deployed_dict:
 		if not catalog.has_unit(str(unit)):
 			return ERR_UNKNOWN_UNIT
@@ -818,7 +826,17 @@ func _raid_result(command: Dictionary) -> String:
 	for res: Variant in loot:
 		amounts[str(res)] = BattleMath.whole(loot[res])
 	_refund(amounts)
-	raids.append({"at": now, "battle": Catalog.ints(battle), "result": Catalog.ints(result)})
+	var logged: Dictionary = Catalog.ints(battle)
+	var raid := {"at": now, "battle": logged, "result": Catalog.ints(result)}
+	if command.has("expedition"):
+		# The field is laid out again from these, so its layout is not kept.
+		var index := BattleMath.whole((command["expedition"] as Dictionary)["index"])
+		logged.erase("defender")
+		raid["expedition"] = {"seed": sector.sector_seed, "epoch": sector.epoch, "index": index,
+			"cc": sector.cc, "capacity": sector.to_dict()["capacity"]}
+		if BattleMath.whole(result["stars"]) >= 1:
+			sector.clear_field(index)
+	raids.append(raid)
 	while raids.size() > RAID_LOG_SIZE:
 		raids.remove_at(0)
 	return ""
@@ -842,6 +860,26 @@ func _snapshot_sector() -> void:
 	for res: String in catalog.resources:
 		capacities[res] = capacity(res)
 	sector.snapshot(cc_level(), capacities)
+
+
+## The expedition half of check_raid_result: `bad_expedition` unless `data` names an open field
+## of this epoch and the battle is that field's: its seed, and its defender as the generator lays
+## it out (compared as JSON with sorted keys, its numbers made ints).
+func _check_expedition(data: Variant, battle: Dictionary) -> String:
+	if typeof(data) != TYPE_DICTIONARY:
+		return ERR_BAD_EXPEDITION
+	var expedition: Dictionary = data
+	var epoch := BattleMath.whole(expedition.get("epoch"))
+	var index := BattleMath.whole(expedition.get("index"))
+	if epoch != sector.epoch or index < 0 or index >= catalog.expedition_field_count() \
+			or sector.is_cleared(index):
+		return ERR_BAD_EXPEDITION
+	var field := OutpostGenerator.generate(catalog, self, index)
+	if BattleMath.whole(battle.get("seed")) != int(field["seed"]):
+		return ERR_BAD_EXPEDITION
+	if JSON.stringify(Catalog.ints(battle.get("defender")), "", true) != JSON.stringify(field["defender"], "", true):
+		return ERR_BAD_EXPEDITION
+	return ""
 
 
 func _check_level_requirements(stats: Dictionary) -> String:

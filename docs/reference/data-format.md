@@ -448,8 +448,10 @@ above a unit's top and queues on a building that is gone or no longer trains the
 dropped or clamped on load (`core-economy.md`).
 
 `raids` (from version 4) holds the last five raids applied, newest last: when, the battle's
-setup with its accepted commands, and its result (`battle.md`, `core-economy.md`, **Raids**). A
-version 1, 2 or 3 save has none.
+setup with its accepted commands, and its result (`battle.md`, `core-economy.md`, **Raids**). An
+expedition's raid has no `battle.defender` and carries `"expedition": {"seed", "epoch", "index",
+"cc", "capacity"}`, the inputs that lay its field out again (`expeditions.md`). A version 1, 2 or
+3 save has none.
 
 `sector` (from version 5) is the expedition sector (`expeditions.md`): its seed, the epoch (the
 scans so far), the field indices cleared this epoch, the last scan's unix time, and the Command
