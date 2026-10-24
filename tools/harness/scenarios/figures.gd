@@ -11,6 +11,8 @@ extends HarnessScenario
 ## every figure is within STUDY_BUDGET triangles, that its lowest point is on its pad (within
 ## GROUND_SLACK, so no foot sinks into it or floats over it) and that each stance figure stands its
 ## height (Figures.COLONIST_HEIGHT, or Figures.AUTOMATON_HEIGHT to the head under its antenna).
+## It reads the ink factor every outline vertex carries (LowPolyMesh.ink, as 1 - UV.x) back from
+## the outline meshes and checks it: FIGURE_INK on a figure's, 1.0 on its pad's and the academy's.
 ## Rendered, the screenshots, each a different frame:
 ## - "row-24": the whole row at camera size 24, the gameplay view: does a figure read as a
 ##   character at the zoom the game is played at?
@@ -21,6 +23,8 @@ extends HarnessScenario
 ##   power unit show.
 
 const STUDY_BUDGET := 1500
+## The ink factor a figure's outline carries.
+const FIGURE_INK := 1.0
 const SPACING := 1.15
 ## How far past the last figure the academy's centre stands, along the row.
 const ACADEMY_GAP := 2.7
@@ -72,6 +76,7 @@ func run(main: MainScript) -> void:
 		else:
 			Figures.colonist(p.body, on_pad, 0.0, pose, heads)
 		var triangles := p.body.triangle_count()
+		var figure_outline := (p.body.to_outline_arrays()[Mesh.ARRAY_VERTEX] as PackedVector3Array).size()
 		var top := -INF
 		var bottom := INF
 		for vertex: Vector3 in p.body.to_arrays()[Mesh.ARRAY_VERTEX] as PackedVector3Array:
@@ -89,6 +94,10 @@ func run(main: MainScript) -> void:
 				"%s stands %.3f to its antenna's tip (%.2f to its head's top)" % [spec[0], top, Figures.AUTOMATON_HEIGHT])
 		p.body.box_chamfered(Vector3(PAD_SIDE, PAD_HEIGHT, PAD_SIDE), 0.03, Vector3.ZERO, Parts.CONCRETE_PAD)
 		var node := BuildingModels.instantiate(p)
+		var inks := _outline_inks(node)
+		check(_all_near(inks.slice(0, figure_outline), FIGURE_INK) and _all_near(inks.slice(figure_outline), 1.0),
+			"%s: its %d outline vertices carry ink %.2f, its pad's %d carry 1.00" % [spec[0], figure_outline, FIGURE_INK,
+				inks.size() - figure_outline])
 		node.position = across * (first + SPACING * k)
 		node.rotation.y = deg_to_rad(facing + (STRIDE_TURN - TURN if walking else 0.0))
 		root.add_child(node)
@@ -97,6 +106,9 @@ func run(main: MainScript) -> void:
 	var academy := BuildingModels.create("cadet_academy", 1, 3, Parts.Tier.BASE)
 	academy.position = across * (first + SPACING * (row.size() - 1) + ACADEMY_GAP)
 	root.add_child(academy)
+	var academy_inks := _outline_inks(academy)
+	check(not academy_inks.is_empty() and _all_near(academy_inks, 1.0),
+		"the academy's %d outline vertices carry ink 1.00" % academy_inks.size())
 	var middle := across * (first + SPACING * (row.size() - 1 + ACADEMY_GAP / SPACING) * 0.5) + Vector3(0, 0.5, 0)
 
 	await _frame(main, 24.0, middle)
@@ -123,3 +135,24 @@ func _frame(main: MainScript, size: float, target: Vector3) -> void:
 	main.camera.pan(centre, centre - main.camera.unproject_position(target))
 	await main.get_tree().create_timer(SETTLE_SECONDS).timeout
 	await frames(SETTLE_FRAMES)
+
+
+## The ink factor (1 - UV.x) of every outline vertex under `node`, in the order its outline
+## instances and their vertices come.
+func _outline_inks(node: Node) -> PackedFloat32Array:
+	var inks := PackedFloat32Array()
+	for child: Node in node.find_children("*", "MeshInstance3D", true, false):
+		if not child.has_meta(BuildingModels.OUTLINE_META):
+			continue
+		var uvs: PackedVector2Array = (child as MeshInstance3D).mesh.surface_get_arrays(0)[Mesh.ARRAY_TEX_UV]
+		for uv: Vector2 in uvs:
+			inks.append(1.0 - uv.x)
+	return inks
+
+
+## Whether every value in `values` is within 0.001 of `expected`.
+func _all_near(values: PackedFloat32Array, expected: float) -> bool:
+	for value: float in values:
+		if absf(value - expected) > 0.001:
+			return false
+	return true

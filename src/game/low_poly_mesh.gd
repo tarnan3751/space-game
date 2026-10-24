@@ -22,7 +22,10 @@ extends RefCounted
 ##
 ## The outline holds the triangles of every part whose Surf has outline on and none of
 ## Surf.NO_OUTLINE's flags, with the face normals averaged by position across the whole mesh, so
-## the hull the ink shader pushes out along them stays closed at hard edges.
+## the hull the ink shader pushes out along them stays closed at hard edges. Each part's line is
+## `ink` times the full width, as `ink` was when the part was added: 1.0, the full line, unless a
+## caller thins it for its own parts. It goes into the outline's UV as the line's thinning,
+## 1 - ink, so a mesh without UV draws the full line.
 
 ## Faces of a smooth part that meet at a smaller angle than this share normals.
 const SMOOTH_ANGLE := 40.0
@@ -40,6 +43,12 @@ var _colors := PackedColorArray()
 var _face_normals := PackedVector3Array()
 var _outlined := PackedByteArray()
 var _hard := PackedByteArray()
+## Per triangle: `ink` when it was added.
+var _inks := PackedFloat32Array()
+
+## The share of the full ink width the parts added from now on are outlined at: 1.0, the full
+## line, but where a caller thins it for its own parts and puts it back after.
+var ink: float = 1.0
 
 
 ## Triangles in the body mesh, both surfaces.
@@ -88,19 +97,22 @@ func to_outline_mesh() -> ArrayMesh:
 	return mesh
 
 
-## The outline's surface arrays (vertex, normal, and each part's UV2 and colour, which carry the
-## flags and the phase, so the ink shader moves the outline with a bobbing or jittering part);
-## empty when no part is outlined.
+## The outline's surface arrays (vertex, normal, each part's UV2 and colour, which carry the flags
+## and the phase, so the ink shader moves the outline with a bobbing or jittering part, and its
+## UV, which carries its line's thinning, (1 - ink, 0)); empty when no part is outlined.
 func to_outline_arrays() -> Array:
 	var vertices := PackedVector3Array()
+	var uvs := PackedVector2Array()
 	var uv2s := PackedVector2Array()
 	var colors := PackedColorArray()
 	var sums: Dictionary[Vector3i, Vector3] = {}
 	for t: int in _outlined.size():
 		if _outlined[t] == 0:
 			continue
+		var thinning := Vector2(1.0 - _inks[t], 0.0)
 		for i: int in range(t * 3, t * 3 + 3):
 			vertices.append(_vertices[i])
+			uvs.append(thinning)
 			uv2s.append(_uv2s[i])
 			colors.append(_colors[i])
 			var key := _weld(_vertices[i])
@@ -115,6 +127,7 @@ func to_outline_arrays() -> Array:
 	arrays.resize(Mesh.ARRAY_MAX)
 	arrays[Mesh.ARRAY_VERTEX] = vertices
 	arrays[Mesh.ARRAY_NORMAL] = normals
+	arrays[Mesh.ARRAY_TEX_UV] = uvs
 	arrays[Mesh.ARRAY_TEX_UV2] = uv2s
 	arrays[Mesh.ARRAY_COLOR] = colors
 	return arrays
@@ -552,6 +565,7 @@ func _emit(a: Vector3, b: Vector3, c: Vector3, uv_a: Vector2, uv_b: Vector2, uv_
 	_face_normals.append(normal)
 	_outlined.append(1 if surf.outline and (surf.flags & Surf.NO_OUTLINE) == 0 else 0)
 	_hard.append(1 if hard else 0)
+	_inks.append(ink)
 
 
 ## Ends a part begun at vertex `start`: a smooth one gets its shared normals.

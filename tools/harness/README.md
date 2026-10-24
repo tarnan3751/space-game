@@ -236,7 +236,8 @@ row a level 1 Cadet Academy for scale. It logs each figure's body triangles, its
 lowest point over its pad, and checks that every figure is within the study budget (1,500), that
 its lowest point is on its pad (within 0.005, so no foot sinks or floats) and that each stance
 figure stands its height (0.8 for the colonist, 0.9 for the automaton to its head with the antenna
-above). Rendered, it shoots the row at camera size 24 (the gameplay view) and 10, the primary
+above). It reads the ink factor every outline vertex carries back from the outline meshes (1 -
+UV.x) and checks it on each figure's outline, its pad's and the academy's. Rendered, it shoots the row at camera size 24 (the gameplay view) and 10, the primary
 colonist and the automaton at size 4 (set directly, under the camera's closest zoom), and the row
 at size 10 with every figure turned 180 degrees so the backs show.
 

@@ -8,7 +8,11 @@ render_mode cull_front, unshaded;
 // The line is ink_px pixels wide at a 720 px viewport height and scales with the viewport
 // height. The camera is orthographic, so that is a fixed share of its vertical extent:
 // 2 / |PROJECTION_MATRIX[1][1]| world units span the viewport (abs, because the Compatibility
-// renderer flips the projection's Y when it draws into a render target).
+// renderer flips the projection's Y when it draws into a render target). Each part's line is
+// that times its ink factor, which the outline mesh carries in UV.x as the line's thinning,
+// 1 - ink (LowPolyMesh.ink): 0, the full line, unless the part was thinned, and on any mesh
+// with no UV at all (the terrain's hull). One material, one width uniform; the factor lives in
+// the vertices, so the selected outline's override keeps it.
 //
 // The push never takes a vertex below the ground (world y = 0) unless it already was, so a
 // building's bottom edge does not dip into the ground. Instances scale uniformly, and only
@@ -25,7 +29,7 @@ uniform float ink_px = 2.2;
 uniform vec4 ink_color : source_color = vec4(0.106, 0.102, 0.18, 1.0);
 
 void vertex() {
-	float width = ink_px * 2.0 / (720.0 * abs(PROJECTION_MATRIX[1][1]));
+	float width = ink_px * 2.0 / (720.0 * abs(PROJECTION_MATRIX[1][1])) * (1.0 - UV.x);
 	float scale = length(MODEL_MATRIX[0].xyz);
 	vec3 moved = effect_vertex(VERTEX, surf_flags(UV2), surf_phase(COLOR), MODEL_MATRIX);
 	vec3 pushed = moved + normalize(NORMAL) * width / scale;

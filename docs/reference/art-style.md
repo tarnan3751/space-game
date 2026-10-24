@@ -140,9 +140,15 @@ across the whole mesh (weighted by each corner's angle), so the hull stays close
 edges of a flat-shaded box. `ink.gdshader` (`cull_front, unshaded`) pushes each vertex out along
 that normal and draws the back faces in ink (`INK`, `1B1A2E`, never black):
 
-- The line is `ink_px` (2.2) pixels at a 720 px viewport height and scales with the viewport
-  height. The camera is orthographic, so that is a share of its vertical extent:
-  `ink_px * 2 / (720 * abs(PROJECTION_MATRIX[1][1]))` world units.
+- The line is `ink_px` (2.2) pixels at a 720 px viewport height times the part's ink factor, and
+  scales with the viewport height. The camera is orthographic, so that is a share of its vertical
+  extent: `ink_px * 2 / (720 * abs(PROJECTION_MATRIX[1][1]))` world units times the factor.
+- The ink factor is `LowPolyMesh.ink` as it was when the part was added: 1.0, the full line, unless
+  a caller thins it for its own parts and puts it back after. The outline mesh carries it per
+  vertex in UV as the line's thinning, `(1 - ink, 0)`, so a mesh drawn with the ink material that
+  has no UV (the terrain's hull) draws the full line. It lives in the vertices, not the material:
+  `MaterialKit.ink()` and `ink_selected()` stay one shared material each, the selected outline's
+  override keeps every part's width, and a thinner part costs no draw call.
 - The push never takes a vertex below the ground (world y = 0) unless it already was, so a bottom
   edge does not dip into it. This assumes instances turn only about Y and scale uniformly, as all
   do.
@@ -337,14 +343,14 @@ faces are left out of boxes and lathes, since the camera always looks down.
 | `lathe(profile, sides, pos, surf, rot, from_deg = 0.0, to_deg = 360.0)` | the general round part; given angles less than a turn apart (degrees from +X towards +Z, as `Parts.around`), it sweeps only that arc, in the share of `sides` steps the arc spans, and closes each end with a flat face, outlined like the rest: the profile, closed through the axis when one of its ends is on it (keep that section convex). U still comes from the angle. A half-vault: a `prism` turned onto its side and swept over its upper half |
 | `turn(offset, rot)` | an offset turned like a part, to place a part on a turned one |
 
-`sides` goes up to 24 and `rings` to 8 anywhere. `to_mesh()` is the body (VERTEX, NORMAL, UV,
-UV2, COLOR): its opaque parts on `MaterialKit.toon()` and, when there are any, its HOLO parts in
-a surface of their own on `MaterialKit.holo()` (with no opaque part, the holograms are surface
-0). `to_outline_mesh()` is the outline (VERTEX, NORMAL, UV2, COLOR) on `MaterialKit.ink()`, null
-when nothing is outlined, and `triangle_count()` the body's triangles, both surfaces. Both meshes
-are unindexed triangle lists. `to_arrays()` (the opaque parts only) and `to_outline_arrays()` are
-the same as surface arrays (the outline's empty when nothing is outlined), for a caller that
-merges meshes itself, as `WallMesh` does.
+`sides` goes up to 24 and `rings` to 8 anywhere. `to_mesh()` is the body (VERTEX, NORMAL, UV, UV2,
+COLOR): its opaque parts on `MaterialKit.toon()` and, when there are any, its HOLO parts in a
+surface of their own on `MaterialKit.holo()` (with no opaque part, the holograms are surface 0).
+`to_outline_mesh()` is the outline (VERTEX, NORMAL, UV, UV2, COLOR; its UV the line's thinning,
+**Ink outlines**) on `MaterialKit.ink()`, null when nothing is outlined, and `triangle_count()`
+the body's triangles, both surfaces. Both meshes are unindexed triangle lists. `to_arrays()` (the
+opaque parts only) and `to_outline_arrays()` are the same as surface arrays (the outline's empty
+when nothing is outlined), for a caller that merges meshes itself, as `WallMesh` does.
 
 - **UVs**: a face's corners in the part's own space, before `pos` and `rot`, projected along the
   dominant axis of its normal, times `uv_scale`. Round parts take U from the angle around their
