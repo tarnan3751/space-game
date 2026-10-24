@@ -83,3 +83,25 @@ static func army_base() -> BaseState:
 	state.advance_to(30)
 	state.apply({"op": "place", "type": "academy", "cell": [9, 9]}, 30)
 	return state
+
+
+## A battle setup on the battle catalog: `buildings` as [type, x, y] or [type, x, y, level], given
+## ids 1, 2, ... in order; `army` as {unit: count}.
+static func battle_setup(buildings: Array, army: Dictionary, commands: Array = [],
+		resources: Dictionary = {}, unit_levels: Dictionary = {}) -> Dictionary:
+	var entries := []
+	for i: int in buildings.size():
+		var entry: Array = buildings[i]
+		var level: int = entry[3] if entry.size() > 3 else 1
+		entries.append({"id": i + 1, "type": entry[0], "level": level, "cell": [entry[1], entry[2]]})
+	return {
+		"seed": 1,
+		"attacker": {"army": army, "unit_levels": unit_levels, "abilities": {}},
+		"defender": {"buildings": entries, "resources": resources},
+		"commands": commands,
+	}
+
+
+## A deploy command.
+static func deploy(tick: int, unit: String, x: int, y: int) -> Dictionary:
+	return {"op": "deploy", "tick": tick, "unit": unit, "cell": [x, y]}
