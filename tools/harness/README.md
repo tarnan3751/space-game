@@ -212,19 +212,20 @@ a second and ten frames, screenshots it at 0.0, 0.3 and 0.9 seconds, and checks 
 region of the screen (1.5 units square round it) changed between the first two shots, or between
 any two for the flickering parts, which can be off in two shots.
 
-`scenarios/kit_swatches.gd` is the tiers' reference (`docs/reference/art-style.md`, **Tiers**):
-on the field, the base's own views hidden, a row of ten swatches across the screen, each a
-chamfered cube and a drum beside it (the surface's smooth version where it has one), in the order
-Base hull-light, plate, gunmetal, gold trim, chrome, cyan strip, obsidian, veins, filigree, core
-glow, and before them a 3x3 pad with the four escorts (`Parts.escort_drone`, `escort_skiff`,
+`scenarios/kit_swatches.gd` is the tiers' reference (`docs/reference/art-style.md`, **Tiers**): on
+the field, the base's own views hidden, a row of ten swatches across the screen, each a chamfered
+cube and a drum beside it (the surface's smooth version where it has one), in the order Base
+hull-light, plate, gunmetal, gold trim, chrome, cyan strip, obsidian, veins, filigree, core glow,
+and before them a 3x3 pad with the four escorts (`Parts.escort_drone`, `escort_skiff`,
 `escort_troopers`, `escort_guard`) orbiting it, which the scenario moves itself as the effects rig
 does, and left of the pad the shared effects: a lightning arc between two posts on `Parts.spark`
 (the slow LIGHTNING crackle) beside a cluster of point sparks on plain FLICKER (the fast one), and
-right of it a stack with `Parts.puffs` rising from its mouth. It logs each swatch by index with its
-layer and flags and checks that every swatch's layer is within the kit, that each escort is at most
-300 body triangles and reaches no further round the pad than its extent (1.65), and that the escorts
-move. Rendered, it frames the row and the pad at the closest zoom (camera size 10) and screenshots
-them, then again 0.3 and 1.0 seconds later, so FLOW, PULSE, the flickers and the orbits show.
+right of it a stack with `Parts.puffs` rising from its mouth. It logs each swatch by index with
+its layer and flags and checks that every swatch's layer is within the kit, that each escort is at
+most 300 body triangles (the troopers, two colonists, 3,000) and reaches no further round the pad
+than its extent (1.65), and that the escorts move. Rendered, it frames the row and the pad at the
+closest zoom (camera size 10) and screenshots them, then again 0.3 and 1.0 seconds later, so FLOW,
+PULSE, the flickers and the orbits show.
 
 `scenarios/figures.gd` is the humanoid design study (`docs/reference/art-style.md`, **Figures**):
 on the field, the base's own views hidden, a row of figures (`Figures`), each on a small concrete

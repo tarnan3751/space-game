@@ -10,8 +10,9 @@ extends HarnessScenario
 ## (the fast one); right of it, a stack with Parts.puffs rising from its mouth.
 ##
 ## It logs each swatch by index with its layer and flags, and checks that every swatch's layer is
-## within the kit, that each escort is at most ESCORT_TRIANGLES body triangles and stays within
-## the pad's extent (half its footprint plus 0.15) all the way round, and that the escorts move.
+## within the kit, that each escort is at most ESCORT_TRIANGLES body triangles (the troopers
+## TROOPERS_TRIANGLES) and stays within the pad's extent (half its footprint plus 0.15) all the way
+## round, and that the escorts move.
 ## It moves them itself, as the effects rig does (Motion.tick() first, then Motion.transform_at).
 ## Rendered, it frames the rows and the pad at ZOOM_SIZE (the closest zoom) and screenshots them,
 ## then again 0.3 and 1.0 seconds later, so FLOW, PULSE, the flickers and the orbits show.
@@ -25,6 +26,9 @@ const PAD_AHEAD := 4.8
 const SIDE_ACROSS := 3.4
 const ZOOM_SIZE := 10.0
 const ESCORT_TRIANGLES := 300
+## The troopers' limit instead: two colonists at the figures' study budget (docs/reference/art-style.md,
+## **Figures**).
+const TROOPERS_TRIANGLES := 3000
 const PAD_SIZE := 3
 const SETTLE_SECONDS := 0.5
 const SETTLE_FRAMES := 10
@@ -76,8 +80,9 @@ func run(main: MainScript) -> void:
 		for vertex: Vector3 in vertices:
 			reach = maxf(reach, Vector2(vertex.x, vertex.z).length())
 		var triangles := escorts[k].triangle_count()
-		check(triangles <= ESCORT_TRIANGLES and reach <= bound, "the %s escort: %d body triangles (limit %d), reach %.2f round the pad (limit %.2f)"
-			% [names[k], triangles, ESCORT_TRIANGLES, reach, bound])
+		var limit := TROOPERS_TRIANGLES if names[k] == "troopers" else ESCORT_TRIANGLES
+		check(triangles <= limit and reach <= bound, "the %s escort: %d body triangles (limit %d), reach %.2f round the pad (limit %.2f)"
+			% [names[k], triangles, limit, reach, bound])
 	var pad_node := BuildingModels.instantiate(pad)
 	pad_node.position = down * PAD_AHEAD
 	root.add_child(pad_node)
