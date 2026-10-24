@@ -4,7 +4,8 @@ extends HarnessScenario
 ## screenshots.
 ##
 ## For every type and level in the catalog, built for its level's tier (BuildingModels.tier_of) as
-## the gallery builds it, each moving part (a node carrying BuildingModels.MOVE_META) and the
+## the gallery builds it, and for every unit type at Base and at Crown (UnitModels.create, as the
+## unit gallery builds it), each moving part (a node carrying BuildingModels.MOVE_META) and the
 ## static body are read back from their meshes, every surface, holograms included, in the model's
 ## own space. Two parts cross when an edge of one's triangles crosses a triangle of the other
 ## (Geometry3D.segment_intersects_triangle), tested only inside the overlap of their posed bounds
@@ -61,58 +62,67 @@ class Shape:
 
 ## Where the last crossing _edges_cross found is, in the model's space.
 var _hit := Vector3.ZERO
+## The run's totals: models, moving parts, pairs and pairs crossing.
+var _models := 0
+var _moving := 0
+var _pairs := 0
+var _crossings := 0
 
 
 func run(main: MainScript) -> void:
 	var catalog: Catalog = main.state.catalog
-	var models := 0
-	var moving := 0
-	var pairs := 0
-	var crossings := 0
 	for type: String in catalog.types():
 		for level: int in range(1, catalog.max_level(type) + 1):
 			var tier := BuildingModels.tier_of(catalog, type, level)
-			var model := BuildingModels.create(type, level, catalog.size_of(type), tier)
-			var lift := BOB_HEIGHT / model.scale.y
-			var body := Shape.new()
-			var parts: Array[Shape] = []
-			for child: Node in model.get_children():
-				if child is MeshInstance3D and not child.has_meta(BuildingModels.OUTLINE_META):
-					_read((child as MeshInstance3D).mesh, body)
-				elif child.has_meta(BuildingModels.MOVE_META):
-					var part := Shape.new()
-					part.motion = child.get_meta(BuildingModels.MOVE_META)
-					part.pivot = (child as Node3D).position
-					for grandchild: Node in child.get_children():
-						if grandchild is MeshInstance3D and not grandchild.has_meta(BuildingModels.OUTLINE_META):
-							_read((grandchild as MeshInstance3D).mesh, part)
-					parts.append(part)
-			model.free()
-			models += 1
-			if parts.is_empty():
-				continue
-			moving += parts.size()
-			var pair_hits := PackedStringArray()
-			for i: int in parts.size():
-				for j: int in range(i + 1, parts.size()):
-					pairs += 1
-					var at := _pair_crossing(parts[i], parts[j], 0.0)
-					var with_bob := ""
-					if at < 0.0 and (not parts[i].bob.is_empty() or not parts[j].bob.is_empty()):
-						at = _pair_crossing(parts[i], parts[j], lift)
-						with_bob = " with BOB"
-					if at >= 0.0:
-						pair_hits.append("parts %d and %d at %.2f s%s, at %s" % [i + 1, j + 1, at, with_bob, _hit])
-			crossings += pair_hits.size()
-			var touching := PackedStringArray()
-			var motions := PackedStringArray()
-			for i: int in parts.size():
-				motions.append("%d %s" % [i + 1, str(Motion.Kind.keys()[parts[i].motion.kind]).to_lower()])
-				touching.append("%d %s" % [i + 1, _body_contact(parts[i], body, lift)])
-			check(pair_hits.is_empty(), "%s %d: %d moving part(s) (%s), %s; against the body: %s" % [type,
-				level, parts.size(), ", ".join(motions), "no pair crossing" if pair_hits.is_empty()
-				else "pairs crossing: " + ", ".join(pair_hits), ", ".join(touching)])
-	say("%d models, %d moving parts, %d pairs, %d crossing" % [models, moving, pairs, crossings])
+			_check_model("%s %d" % [type, level], BuildingModels.create(type, level, catalog.size_of(type), tier))
+	for type: String in catalog.unit_types():
+		for tier: int in [Parts.Tier.BASE, Parts.Tier.CROWN]:
+			_check_model("unit %s at %s" % [type, str(Parts.Tier.keys()[tier]).to_lower()], UnitModels.create(type, tier))
+	say("%d models, %d moving parts, %d pairs, %d crossing" % [_models, _moving, _pairs, _crossings])
+
+
+## Reads back `model`'s body and moving parts, checks every pair of its moving parts and counts
+## each one's poses touching the body, says it as `label`, and frees it.
+func _check_model(label: String, model: Node3D) -> void:
+	var lift := BOB_HEIGHT / model.scale.y
+	var body := Shape.new()
+	var parts: Array[Shape] = []
+	for child: Node in model.get_children():
+		if child is MeshInstance3D and not child.has_meta(BuildingModels.OUTLINE_META):
+			_read((child as MeshInstance3D).mesh, body)
+		elif child.has_meta(BuildingModels.MOVE_META):
+			var part := Shape.new()
+			part.motion = child.get_meta(BuildingModels.MOVE_META)
+			part.pivot = (child as Node3D).position
+			for grandchild: Node in child.get_children():
+				if grandchild is MeshInstance3D and not grandchild.has_meta(BuildingModels.OUTLINE_META):
+					_read((grandchild as MeshInstance3D).mesh, part)
+			parts.append(part)
+	model.free()
+	_models += 1
+	if parts.is_empty():
+		return
+	_moving += parts.size()
+	var pair_hits := PackedStringArray()
+	for i: int in parts.size():
+		for j: int in range(i + 1, parts.size()):
+			_pairs += 1
+			var at := _pair_crossing(parts[i], parts[j], 0.0)
+			var with_bob := ""
+			if at < 0.0 and (not parts[i].bob.is_empty() or not parts[j].bob.is_empty()):
+				at = _pair_crossing(parts[i], parts[j], lift)
+				with_bob = " with BOB"
+			if at >= 0.0:
+				pair_hits.append("parts %d and %d at %.2f s%s, at %s" % [i + 1, j + 1, at, with_bob, _hit])
+	_crossings += pair_hits.size()
+	var touching := PackedStringArray()
+	var motions := PackedStringArray()
+	for i: int in parts.size():
+		motions.append("%d %s" % [i + 1, str(Motion.Kind.keys()[parts[i].motion.kind]).to_lower()])
+		touching.append("%d %s" % [i + 1, _body_contact(parts[i], body, lift)])
+	check(pair_hits.is_empty(), "%s: %d moving part(s) (%s), %s; against the body: %s" % [label, parts.size(),
+		", ".join(motions), "no pair crossing" if pair_hits.is_empty() else "pairs crossing: " + ", ".join(pair_hits),
+		", ".join(touching)])
 
 
 ## Adds a mesh's triangles, every surface, to `shape`, with its distinct edges and its BOB corners.

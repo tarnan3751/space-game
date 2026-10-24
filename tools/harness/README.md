@@ -173,7 +173,8 @@ line names its tier, its budget and its top.
 
 `scenarios/model_clash.gd` is the clash rule's check (`docs/reference/art-style.md`, **The clash
 rule**), headless, with no screenshots. For every type and level in the catalog, built for its
-level's tier as the gallery builds it, it reads back the static body and each moving part (each
+level's tier as the gallery builds it, and for every unit type at Base and at Crown
+(`UnitModels.create`, as `unit_gallery` builds it), it reads back the static body and each moving part (each
 node carrying `BuildingModels.MOVE_META`), every surface, holograms included, and tests whether
 an edge of one's triangles crosses a triangle of the other (`Geometry3D.segment_intersects_triangle`),
 only inside the overlap of their posed bounds and through a spatial hash of 0.25-unit cells. Every
