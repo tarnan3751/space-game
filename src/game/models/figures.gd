@@ -17,7 +17,8 @@ extends RefCounted
 ##   ankle, the pelvis lowered so the lower foot stands on `foot`. Each segment (the head, the
 ##   torso, each upper arm, forearm, hand, thigh, shin and foot) is built by a function of its
 ##   own from its joint's transform, the segment hanging along the joint's -Y, so posing is only
-##   changing angles, and a unit pipeline can later build each segment on its own.
+##   changing angles, and a unit pipeline can later build each segment on its own. joints() hands
+##   the posed skeleton to a caller that adds to a figure or seats it.
 ## - Nothing here moves: there are no moving parts and no Motion. The poses are static.
 ## - A figure's ink line is FIGURE_INK of the full width (LowPolyMesh.ink): each builder sets it
 ##   for its own parts and puts the mesh's value back after, so a figure in a building's mesh (the
@@ -145,14 +146,32 @@ static func stride() -> Pose:
 	return pose
 
 
+## Seated at the controls: the thighs level forward, the shins hanging straight down to feet flat
+## on the floor, the torso upright and a touch back, both forearms reaching forward to the controls
+## at chest height, the sides a little unalike. The lower sole stands on `foot`, so the seat goes
+## under the pelvis (joints()).
+static func seated() -> Pose:
+	var pose := Pose.new()
+	pose.torso = Vector3(-4, 4, 0)
+	pose.head = Vector3(2, -6, 0)
+	pose.shoulder_swing = PackedFloat32Array([42.0, 36.0])
+	pose.shoulder_out = PackedFloat32Array([12.0, 10.0])
+	pose.elbow = PackedFloat32Array([52.0, 60.0])
+	pose.hip_swing = PackedFloat32Array([86.0, 82.0])
+	pose.hip_out = PackedFloat32Array([9.0, 7.0])
+	pose.knee = PackedFloat32Array([86.0, 82.0])
+	pose.foot_pitch = PackedFloat32Array([0.0, 0.0])
+	return pose
+
+
 ## A colonist in a spacesuit, `heads` tall: a round helmet with a dark curved visor and an orange
 ## stripe on a ring collar, a broad suit tapering to a belt, orange shoulder pads and chest plate
 ## with a glowing lamp, round-jointed tapered limbs, big gloves and boots, a backpack with a tank.
+## Without `legs`, the thighs, shins and boots are left out (the legs still set where it sits): a
+## pilot whose legs are hidden in its machine's hull.
 static func colonist(m: LowPolyMesh, foot: Vector3, yaw: float, pose: Pose, heads: float = PRIMARY_HEADS,
-		scale: float = 1.0) -> void:
-	var b := _body(COLONIST_HEIGHT * scale, heads)
-	b.sole_back = 0.062 * b.k
-	b.sole_front = 0.111 * b.k
+		scale: float = 1.0, legs: bool = true) -> void:
+	var b := _colonist_body(heads, scale)
 	var j := _skeleton(b, pose, foot, yaw)
 	var ink := m.ink
 	m.ink = FIGURE_INK
@@ -162,9 +181,10 @@ static func colonist(m: LowPolyMesh, foot: Vector3, yaw: float, pose: Pose, head
 		_suit_upper_arm(m, j.shoulders[s], b)
 		_suit_forearm(m, j.elbows[s], b)
 		_glove(m, j.wrists[s], b)
-		_suit_thigh(m, j.hips[s], b)
-		_suit_shin(m, j.knees[s], b)
-		_boot(m, j.ankles[s], b)
+		if legs:
+			_suit_thigh(m, j.hips[s], b)
+			_suit_shin(m, j.knees[s], b)
+			_boot(m, j.ankles[s], b)
 	m.ink = ink
 
 
@@ -174,9 +194,7 @@ static func colonist(m: LowPolyMesh, foot: Vector3, yaw: float, pose: Pose, head
 ## forearms and shins, gunmetal hands, broad flat foot pads and a dorsal power unit.
 static func automaton(m: LowPolyMesh, foot: Vector3, yaw: float, pose: Pose, heads: float = PRIMARY_HEADS,
 		scale: float = 1.0) -> void:
-	var b := _body(AUTOMATON_HEIGHT * scale, heads)
-	b.sole_back = 0.06 * b.k
-	b.sole_front = 0.12 * b.k
+	var b := _automaton_body(heads, scale)
 	var j := _skeleton(b, pose, foot, yaw)
 	var ink := m.ink
 	m.ink = FIGURE_INK
@@ -192,7 +210,31 @@ static func automaton(m: LowPolyMesh, foot: Vector3, yaw: float, pose: Pose, hea
 	m.ink = ink
 
 
+## The joints of a colonist, or with `robot` an automaton, as colonist() or automaton() poses it
+## standing on `foot`: for a caller that adds to a figure (a rifle in its hands, a pack on its
+## back) or seats it (the pelvis is where its seat goes).
+static func joints(foot: Vector3, yaw: float, pose: Pose, heads: float = PRIMARY_HEADS, scale: float = 1.0,
+		robot: bool = false) -> Joints:
+	return _skeleton(_automaton_body(heads, scale) if robot else _colonist_body(heads, scale), pose, foot, yaw)
+
+
 # --- The skeleton ----------------------------------------------------------------
+
+## The colonist's lengths at `heads` and `scale`, its soles' reach included.
+static func _colonist_body(heads: float, scale: float) -> Body:
+	var b := _body(COLONIST_HEIGHT * scale, heads)
+	b.sole_back = 0.062 * b.k
+	b.sole_front = 0.111 * b.k
+	return b
+
+
+## The automaton's lengths at `heads` and `scale`, its foot pads' reach included.
+static func _automaton_body(heads: float, scale: float) -> Body:
+	var b := _body(AUTOMATON_HEIGHT * scale, heads)
+	b.sole_back = 0.06 * b.k
+	b.sole_front = 0.12 * b.k
+	return b
+
 
 ## The lengths of a figure `height` tall and `heads` head units: the legs (to the hip joints,
 ## standing straight) 0.3 of the height at PRIMARY_HEADS, shorter with a bigger head, longer with a
