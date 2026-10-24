@@ -95,10 +95,10 @@ through the game layer as the player would, and read the state through `BaseStat
 
 | Through | What |
 |---|---|
-| `main.placement` | `begin_place(type)`, `confirm_place()`, `cancel_place()`, `select(id)`, `upgrade_selected()`, `is_placing()`, `is_painting()`, `ghost_is_valid()`, `ghost_cell()`, `selected_id` |
+| `main.placement` | `begin_place(type)`, `confirm_place()`, `cancel_place()`, `select(id)`, `upgrade_selected()`, `train(id, unit)`, `cancel_training(id, unit)`, `research(unit)`, `is_placing()`, `is_painting()`, `ghost_is_valid()`, `ghost_cell()`, `selected_id` |
 | `main.world_input` signals | `tapped`, `drag_started`, `dragged`, `drag_ended`, `pinched`, `panned`; emit them to simulate a gesture (`tap_cell` below does) |
-| `main.hud` signals | `build_pressed`, `confirm_pressed`, `cancel_pressed`, `upgrade_pressed`, `close_pressed`, `reset_pressed`, `template_pressed`; emit them to press a button |
-| `main.hud` queries | `build_button()`, `is_menu_open()`, `build_panel()`, `close_button()`, `tab_button(category)`, `entry_button(type)`, `entry_status(type)`, `entry_preview(type)`, `previews_done()`, `entry_strip()`, `resource_panel(res)`, `resource_fill(res)`, `place_button()`, `drones_panel()` (the `DroneRing`: `free_count()`, `total_count()`), `reset_button()`, `template_button()` (`docs/reference/hud.md`); `apply_safe_area(inset)` to try a notch-like inset |
+| `main.hud` signals | `build_pressed`, `confirm_pressed`, `cancel_pressed`, `upgrade_pressed`, `close_pressed`, `reset_pressed`, `template_pressed`, `train_pressed`, `cancel_training_pressed`, `research_pressed`; emit them to press a button |
+| `main.hud` queries | `build_button()`, `is_menu_open()`, `build_panel()`, `close_button()`, `tab_button(category)`, `entry_button(type)`, `entry_status(type)`, `entry_preview(type)`, `previews_done()`, `entry_strip()`, `resource_panel(res)`, `resource_fill(res)`, `army_meter()`, `army_meter_text()`, `army_fill()`, `place_button()`, `drones_panel()` (the `DroneRing`: `free_count()`, `total_count()`), `reset_button()`, `template_button()`, `action_button()`, `army_panel()`, `is_training_open()`, `is_research_open()`, `army_close_button()`, `army_title()`, `train_card(unit)`, `train_card_info(unit)`, `queue_shown()`, `queue_entry(index)`, `queue_head_status()`, `research_card(unit)`, `research_card_lines(unit)`, `research_line()`, `toast_text()` (`docs/reference/hud.md`); `apply_safe_area(inset)` to try a notch-like inset |
 | `main.state` | the `BaseState`: `buildings`, `resources`, `capacity()`, `builders_free()`, `seconds_left(id)`, `check_*` |
 | `main.camera`, `main.base_view` | `IsoCamera` and `BaseView`, for cell and screen mapping |
 
@@ -315,6 +315,33 @@ less `Hud.MARGIN`, while the panel reaches the screen's sides and bottom edge; i
 that. Back on the whole screen, a real one-finger drag across the card strip scrolls it and
 presses nothing. Last, it presses Build, resizes the window to 1280x900 two frames into the
 opening slide, and checks that the panel ends open on the new bottom edge, and screenshots it.
+
+`scenarios/train_units.gd` checks the training and research HUD (`docs/reference/hud.md`,
+**Army panel**) on the debug build's Template base, pressed through its button, so every
+producer and the Research Lab are at their top level and the Hangars are built: the army meter
+shows "0 / capacity". It centres a Cadet Academy above where the panel opens, selects it with
+`tap_cell`, and checks that its info panel offers Train, which opens the training panel on the
+screen's bottom edge, titled with the academy's name and level and showing exactly its units'
+cards with an empty queue. It queues two Rangers and a Breacher from the cards, the first by a real
+touch, and checks the queue in `BaseState` and on the strip, the crystal paid and the head's time
+left; cancels from the strip's second entry, which removes the newest Ranger, and checks the queue,
+the refund and the "Refunded" toast; advances two seconds and, after the game's one-second tick,
+checks the head's countdown (the HUD's tick path, with no state change); advances until the head
+trains and checks the army, the army
+meter's text and the Ranger card's count. Then it selects the Research Lab, which closes the
+training panel, opens Research and checks the progress line, that exactly the unlocked units'
+cards show, the Ranger card's lines, a research of the Ranger paid for and named on the progress
+line and its card, a second research refused with "Research already running" and nothing paid,
+and the level reached once the research finishes. Last, a real tap on the panel's header reaches
+nothing behind it, and a real tap on a building above the panel selects it and closes the panel.
+Then it presses Reset base, places a Cadet Academy and finishes it at level 1: with no Hangar the
+army meter is hidden; the Breacher's card is disabled reading "Needs Cadet Academy 2", and a real
+touch on it queues nothing; a Ranger is refused with "Not enough room in the Hangars"; the panel's
+close button shows the info panel again with the academy still selected; and Build over the
+reopened panel closes it, clears the selection and opens the build panel. No tap on the panels
+reaches the world (a counter on `WorldInput.tapped`). It screenshots the academy's info panel with
+Train, the training panel with the queue, after the first unit trained, the research panel with a
+research running, the building selected outside, and the level 1 academy's locked cards.
 
 `scenarios/paint_walls.gd` checks wall painting and the edge scroll on a fresh base: Barrier Wall
 from the menu enters paint mode with Done on the place bar; a drag along a row of twelve cells
