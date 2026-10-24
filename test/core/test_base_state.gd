@@ -195,7 +195,7 @@ func test_save_from_before_the_third_resource_loads() -> void:
 	var saved := state.to_dict()
 	assert_eq(saved["resources"], {"metal": 400, "crystal": 300, "antimatter": 0})
 	assert_eq(saved["remainders"], {"metal": 0, "crystal": 1800, "antimatter": 0})
-	assert_eq(saved["version"], 4)
+	assert_eq(saved["version"], 5)
 
 
 func test_version_1_save_is_centred_on_a_grown_field() -> void:
@@ -212,7 +212,7 @@ func test_version_1_save_is_centred_on_a_grown_field() -> void:
 	assert_eq(state.grid.occupant_at(Vector2i(43, 40)), 4)
 	assert_eq(state.grid.occupant_at(Vector2i(39, 36)), 0, "the wall's old cell is free")
 	var saved := state.to_dict()
-	assert_eq(saved["version"], 4)
+	assert_eq(saved["version"], 5)
 	assert_eq(saved["grid"], {"width": 48, "height": 48})
 	assert_eq(saved["now"], 100)
 	assert_eq(saved["next_id"], 5)
@@ -221,6 +221,8 @@ func test_version_1_save_is_centred_on_a_grown_field() -> void:
 	var extractor: Dictionary = (saved["buildings"] as Array)[2]
 	assert_eq(extractor, {"id": 3, "type": "extractor", "cell": [42, 42], "level": 1, "target_level": 2,
 		"finish_at": 150})
+	assert_eq(saved["sector"], {"seed": Sector.seed_from_time(100), "epoch": 0, "cleared": [], "last_scan": 0,
+		"cc": 1, "capacity": {"metal": 1000, "crystal": 1000, "antimatter": 0}})
 
 
 func test_save_with_no_version_loads_as_version_1() -> void:
@@ -380,12 +382,13 @@ func test_saves_before_the_army_load_with_none() -> void:
 		assert_eq(state.training.size(), 0)
 		assert_eq(state.research_unit, "")
 		var saved := state.to_dict()
-		assert_eq(saved["version"], 4)
+		assert_eq(saved["version"], 5)
 		assert_eq(saved["army"], {})
 		assert_eq(saved["unit_levels"], {})
 		assert_eq(saved["research"], {})
 		assert_eq(saved["training"], [])
 		assert_eq(saved["raids"], [])
+		assert_eq((saved["sector"] as Dictionary)["epoch"], 0)
 
 
 func test_load_drops_army_entries_that_no_longer_fit() -> void:

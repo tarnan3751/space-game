@@ -403,7 +403,7 @@ line) replaces it, which is how the gate and the harness keep off the real save.
 
 ```json
 {
-  "version": 4,
+  "version": 5,
   "grid": { "width": 48, "height": 48 },
   "now": 1760400000,
   "next_id": 4,
@@ -422,7 +422,9 @@ line) replaces it, which is how the gate and the harness keep off the real save.
     { "at": 1760400200, "battle": { "seed": 7, "attacker": {...}, "defender": {...}, "commands": [...] },
       "result": { "abilities_used": {}, "deployed": { "ranger": 8 }, "destruction": 63, "hash": 1234567,
                   "loot": { "antimatter": 0, "crystal": 1600, "metal": 1800 }, "stars": 2, "ticks": 2412 } }
-  ]
+  ],
+  "sector": { "seed": 2941771520, "epoch": 3, "cleared": [0, 2], "last_scan": 1760400100, "cc": 4,
+              "capacity": { "metal": 30000, "crystal": 30000, "antimatter": 700 } }
 }
 ```
 
@@ -447,5 +449,11 @@ dropped or clamped on load (`core-economy.md`).
 
 `raids` (from version 4) holds the last five raids applied, newest last: when, the battle's
 setup with its accepted commands, and its result (`battle.md`, `core-economy.md`, **Raids**). A
-version 1, 2 or 3 save has none. The next save is version 4. A change to this shape keeps old saves loading or bumps `version` with a migration
+version 1, 2 or 3 save has none.
+
+`sector` (from version 5) is the expedition sector (`expeditions.md`): its seed, the epoch (the
+scans so far), the field indices cleared this epoch, the last scan's unix time, and the Command
+Center level and capacity the epoch's fields are laid out against. A save from before version 5
+loads with a sector seeded from its `now` (0 when absent), at epoch 0, nothing cleared, the
+snapshot taken of the loaded base. The next save is version 5. A change to this shape keeps old saves loading or bumps `version` with a migration
 (`CLAUDE.md`, **Agent workflow**, tier A).

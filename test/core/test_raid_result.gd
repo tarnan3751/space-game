@@ -101,11 +101,13 @@ func test_a_version_3_save_loads_with_no_raids() -> void:
 	var data := _base().to_dict()
 	data["version"] = 3
 	data.erase("raids")
+	data.erase("sector")
 	var state := BaseState.from_dict(Fixtures.battle_catalog(), data)
 	assert_eq(state.raids, [] as Array[Dictionary])
 	var saved := state.to_dict()
-	assert_eq(saved["version"], 4)
+	assert_eq(saved["version"], 5)
 	assert_eq(saved["raids"], [])
+	assert_eq((saved["sector"] as Dictionary)["seed"], Sector.seed_from_time(30))
 
 
 ## The battle fixture base: the Command Center and drone bay, a finished hangar (id 3, housing 20)

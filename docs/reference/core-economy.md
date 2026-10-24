@@ -66,11 +66,13 @@ The authoritative model of one player's base. One per player; `main.gd` holds on
 | `training: Dictionary[int, TrainingQueue]` | Training queues by producer building id (**The army**). A queue stays when it empties. |
 | `research_unit: String`, `research_done_at: int` | The unit type being researched to its next level (`""` when none) and the unix second it completes. |
 | `raids: Array[Dictionary]` | The last `RAID_LOG_SIZE` (5) raids applied, newest last: `{"at": unix seconds, "battle", "result"}` as `raid_result` carried them (**Raids**). |
+| `sector: Sector` | The expedition sector: its seed, epoch, cleared fields, last scan and the snapshot its fields are laid out against (**Expeditions**; `expeditions.md`). |
 | `signal changed` | Emitted after anything visible changed: by `apply` on success, by `advance_to` when a timer completed or a resource amount changed. |
 
 `BaseState.create_new(catalog, start_time)` lays out `catalog.start`: each listed building is
 added finished at its listed level (one that is unknown or does not fit is skipped), then each
-starting resource is set to `min(listed, capacity)`.
+starting resource is set to `min(listed, capacity)`. The sector is seeded from `start_time`
+(`Sector.seed_from_time`) and its snapshot taken of the new base.
 
 ### Commands
 
@@ -88,6 +90,7 @@ emits `changed`. A failed command changes nothing and charges nothing. The ops, 
 | `{"op": "cancel_training", "id": int, "unit": String}` | `check_cancel_training(id, unit)` | Removes the newest queued `unit` from producer `id`'s queue and refunds its `train_cost` at the level it was paid for, up to storage. |
 | `{"op": "research", "unit": String}` | `check_research(unit)` | Pays the unit's next level's `research_cost` and starts its research, `research_seconds` long. |
 | `{"op": "raid_result", "battle": {...}, "result": {...}}` | `check_raid_result(command)` | Spends the units deployed, adds the loot up to storage and keeps the raid (**Raids**). |
+| `{"op": "scan"}` | `check_scan()` | Starts the sector's next epoch: new fields, none cleared, the snapshot retaken (**Expeditions**). |
 
 `"cell"` may also be a `Vector2i`; anything else becomes `(-1, -1)` and fails as `blocked`.
 
@@ -124,6 +127,7 @@ Checks, in the order they are made:
   commands exactly (a unit for each, no other); `unknown_unit` for a deployed unit the catalog
   does not have; `not_enough_units` when a count exceeds the army's; `unknown_ability` unless
   `abilities_used` is empty, an entry at zero included (step 4b).
+- `check_scan()`: `scan_cooldown` while `scan_seconds_left()` is above 0.
 - Level requirements (`_check_level_requirements(stats)`): `needs_command_center_level` when
   `requires_cc` (default 1) exceeds `cc_level()`; `no_free_builder` when `build_seconds > 0`
   and `builders_free() <= 0`; `insufficient_resources` unless `can_afford(cost)`.
@@ -150,6 +154,7 @@ Checks, in the order they are made:
 | `ERR_BAD_RAID` | `bad_raid` |
 | `ERR_NOT_ENOUGH_UNITS` | `not_enough_units` |
 | `ERR_UNKNOWN_ABILITY` | `unknown_ability` |
+| `ERR_SCAN_COOLDOWN` | `scan_cooldown` |
 
 `Hud.ERROR_TEXT` maps these to player-facing text (`hud.md`).
 
@@ -250,6 +255,21 @@ what is there; abilities are refused until step 4b makes them. The raid is kept,
 can replay the inputs later. `apply` runs `_resume_training()` after it, as after every
 command, so a trained unit waiting for room is housed in the room the raid freed.
 
+### Expeditions
+
+The base's `sector` (`expeditions.md`) holds what its expedition fields are derived from. A
+field is never stored: `OutpostGenerator.generate(catalog, state, index)` lays it out from the
+sector's seed, epoch and snapshot (the Command Center level and capacity when the epoch began),
+so the fields stay the same while the base grows, until the next `scan`. `scan` is free the first
+time (epoch 0) and then once every `rules.expedition.scan_seconds` from the last; it advances
+the epoch, clears nothing cleared and retakes the snapshot. A catalog without `rules.expedition`
+has no fields and no cooldown.
+
+| Query | What |
+| --- | --- |
+| `sector_fields()` | One entry per field, `{"index", "band", "cc" (the outpost's Command Center level), "loot" ({res: the target}), "cleared", "seed"}`, from `OutpostGenerator.summary`: no field is laid out. It builds a new Array, so it is for the map when it opens, not per frame. |
+| `scan_seconds_left()` | Seconds until `scan` is allowed; 0 before the first scan and once the cooldown has passed. |
+
 ### Time and production
 
 `advance_to(time)` moves the base forward. Earlier or equal times are ignored, so a clock that
@@ -287,16 +307,17 @@ upgrade. `seconds_left(id)` is `finish_at - now`, floored at 0.
 
 ### Save and load
 
-`to_dict()` returns the save, version 4 (`SAVE_VERSION`), with the field it was laid out on, the
-army and the raids:
+`to_dict()` returns the save, version 5 (`SAVE_VERSION`), with the field it was laid out on, the
+army, the raids and the sector:
 
 ```
-{"version": 4, "grid": {"width": int, "height": int}, "now": int, "next_id": int,
+{"version": 5, "grid": {"width": int, "height": int}, "now": int, "next_id": int,
  "resources": {res: int}, "remainders": {res: int},
  "buildings": [{"id", "type", "cell": [x, y], "level", "target_level", "finish_at"}, ...],
  "army": {unit: int}, "unit_levels": {unit: int}, "research": {"unit", "done_at"} or {},
  "training": [{"building", "units": [unit, ...], "paid_levels": [int, ...], "done_at", "left"}, ...],
- "raids": [{"at", "battle", "result"}, ...]}
+ "raids": [{"at", "battle", "result"}, ...],
+ "sector": {"seed", "epoch", "cleared": [int, ...], "last_scan", "cc", "capacity": {res: int}}}
 ```
 
 Buildings and training queues are listed in id order, and `army` and `unit_levels` in sorted
@@ -315,7 +336,12 @@ moves by half the field's growth since, `(grid_size - V1_FIELD) / 2` floored at 
 (4, 4) on 48×48, so the base stays centred; a field that did not grow (the fixture's 10×10) moves
 nothing. A version 2 save loads where it was; its `grid` is recorded for later migrations, not
 read. A version 1 or 2 save has no army keys, so it loads with no army, every unit at level 1,
-no queues and no research; a version 1, 2 or 3 save has no raids. The next save is version 4.
+no queues and no research; a version 1, 2 or 3 save has no raids. A save from before version 5
+has no sector: it loads with one seeded from its `now` (0 when absent), at epoch 0, nothing
+cleared, its snapshot taken of the loaded base (after the buildings, before any advance). A saved
+sector is cleaned on load (`Sector.from_dict`: the level clamped, cleared entries kept only when
+they are whole field indices, and `last_scan` brought back to the saved `now` when it is later,
+so a clock set back costs at most one cooldown). The next save is version 5.
 Saved raids are loaded as they were, their whole numbers made ints again (`Catalog.ints`) so
 the save stays canonical, the newest `RAID_LOG_SIZE` kept; nothing checks them, since nothing
 in the base reads them.

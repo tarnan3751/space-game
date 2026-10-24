@@ -17,6 +17,10 @@ extends RefCounted
 ## are spent and the loot comes home, up to storage. The base trusts the result and keeps the
 ## battle's inputs with it in `raids`, the last RAID_LOG_SIZE of them, so a server can replay
 ## them later.
+##
+## Expeditions (src/core/expedition): the base keeps a sector of fields (Sector), laid out by
+## OutpostGenerator against the snapshot of the base taken at the epoch's scan; `scan` starts the
+## next epoch, at most once every rules.expedition.scan_seconds after the first.
 
 ## Emitted after anything visible changes: resources, buildings, levels, timers, the army.
 signal changed
@@ -25,8 +29,9 @@ const SECONDS_PER_HOUR := 3600
 ## The save's shape (to_dict). Version 2 records the field it was laid out on; every version 1
 ## save was laid out on V1_FIELD, and from_dict centres it on a field that has grown since.
 ## Version 3 adds the army; an older save loads with none. Version 4 adds the raids; an older
-## save loads with none.
-const SAVE_VERSION := 4
+## save loads with none. Version 5 adds the sector; an older save loads with one seeded from its
+## `now`, at epoch 0, nothing cleared, its snapshot the loaded base.
+const SAVE_VERSION := 5
 ## The raids kept, newest last.
 const RAID_LOG_SIZE := 5
 const V1_FIELD := Vector2i(40, 40)
@@ -51,6 +56,7 @@ const ERR_LAB_LEVEL := "needs_lab_level"
 const ERR_BAD_RAID := "bad_raid"
 const ERR_NOT_ENOUGH_UNITS := "not_enough_units"
 const ERR_UNKNOWN_ABILITY := "unknown_ability"
+const ERR_SCAN_COOLDOWN := "scan_cooldown"
 
 ## training_status(): nothing queued; the head training; the head stopped with time left while
 ## the producer is busy (constructing or upgrading); the head finished and waiting for room in
@@ -83,6 +89,8 @@ var research_done_at: int = 0
 ## The last raids applied, newest last: {"at": unix seconds, "battle": the battle's setup,
 ## "result": its result}, as raid_result carried them.
 var raids: Array[Dictionary] = []
+## The expedition sector: its seed, epoch, cleared fields, last scan and snapshot.
+var sector: Sector = Sector.new()
 
 ## Production not yet paid out, per resource, in "resource-seconds" (amount * 3600).
 ## Keeping the remainder means ticking every second or once a day gives the same total.
@@ -118,6 +126,8 @@ static func create_new(base_catalog: Catalog, start_time: int) -> BaseState:
 	var start_resources: Dictionary = base_catalog.start.get("resources", {})
 	for res: String in base_catalog.resources:
 		state.resources[res] = mini(int(start_resources.get(res, 0)), state.capacity(res))
+	state.sector.sector_seed = Sector.seed_from_time(start_time)
+	state._snapshot_sector()
 	return state
 
 
@@ -131,6 +141,7 @@ static func create_new(base_catalog: Catalog, start_time: int) -> BaseState:
 ##   {"op": "cancel_training", "id": int, "unit": String}
 ##   {"op": "research", "unit": String}
 ##   {"op": "raid_result", "battle": {seed, attacker, defender, commands}, "result": {...}}
+##   {"op": "scan"}
 func apply(command: Dictionary, at_time: int) -> String:
 	advance_to(at_time)
 	var result := ""
@@ -150,6 +161,8 @@ func apply(command: Dictionary, at_time: int) -> String:
 			result = _research(str(command.get("unit", "")))
 		"raid_result":
 			result = _raid_result(command)
+		"scan":
+			result = _scan()
 		_:
 			result = ERR_UNKNOWN_OP
 	if result == "":
@@ -307,6 +320,14 @@ func check_raid_result(command: Dictionary) -> String:
 	return ""
 
 
+## Whether the sector can be scanned now: the first scan is free; after it, scan_seconds must
+## have passed since the last.
+func check_scan() -> String:
+	if scan_seconds_left() > 0:
+		return ERR_SCAN_COOLDOWN
+	return ""
+
+
 # --- Time ----------------------------------------------------------------------
 
 ## Moves the base forward to `time`: finishes construction and training in time order and
@@ -460,6 +481,26 @@ func research_seconds_left() -> int:
 	return maxi(0, research_done_at - now)
 
 
+## Seconds until the sector can be scanned again; 0 before the first scan and once the cooldown
+## has passed.
+func scan_seconds_left() -> int:
+	if sector.epoch == 0:
+		return 0
+	return maxi(0, sector.last_scan + catalog.scan_seconds - now)
+
+
+## The sector's fields for the map, one per index: {"index", "band", "cc" (the outpost's
+## Command Center level), "loot" ({res: the target}), "cleared", "seed"}. No field is laid out;
+## it builds a new Array, so it is for the map when it opens, not per frame.
+func sector_fields() -> Array[Dictionary]:
+	var fields: Array[Dictionary] = []
+	for index: int in catalog.expedition_field_count():
+		var field := OutpostGenerator.summary(catalog, sector, index)
+		field["cleared"] = sector.is_cleared(index)
+		fields.append(field)
+	return fields
+
+
 func army_count(unit: String) -> int:
 	var count: int = army.get(unit, 0)
 	return count
@@ -582,6 +623,7 @@ func to_dict() -> Dictionary:
 		"research": research_data,
 		"training": training_list,
 		"raids": raid_list,
+		"sector": sector.to_dict(),
 	}
 
 
@@ -589,7 +631,8 @@ func to_dict() -> Dictionary:
 ## 1 save (or one with no version) was laid out on V1_FIELD: its buildings move by half the
 ## field's growth since, so the base stays centred; a field that did not grow moves nothing. A
 ## save from before version 3 has no army, so it loads with none, every unit at level 1; one
-## from before version 4 has no raids.
+## from before version 4 has no raids, and one from before version 5 no sector: it is seeded from
+## the saved `now` (0 when absent), at epoch 0, with the loaded base as its snapshot.
 static func from_dict(base_catalog: Catalog, data: Dictionary) -> BaseState:
 	var state := BaseState.new(base_catalog)
 	var shift := Vector2i.ZERO
@@ -614,6 +657,12 @@ static func from_dict(base_catalog: Catalog, data: Dictionary) -> BaseState:
 		state.buildings[building.id] = building
 		state.grid.occupy(building.id, building.cell, base_catalog.size_of(building.type))
 		state._next_id = maxi(state._next_id, building.id + 1)
+	var sector_data: Variant = data.get("sector")
+	if typeof(sector_data) == TYPE_DICTIONARY:
+		state.sector = Sector.from_dict(base_catalog, sector_data, state.now)
+	else:
+		state.sector.sector_seed = Sector.seed_from_time(int(data.get("now", 0)))
+		state._snapshot_sector()
 	state._load_army(data)
 	# The raids are kept as they were saved, numbers made ints again, never checked: nothing in
 	# the base reads them.
@@ -773,6 +822,26 @@ func _raid_result(command: Dictionary) -> String:
 	while raids.size() > RAID_LOG_SIZE:
 		raids.remove_at(0)
 	return ""
+
+
+## Starts the sector's next epoch: new fields, none cleared, laid out against the base as it is.
+func _scan() -> String:
+	var error := check_scan()
+	if error != "":
+		return error
+	sector.epoch += 1
+	sector.cleared = PackedInt32Array()
+	sector.last_scan = now
+	_snapshot_sector()
+	return ""
+
+
+## Records the Command Center level and the capacity the sector's fields are laid out against.
+func _snapshot_sector() -> void:
+	var capacities: Dictionary[String, int] = {}
+	for res: String in catalog.resources:
+		capacities[res] = capacity(res)
+	sector.snapshot(cc_level(), capacities)
 
 
 func _check_level_requirements(stats: Dictionary) -> String:

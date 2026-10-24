@@ -60,6 +60,12 @@ var _turn: int = 0
 var _mirror: int = 0
 
 
+## The field `index` of the state's sector; {} for an index that is not a field.
+static func generate(catalog: Catalog, state: BaseState, index: int) -> Dictionary:
+	var sector := state.sector
+	return generate_field(catalog, sector.sector_seed, sector.epoch, index, sector.cc, sector.capacity)
+
+
 ## One field from its inputs:
 ##   {"seed", "index", "band", "cc",
 ##    "defender": {"buildings": [{"id", "type", "level", "cell": [x, y]}...], "resources": {res: n}},

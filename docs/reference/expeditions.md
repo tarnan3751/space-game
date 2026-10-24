@@ -39,6 +39,14 @@ the save holds only `{seed, epoch, cleared, last_scan, cc, capacity}`.
   catalog's resources only, and `last_scan` brought back to `now` when it is later, so a clock
   set back costs at most one cooldown.
 
+## The base's sector
+
+`BaseState.sector` holds it (`core-economy.md`, **Expeditions**): `create_new` seeds it and takes
+the snapshot, `from_dict` migrates an older save, `{"op": "scan"}` (`check_scan`,
+`scan_cooldown`) starts the next epoch once `rules.expedition.scan_seconds` have passed since the
+last (the first scan is free), and `sector_fields()` and `scan_seconds_left()` are the map's
+queries. `OutpostGenerator.generate(catalog, state, index)` lays out a field of the base's sector.
+
 ## The outpost generator
 
 `OutpostGenerator.generate_field(catalog, sector_seed, epoch, index, player_cc, capacity)` lays
