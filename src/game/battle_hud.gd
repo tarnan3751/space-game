@@ -30,6 +30,8 @@ const RESULT_STAR_SIZE := Vector2(64, 64)
 const RESULT_PICTURE_SIZE := Vector2(48, 48)
 const ICON_SIZE := Vector2(28, 28)
 const CARD_GAP := 10
+## Between the deploy bar and the abilities bar.
+const BAR_GAP := 16
 ## The dim behind the End confirmation, which takes every touch while it is open.
 const BACKDROP := Color(0.106, 0.102, 0.18, 0.35)
 const SPEED_SIZE := Vector2(88, 52)
@@ -37,6 +39,10 @@ const END_SIZE := Vector2(120, 52)
 ## The refused deploys' toasts. A card run out is let go on the next refresh, so a tap never meets
 ## `none_left`; a smear can, when a frame steps several ticks and the type runs out between two
 ## of them, before the refresh: that is the toast it keeps.
+const CAST_TEXT := {
+	BattleSim.ERR_BLOCKED: "Can't cast there",
+	BattleSim.ERR_NONE_LEFT: "None of those left",
+}
 const DEPLOY_TEXT := {
 	BattleSim.ERR_BLOCKED: "Can't deploy there",
 	BattleSim.ERR_NONE_LEFT: "None of those left",
@@ -62,6 +68,12 @@ var _counts: Dictionary[String, Label] = {}
 var _pictures: Dictionary[String, TextureRect] = {}
 ## Each type's picture key (ModelPreview.unit_key).
 var _keys: Dictionary[String, String] = {}
+var _ability_bar: PanelContainer
+var _ability_cards: Dictionary[String, Button] = {}
+var _ability_counts: Dictionary[String, Label] = {}
+var _shown_uses: Dictionary[String, int] = {}
+## The abilities bar's row width, and the gap between it and the deploy bar.
+var _abilities_width: float = 0.0
 var _confirm: PanelContainer
 var _confirm_backdrop: ColorRect
 var _keep_button: Button
@@ -129,6 +141,7 @@ func setup(catalog: Catalog, theme: Theme, preview: ModelPreview, view: BattleVi
 	view.stepped.connect(_refresh)
 	view.ended.connect(_show_result)
 	view.deploy_failed.connect(_on_deploy_failed)
+	view.cast_failed.connect(_on_cast_failed)
 	preview.rendered.connect(_on_rendered)
 	var keys := PackedStringArray()
 	for unit: String in _keys:
@@ -151,6 +164,15 @@ func _ready() -> void:
 
 func card(unit: String) -> Button:
 	return _cards[unit]
+
+
+## An ability's card on the abilities bar, and its count left.
+func ability_card(ability: String) -> Button:
+	return _ability_cards[ability]
+
+
+func ability_count(ability: String) -> String:
+	return _ability_counts[ability].text
 
 
 ## A deploy card's count left.
@@ -222,6 +244,10 @@ func return_button() -> Button:
 
 func deploy_bar() -> Control:
 	return _bar
+
+
+func ability_bar() -> Control:
+	return _ability_bar
 
 
 ## The toast's text while it shows; "" once it has faded.
@@ -314,30 +340,79 @@ func _build_deploy_bar() -> void:
 	for unit: String in _view.units_brought():
 		var level := clampi(BattleMath.whole(levels.get(unit, 1)), 1, _catalog.unit_max_level(unit))
 		_keys[unit] = ModelPreview.unit_key(unit, UnitModels.tier_of(_catalog, unit, level))
-		var button := _button("", CARD_SIZE)
-		# PASS, as the HUD's cards, so a drag on a card scrolls the bar.
-		button.mouse_filter = Control.MOUSE_FILTER_PASS
-		button.pressed.connect(_on_card.bind(unit))
-		row.add_child(button)
-		var content := VBoxContainer.new()
-		content.mouse_filter = Control.MOUSE_FILTER_IGNORE
-		content.alignment = BoxContainer.ALIGNMENT_CENTER
-		content.add_theme_constant_override("separation", 0)
-		button.add_child(content)
-		content.set_anchors_preset(Control.PRESET_FULL_RECT)
-		content.offset_left = 6
-		content.offset_right = -6
-		content.offset_top = Hud.BORDER + 2
-		content.offset_bottom = -Hud.BORDER - 2
+		var button := _card(row, _on_card.bind(unit))
+		var content := button.get_child(0) as Control
 		_pictures[unit] = _picture(content, PICTURE_SIZE)
-		var name := _label(content, _catalog.unit_name(unit), &"QueueName")
-		name.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-		name.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
-		_counts[unit] = _label(content, "", &"CardCost")
-		_counts[unit].horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		_counts[unit] = _card_lines(content, _catalog.unit_name(unit))
 		_cards[unit] = button
 		_shown_left[unit] = -1
 	_cards_width = _cards.size() * (CARD_SIZE.x + CARD_GAP) - CARD_GAP
+	_build_ability_bar()
+
+
+## The abilities bar, right of the deploy bar: a card per ability brought (above 0), in the
+## catalog's order; hidden when none is.
+func _build_ability_bar() -> void:
+	_ability_bar = PanelContainer.new()
+	_ability_bar.theme_type_variation = &"MenuPanel"
+	_ability_bar.mouse_filter = Control.MOUSE_FILTER_STOP
+	_root.add_child(_ability_bar)
+	_ability_bar.set_anchors_preset(Control.PRESET_BOTTOM_LEFT)
+	_ability_bar.grow_vertical = Control.GROW_DIRECTION_BEGIN
+	_ability_bar.grow_horizontal = Control.GROW_DIRECTION_END
+	_ability_bar.offset_bottom = -Hud.MARGIN
+	_ability_bar.offset_top = -Hud.MARGIN
+	var row := HBoxContainer.new()
+	row.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	row.add_theme_constant_override("separation", CARD_GAP)
+	row.custom_minimum_size.y = CARD_SIZE.y + 14
+	row.alignment = BoxContainer.ALIGNMENT_BEGIN
+	_ability_bar.add_child(row)
+	for ability: String in _view.abilities_brought():
+		var button := _card(row, _on_ability_card.bind(ability))
+		button.size_flags_vertical = Control.SIZE_SHRINK_BEGIN
+		var content := button.get_child(0) as Control
+		var glyph := HudIcon.new()
+		glyph.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		glyph.custom_minimum_size = PICTURE_SIZE
+		glyph.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
+		content.add_child(glyph)
+		Hud.show_ability_glyph(glyph, _catalog, ability)
+		_ability_counts[ability] = _card_lines(content, _catalog.ability_name(ability))
+		_ability_cards[ability] = button
+		_shown_uses[ability] = -1
+	_ability_bar.visible = not _ability_cards.is_empty()
+	_abilities_width = _ability_cards.size() * (CARD_SIZE.x + CARD_GAP) - CARD_GAP
+
+
+## A card in `row`: a button CARD_SIZE calling `pressed`, holding a centred column (its child 0)
+## the caller fills. PASS, as the HUD's cards, so a drag on a card scrolls its strip.
+func _card(row: Control, pressed: Callable) -> Button:
+	var button := _button("", CARD_SIZE)
+	button.mouse_filter = Control.MOUSE_FILTER_PASS
+	button.pressed.connect(pressed)
+	row.add_child(button)
+	var content := VBoxContainer.new()
+	content.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	content.alignment = BoxContainer.ALIGNMENT_CENTER
+	content.add_theme_constant_override("separation", 0)
+	button.add_child(content)
+	content.set_anchors_preset(Control.PRESET_FULL_RECT)
+	content.offset_left = 6
+	content.offset_right = -6
+	content.offset_top = Hud.BORDER + 2
+	content.offset_bottom = -Hud.BORDER - 2
+	return button
+
+
+## A card's name and, under it, its count, which it returns.
+func _card_lines(content: Control, title: String) -> Label:
+	var name := _label(content, title, &"QueueName")
+	name.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	name.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
+	var count := _label(content, "", &"CardCost")
+	count.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	return count
 
 
 ## End's question, centred: Keep fighting or End battle.
@@ -459,12 +534,21 @@ func _refresh() -> void:
 			_cards[unit].modulate.a = Hud.DISABLED_ALPHA if left == 0 else 1.0
 			if left == 0 and _view.deploy_unit == unit:
 				_select("")
+	for ability: String in _ability_cards:
+		var uses := sim.left_to_use(ability)
+		if uses != _shown_uses[ability]:
+			_shown_uses[ability] = uses
+			_ability_counts[ability].text = "x%d" % uses
+			_ability_cards[ability].modulate.a = Hud.DISABLED_ALPHA if uses == 0 else 1.0
+			if uses == 0 and _view.cast_ability == ability:
+				_select_ability("")
 
 
 func _show_result(result: Dictionary) -> void:
 	_refresh()
 	_confirm_backdrop.hide()
 	_bar.hide()
+	_ability_bar.hide()
 	_end_button.disabled = true
 	_speed_button.disabled = true
 	var stars := int(result.get("stars", 0))
@@ -500,6 +584,27 @@ func _show_result(result: Dictionary) -> void:
 			picture.texture = _preview.texture_of(_keys.get(unit, ""))
 			_label(cell, "%s x%d" % [_catalog.unit_name(unit), int(deployed[unit])], &"CardCost") \
 				.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	var used: Dictionary = result.get("abilities_used", {})
+	if not used.is_empty():
+		_label(_result_lines, "Abilities used", &"CardCount").horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		var abilities := HBoxContainer.new()
+		abilities.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		abilities.alignment = BoxContainer.ALIGNMENT_CENTER
+		abilities.add_theme_constant_override("separation", 14)
+		_result_lines.add_child(abilities)
+		for ability: String in used:
+			var cell := VBoxContainer.new()
+			cell.mouse_filter = Control.MOUSE_FILTER_IGNORE
+			cell.add_theme_constant_override("separation", 0)
+			abilities.add_child(cell)
+			var glyph := HudIcon.new()
+			glyph.mouse_filter = Control.MOUSE_FILTER_IGNORE
+			glyph.custom_minimum_size = RESULT_PICTURE_SIZE
+			glyph.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
+			cell.add_child(glyph)
+			Hud.show_ability_glyph(glyph, _catalog, ability)
+			_label(cell, "%s x%d" % [_catalog.ability_name(ability), int(used[ability])], &"CardCost") \
+				.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	_result.show()
 
 
@@ -516,12 +621,37 @@ func _select(unit: String) -> void:
 	if unit != "" and _view.sim.left_to_deploy(unit) == 0:
 		unit = ""
 	_view.select_unit(unit)
+	_highlight()
+
+
+## Selects `ability` to cast, "" for none: the unit type is let go (BattleView.select_ability).
+func _select_ability(ability: String) -> void:
+	if ability != "" and _view.sim.left_to_use(ability) == 0:
+		ability = ""
+	_view.select_ability(ability)
+	_highlight()
+
+
+func _on_ability_card(ability: String) -> void:
+	if _view.sim.is_over():
+		return
+	_select_ability("" if _view.cast_ability == ability else ability)
+
+
+## The selected card, unit or ability, takes the accent fill and ink text; the others the card's.
+func _highlight() -> void:
 	for type: String in _cards:
-		_cards[type].theme_type_variation = &"TabSelected" if type == unit else &""
-		var name_color := Hud.INK if type == unit else Hud.TEXT
-		for child: Node in _cards[type].get_child(0).get_children():
-			if child is Label:
-				(child as Label).add_theme_color_override("font_color", name_color)
+		_mark(_cards[type], type == _view.deploy_unit)
+	for ability: String in _ability_cards:
+		_mark(_ability_cards[ability], ability == _view.cast_ability)
+
+
+func _mark(card: Button, on: bool) -> void:
+	card.theme_type_variation = &"TabSelected" if on else &""
+	var name_color := Hud.INK if on else Hud.TEXT
+	for child: Node in card.get_child(0).get_children():
+		if child is Label:
+			(child as Label).add_theme_color_override("font_color", name_color)
 
 
 func _on_speed() -> void:
@@ -541,9 +671,17 @@ func _on_confirm_end() -> void:
 
 
 func _on_deploy_failed(error: String) -> void:
-	if not DEPLOY_TEXT.has(error):
-		return
-	_toast_label.text = DEPLOY_TEXT[error]
+	if DEPLOY_TEXT.has(error):
+		_show_toast(DEPLOY_TEXT[error])
+
+
+func _on_cast_failed(error: String) -> void:
+	if CAST_TEXT.has(error):
+		_show_toast(CAST_TEXT[error])
+
+
+func _show_toast(text: String) -> void:
+	_toast_label.text = text
 	_toast.modulate.a = 1.0
 	_toast.show()
 	if _toast_tween != null:
@@ -575,9 +713,13 @@ func _fit() -> void:
 	# The room for the cards: the safe area's width less the bar's left margin, the Build column
 	# with its margins, and the panel's own content margins either side of the strip.
 	var panel := _bar.get_theme_stylebox(&"panel")
-	var room := area.size.x - Hud.MARGIN - (Hud.BUILD_SIZE.x + 2 * Hud.MARGIN) \
-		- panel.get_margin(SIDE_LEFT) - panel.get_margin(SIDE_RIGHT)
-	_scroll.custom_minimum_size.x = minf(_cards_width, maxf(room, CARD_SIZE.x))
+	var margins := panel.get_margin(SIDE_LEFT) + panel.get_margin(SIDE_RIGHT)
+	var room := area.size.x - Hud.MARGIN - (Hud.BUILD_SIZE.x + 2 * Hud.MARGIN) - margins
+	# The abilities bar takes its whole width and the gap first; the deploy bar scrolls in the rest.
+	var abilities := _abilities_width + margins + BAR_GAP if _ability_bar.visible else 0.0
+	_scroll.custom_minimum_size.x = minf(_cards_width, maxf(room - abilities, CARD_SIZE.x))
+	_ability_bar.offset_left = Hud.MARGIN + _scroll.custom_minimum_size.x + margins + BAR_GAP
+	_ability_bar.offset_right = _ability_bar.offset_left
 
 
 # --- Pieces -------------------------------------------------------------------------

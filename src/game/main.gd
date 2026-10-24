@@ -240,8 +240,8 @@ func _practice_raid() -> void:
 
 
 ## A practice raid's setup (docs/reference/battle.md): the template base's buildings and
-## resources defending, the base's army at its levels attacking, a seed from the clock (so each
-## practice stands in a landscape of its own), no commands.
+## resources defending, the base's army at its levels attacking with the Foundry's stock at its
+## levels, a seed from the clock (so each practice stands in a landscape of its own), no commands.
 func practice_setup() -> Dictionary:
 	var template := TemplateBase.build(catalog, catalog.grid_size, _now())
 	var army := {}
@@ -250,9 +250,16 @@ func practice_setup() -> Dictionary:
 		if state.army_count(unit) > 0:
 			army[unit] = state.army_count(unit)
 			levels[unit] = state.unit_level(unit)
+	var abilities := {}
+	var ability_levels := {}
+	for ability: String in catalog.ability_types():
+		if state.stock(ability) > 0:
+			abilities[ability] = state.stock(ability)
+			ability_levels[ability] = state.ability_level(ability)
 	return {
 		"seed": _now() & SeededRng.MASK_32,
-		"attacker": {"army": army, "unit_levels": levels, "abilities": {}},
+		"attacker": {"army": army, "unit_levels": levels, "abilities": abilities,
+			"ability_levels": ability_levels},
 		"defender": {"buildings": template["buildings"], "resources": template["resources"]},
 		"commands": [],
 	}

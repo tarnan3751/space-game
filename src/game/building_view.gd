@@ -10,7 +10,8 @@ extends Node3D
 ## turn core gold (ink_selected) until both end, when the override is cleared (null); a
 ## placement ghost keeps plain ink outlines, lifted as it is, and its bodies take the valid or
 ## invalid ghost tint (set_ghost) for as long as it lives. In battle (BattleView) a hit whitens the
-## bodies for a moment (set_flash, MaterialKit.hit_flash).
+## bodies for a moment (set_flash, MaterialKit.hit_flash), and an EMP burst dims them grey while the
+## building is disabled (set_disabled, MaterialKit.disabled).
 ##
 ## While the building is busy a ConstructionDrone works over it, driven from _process; when the
 ## work ends the drone leaves, and if the view is freed first (a finished level replaces it)
@@ -51,8 +52,10 @@ var _lifted: bool = false
 ## A placement ghost's body tint (set_ghost), null for any other view. A ghost's outlines stay
 ## plain ink though it is lifted.
 var _ghost_tint: Material = null
-## Whether the bodies carry the hit flash now (set_flash).
+## Whether the bodies carry the hit flash now (set_flash), and whether the building is disabled
+## (set_disabled), which tints them grey while no flash is on.
 var _flashed: bool = false
+var _disabled: bool = false
 ## Whether the outlines carry the selected ink now.
 var _inked: bool = false
 ## The model's moving parts, each with its Motion and its rest position. They are posed at
@@ -193,7 +196,29 @@ func set_flash(on: bool) -> void:
 	if on == _flashed or _ghost_tint != null:
 		return
 	_flashed = on
-	var material: Material = MaterialKit.hit_flash() if on else null
+	_apply_tint()
+
+
+## Dims the bodies grey (MaterialKit.disabled) while an EMP burst has the building disabled in
+## battle, or clears it; a hit's flash shows over it.
+func set_disabled(on: bool) -> void:
+	if on == _disabled or _ghost_tint != null:
+		return
+	_disabled = on
+	_apply_tint()
+
+
+## Whether the building shows as disabled (set_disabled).
+func is_disabled() -> bool:
+	return _disabled
+
+
+func _apply_tint() -> void:
+	var material: Material = null
+	if _flashed:
+		material = MaterialKit.hit_flash()
+	elif _disabled:
+		material = MaterialKit.disabled()
 	for body: MeshInstance3D in _bodies:
 		if body.mesh.surface_get_material(0) == MaterialKit.toon():
 			body.set_surface_override_material(0, material)

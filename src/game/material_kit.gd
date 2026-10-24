@@ -69,6 +69,10 @@ const SUN := Color("fff4e0")
 const GHOST_MIX := 0.65
 ## How much white a building's body takes for the moment it is hit in battle (hit_flash).
 const HIT_FLASH_MIX := 0.6
+## The grey a building's body takes while an EMP burst has it disabled in battle (disabled), and
+## how much of it.
+const DISABLED_GREY := Color("6e6c80")
+const DISABLED_MIX := 0.5
 
 const TOON_SHADER := preload("res://src/game/toon.gdshader")
 const INK_SHADER := preload("res://src/game/ink.gdshader")
@@ -86,6 +90,7 @@ static var _holo: ShaderMaterial
 static var _ghost_valid: ShaderMaterial
 static var _ghost_invalid: ShaderMaterial
 static var _hit_flash: ShaderMaterial
+static var _disabled: ShaderMaterial
 static var _terrain: ShaderMaterial
 
 
@@ -152,6 +157,14 @@ static func hit_flash() -> ShaderMaterial:
 	if _hit_flash == null:
 		_hit_flash = _toon_material(Color(Color.WHITE, HIT_FLASH_MIX))
 	return _hit_flash
+
+
+## The body of a building disabled in battle (an EMP burst): dimmed grey
+## (BuildingView.set_disabled).
+static func disabled() -> ShaderMaterial:
+	if _disabled == null:
+		_disabled = _toon_material(Color(DISABLED_GREY, DISABLED_MIX))
+	return _disabled
 
 
 ## The terrain ring's body: its vertex tint drawn over with the field texture's marks and the rock

@@ -36,6 +36,8 @@ signal stepped
 signal ended(result: Dictionary)
 ## A deploy was refused (BattleSim's code: blocked, none_left, battle_over).
 signal deploy_failed(error: String)
+## A cast was refused (BattleSim's code: blocked, none_left, battle_over).
+signal cast_failed(error: String)
 
 ## Seconds of battle a tick is, and the most ticks one frame steps.
 const TICK_SECONDS := 1.0 / BattleSim.TICKS_PER_SECOND
@@ -71,6 +73,14 @@ const MINE_BLAST := MaterialKit.HAZARD
 const WELL_PULL := MaterialKit.ANTIMATTER
 const FALL_DUST := Color("c9c2e0")
 const SCORCH_RADIUS := 0.7
+## The abilities' tints: the swarm's dome, the EMP's ring, the strike's marker and its blast.
+const SWARM_GLOW := MaterialKit.NANITE_GREEN
+const EMP_RING := MaterialKit.ARC_BLUE
+const STRIKE_MARKER := MaterialKit.DEFENCE
+const STRIKE_BLAST := Color("ff6a3d")
+const STRIKE_CORE := Color("fff6e0")
+## A strike's blast lasts this long (the other impacts IMPACT_SECONDS).
+const STRIKE_BLAST_SECONDS := 0.6
 
 ## The battle being run; read only.
 var sim: BattleSim
@@ -81,6 +91,8 @@ var catalog: Catalog
 var speed: int = 1
 ## The unit type selected to deploy (select_unit); "" for none.
 var deploy_unit: String = ""
+## The ability selected to cast (select_ability); "" for none. One of this and deploy_unit at most.
+var cast_ability: String = ""
 var camera: IsoCamera
 ## The defender's field: ground, scenery, the merged walls.
 var field: BaseView
@@ -113,6 +125,10 @@ var _bars: Dictionary[int, float] = {}
 var _done := PackedInt32Array()
 ## The shield generators.
 var _shields := PackedInt32Array()
+## The defences an EMP burst has disabled, dimmed until the sim wakes them, and the ids done this
+## step, reused.
+var _disabled: Dictionary[int, bool] = {}
+var _woken := PackedInt32Array()
 ## Arc towers, whose shots are lightning.
 var _arc_towers: Dictionary[int, bool] = {}
 ## Per unit type brought: its reach at the attacker's level (field units) and its splash (world
@@ -304,6 +320,7 @@ func _process(delta: float) -> void:
 		_accumulator = TICK_SECONDS
 		_smear.clear()
 		select_unit("")
+		select_ability("")
 		ended.emit(sim.result())
 	var alpha := clampf(_accumulator / TICK_SECONDS, 0.0, 1.0)
 	effects.begin_bars()
@@ -329,7 +346,22 @@ func select_unit(unit: String) -> void:
 	_smear.clear()
 	if unit == "":
 		_smearing = false
+	else:
+		cast_ability = ""
 	field.set_deploy_mask(_mask, MASK_STRENGTH if unit != "" else 0.0)
+
+
+## Selects the ability a tap casts, "" for none; it lets the unit type go, so the red zone hides
+## (an ability may be cast anywhere on the field) and a drag pans.
+func select_ability(ability: String) -> void:
+	cast_ability = ability
+	if ability != "":
+		select_unit("")
+
+
+## Casts one `ability` on `cell` now: "" or the refusal's code.
+func cast(ability: String, cell: Vector2i) -> String:
+	return command({"op": "ability", "ability": ability, "cell": [cell.x, cell.y]})
 
 
 ## Buildings fallen so far, walls included; it moves only when the loot can have.
@@ -369,6 +401,21 @@ func _step() -> void:
 	_read_events()
 	for id: int in _shields:
 		effects.set_shield(id, sim.shield_hp(id), _clock)
+	_wake_defences()
+
+
+## The defences an EMP burst disabled whose time is up lose their grey.
+func _wake_defences() -> void:
+	if _disabled.is_empty():
+		return
+	_woken.clear()
+	for id: int in _disabled:
+		if sim.is_destroyed(id) or not sim.building_disabled(id):
+			_woken.append(id)
+	for id: int in _woken:
+		_disabled.erase(id)
+		if _views.has(id):
+			_views[id].set_disabled(false)
 
 
 ## The last tick's events (BattleEvents) turned into effects, flashes, falls and deaths.
@@ -415,6 +462,56 @@ func _read_events() -> void:
 				_mask_changed = true
 			BattleEvents.DEATH:
 				units.die(target, _clock)
+			BattleEvents.ABILITY:
+				_ability_used(source, events.to_x[i], events.to_y[i], events.land_tick[i])
+			BattleEvents.STRIKE_LAND:
+				var at := _point(events.to_x[i], events.to_y[i])
+				var radius := _ability_radius(source)
+				effects.strike_landed(at, radius, _under_strike(at, radius, true).x, _clock, STRIKE_BLAST_SECONDS, STRIKE_CORE,
+					STRIKE_BLAST)
+
+
+## An ability (its place in catalog.ability_types() plus one, `index`) used at the field point
+## (x, y), its effect lasting to tick `until`: a swarm's dome; an EMP's ring and the defences it
+## disabled dimmed; a strike's marker until it lands.
+func _ability_used(index: int, x: int, y: int, until: int) -> void:
+	var ability := catalog.ability_types()[index - 1]
+	var at := _point(x, y)
+	var radius := _ability_radius(index)
+	var seconds := maxf(float(until - (sim.tick - 1)) * TICK_SECONDS, TICK_SECONDS)
+	match catalog.ability_effect(ability):
+		"swarm":
+			effects.swarm(at, radius, _clock, seconds, SWARM_GLOW)
+		"emp":
+			effects.impact(at, radius, EMP_RING, _clock)
+			for id: int in _views:
+				if not _disabled.has(id) and sim.building_disabled(id):
+					_disabled[id] = true
+					_views[id].set_disabled(true)
+		_:
+			var under := _under_strike(at, radius)
+			effects.strike_marker(at, radius, maxf(radius, under.y), under.x, _clock, seconds, STRIKE_MARKER)
+
+
+## Under a strike at `at`, `radius` across: (the top of the tallest drawn standing building it
+## reaches, a ground ring's radius that stands out round that building's footprint); (0, 0) on
+## open ground. Read at the cast and at the landing, never a frame; at the landing (`landing`) the
+## buildings it has just felled count, since their falls are read after it.
+func _under_strike(at: Vector3, radius: float, landing: bool = false) -> Vector2:
+	var under := Vector2.ZERO
+	for id: int in _views:
+		var centre := _centres[id]
+		var half := _sizes[id] * 0.5
+		if absf(centre.x - at.x) <= radius + half and absf(centre.y - at.z) <= radius + half \
+				and (landing or not sim.is_destroyed(id)) and _views[id].visible:
+			under.x = maxf(under.x, _muzzles[id] / MUZZLE_SHARE)
+			under.y = maxf(under.y, half * 1.6)
+	return under
+
+
+## An ability's radius in world units, by its place in catalog.ability_types() plus one.
+func _ability_radius(index: int) -> float:
+	return catalog.ability_radius(catalog.ability_types()[index - 1]) / 1000.0
 
 
 ## Unit `unit`, standing at the field point (x, y), hits `building`: a bolt from it, or a blow at
@@ -515,10 +612,15 @@ func _draw_buildings(shown: float) -> void:
 
 ## A tap on the field deploys one unit of the selected type on the cell under it.
 func _on_tapped(screen_pos: Vector2) -> void:
-	if deploy_unit == "":
-		return
 	var cell := _cell_at(screen_pos)
 	if cell.x < 0:
+		return
+	if cast_ability != "":
+		var refused := cast(cast_ability, cell)
+		if refused != "":
+			cast_failed.emit(refused)
+		return
+	if deploy_unit == "":
 		return
 	_report(deploy(deploy_unit, cell))
 
@@ -593,6 +695,37 @@ func _update_mask() -> void:
 		for x: int in grid.x:
 			_mask_image.set_pixel(x, y, Color.BLACK if sim.is_deploy_cell(Vector2i(x, y)) else Color.WHITE)
 	_mask.update(_mask_image)
+
+
+## The abilities the attacker brought (above 0), in the catalog's order.
+func abilities_brought() -> PackedStringArray:
+	var names := PackedStringArray()
+	var stock: Dictionary = (battle_setup.get("attacker", {}) as Dictionary).get("abilities", {})
+	for ability: String in catalog.ability_types():
+		if BattleMath.whole(stock.get(ability, 0)) > 0:
+			names.append(ability)
+	return names
+
+
+## Building `id`'s type, "" for none.
+func building_type(id: int) -> String:
+	return _types.get(id, "")
+
+
+## Building `id`'s centre on the ground (world).
+func building_centre(id: int) -> Vector3:
+	var centre: Vector2 = _centres.get(id, Vector2.ZERO)
+	return Vector3(centre.x, 0.0, centre.y)
+
+
+## Whether building `id` is a drawn defence the attacker can see: a defence, not hidden now.
+func is_revealed_defence(id: int) -> bool:
+	return _views.has(id) and sim.is_revealed(id) and catalog.battle_class(_types[id]) == Catalog.CLASS_DEFENSE
+
+
+## Whether building `id` shows as disabled now (an EMP burst).
+func is_shown_disabled(id: int) -> bool:
+	return _views.has(id) and _views[id].is_disabled()
 
 
 ## The unit types the attacker brought, in sorted order.
