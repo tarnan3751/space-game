@@ -32,6 +32,10 @@ const InfantryModels := preload("res://src/game/models/infantry.gd")
 const VehicleModels := preload("res://src/game/models/vehicles.gd")
 const AircraftModels := preload("res://src/game/models/aircraft.gd")
 
+## The far version's share of sides and rings (LowPolyMesh.detail): what the battle draws at the
+## wider zooms, where a unit is a few dozen pixels tall.
+const FAR_DETAIL := 0.5
+
 ## Moving parts a unit model may have: none, since a unit is drawn from a MultiMesh of its one
 ## mesh; a rotor spins through LowPolyMesh.spin instead.
 const MAX_MOVING := 0
@@ -75,13 +79,14 @@ static func create(type: String, tier: int) -> Node3D:
 	return BuildingModels.assemble(meshes(type, tier))
 
 
-## The meshes of `type` built for `tier`, cached by type and tier: the body and its outline, for a
-## caller that draws them itself (BattleView's MultiMeshes).
-static func meshes(type: String, tier: int) -> BuildingModels.Meshes:
-	var key := "%s/%d" % [type, tier]
+## The meshes of `type` built for `tier`, cached by type, tier and version: the body and its
+## outline, for a caller that draws them itself (BattleView's MultiMeshes); `far` for the version
+## with fewer sides (FAR_DETAIL) the battle draws at the wider zooms.
+static func meshes(type: String, tier: int, far: bool = false) -> BuildingModels.Meshes:
+	var key := "%s/%d%s" % [type, tier, "/far" if far else ""]
 	var built: BuildingModels.Meshes = _cache.get(key)
 	if built == null:
-		built = BuildingModels.meshes_of(build(type, tier))
+		built = BuildingModels.meshes_of(build(type, tier, FAR_DETAIL if far else 1.0))
 		_cache[key] = built
 	return built
 
@@ -92,10 +97,12 @@ static func instantiate(p: Parts) -> Node3D:
 
 
 ## The parts of `type` built for `tier`, uncached: for create() and for a caller that reads them
-## (the gallery's counts). An unknown type gets a plain marker and one warning.
-static func build(type: String, tier: int) -> Parts:
+## (the gallery's counts); at `detail` below 1, its far version (LowPolyMesh.detail). An unknown
+## type gets a plain marker and one warning.
+static func build(type: String, tier: int, detail: float = 1.0) -> Parts:
 	var p := Parts.new()
 	p.tier = tier
+	p.body.detail = detail
 	match type:
 		"ranger":
 			InfantryModels.build_ranger(p)

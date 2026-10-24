@@ -32,10 +32,19 @@ extends RefCounted
 ## moving part about +Y. The pivot and the rate go into a CUSTOM0 channel (four floats a vertex) on
 ## the body and the outline, which a mesh with no spinning part leaves out, so the rotor is part
 ## of the one mesh and costs no draw of its own.
+##
+## `detail`, below 1, builds a far version of a model: every round part with that share of its
+## sides (at least MIN_SIDES, never more than asked) and its rings (at least MIN_RINGS), and its
+## smooth parts smoothed up to 65 degrees (FAR_SMOOTH_COS), so the fewer sides still shade as a curve. The
+## battle draws its units from such a version at the wider zooms (UnitModels.meshes).
 
 ## Faces of a smooth part that meet at a smaller angle than this share normals.
 const SMOOTH_ANGLE := 40.0
 const SMOOTH_COS := 0.766
+## A far version's (detail below 1) least sides and rings, and its smoothing angle.
+const MIN_SIDES := 6
+const MIN_RINGS := 2
+const FAR_SMOOTH_COS := 0.423
 ## Corners closer than this (world units) are one point when normals are averaged.
 const WELD := 0.001
 
@@ -65,6 +74,8 @@ var flags: int = 0
 ## The spin given to the parts added from now on, as `ink` is kept: (pivot x, y, z, radians a
 ## second) about the mesh's +Y; a zero rate, the default, spins nothing.
 var spin: Vector4 = Vector4.ZERO
+## The share of their sides and rings round parts are built with; set before the first part.
+var detail: float = 1.0
 
 
 ## Triangles in the body mesh, both surfaces.
@@ -381,6 +392,7 @@ func pyramid(width: float, height: float, pos: Vector3, surf: Surf,
 func dome(radius: float, height: float, sides: int, rings: int, pos: Vector3, surf: Surf,
 		rot: Vector3 = Vector3.ZERO, from_deg: float = 0.0, to_deg: float = 360.0) -> void:
 	var profile := PackedVector2Array()
+	rings = _rings(rings)
 	for k: int in rings:
 		var angle := PI * 0.5 * k / rings
 		profile.append(Vector2(radius * cos(angle), height * sin(angle)))
@@ -392,6 +404,7 @@ func dome(radius: float, height: float, sides: int, rings: int, pos: Vector3, su
 func orb(radius: float, sides: int, rings: int, pos: Vector3, surf: Surf,
 		rot: Vector3 = Vector3.ZERO) -> void:
 	var profile := PackedVector2Array([Vector2(0, -radius)])
+	rings = _rings(rings)
 	for k: int in range(1, rings):
 		var angle := PI * k / rings - PI * 0.5
 		profile.append(Vector2(radius * cos(angle), radius * sin(angle)))
@@ -424,7 +437,7 @@ func tube(inner_radius: float, outer_radius: float, height: float, sides: int, p
 func disc(radius: float, sides: int, pos: Vector3, surf: Surf,
 		rot: Vector3 = Vector3.ZERO) -> void:
 	var start := _vertices.size()
-	_fan(radius, 0.0, sides, Transform3D(_basis(rot), pos), surf, _repeats(radius, surf))
+	_fan(radius, 0.0, _sides(sides), Transform3D(_basis(rot), pos), surf, _repeats(radius, surf))
 	_finish(start, surf)
 
 
@@ -437,6 +450,7 @@ func disc(radius: float, sides: int, pos: Vector3, surf: Surf,
 func lathe(profile: PackedVector2Array, sides: int, pos: Vector3, surf: Surf,
 		rot: Vector3 = Vector3.ZERO, from_deg: float = 0.0, to_deg: float = 360.0) -> void:
 	var start := _vertices.size()
+	sides = _sides(sides)
 	var xf := Transform3D(_basis(rot), pos)
 	var last := profile.size() - 1
 	var flat_top := profile[last].x == 0.0 and last > 0 and profile[last - 1].y == profile[last].y
@@ -649,10 +663,24 @@ func _finish(start: int, surf: Surf) -> void:
 			var sum := Vector3.ZERO
 			for j: int in members:
 				var other := _face_normals[j / 3]
-				if own.dot(other) >= SMOOTH_COS:
+				if own.dot(other) >= (SMOOTH_COS if detail >= 1.0 else FAR_SMOOTH_COS):
 					sum += other * _corner_angle(j)
 			if sum != Vector3.ZERO:
 				_normals[i] = sum.normalized()
+
+
+## `sides` at this mesh's detail.
+func _sides(sides: int) -> int:
+	if detail >= 1.0:
+		return sides
+	return maxi(mini(sides, MIN_SIDES), roundi(sides * detail))
+
+
+## `rings` at this mesh's detail.
+func _rings(rings: int) -> int:
+	if detail >= 1.0:
+		return rings
+	return maxi(mini(rings, MIN_RINGS), roundi(rings * detail))
 
 
 ## Whole texture repeats around a circle of `radius`, about one per world unit at uv_scale 1.

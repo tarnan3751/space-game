@@ -3,7 +3,8 @@
 // toon_common.gdshaderinc), ink.gdshader and holo.gdshader, so an outline follows its part and a
 // hologram moves like any other. The flags are bits of the integer in UV2.y; a part's phase, 0 to
 // 1 in 1/254 steps, is in COLOR.a (surf_phase) and offsets its effect's cycle. No per-instance
-// uniforms: every instance of a mesh animates alike, from anim_time.
+// uniforms: every instance of a mesh animates alike, from anim_time, but for a battle's MultiMesh
+// instances, whose custom data carries their gait, hit flash and fade (effect_gait, below).
 
 // The game's animation clock in seconds, wrapping every hour: main.gd sets it once a frame from
 // the clock Motion.clock() returns, so the moving parts BuildingView poses keep step with these
@@ -90,6 +91,36 @@ vec3 effect_spin(vec3 vertex, int flags, vec4 spin) {
 	float s = sin(angle);
 	vec3 off = vertex - spin.xyz;
 	return spin.xyz + vec3(off.x * c + off.z * s, off.y, -off.x * s + off.z * c);
+}
+
+// The battle's per-instance state (BattleUnits and BattleEffects draw from MultiMeshes whose
+// custom data reaches the shaders as INSTANCE_CUSTOM): x the gait's phase, in steps; y how much of
+// the gait shows, 0 standing (or hovering) to 1 striding; z the hit flash, 0 to 1; w the fade, 0 to
+// 1. Every other instance reads zeros, so nothing here changes it.
+//
+// The gait (effect_gait) is the Clash hop: once a step the model lifts GAIT_HOP off the ground on
+// a half sine and lands squashed by GAIT_SQUASH, leaning forward (+Z) by GAIT_LEAN and swaying
+// GAIT_SWAY to either side in turn, each a shear growing with the vertex's height, so the feet
+// stay planted while the head moves most. The hit flash whitens the colour by FLASH_WHITE at its
+// height (toon.gdshader); the fade thins the outline (ink.gdshader) and a hologram's alpha
+// (holo.gdshader), while BattleUnits shrinks the instance itself.
+const float GAIT_HOP = 0.09;
+const float GAIT_SQUASH = 0.1;
+const float GAIT_LEAN = 0.16;
+const float GAIT_SWAY = 0.05;
+const float FLASH_WHITE = 0.75;
+
+vec3 effect_gait(vec3 vertex, vec4 custom) {
+	if (custom.y <= 0.0) {
+		return vertex;
+	}
+	float stride = sin(PI * custom.x);
+	float lift = abs(stride);
+	vec3 moved = vertex;
+	moved.y = vertex.y * (1.0 - GAIT_SQUASH * custom.y * (1.0 - lift)) + GAIT_HOP * custom.y * lift;
+	moved.z += vertex.y * GAIT_LEAN * custom.y;
+	moved.x += vertex.y * GAIT_SWAY * custom.y * stride;
+	return moved;
 }
 
 // How far through its climb a RISE part is now, 0 to 1.

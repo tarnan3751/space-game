@@ -22,7 +22,8 @@ render_mode cull_front, unshaded;
 // The outline carries its parts' flags (UV2.y) and phases (COLOR.a), and moves each vertex as
 // the body's shader does (effects.gdshaderinc: SPIN, BOB and JITTER) before the push, so an
 // outline never comes off a spinning, bobbing or jittering part. Parts that flicker are never
-// outlined.
+// outlined. A battle's MultiMesh instance (INSTANCE_CUSTOM) moves its outline with its gait, and
+// its fade thins the line to nothing.
 
 #include "res://src/game/effects.gdshaderinc"
 
@@ -30,11 +31,13 @@ uniform float ink_px = 2.2;
 uniform vec4 ink_color : source_color = vec4(0.106, 0.102, 0.18, 1.0);
 
 void vertex() {
-	float width = ink_px * 2.0 / (720.0 * abs(PROJECTION_MATRIX[1][1])) * (1.0 - UV.x);
+	float width = ink_px * 2.0 / (720.0 * abs(PROJECTION_MATRIX[1][1])) * (1.0 - UV.x)
+		* (1.0 - INSTANCE_CUSTOM.w);
 	float scale = length(MODEL_MATRIX[0].xyz);
 	int flags = surf_flags(UV2);
 	vec3 normal = effect_spin(NORMAL, flags, vec4(vec3(0.0), CUSTOM0.w));
-	vec3 moved = effect_vertex(effect_spin(VERTEX, flags, CUSTOM0), flags, surf_phase(COLOR), MODEL_MATRIX);
+	vec3 spun = effect_gait(effect_spin(VERTEX, flags, CUSTOM0), INSTANCE_CUSTOM);
+	vec3 moved = effect_vertex(spun, flags, surf_phase(COLOR), MODEL_MATRIX);
 	vec3 pushed = moved + normalize(normal) * width / scale;
 	pushed.y = max(pushed.y, min(moved.y, -MODEL_MATRIX[3][1] / scale));
 	VERTEX = pushed;

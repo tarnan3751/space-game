@@ -9,7 +9,8 @@ extends Node3D
 ## shared one from MaterialKit, never a new material: a selected or lifted building's outlines
 ## turn core gold (ink_selected) until both end, when the override is cleared (null); a
 ## placement ghost keeps plain ink outlines, lifted as it is, and its bodies take the valid or
-## invalid ghost tint (set_ghost) for as long as it lives.
+## invalid ghost tint (set_ghost) for as long as it lives. In battle (BattleView) a hit whitens the
+## bodies for a moment (set_flash, MaterialKit.hit_flash).
 ##
 ## While the building is busy a ConstructionDrone works over it, driven from _process; when the
 ## work ends the drone leaves, and if the view is freed first (a finished level replaces it)
@@ -50,6 +51,8 @@ var _lifted: bool = false
 ## A placement ghost's body tint (set_ghost), null for any other view. A ghost's outlines stay
 ## plain ink though it is lifted.
 var _ghost_tint: Material = null
+## Whether the bodies carry the hit flash now (set_flash).
+var _flashed: bool = false
 ## Whether the outlines carry the selected ink now.
 var _inked: bool = false
 ## The model's moving parts, each with its Motion and its rest position. They are posed at
@@ -179,6 +182,18 @@ func set_ghost(valid: bool) -> void:
 		return
 	_ghost_tint = material
 	_update_outlines()
+	for body: MeshInstance3D in _bodies:
+		if body.mesh.surface_get_material(0) == MaterialKit.toon():
+			body.set_surface_override_material(0, material)
+
+
+## Whitens the bodies (MaterialKit.hit_flash) for the moment the building is hit in battle, or
+## clears it. A ghost keeps its tint.
+func set_flash(on: bool) -> void:
+	if on == _flashed or _ghost_tint != null:
+		return
+	_flashed = on
+	var material: Material = MaterialKit.hit_flash() if on else null
 	for body: MeshInstance3D in _bodies:
 		if body.mesh.surface_get_material(0) == MaterialKit.toon():
 			body.set_surface_override_material(0, material)

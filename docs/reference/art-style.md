@@ -328,7 +328,11 @@ scale it. Round parts are lathes, a profile of (radius, height) points spun arou
 faces are left out of boxes and lathes, since the camera always looks down. `flags`, like `ink`,
 is a member a caller sets for the parts it adds next and puts back after: flags added to every
 part's own (`Surf.flags`), none by default; a hovering unit sets `Surf.BOB` for its whole build,
-its figures' parts included (**Units**). `spin`, kept the same way, is a part tag: while it is
+its figures' parts included (**Units**). `detail`, set before the first part, builds a far
+version: below 1, every round part takes that share of its sides (at least `MIN_SIDES`, 6, never
+more than asked) and of a dome's or an orb's rings (at least `MIN_RINGS`, 2), and smooth parts
+share normals up to 65 degrees (`FAR_SMOOTH_COS`), so the fewer sides still shade as a curve (the
+battle's units at the wider zooms, **Units**). `spin`, kept the same way, is a part tag: while it is
 (pivot x, y, z, radians a second) with a non-zero rate, the parts added get the `SPIN` flag and the
 spin in a `CUSTOM0` channel (four floats a vertex, on the body and the outline; `format()` gives the
 flags `add_surface_from_arrays` takes for it), and the shaders turn them about the vertical line
@@ -685,14 +689,18 @@ even proportions with no neck, no joints, no taper and no hands or feet.
 The army's eleven unit types (`data/units.json`, `docs/reference/data-format.md`), one model each,
 built by `UnitModels` (`src/game/unit_models.gd`) on the figures above: `create(type, tier)`
 returns a model as `BuildingModels.create` does (a `Node3D` of the body's instance and its
-outline's), its meshes built once per type and tier and cached; `build(type, tier)` returns the uncached `Parts`, `instantiate(parts)`
+outline's), its meshes built once per type and tier and cached (`meshes(type, tier, far)` returns
+them, for the battle's MultiMeshes; `far` the version built at `FAR_DETAIL`, 0.5, of
+`LowPolyMesh.detail`, about half the triangles, which the battle draws from camera size 20 out); `build(type, tier)` returns the uncached `Parts`, `instantiate(parts)`
 a model of parts a caller built. Each type's builder is a static `build_<type>(p: Parts)` in
 `src/game/models/infantry.gd` (ranger, breacher, jet trooper, brawler), `vehicles.gd` (dune
 runner, siege walker, hover tank, titan) or `aircraft.gd` (skimmer, gunship, bomber). The
 contract: origin on the ground under the unit's middle, +Y up, facing +Z; a hovering or flying
 unit is built at its height over that point. One cell is one unit. A unit has no moving part
-(`MAX_MOVING` is 0), so the battle can draw every unit of a type from one MultiMesh of its body and
-one of its outline; what turns is a part tagged with `LowPolyMesh.spin`, which the shaders spin.
+(`MAX_MOVING` is 0), so the battle draws every unit of a type from one MultiMesh of its body and
+one of its outline (`battle-view.md`, **Units**); what turns is a part tagged with
+`LowPolyMesh.spin`, which the shaders spin, and the hop, the lean, the hit flash and the death are
+the battle's per-instance data (**Surface effects**).
 
 - **Tiers.** One shape per type; the tier repaints a machine's hull, panels, trim and glows, as
   the buildings' tiers do (**Tiers**), so a Crown unit reads black and gold with violet as a Crown
@@ -816,7 +824,16 @@ its cycle by phase times the period. It is stored in the vertex colour's alpha, 
 steps: `LowPolyMesh` writes (round(phase × 254) + 0.25) / 255, the same byte whether the store
 rounds or truncates, and `surf_phase()` in `effects.gdshaderinc` reads round(alpha × 255) / 254,
 so 0.5 (a FLOW part standing still) is exact. There are no per-instance uniforms: every instance
-of a mesh animates alike.
+of a mesh animates alike, but for the battle's MultiMesh instances, whose custom data
+(`INSTANCE_CUSTOM`) carries their own state: x a gait's phase in steps, y its share, z a hit
+flash, w a fade (`battle-view.md`, **Units**). The toon and ink shaders apply the gait
+(`effect_gait`: once a step a hop of `GAIT_HOP` 0.09 on a half sine, landing squashed by
+`GAIT_SQUASH`, a forward lean `GAIT_LEAN` and a sway `GAIT_SWAY` to either side in turn, each a
+shear growing with the vertex's height, so the feet stay planted) before the surface effects; the
+toon shader whitens by the flash (`FLASH_WHITE`, 0.75 at its height), the ink shader thins the line
+by the fade and the hologram shader its alpha. Every other instance reads zeros there, so nothing
+changes for it; the Compatibility renderer passes the custom data through (verified on the
+development Mac by the `battle_view` scenario's shots).
 
 | Flag | Bit | Effect |
 | --- | --- | --- |
@@ -1073,6 +1090,7 @@ only when it is the toon surface, so its holograms keep their look.
 | Selected (`set_footprint(SELECTED)`) or lifted (`set_lifted(true)`, while dragged) | the outline instances take `ink_selected` (core gold); the footprint tile shows as before |
 | Placement ghost (`set_ghost(valid)`, from `PlacementController` as its spot is checked) | the body instances take `ghost_valid` or `ghost_invalid`: the toon shader with energy cyan or defence red mixed in at 0.65; the outline stays plain ink, though the ghost is lifted |
 | Under construction | the scaffold, a model like any other, outlined; a construction drone works over it, and over a building being upgraded (**Construction drone**) |
+| Hit in battle (`set_flash(on)`, from `BattleView` for a moment after each hit) | the body instances take `hit_flash`: the toon shader with white mixed in at 0.6 (`HIT_FLASH_MIX`); the outlines stay plain ink |
 
 A wall drawn by the merged wall mesh hides its own model, outlines included (`set_merged`), so a
 selected merged wall shows its footprint tile and no gold, and the merged outline stays plain ink.

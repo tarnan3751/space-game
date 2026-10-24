@@ -7,7 +7,8 @@ render_mode blend_mix, depth_draw_never, cull_back, unshaded;
 // view grazes the surface, and a "phase out" every HOLO_DIP_PERIOD seconds, when it fades to
 // HOLO_DIP_ALPHA for HOLO_DIP_SECONDS, offset by the part's phase (surf_phase). A RISE part fades
 // in just above its start and out over the top half of its climb, so it is gone when it restarts.
-// The other effects (effects.gdshaderinc) apply as on any part. Holograms are never outlined, so
+// The other effects (effects.gdshaderinc) apply as on any part, and a battle's MultiMesh instance
+// (INSTANCE_CUSTOM) fades out by its w. Holograms are never outlined, so
 // the rim is a fresnel term here, unlike the toon shader.
 
 #include "res://src/game/effects.gdshaderinc"
@@ -26,11 +27,14 @@ const float RIM_BRIGHTEN = 0.3;
 uniform sampler2DArray kit : source_color, filter_linear_mipmap, repeat_enable;
 
 varying float world_y;
+varying float fade;
 
 void vertex() {
 	int flags = surf_flags(UV2);
-	VERTEX = effect_vertex(effect_spin(VERTEX, flags, CUSTOM0), flags, surf_phase(COLOR), MODEL_MATRIX);
+	vec3 spun = effect_gait(effect_spin(VERTEX, flags, CUSTOM0), INSTANCE_CUSTOM);
+	VERTEX = effect_vertex(spun, flags, surf_phase(COLOR), MODEL_MATRIX);
 	world_y = (MODEL_MATRIX * vec4(VERTEX, 1.0)).y;
+	fade = INSTANCE_CUSTOM.w;
 }
 
 void fragment() {
@@ -47,5 +51,5 @@ void fragment() {
 		float t = rise_progress(phase);
 		alpha *= smoothstep(0.0, 0.12, t) * (1.0 - smoothstep(0.5, 1.0, t));
 	}
-	ALPHA = alpha;
+	ALPHA = alpha * (1.0 - fade);
 }
