@@ -937,9 +937,11 @@ its lower mask, and the merged outline against its pieces' with their steps). `b
 to, is the lone post (mask 0): the paint brush, a lifted wall and the gallery show it.
 
 The merged mesh keeps each piece's UV2 and colour, so PULSE, BLINK and FLOW work on wall pieces.
-It takes a piece's opaque surface only, so a HOLO part is not allowed in a wall piece, and its
-merged outline carries no flags (`WallMesh` copies UV2 and colour only with UV), so BOB and
-JITTER are not for walls either.
+It takes a piece's opaque surface only, so a HOLO part is not allowed in a wall piece. The
+merged outline carries each piece's UV (its ink thinning), UV2 and colour as well, since
+`to_outline_arrays` writes all three, so a moving flag would move a piece's outline with its
+body; BOB and JITTER stay out of wall pieces all the same, because joined pieces must not move
+against their neighbours.
 
 ## View states
 
