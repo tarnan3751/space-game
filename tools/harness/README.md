@@ -148,6 +148,17 @@ and hash, and the result applied with `raid_result` to a copy of the game's base
 army must spend the units deployed and bring the loot home up to storage. `main.state` itself
 is untouched, since no player action leads to a raid yet. Headless; no screenshots.
 
+`scenarios/expedition.gd` runs an expedition on the real data
+(`docs/reference/expeditions.md`): a copy of the template base with a fixed sector seed lays out
+its six fields, each logged (band, outpost level, counts, rings, deposits, hazards, loot, and the
+wall time, read in the scenario, never in the generator) and checked to drop nothing and to set
+up a battle; the battle scenario's army attacks the even field from the middles of the four
+edges, and the result is applied with `raid_result` and the expedition key: the field must be
+cleared exactly when the attack took a star (which one it gets is the development balance's, so
+it is logged), and the raid logged with the field's inputs, not its layout; then the first scan
+must start epoch 1 with every field new and the next scan wait. `main.state` is untouched.
+Headless; no screenshots.
+
 `scenarios/model_gallery.gd` shows every building model: one `BuildingView` per type and level
 in the catalog, laid out on the grid in rows by category (`"core"`, then
 `catalog.categories`), under a node of its own, with the base's own views hidden. The roster

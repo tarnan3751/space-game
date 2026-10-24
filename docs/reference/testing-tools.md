@@ -30,8 +30,11 @@ preload("res://test/support/fixtures.gd")`, then `Fixtures.catalog()`,
 `Fixtures.catalog_with_grid(size)` (the same rules on another field),
 `Fixtures.new_base(start_time)`, `Fixtures.army_base()` (the fixture base with a finished
 hangar and an academy, at time 30; `data-format.md` describes the fixture base) or
-`Fixtures.battle_catalog(size)` (the fixture catalog with the battle units merged in). The one
-exception is `test_catalog.gd`, whose `test_shipped_*` tests load the real `data/` on purpose:
+`Fixtures.battle_catalog(size)` (the fixture catalog with the battle units merged in), or
+`Fixtures.expedition_catalog(change)` (the expedition catalog: a 40×40 field and ten Command
+Center levels, its rules optionally changed first). The exceptions are `test_catalog.gd`, whose
+`test_shipped_*` tests load the real `data/` on purpose, and the data check
+`test_outpost_generator.gd::test_shipped_data_lays_out_every_field`. The shipped-data tests check:
 the data is valid, the start layout fits, every level's price fits the storage a base can reach
 when that level unlocks, and no curve (cost, `build_seconds`, `hp`, `produces`, `storage`,
 `capacity`) goes down from one level to the next.
@@ -46,9 +49,12 @@ when that level unlocks, and no curve (cost, `build_seconds`, `hp`, `produces`, 
 | `test/core/test_battle_targeting.gd` | Ground by path and air by straight line, preferences and their fallback, traps never targets, ties to the lowest id, a new target after a fall, the unrevealed sentry as the last resort, defences by class and range, keeping their target. |
 | `test/core/test_base_state.gd` | Start layout, place and its refusals, the Command Center level checked before the limit, instant buildings, walls, timers, upgrades and their rules, moves, bad commands, the `changed` signal, the clock going backwards, the save round trip, a save from before the third resource, a version 1 save centred on a grown field (`Fixtures.catalog_with_grid`) and left in place on one that did not grow, dropping buildings that no longer fit, the army's save round trip mid-way (queues running and paused, a research), saving leaving the catalog's unit order alone, version 1 and 2 saves loading with no army, and army entries that no longer fit dropped or clamped (an army above the housing kept, waiting). |
 | `test/core/test_catalog.gd` | The shipped data (validity, start layout, affordability, curves, final levels at the top Command Center, counts; for units, prices and housing within reach, curves, final levels at the top lab), int conversion, level, count, resource, category, display-field and unit lookups, one validation message per rule (units, `rules.army` and `rules.battle` included), the battle classes and a catalog without battle rules, the shipped battle data (a hull on every type but the traps, each special's fields at every level), the dev cheats (every level free and one second at most, nothing else changed; units free to train and research in one second at most; a base building what it could not afford). |
+| `test/core/test_expedition_raid.gd` | An expedition's `raid_result`: a star clears the field (until a scan), none leaves it open, every `bad_expedition` (another epoch, an index out of range or missing, a cleared field, not an object, a moved building, more stored, another seed) through its check and `apply` changing nothing, a command parsed from JSON still matching, the log keeping the field's inputs (which lay it out again) and not its layout, a raid without the key unchanged. |
+| `test/core/test_outpost_generator.gd` | The generator: the same inputs giving the same JSON, another index, epoch or seed differing, the field seed, no field past the last; every band at every Command Center level valid (no overlap, inside the margin, ids in order, a battle sets up, nothing dropped, counts within `max_count`, levels as the band says), the outpost level clamped, rings with exactly their band's gaps, a ring short of walls left open, deposits and hazards outside the walls, traps inside the rings and on every gap, the loot a full raid takes, no loot without capacity or a holder, the summary agreeing, the battle setup, a crowded field ending valid with drops counted; and the shipped data laying out every field at every level with nothing dropped, the hard rings closed. |
 | `test/core/test_raid_result.gd` | `raid_result`: a real battle's result applied (units spent, loot home), loot capped by storage and never removing, every refusal through its check and `apply` changing nothing, a waiting unit housed in the room a raid frees, the last five raids kept, the save round trip, a version 3 save loading with none. |
 | `test/core/test_production.gd` | Production starting at completion, carried remainders, tick-size independence, storage caps, caps rising when a silo finishes, busy buildings not producing, a third resource. |
 | `test/core/test_research.gd` | Research: no lab, pay and level up (training at the new price), max level, lab level gating (an upgrade under way not counting), research going on while the lab upgrades, one at a time, the unit unlocked first, funds, the dev cheats, and one-second ticks equal to one big tick with a building, the research and a unit finishing in one second. |
+| `test/core/test_sector.gd` | The sector: its seed from the creation time, a seed per field and epoch, cleared fields sorted and unique, its save shape and cleaning on load; in the base, a new base's sector, the free first scan and the cooldown (refusals through `check_scan` and `apply` changing nothing), a scan's new fields against the base as it is (the snapshot held until then), `sector_fields`, `generate` reading the sector, the save round trip, a version 4 save migrating from its `now`, and a catalog without expeditions. |
 | `test/core/test_seeded_rng.gd` | The frozen sequences for seeds 1 and 12345, range bounds, the zero seed. **These expected values never change.** |
 | `test/core/test_training.gd` | Training: queue and pay, units finishing in order, all-or-nothing counts, every refusal through its check and `apply`, a huge count refused before it is multiplied, `queue_of` handing out a copy, no Hangar, a producer under construction, the queue limit, two producers side by side, a busy producer pausing and resuming, an army above the housing waiting for a Hangar (and a Hangar being upgraded keeping its housing), a finished unit housed while its producer upgrades, the lowest id that fits housed first, a unit and a Hangar finishing in the same second, cancel and its refund, refusals, production untouched, the same commands giving the same state, and one-second ticks equal to one big tick. |
 
@@ -86,6 +92,9 @@ write a scenario; `scenarios/place_and_build.gd` is the example.
 
 `scenarios/battle.gd` runs a scripted attack on the template base through the battle sim,
 headless, and applies its result to a copy of the base (`battle.md`, **Tools**).
+`scenarios/expedition.gd` lays out the template base's six expedition fields, fights the even
+one with the same army and applies the result with the expedition key, then scans, headless
+(`expeditions.md`).
 
 Two scenarios check every model of the roster against the art style's contract
 (`art-style.md`, **Budget and checks**): `model_gallery` (instances, outlines, kit layers,
@@ -107,6 +116,22 @@ and resources of a save file, which it only reads. Each seed draws one to four d
 each unit's deploy tick in the first three seconds from the tool's own `SeededRng`. It writes
 one CSV row a seed (seed, ticks, destruction, stars, loot per resource, units deployed, wall
 time in ms) to `--out` or stdout. The gate does not run it.
+
+## Outposts: `tools/gen_outposts.gd`
+
+```
+$GODOT --headless --path . -s res://tools/gen_outposts.gd -- [--cc=5] [--seed=1] [--epoch=0] \
+    [--index=2] [--out=<file.json>] [--ascii]
+```
+
+A headless `SceneTree` script, run after an import, for inspecting the outpost generator
+(`expeditions.md`) and for the views that draw outposts: it lays out a sector's fields on the
+shipped data for a player's Command Center level (`--cc`, the capacity a base of that level holds
+with every storage at its count and best level) and sector seed, every field or `--index`, and
+writes `{"fields": [...]}` as JSON to `--out` or stdout. `--ascii` prints each field as a map
+instead of the JSON on stdout (H the Command Center, S storage, C collector, O other, D defence,
+T trap, # wall, $ deposit, ! hazard). A line per field on stderr gives its band, level, counts,
+loot and wall time. The gate does not run it.
 
 ## The texture generator: `tools/gen_textures.gd`
 

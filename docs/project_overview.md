@@ -110,7 +110,7 @@ in one second at most (`Catalog.apply_dev_cheats`; `-- --no-cheats` for the real
 | 4 | The battle sim in `src/core/battle/`: fixed-point integer positions (1 cell = 1000 units), fixed tick, pathing round and through walls, targeting, defences, traps, status effects; replay = seed + layouts + deploy commands; byte-identical results tested headless; batch simulations for balance; the result applied to the base (`raid_result`) | Built (`docs/reference/battle.md`): 20 ticks a second, the deploy zone opening as buildings fall, every special and trap, loot by storage, save version 4 keeping the last five raids, the `battle` harness scenario and `tools/sim_battles.gd`; a full battle simulates in 0.15 to 1.6 s headless on the development Mac |
 | 4b | Abilities: `data/abilities.json` (a repair swarm, an EMP burst, an orbital strike), made in the Nanite Foundry as a timed queue with a stock, their effects in the battle sim, spent through `raid_result` | Planned |
 | 5 | The battle view: units moving, projectiles, damage and destruction, the attack HUD; the phone target fixed, and the maxed base and a full battle measured on it | Planned |
-| 6 | Expeditions: the sector map, the outpost generator (the player's roster with a faction tint, loot deposits, hazards), loot into `BaseState` through a new command, re-training; then the real-timer retune (6a). Milestone 2 complete: a game that plays end to end offline | Planned |
+| 6 | Expeditions: the sector map, the outpost generator (the player's roster with a faction tint, loot deposits, hazards), loot into `BaseState` through a new command, re-training; then the real-timer retune (6a). Milestone 2 complete: a game that plays end to end offline | Core built (`docs/reference/expeditions.md`): the sector of six fields (two easy, two even, two hard) derived from a seed, the `scan` command on a cooldown, the outpost generator (walled compound, defences, collectors, deposits and hazards outside the walls, traps; loot sized to the player's capacity), `raid_result` clearing a field with a star, save version 5, the `expedition` harness scenario and `tools/gen_outposts.gd`. The sector map screen and the faction tint are planned |
 | 7 | Milestone 3, the online game — the server: Nakama with accounts, base storage, migration of the local save and command validation; battles verified by replaying them in headless Godot running the same `src/core` | Planned |
 | 8 | Async PvP: matchmaking, attacking saved bases, a defence log with replays, shields, revenge, a league ladder | Planned |
 | 9 | Milestone 4, the social game — alliances through the Alliance Beacon: membership, donations, later wars; then a distinct PvE faction and the store release | Planned |
@@ -252,6 +252,21 @@ in one second at most (`Catalog.apply_dev_cheats`; `-- --no-cheats` for the real
   sim has a reference file of its own; the deploy zone (every footprint, walls in, grown by one
   cell) opens as buildings fall, cell by cell, and traps stay out of it, so a deploy on a trap's
   cell is allowed and sets it off.
+
+- **Expeditions in core** (the coordinator under the owner's mandate, 2026-10-24; the step 6
+  core plan; `docs/reference/expeditions.md`): the sector is renewable: six fields from
+  `(sector seed, epoch, index)`, a field raided once an epoch (a star clears it, none leaves it
+  open), a `scan` starting the next epoch on a cooldown from the last, the first free (epoch 0);
+  the sector seed comes from the base's creation time, or a migrated save's `now`; the fields are
+  laid out against a snapshot of the player's Command Center level and capacity taken at each
+  scan (and at creation and migration), not the live base; `check_raid_result` lays the field out
+  again and compares the battle's seed and defender as sorted-key JSON after `Catalog.ints`; no
+  expedition cost in this step (a `rules.expedition.cost` slot is the retune's); deposits and
+  hazards come out of the outpost's counts; the field count is the sum of the bands' `fields`;
+  the raid log keeps an expedition's battle without its defender, with the field's inputs; a
+  catalog without `rules.expedition` has no fields and `scan` still works; the hard band's
+  density is 85% of `max_count`, a density that lays out with nothing dropped on every seed tried;
+  drops begin around 88%.
 
 ### 3.2 Open
 
