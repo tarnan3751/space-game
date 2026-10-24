@@ -14,7 +14,7 @@ render_mode ambient_light_disabled;
 // other instance reads zeros there.
 //
 // The surface flags in UV2.y animate a part from anim_time, offset by its phase in COLOR.a
-// (effects.gdshaderinc): the vertex moves (SPIN, BOB, JITTER, FLICKER), the texture scrolls (FLOW,
+// (effects.gdshaderinc): the vertex moves (SPIN, RIG, BOB, JITTER, FLICKER), the texture scrolls (FLOW,
 // FLOW_U) and the colour, emission included, brightens and dims (PULSE, BLINK).
 
 #include "res://src/game/toon_common.gdshaderinc"
@@ -30,6 +30,8 @@ void vertex() {
 	int flags = surf_flags(UV2);
 	VERTEX = effect_spin(VERTEX, flags, CUSTOM0);
 	NORMAL = effect_spin(NORMAL, flags, vec4(vec3(0.0), CUSTOM0.w));
+	VERTEX = effect_rig(VERTEX, flags, CUSTOM1, CUSTOM2, INSTANCE_CUSTOM, true);
+	NORMAL = effect_rig(NORMAL, flags, CUSTOM1, CUSTOM2, INSTANCE_CUSTOM, false);
 	VERTEX = effect_vertex(effect_gait(VERTEX, INSTANCE_CUSTOM), flags, surf_phase(COLOR), MODEL_MATRIX);
 	hit_flash = INSTANCE_CUSTOM.z;
 	if (rival > 0.5) {

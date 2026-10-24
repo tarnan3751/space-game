@@ -25,6 +25,7 @@ const int FLAG_HOLO = 512;
 const int FLAG_LIGHTNING = 1024;
 const int FLAG_RISE = 2048;
 const int FLAG_SPIN = 4096;
+const int FLAG_RIG = 8192;
 
 // PULSE: the colour swells between PULSE_LOW and 1 on a sine of PULSE_PERIOD seconds.
 const float PULSE_PERIOD = 1.6;
@@ -96,7 +97,8 @@ vec3 effect_spin(vec3 vertex, int flags, vec4 spin) {
 // The battle's per-instance state (BattleUnits and BattleEffects draw from MultiMeshes whose
 // custom data reaches the shaders as INSTANCE_CUSTOM): x the gait's phase, in steps; y how much of
 // the gait shows, 0 standing (or hovering) to 1 striding; z the hit flash, 0 to 1; w the fade, 0 to
-// 1. Every other instance reads zeros, so nothing here changes it.
+// 1. While a rigged unit aims, y is minus the aim's share and x the fire phase instead (RIG,
+// below), and the gait shows nothing. Every other instance reads zeros, so nothing here changes it.
 //
 // The gait (effect_gait) is the Clash hop: once a step the model lifts GAIT_HOP off the ground on
 // a half sine and lands squashed by GAIT_SQUASH, leaning forward (+Z) by GAIT_LEAN and swaying
@@ -121,6 +123,76 @@ vec3 effect_gait(vec3 vertex, vec4 custom) {
 	moved.z += vertex.y * GAIT_LEAN * custom.y;
 	moved.x += vertex.y * GAIT_SWAY * custom.y * stride;
 	return moved;
+}
+
+// RIG (LowPolyMesh.rig, docs/reference/art-style.md, **Rig**): a vertex turned about its own joint
+// (CUSTOM1: pivot xyz, channel) and then about the joint it hangs from (CUSTOM2), each by the
+// angle its channel takes from the instance's state: x the gait's phase while y >= 0 and the fire
+// phase while y < 0, y the gait's share while >= 0 and minus the aim's share while < 0. The
+// channel table is Rig's (src/game/rig.gd), which mirrors these functions for the CPU: change
+// both together. A normal is turned the same way about zero pivots. A mesh with no rigged part
+// carries neither channel, so they are read only under the flag.
+const int RIG_HIP_L = 1;
+const int RIG_HIP_R = 2;
+const int RIG_KNEE_L = 3;
+const int RIG_KNEE_R = 4;
+const int RIG_AIM = 5;
+// Radians: 44, 70, 30 and 16 degrees, as Rig has them.
+const float RIG_HIP_SWING = 0.7679;
+const float RIG_KNEE_BEND = 1.2217;
+const float RIG_AIM_RAISE = 0.5236;
+const float RIG_RECOIL_KICK = 0.2793;
+const float RIG_RECOIL_SPAN = 0.3;
+
+float rig_angle(int channel, vec4 state) {
+	float walk = max(state.y, 0.0);
+	float s = sin(PI * state.x);
+	float aim = max(-state.y, 0.0);
+	if (channel == RIG_HIP_L) {
+		return -RIG_HIP_SWING * walk * s;
+	}
+	if (channel == RIG_HIP_R) {
+		return RIG_HIP_SWING * walk * s;
+	}
+	if (channel == RIG_KNEE_L) {
+		return RIG_KNEE_BEND * walk * max(-s, 0.0);
+	}
+	if (channel == RIG_KNEE_R) {
+		return RIG_KNEE_BEND * walk * max(s, 0.0);
+	}
+	if (channel == RIG_AIM) {
+		float kick = aim * (1.0 - smoothstep(0.0, RIG_RECOIL_SPAN, state.x));
+		return -(RIG_AIM_RAISE * aim + RIG_RECOIL_KICK * kick);
+	}
+	return 0.0;
+}
+
+// The axis a channel turns about, in the model's space: X for every channel built so far.
+vec3 rig_axis(int channel) {
+	return vec3(1.0, 0.0, 0.0);
+}
+
+// `v` turned about the joint `joint` (pivot xyz, channel) by its channel's angle, as Godot's
+// Basis(axis, angle) turns it; about the origin for a normal (`about_pivot` false).
+vec3 rig_turn(vec3 v, vec4 joint, vec4 state, bool about_pivot) {
+	int channel = int(joint.w + 0.5);
+	if (channel == 0) {
+		return v;
+	}
+	float a = rig_angle(channel, state);
+	vec3 k = rig_axis(channel);
+	vec3 pivot = about_pivot ? joint.xyz : vec3(0.0);
+	vec3 off = v - pivot;
+	float c = cos(a);
+	float s = sin(a);
+	return pivot + off * c + cross(k, off) * s + k * dot(k, off) * (1.0 - c);
+}
+
+vec3 effect_rig(vec3 v, int flags, vec4 joint, vec4 parent, vec4 state, bool about_pivot) {
+	if (!has_flag(flags, FLAG_RIG)) {
+		return v;
+	}
+	return rig_turn(rig_turn(v, joint, state, about_pivot), parent, state, about_pivot);
 }
 
 // How far through its climb a RISE part is now, 0 to 1.
