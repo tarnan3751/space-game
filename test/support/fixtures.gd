@@ -124,6 +124,14 @@ static func army_base() -> BaseState:
 	return state
 
 
+## The army base with a foundry (id 5, at (5, 5), level 1, capacity 2), at time 30 with 380
+## metal and 500 crystal.
+static func foundry_base() -> BaseState:
+	var state := army_base()
+	state.apply({"op": "place", "type": "foundry", "cell": [5, 5]}, 30)
+	return state
+
+
 ## A battle setup on the battle catalog: `buildings` as [type, x, y] or [type, x, y, level], given
 ## ids 1, 2, ... in order; `army` as {unit: count}.
 static func battle_setup(buildings: Array, army: Dictionary, commands: Array = [],

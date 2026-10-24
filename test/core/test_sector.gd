@@ -186,7 +186,7 @@ func test_a_version_4_save_migrates_its_sector_from_its_now() -> void:
 	assert_eq(state.sector.epoch, 0)
 	assert_eq(state.sector.cc, 1)
 	assert_eq(state.sector.capacity["metal"], 1000)
-	assert_eq(state.to_dict()["version"], 5)
+	assert_eq(state.to_dict()["version"], 6)
 	data.erase("now")
 	assert_eq(BaseState.from_dict(Fixtures.expedition_catalog(), data).sector.sector_seed, Sector.seed_from_time(0))
 

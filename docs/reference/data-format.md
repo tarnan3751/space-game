@@ -481,7 +481,7 @@ line) replaces it, which is how the gate and the harness keep off the real save.
 
 ```json
 {
-  "version": 5,
+  "version": 6,
   "grid": { "width": 48, "height": 48 },
   "now": 1760400000,
   "next_id": 4,
@@ -502,7 +502,10 @@ line) replaces it, which is how the gate and the harness keep off the real save.
                   "loot": { "antimatter": 0, "crystal": 1600, "metal": 1800 }, "stars": 2, "ticks": 2412 } }
   ],
   "sector": { "seed": 2941771520, "epoch": 3, "cleared": [0, 2], "last_scan": 1760400100, "cc": 4,
-              "capacity": { "metal": 30000, "crystal": 30000, "antimatter": 700 } }
+              "capacity": { "metal": 30000, "crystal": 30000, "antimatter": 700 } },
+  "abilities": { "stock": { "repair_swarm": 1 }, "levels": { "repair_swarm": 2 },
+                 "making": [ { "building": 12, "units": ["emp_burst"], "paid_levels": [1],
+                               "done_at": 1760400090, "left": 0 } ] }
 }
 ```
 
@@ -535,5 +538,11 @@ expedition's raid has no `battle.defender` and carries `"expedition": {"seed", "
 scans so far), the field indices cleared this epoch, the last scan's unix time, and the Command
 Center level and capacity the epoch's fields are laid out against. A save from before version 5
 loads with a sector seeded from its `now` (0 when absent), at epoch 0, nothing cleared, the
-snapshot taken of the loaded base. The next save is version 5. A change to this shape keeps old saves loading or bumps `version` with a migration
+snapshot taken of the loaded base.
+
+`abilities` (from version 6) holds the abilities (`core-economy.md`, **The Foundry**): the stock
+by ability id, each ability's level (only what differs from a new base, as for the army), and
+each Foundry's making queue in the training queue's shape, its `units` holding ability ids.
+`research` is `{"ability", "done_at"}` while an ability's level is researched. A save from before
+version 6 loads with nothing made, every ability at level 1. The next save is version 6. A change to this shape keeps old saves loading or bumps `version` with a migration
 (`CLAUDE.md`, **Agent workflow**, tier A).

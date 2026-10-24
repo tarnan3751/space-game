@@ -13,6 +13,11 @@ extends RefCounted
 ## (rules.army.research) raises one unit type a level at a time, and keeps researching while
 ## it upgrades.
 ##
+## Abilities: the Foundry (rules.army.foundry) makes them from a queue of its own (`making`, a
+## TrainingQueue whose `units` hold ability ids), only while it is idle, into `ability_stock`,
+## whose total its `capacity` caps; a finished ability waits for room as a unit waits for
+## housing. The research building raises an ability's level from the same research slot.
+##
 ## Raids: a battle (BattleSim, src/core/battle) is applied through raid_result: the units deployed
 ## are spent and the loot comes home, up to storage. The base trusts the result and keeps the
 ## battle's inputs with it in `raids`, the last RAID_LOG_SIZE of them, so a server can replay
@@ -31,8 +36,9 @@ const SECONDS_PER_HOUR := 3600
 ## save was laid out on V1_FIELD, and from_dict centres it on a field that has grown since.
 ## Version 3 adds the army; an older save loads with none. Version 4 adds the raids; an older
 ## save loads with none. Version 5 adds the sector; an older save loads with one seeded from its
-## `now`, at epoch 0, nothing cleared, its snapshot the loaded base.
-const SAVE_VERSION := 5
+## `now`, at epoch 0, nothing cleared, its snapshot the loaded base. Version 6 adds the abilities;
+## an older save loads with nothing made and every ability at level 1.
+const SAVE_VERSION := 6
 ## The raids kept, newest last.
 const RAID_LOG_SIZE := 5
 const V1_FIELD := Vector2i(40, 40)
@@ -59,6 +65,9 @@ const ERR_NOT_ENOUGH_UNITS := "not_enough_units"
 const ERR_UNKNOWN_ABILITY := "unknown_ability"
 const ERR_SCAN_COOLDOWN := "scan_cooldown"
 const ERR_BAD_EXPEDITION := "bad_expedition"
+const ERR_NOT_FOUNDRY := "not_a_foundry"
+const ERR_FOUNDRY_LEVEL := "needs_foundry_level"
+const ERR_STOCK_ROOM := "not_enough_stock_room"
 
 ## training_status(): nothing queued; the head training; the head stopped with time left while
 ## the producer is busy (constructing or upgrading); the head finished and waiting for room in
@@ -85,9 +94,18 @@ var army: Dictionary[String, int] = {}
 var unit_levels: Dictionary[String, int] = {}
 ## Training queues by producer building id. A queue stays when it empties.
 var training: Dictionary[int, TrainingQueue] = {}
-## The unit type being researched to its next level, "" when none; and when it completes.
+## The unit type or the ability being researched to its next level, "" when none (at most one
+## of the two is set); and when it completes.
 var research_unit: String = ""
+var research_ability: String = ""
 var research_done_at: int = 0
+## Abilities made and ready, per ability id; every catalog ability has an entry, 0 by default.
+var ability_stock: Dictionary[String, int] = {}
+## Each ability's level, for the whole type; every catalog ability has an entry, 1 by default.
+var ability_levels: Dictionary[String, int] = {}
+## Making queues by Foundry building id; a queue's `units` are ability ids. A queue stays when it
+## empties.
+var making: Dictionary[int, TrainingQueue] = {}
 ## The last raids applied, newest last: {"at": unix seconds, "battle": the battle's setup,
 ## "result": its result}, as raid_result carried them.
 var raids: Array[Dictionary] = []
@@ -109,6 +127,9 @@ func _init(base_catalog: Catalog) -> void:
 	for unit: String in catalog.unit_types():
 		army[unit] = 0
 		unit_levels[unit] = 1
+	for ability: String in catalog.ability_types():
+		ability_stock[ability] = 0
+		ability_levels[ability] = 1
 
 
 ## A brand-new base laid out from the catalog's "start" section. Start buildings are finished.
@@ -141,7 +162,9 @@ static func create_new(base_catalog: Catalog, start_time: int) -> BaseState:
 ##   {"op": "upgrade", "id": int}
 ##   {"op": "train",   "id": int,      "unit": String, "count": int}   (count optional, 1)
 ##   {"op": "cancel_training", "id": int, "unit": String}
-##   {"op": "research", "unit": String}
+##   {"op": "research", "unit": String}   or   {"op": "research", "ability": String}
+##   {"op": "make",    "id": int,      "ability": String, "count": int}   (count optional, 1)
+##   {"op": "cancel_making", "id": int, "ability": String}
 ##   {"op": "raid_result", "battle": {seed, attacker, defender, commands}, "result": {...},
 ##    "expedition": {"epoch": int, "index": int}}   (expedition optional)
 ##   {"op": "scan"}
@@ -161,7 +184,15 @@ func apply(command: Dictionary, at_time: int) -> String:
 		"cancel_training":
 			result = _cancel_training(int(command.get("id", 0)), str(command.get("unit", "")))
 		"research":
-			result = _research(str(command.get("unit", "")))
+			if command.has("ability"):
+				result = _research_ability(str(command["ability"]))
+			else:
+				result = _research(str(command.get("unit", "")))
+		"make":
+			result = _make(int(command.get("id", 0)), str(command.get("ability", "")),
+				int(command.get("count", 1)))
+		"cancel_making":
+			result = _cancel_making(int(command.get("id", 0)), str(command.get("ability", "")))
 		"raid_result":
 			result = _raid_result(command)
 		"scan":
@@ -261,7 +292,56 @@ func check_research(unit: String) -> String:
 	var stats := catalog.unit_level_stats(unit, unit_levels[unit] + 1)
 	if lab_level() < int(stats.get("requires_lab", 1)):
 		return ERR_LAB_LEVEL
-	if research_unit != "":
+	if is_researching():
+		return ERR_BUSY
+	if not can_afford(stats.get("research_cost", _EMPTY)):
+		return ERR_FUNDS
+	return ""
+
+
+## Everything about queueing `count` of `ability` at Foundry `id`. The queue limit is the
+## capacity: the stock plus every queue, this one included, fits it. A count above the whole
+## capacity is refused before anything is multiplied by it, so no product can overflow.
+func check_make(id: int, ability: String, count: int = 1) -> String:
+	if not catalog.has_ability(ability):
+		return ERR_UNKNOWN_ABILITY
+	if not buildings.has(id):
+		return ERR_UNKNOWN_BUILDING
+	var building: BuildingState = buildings[id]
+	if building.type != catalog.foundry_type:
+		return ERR_NOT_FOUNDRY
+	if count < 1:
+		return ERR_BAD_COUNT
+	if building.level < catalog.ability_requires_foundry(ability):
+		return ERR_FOUNDRY_LEVEL
+	var room := foundry_capacity()
+	if count > room or stock_total() + making_queued() + count > room:
+		return ERR_STOCK_ROOM
+	if not can_afford(_make_cost(ability, ability_levels[ability]), count):
+		return ERR_FUNDS
+	return ""
+
+
+func check_cancel_making(id: int, ability: String) -> String:
+	if not buildings.has(id):
+		return ERR_UNKNOWN_BUILDING
+	if not making.has(id) or not making[id].units.has(ability):
+		return ERR_NOT_QUEUED
+	return ""
+
+
+## Everything about researching `ability`'s next level, in the one research slot units use.
+func check_research_ability(ability: String) -> String:
+	if not catalog.has_ability(ability):
+		return ERR_UNKNOWN_ABILITY
+	if ability_levels[ability] >= catalog.ability_max_level(ability):
+		return ERR_MAX_LEVEL
+	if not is_ability_unlocked(ability):
+		return ERR_FOUNDRY_LEVEL
+	var stats := catalog.ability_level_stats(ability, ability_levels[ability] + 1)
+	if lab_level() < int(stats.get("requires_lab", 1)):
+		return ERR_LAB_LEVEL
+	if is_researching():
 		return ERR_BUSY
 	if not can_afford(stats.get("research_cost", _EMPTY)):
 		return ERR_FUNDS
@@ -338,23 +418,24 @@ func check_scan() -> String:
 
 # --- Time ----------------------------------------------------------------------
 
-## Moves the base forward to `time`: finishes construction and training in time order and
-## pays out production for each stretch in between, so a building that completes mid-interval
-## only produces after it completes. In one second, buildings complete first, then research,
-## then units, so a Hangar finishing then already houses them. Earlier times are ignored
-## (clocks can go backwards).
+## Moves the base forward to `time`: finishes construction, training and making in time order
+## and pays out production for each stretch in between, so a building that completes
+## mid-interval only produces after it completes. In one second, buildings complete first, then
+## research, then units, then abilities, so a Hangar finishing then already houses them.
+## Earlier times are ignored (clocks can go backwards).
 func advance_to(time: int) -> void:
 	if time <= now:
 		return
 	var any_change := false
 	while true:
 		var building := _next_completion(time)
-		var queue := _next_training(time)
-		var researched := research_unit != "" and research_done_at <= time
-		if building == null and queue == null and not researched:
+		var queue := _next_training(time, training)
+		var made := _next_training(time, making)
+		var researched := is_researching() and research_done_at <= time
+		if building == null and queue == null and made == null and not researched:
 			break
 		any_change = true
-		# The earliest of the three; a strict comparison keeps the tie order.
+		# The earliest of the four; a strict comparison keeps the tie order.
 		var at := time + 1
 		if building != null:
 			at = building.finish_at
@@ -362,6 +443,8 @@ func advance_to(time: int) -> void:
 			at = research_done_at
 		if queue != null and queue.done_at < at:
 			at = queue.done_at
+		if made != null and made.done_at < at:
+			at = made.done_at
 		if _accumulate(at - now):
 			any_change = true
 		now = maxi(now, at)
@@ -369,8 +452,10 @@ func advance_to(time: int) -> void:
 			_complete(building)
 		elif researched and research_done_at == at:
 			_finish_research()
-		else:
+		elif queue != null and queue.done_at == at:
 			_finish_head(queue)
+		else:
+			_finish_making(made)
 		# A finished producer resumes, a finished Hangar or unit changes the room.
 		_resume_training()
 	if _accumulate(time - now):
@@ -482,11 +567,95 @@ func is_unit_unlocked(unit: String) -> bool:
 	return false
 
 
+## Whether a research runs, of a unit or of an ability.
+func is_researching() -> bool:
+	return research_unit != "" or research_ability != ""
+
+
 ## Seconds until the research running completes; 0 when none is.
 func research_seconds_left() -> int:
-	if research_unit == "":
+	if not is_researching():
 		return 0
 	return maxi(0, research_done_at - now)
+
+
+## The ability stock's cap: the `capacity` of every finished Foundry (rules.army.foundry) at its
+## current level, busy or not, like housing.
+func foundry_capacity() -> int:
+	var total := 0
+	for id: int in buildings:
+		var building: BuildingState = buildings[id]
+		if building.type == catalog.foundry_type and building.level >= 1:
+			total += int(_stats(building).get("capacity", 0))
+	return total
+
+
+## Abilities made and ready of one id; 0 for an id the catalog does not have.
+func stock(ability: String) -> int:
+	var count: int = ability_stock.get(ability, 0)
+	return count
+
+
+## Every ability in the stock.
+func stock_total() -> int:
+	var total := 0
+	for ability: String in ability_stock:
+		total += ability_stock[ability]
+	return total
+
+
+## Every ability queued in the Foundries, the ones being made included.
+func making_queued() -> int:
+	var total := 0
+	for id: int in making:
+		total += making[id].units.size()
+	return total
+
+
+## An ability's level; 0 for an id the catalog does not have.
+func ability_level(ability: String) -> int:
+	var level: int = ability_levels.get(ability, 0)
+	return level
+
+
+## Whether some Foundry has the finished level that unlocks the ability.
+func is_ability_unlocked(ability: String) -> bool:
+	var needed := catalog.ability_requires_foundry(ability)
+	for id: int in buildings:
+		var building: BuildingState = buildings[id]
+		if building.type == catalog.foundry_type and building.level >= needed:
+			return true
+	return false
+
+
+## The abilities queued at a Foundry, oldest (the one being made) first: a copy, built per call.
+func making_queue_of(id: int) -> PackedStringArray:
+	if not making.has(id):
+		return PackedStringArray()
+	return making[id].units.duplicate()
+
+
+## One of the TRAINING_* states of a Foundry's queue: idle, running, paused while the Foundry is
+## busy, or waiting for room in the stock.
+func making_status(id: int) -> String:
+	if not making.has(id) or making[id].is_empty():
+		return TRAINING_IDLE
+	var queue: TrainingQueue = making[id]
+	if queue.is_running():
+		return TRAINING_RUNNING
+	if queue.left > 0:
+		return TRAINING_PAUSED
+	return TRAINING_WAITING
+
+
+## Seconds until the head of a Foundry's queue is made; 0 when it has been (waiting).
+func making_seconds_left(id: int) -> int:
+	if not making.has(id):
+		return 0
+	var queue: TrainingQueue = making[id]
+	if queue.is_running():
+		return maxi(0, queue.done_at - now)
+	return queue.left
 
 
 ## Seconds until the sector can be scanned again; 0 before the first scan and once the cooldown
@@ -611,6 +780,8 @@ func to_dict() -> Dictionary:
 	var research_data := {}
 	if research_unit != "":
 		research_data = {"unit": research_unit, "done_at": research_done_at}
+	elif research_ability != "":
+		research_data = {"ability": research_ability, "done_at": research_done_at}
 	var training_list := []
 	for id: int in _sorted_ids():
 		if training.has(id) and not training[id].is_empty():
@@ -618,6 +789,20 @@ func to_dict() -> Dictionary:
 	var raid_list := []
 	for raid: Dictionary in raids:
 		raid_list.append(raid.duplicate(true))
+	# Ability ids in sorted order, and only what differs from a new base, as for the army.
+	var ability_ids := catalog.ability_types().duplicate()
+	ability_ids.sort()
+	var stock_data := {}
+	var ability_level_data := {}
+	for ability: String in ability_ids:
+		if ability_stock[ability] > 0:
+			stock_data[ability] = ability_stock[ability]
+		if ability_levels[ability] > 1:
+			ability_level_data[ability] = ability_levels[ability]
+	var making_list := []
+	for id: int in _sorted_ids():
+		if making.has(id) and not making[id].is_empty():
+			making_list.append(making[id].to_dict())
 	return {
 		"version": SAVE_VERSION,
 		"grid": {"width": catalog.grid_size.x, "height": catalog.grid_size.y},
@@ -632,6 +817,7 @@ func to_dict() -> Dictionary:
 		"training": training_list,
 		"raids": raid_list,
 		"sector": sector.to_dict(),
+		"abilities": {"stock": stock_data, "levels": ability_level_data, "making": making_list},
 	}
 
 
@@ -640,7 +826,8 @@ func to_dict() -> Dictionary:
 ## field's growth since, so the base stays centred; a field that did not grow moves nothing. A
 ## save from before version 3 has no army, so it loads with none, every unit at level 1; one
 ## from before version 4 has no raids, and one from before version 5 no sector: it is seeded from
-## the saved `now` (0 when absent), at epoch 0, with the loaded base as its snapshot.
+## the saved `now` (0 when absent), at epoch 0, with the loaded base as its snapshot. One from
+## before version 6 has no abilities: nothing made, every ability at level 1.
 static func from_dict(base_catalog: Catalog, data: Dictionary) -> BaseState:
 	var state := BaseState.new(base_catalog)
 	var shift := Vector2i.ZERO
@@ -672,6 +859,7 @@ static func from_dict(base_catalog: Catalog, data: Dictionary) -> BaseState:
 		state.sector.sector_seed = Sector.seed_from_time(int(data.get("now", 0)))
 		state._snapshot_sector()
 	state._load_army(data)
+	state._load_abilities(data)
 	# The raids are kept as they were saved, numbers made ints again, never checked: nothing in
 	# the base reads them.
 	var raid_data: Variant = data.get("raids", [])
@@ -728,6 +916,53 @@ func _load_army(data: Dictionary) -> void:
 		training[queue.building_id] = queue
 	# A consistent save is already in line; this mends one that is not (a head running on a
 	# busy producer, or stopped on an idle one).
+	_resume_training()
+
+
+## The abilities half of from_dict, after the army. As for the army, what a data change has made
+## wrong is dropped or clamped: an unknown ability's stock, level or research, a level above the
+## top, a queue whose building is gone or is not a Foundry, a queued unknown ability. A stock
+## above the capacity is kept.
+func _load_abilities(data: Dictionary) -> void:
+	var saved_abilities: Variant = data.get("abilities", {})
+	var abilities_data: Dictionary = saved_abilities if typeof(saved_abilities) == TYPE_DICTIONARY else _EMPTY
+	var stock_data: Dictionary = abilities_data.get("stock", {})
+	for ability: Variant in stock_data:
+		if catalog.has_ability(str(ability)):
+			ability_stock[str(ability)] = maxi(0, int(stock_data[ability]))
+	var level_data: Dictionary = abilities_data.get("levels", {})
+	for ability: Variant in level_data:
+		if catalog.has_ability(str(ability)):
+			ability_levels[str(ability)] = clampi(int(level_data[ability]), 1,
+				catalog.ability_max_level(str(ability)))
+	var research_data: Dictionary = data.get("research", {})
+	var researching := str(research_data.get("ability", ""))
+	if research_unit == "" and catalog.has_ability(researching) \
+			and ability_levels[researching] < catalog.ability_max_level(researching):
+		research_ability = researching
+		research_done_at = int(research_data.get("done_at", 0))
+	for entry: Variant in abilities_data.get("making", []):
+		var saved := TrainingQueue.from_dict(entry)
+		if not buildings.has(saved.building_id) or making.has(saved.building_id) \
+				or buildings[saved.building_id].type != catalog.foundry_type:
+			continue
+		var queue := TrainingQueue.new()
+		queue.building_id = saved.building_id
+		var head_kept := false
+		for i: int in saved.units.size():
+			var ability := saved.units[i]
+			if catalog.has_ability(ability):
+				queue.units.append(ability)
+				queue.paid_levels.append(clampi(saved.paid_levels[i], 1, catalog.ability_max_level(ability)))
+				head_kept = head_kept or i == 0
+		if queue.is_empty():
+			continue
+		if head_kept:
+			queue.done_at = saved.done_at
+			queue.left = saved.left
+		else:
+			_start_making_head(queue)
+		making[queue.building_id] = queue
 	_resume_training()
 
 
@@ -806,6 +1041,53 @@ func _research(unit: String) -> String:
 	var stats := catalog.unit_level_stats(unit, unit_levels[unit] + 1)
 	_pay(stats.get("research_cost", _EMPTY))
 	research_unit = unit
+	research_done_at = now + int(stats.get("research_seconds", 0))
+	return ""
+
+
+func _make(id: int, ability: String, count: int) -> String:
+	var error := check_make(id, ability, count)
+	if error != "":
+		return error
+	var level: int = ability_levels[ability]
+	_pay(_make_cost(ability, level), count)
+	if not making.has(id):
+		var created := TrainingQueue.new()
+		created.building_id = id
+		making[id] = created
+	var queue: TrainingQueue = making[id]
+	var was_empty := queue.is_empty()
+	for i: int in count:
+		queue.units.append(ability)
+		queue.paid_levels.append(level)
+	if was_empty:
+		_start_making_head(queue)
+	return ""
+
+
+## Removes the newest queued `ability` and refunds what it was paid, up to storage. Removing the
+## head starts the next from the beginning.
+func _cancel_making(id: int, ability: String) -> String:
+	var error := check_cancel_making(id, ability)
+	if error != "":
+		return error
+	var queue: TrainingQueue = making[id]
+	var index := queue.units.rfind(ability)
+	_refund(_make_cost(ability, queue.paid_levels[index]))
+	queue.units.remove_at(index)
+	queue.paid_levels.remove_at(index)
+	if index == 0:
+		_start_making_head(queue)
+	return ""
+
+
+func _research_ability(ability: String) -> String:
+	var error := check_research_ability(ability)
+	if error != "":
+		return error
+	var stats := catalog.ability_level_stats(ability, ability_levels[ability] + 1)
+	_pay(stats.get("research_cost", _EMPTY))
+	research_ability = ability
 	research_done_at = now + int(stats.get("research_seconds", 0))
 	return ""
 
@@ -935,16 +1217,21 @@ func _next_completion(limit: int) -> BuildingState:
 
 
 func _finish_research() -> void:
-	unit_levels[research_unit] += 1
+	if research_ability != "":
+		ability_levels[research_ability] += 1
+	else:
+		unit_levels[research_unit] += 1
 	research_unit = ""
+	research_ability = ""
 	research_done_at = 0
 
 
-## Earliest running training queue finishing at or before `limit`; ties broken by producer id.
-func _next_training(limit: int) -> TrainingQueue:
+## Earliest running queue of `queues` (training or making) finishing at or before `limit`; ties
+## broken by building id.
+func _next_training(limit: int, queues: Dictionary[int, TrainingQueue]) -> TrainingQueue:
 	var best: TrainingQueue = null
-	for id: int in training:
-		var queue: TrainingQueue = training[id]
+	for id: int in queues:
+		var queue: TrainingQueue = queues[id]
 		if not queue.is_running() or queue.done_at > limit:
 			continue
 		if best == null or queue.done_at < best.done_at \
@@ -975,10 +1262,32 @@ func _finish_head(queue: TrainingQueue) -> void:
 	_start_head(queue)
 
 
+## Sets a making queue's head (if any) to be made from the beginning, stopped: _resume_training
+## starts it when its Foundry is idle.
+func _start_making_head(queue: TrainingQueue) -> void:
+	queue.done_at = 0
+	queue.left = 0
+	if not queue.is_empty():
+		queue.left = catalog.ability_make_seconds(queue.units[0])
+
+
+## The head has been made: stocked if there is room, else it waits for room.
+func _finish_making(queue: TrainingQueue) -> void:
+	queue.done_at = 0
+	queue.left = 0
+	if stock_total() + 1 > foundry_capacity():
+		return
+	ability_stock[queue.units[0]] += 1
+	queue.units.remove_at(0)
+	queue.paid_levels.remove_at(0)
+	_start_making_head(queue)
+
+
 ## Brings every queue in line with its producer and the room in the Hangars at `now`: a busy
 ## producer's queue stops with the time it has left and an idle one's runs, each queue on its
 ## own, so the order does not matter; then a head waiting for room is housed when it fits,
-## busy producer or not, lowest producer id first.
+## busy producer or not, lowest producer id first. The Foundries' making queues the same, a
+## head waiting for room in the stock stocked when there is some, lowest Foundry id first.
 func _resume_training() -> void:
 	for id: int in training:
 		var queue: TrainingQueue = training[id]
@@ -998,6 +1307,38 @@ func _resume_training() -> void:
 			waiting.done_at = now + waiting.left
 			waiting.left = 0
 		waiting = _next_waiting()
+	for id: int in making:
+		var queue: TrainingQueue = making[id]
+		if queue.is_empty():
+			continue
+		var busy := buildings[id].is_busy()
+		if queue.is_running() and busy:
+			queue.left = queue.done_at - now
+			queue.done_at = 0
+		elif not queue.is_running() and not busy and queue.left > 0:
+			queue.done_at = now + queue.left
+			queue.left = 0
+	var made := _next_made()
+	while made != null:
+		_finish_making(made)
+		if not made.is_empty() and not buildings[made.building_id].is_busy():
+			made.done_at = now + made.left
+			made.left = 0
+		made = _next_made()
+
+
+## The lowest-id making queue whose head has been made and waits, when the stock has room.
+func _next_made() -> TrainingQueue:
+	if stock_total() >= foundry_capacity():
+		return null
+	var best: TrainingQueue = null
+	for id: int in making:
+		var queue: TrainingQueue = making[id]
+		if queue.is_empty() or queue.is_running() or queue.left > 0:
+			continue
+		if best == null or id < best.building_id:
+			best = queue
+	return best
 
 
 ## The lowest-id queue whose head has trained, waits for room and fits now. A lower id whose
@@ -1018,6 +1359,10 @@ func _next_waiting() -> TrainingQueue:
 
 func _train_cost(unit: String, level: int) -> Dictionary:
 	return catalog.unit_level_stats(unit, level).get("train_cost", _EMPTY)
+
+
+func _make_cost(ability: String, level: int) -> Dictionary:
+	return catalog.ability_level_stats(ability, level).get("make_cost", _EMPTY)
 
 
 ## Pays out production for `seconds` at current rates, capped by storage. Returns true

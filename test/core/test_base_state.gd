@@ -195,7 +195,7 @@ func test_save_from_before_the_third_resource_loads() -> void:
 	var saved := state.to_dict()
 	assert_eq(saved["resources"], {"metal": 400, "crystal": 300, "antimatter": 0})
 	assert_eq(saved["remainders"], {"metal": 0, "crystal": 1800, "antimatter": 0})
-	assert_eq(saved["version"], 5)
+	assert_eq(saved["version"], 6)
 
 
 func test_version_1_save_is_centred_on_a_grown_field() -> void:
@@ -212,7 +212,7 @@ func test_version_1_save_is_centred_on_a_grown_field() -> void:
 	assert_eq(state.grid.occupant_at(Vector2i(43, 40)), 4)
 	assert_eq(state.grid.occupant_at(Vector2i(39, 36)), 0, "the wall's old cell is free")
 	var saved := state.to_dict()
-	assert_eq(saved["version"], 5)
+	assert_eq(saved["version"], 6)
 	assert_eq(saved["grid"], {"width": 48, "height": 48})
 	assert_eq(saved["now"], 100)
 	assert_eq(saved["next_id"], 5)
@@ -382,7 +382,7 @@ func test_saves_before_the_army_load_with_none() -> void:
 		assert_eq(state.training.size(), 0)
 		assert_eq(state.research_unit, "")
 		var saved := state.to_dict()
-		assert_eq(saved["version"], 5)
+		assert_eq(saved["version"], 6)
 		assert_eq(saved["army"], {})
 		assert_eq(saved["unit_levels"], {})
 		assert_eq(saved["research"], {})
@@ -415,6 +415,75 @@ func test_load_drops_army_entries_that_no_longer_fit() -> void:
 	state.advance_to(1000)
 	assert_eq(state.army_count("grunt"), 25, "waits for room")
 	assert_eq(state.training_status(4), BaseState.TRAINING_WAITING)
+
+
+func test_the_abilities_round_trip() -> void:
+	var state := Fixtures.foundry_base()
+	state.apply({"op": "make", "id": 5, "ability": "swarm", "count": 2}, 30)
+	state.advance_to(40)
+	state.ability_levels["swarm"] = 2
+	state.research_ability = "strike"
+	state.research_done_at = 100
+	var saved := state.to_dict()
+	assert_eq(saved["version"], BaseState.SAVE_VERSION)
+	assert_eq(saved["abilities"], {"stock": {"swarm": 1}, "levels": {"swarm": 2}, "making": [
+		{"building": 5, "units": ["swarm"], "paid_levels": [1], "done_at": 50, "left": 0},
+	]})
+	assert_eq(saved["research"], {"ability": "strike", "done_at": 100})
+	var json := JSON.stringify(saved)
+	var restored := BaseState.from_dict(Fixtures.catalog(), JSON.parse_string(json))
+	assert_eq(JSON.stringify(restored.to_dict()), json)
+	restored.advance_to(200)
+	state.advance_to(200)
+	assert_eq(JSON.stringify(restored.to_dict()), JSON.stringify(state.to_dict()))
+	assert_eq(restored.stock("swarm"), 2)
+	assert_eq(restored.ability_level("strike"), 2)
+
+
+func test_a_version_5_save_loads_with_no_abilities() -> void:
+	var data := Fixtures.foundry_base().to_dict()
+	data.erase("abilities")
+	data["version"] = 5
+	var state := BaseState.from_dict(Fixtures.catalog(), JSON.parse_string(JSON.stringify(data)))
+	assert_eq(state.ability_stock, {"swarm": 0, "burst": 0, "strike": 0})
+	assert_eq(state.ability_levels, {"swarm": 1, "burst": 1, "strike": 1})
+	assert_eq(state.making.size(), 0)
+	assert_eq(state.research_ability, "")
+	assert_eq(state.buildings.size(), 5, "the foundry is kept")
+	var saved := state.to_dict()
+	assert_eq(saved["version"], 6)
+	assert_eq(saved["abilities"], {"stock": {}, "levels": {}, "making": []})
+	assert_eq(state.apply({"op": "make", "id": 5, "ability": "swarm"}, 30), "")
+
+
+func test_load_drops_ability_entries_that_no_longer_fit() -> void:
+	var data := Fixtures.foundry_base().to_dict()
+	data["abilities"] = {
+		"stock": {"swarm": 5, "ghost": 1},
+		"levels": {"swarm": 9, "ghost": 2},
+		"making": [
+			{"building": 5, "units": ["ghost", "burst", "swarm"], "paid_levels": [1, 4, 1], "done_at": 35,
+				"left": 0},
+			{"building": 4, "units": ["swarm"], "paid_levels": [1], "done_at": 40, "left": 0},
+			{"building": 77, "units": ["swarm"], "paid_levels": [1], "done_at": 40, "left": 0},
+		],
+	}
+	data["research"] = {"ability": "burst", "done_at": 99}
+	var state := BaseState.from_dict(Fixtures.catalog(), data)
+	assert_eq(state.ability_stock, {"swarm": 5, "burst": 0, "strike": 0}, "a stock above the capacity is kept")
+	assert_eq(state.ability_level("swarm"), 2, "clamped to the top level")
+	assert_eq(state.research_ability, "", "an ability at its top level is not researched")
+	assert_eq(state.making_queue_of(5), PackedStringArray(["burst", "swarm"]))
+	assert_eq(state.making[5].paid_levels, PackedInt32Array([1, 1]))
+	assert_eq(state.making_seconds_left(5), 20, "the head was dropped: the next starts afresh")
+	assert_false(state.making.has(4), "the academy makes nothing")
+	assert_false(state.making.has(77), "the building is gone")
+	assert_eq(state.check_make(5, "swarm"), BaseState.ERR_STOCK_ROOM)
+	state.advance_to(1000)
+	assert_eq(state.stock("burst"), 0, "waits for room")
+	assert_eq(state.making_status(5), BaseState.TRAINING_WAITING)
+	data["research"] = {"ability": "ghost", "done_at": 99}
+	assert_eq(BaseState.from_dict(Fixtures.catalog(), data).research_ability, "")
 
 
 ## A version 1 save: the fixture's Command Center and drone bay in its corner, an extractor

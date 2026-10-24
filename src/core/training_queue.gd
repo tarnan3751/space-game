@@ -7,6 +7,10 @@ extends RefCounted
 ## Running: done_at is the unix time (seconds) the head completes, and left is 0. Stopped:
 ## done_at is 0 and left is the head's seconds still to go, while the producer is busy, or 0
 ## when the head has finished and waits for room in the Hangars. Empty: both 0.
+##
+## The Foundry's making queue is one too (BaseState.making): its `units` hold ability ids, its
+## paid_levels the ability level each was paid for, and a finished head waits for room in the
+## ability stock.
 
 var building_id: int = 0
 var units: PackedStringArray = PackedStringArray()

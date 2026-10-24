@@ -69,7 +69,10 @@ The authoritative model of one player's base. One per player; `main.gd` holds on
 | `army: Dictionary[String, int]` | Units housed, per unit type; every catalog unit has an entry, 0 by default. |
 | `unit_levels: Dictionary[String, int]` | Each unit type's level, for the whole type; every catalog unit has an entry, 1 by default. |
 | `training: Dictionary[int, TrainingQueue]` | Training queues by producer building id (**The army**). A queue stays when it empties. |
-| `research_unit: String`, `research_done_at: int` | The unit type being researched to its next level (`""` when none) and the unix second it completes. |
+| `research_unit: String`, `research_ability: String`, `research_done_at: int` | The unit type or the ability being researched to its next level (`""` when none; at most one of the two is set) and the unix second it completes. |
+| `ability_stock: Dictionary[String, int]` | Abilities made and ready, per ability id; every catalog ability has an entry, 0 by default (**The Foundry**). |
+| `ability_levels: Dictionary[String, int]` | Each ability's level, for the whole type; every catalog ability has an entry, 1 by default. |
+| `making: Dictionary[int, TrainingQueue]` | Making queues by Foundry building id; a queue's `units` hold ability ids. A queue stays when it empties. |
 | `raids: Array[Dictionary]` | The last `RAID_LOG_SIZE` (5) raids applied, newest last: `{"at": unix seconds, "battle", "result"}` as `raid_result` carried them (**Raids**). |
 | `sector: Sector` | The expedition sector: its seed, epoch, cleared fields, last scan and the snapshot its fields are laid out against (**Expeditions**; `expeditions.md`). |
 | `signal changed` | Emitted after anything visible changed: by `apply` on success, by `advance_to` when a timer completed or a resource amount changed. |
@@ -94,6 +97,9 @@ emits `changed`. A failed command changes nothing and charges nothing. The ops, 
 | `{"op": "train", "id": int, "unit": String, "count": int}` | `check_train(id, unit, count)` | Pays `count` times the unit's `train_cost` at its current level and queues `count` of it at producer `id`. `count` is optional (1); all or nothing. |
 | `{"op": "cancel_training", "id": int, "unit": String}` | `check_cancel_training(id, unit)` | Removes the newest queued `unit` from producer `id`'s queue and refunds its `train_cost` at the level it was paid for, up to storage. |
 | `{"op": "research", "unit": String}` | `check_research(unit)` | Pays the unit's next level's `research_cost` and starts its research, `research_seconds` long. |
+| `{"op": "research", "ability": String}` | `check_research_ability(ability)` | The same for an ability's next level, in the same research slot. A command with an `ability` key is this form. |
+| `{"op": "make", "id": int, "ability": String, "count": int}` | `check_make(id, ability, count)` | Pays `count` times the ability's `make_cost` at its current level and queues `count` of it at Foundry `id`. `count` is optional (1); all or nothing. |
+| `{"op": "cancel_making", "id": int, "ability": String}` | `check_cancel_making(id, ability)` | Removes the newest queued `ability` from Foundry `id`'s queue and refunds its `make_cost` at the level it was paid for, up to storage. |
 | `{"op": "raid_result", "battle": {...}, "result": {...}, "expedition": {"epoch", "index"}}` | `check_raid_result(command)` | Spends the units deployed, adds the loot up to storage and keeps the raid (**Raids**). `expedition` is optional: with it, a raid with a star clears that field of the sector (**Expeditions**). |
 | `{"op": "scan"}` | `check_scan()` | Starts the sector's next epoch: new fields, none cleared, the snapshot retaken (**Expeditions**). |
 
@@ -123,8 +129,19 @@ Checks, in the order they are made:
   queue holds the unit.
 - `check_research(unit)`: `unknown_unit`; `max_level` at the unit's top level;
   `needs_producer_level` unless `is_unit_unlocked(unit)`; `needs_lab_level` while
-  `lab_level()` is below the next level's `requires_lab`; `busy` while a research runs;
-  `insufficient_resources`.
+  `lab_level()` is below the next level's `requires_lab`; `busy` while a research runs, of a unit
+  or of an ability; `insufficient_resources`.
+- `check_make(id, ability, count = 1)`: `unknown_ability`; `unknown_building`; `not_a_foundry`
+  unless the building's type is `catalog.foundry_type`; `bad_count` below 1;
+  `needs_foundry_level` while the building's finished level is below the ability's
+  `requires_foundry`; `not_enough_stock_room` when `count` exceeds `foundry_capacity()` (checked
+  before anything is multiplied by `count`) or unless `stock_total() + making_queued() + count <=
+  foundry_capacity()`; `insufficient_resources` unless `can_afford(make_cost, count)`.
+- `check_cancel_making(id, ability)`: `unknown_building`; `not_queued` unless the building's
+  queue holds the ability.
+- `check_research_ability(ability)`: `unknown_ability`; `max_level` at its top level;
+  `needs_foundry_level` unless `is_ability_unlocked(ability)`; `needs_lab_level`; `busy` while a
+  research runs, of a unit or of an ability; `insufficient_resources`.
 - `check_raid_result(command)`: `bad_raid` unless `battle` and `result` are objects, the
   result's `deployed`, `loot` and `abilities_used` are objects and the battle's `commands` a
   list of objects, its `ticks` and `hash` whole, `destruction` 0–100 and `stars` 0–3, every
@@ -166,8 +183,13 @@ Checks, in the order they are made:
 | `ERR_UNKNOWN_ABILITY` | `unknown_ability` |
 | `ERR_SCAN_COOLDOWN` | `scan_cooldown` |
 | `ERR_BAD_EXPEDITION` | `bad_expedition` |
+| `ERR_NOT_FOUNDRY` | `not_a_foundry` |
+| `ERR_FOUNDRY_LEVEL` | `needs_foundry_level` |
+| `ERR_STOCK_ROOM` | `not_enough_stock_room` |
 
-`Hud.ERROR_TEXT` maps these to player-facing text (`hud.md`).
+`Hud.ERROR_TEXT` maps these to player-facing text (`hud.md`); a code it does not know shows as
+the raw code, as `not_a_foundry`, `needs_foundry_level` and `not_enough_stock_room` do until the
+Foundry's HUD maps them.
 
 ### Buildings, levels and builders
 
@@ -246,7 +268,9 @@ times = 1)` answers for `times` of a price.
 ### The army: research
 
 One research runs at a time, in the research building (`catalog.research_type`, the Research
-Lab): `research_unit` and `research_done_at`. A unit's level belongs to its whole type
+Lab): `research_unit` and `research_done_at`, or `research_ability` for an ability's level
+(**The Foundry**), which needs the ability unlocked (`is_ability_unlocked`) instead of the unit,
+and shares the slot: while one runs neither kind can start. A unit's level belongs to its whole type
 (`unit_levels`): the army trains at it, and a unit already queued keeps the price it was paid.
 Researching level k + 1 needs the unit unlocked (`is_unit_unlocked`: some producer of its type
 has a finished level of at least its `producer_level`) and `lab_level()`, the research
@@ -254,6 +278,39 @@ building's highest finished level (0 without one), at least that level's `requir
 needs no builder, and the research building's own upgrade neither stops it nor counts until it
 completes. When it completes, `unit_levels[unit]` rises by one and the slot empties. There is
 no cancel. `research_seconds_left()` is the time left, 0 when none runs.
+
+### The Foundry: making abilities
+
+The Foundry (`catalog.foundry_type`, the Nanite Foundry) makes the abilities the attacker uses in
+battle (`battle.md`, **Abilities**), from a queue of its own, as a producer trains units: a
+`TrainingQueue` in `making`, by building id, whose `units` hold ability ids and whose
+`paid_levels` the level each was paid at. A Foundry makes an ability from the moment its finished
+level reaches the ability's `requires_foundry`; each takes the ability's `make_seconds`.
+
+- **Time runs only while the Foundry is idle**: its upgrade stops the queue with the time left,
+  and the upgrade completing restarts it from there.
+- **A finished head goes into the stock** (`ability_stock`, by id, no level) if the stock's total
+  is below `foundry_capacity()`; otherwise it waits (`left` 0), busy Foundry or not, until there is
+  room, then is stocked at once, lowest Foundry id first. `_resume_training()` handles the making
+  queues in the same two passes as the training queues, after them.
+- **The queue limit is the capacity**: the stock plus every queue, the new ones included, must fit
+  `foundry_capacity()`, so only a stock above it (a save after a data change, or a capacity
+  lowered) waits. A raid that spends abilities frees room, and the apply's `_resume_training()`
+  stocks a waiting head in it.
+- **Cancel** refunds the newest queued one of the ability at the level it was paid for, up to
+  storage. Cancelling the head starts the next from the beginning.
+- **Levels**: an ability's level belongs to its whole type (`ability_levels`), researched in the
+  lab's one slot (**The army: research**). The stock carries no level: a battle uses the levels
+  the attacker has when it starts.
+
+`foundry_capacity()` is the `capacity` of every finished Foundry at its current level, busy or not,
+like housing.
+
+Queries for the HUD: `stock(ability)`, `stock_total()`, `making_queued()`, `foundry_capacity()`,
+`ability_level(ability)`, `is_ability_unlocked(ability)` (some Foundry has the finished level),
+`making_queue_of(id) -> PackedStringArray` (a copy, built per call, for the HUD on `changed`),
+`making_status(id)` (the `TRAINING_*` states) and `making_seconds_left(id)`. Like the army's, the
+checks and sums allocate nothing.
 
 ### Raids
 
@@ -290,10 +347,10 @@ has no fields and no cooldown.
 
 `advance_to(time)` moves the base forward. Earlier or equal times are ignored, so a clock that
 goes backwards cannot undo anything. It finds the earliest completion at or before `time`, a
-building (`_next_completion`: lowest `finish_at`, ties broken by lowest id), the research, or a
-training head (`_next_training`: lowest `done_at`, ties broken by lowest producer id); in the
-same second buildings come first, then the research, then training, so the order is the same on
-every device; pays production for the
+building (`_next_completion`: lowest `finish_at`, ties broken by lowest id), the research, a
+training head or a making head (`_next_training`, over the training or the making queues: lowest
+`done_at`, ties broken by lowest building id); in the same second buildings come first, then the
+research, then training, then making, so the order is the same on every device; pays production for the
 stretch up to it, completes it, brings the training queues in line, and repeats; then pays
 production for the rest of the interval and sets `now`. Ticking every second or once gives the
 same state (`test_training.gd`, `test_ticks_of_one_second_equal_one_big_tick`). A building that completes mid-interval
@@ -323,22 +380,25 @@ upgrade. `seconds_left(id)` is `finish_at - now`, floored at 0.
 
 ### Save and load
 
-`to_dict()` returns the save, version 5 (`SAVE_VERSION`), with the field it was laid out on, the
-army, the raids and the sector:
+`to_dict()` returns the save, version 6 (`SAVE_VERSION`), with the field it was laid out on, the
+army, the raids, the sector and the abilities:
 
 ```
-{"version": 5, "grid": {"width": int, "height": int}, "now": int, "next_id": int,
+{"version": 6, "grid": {"width": int, "height": int}, "now": int, "next_id": int,
  "resources": {res: int}, "remainders": {res: int},
  "buildings": [{"id", "type", "cell": [x, y], "level", "target_level", "finish_at"}, ...],
- "army": {unit: int}, "unit_levels": {unit: int}, "research": {"unit", "done_at"} or {},
+ "army": {unit: int}, "unit_levels": {unit: int},
+ "research": {"unit", "done_at"} or {"ability", "done_at"} or {},
  "training": [{"building", "units": [unit, ...], "paid_levels": [int, ...], "done_at", "left"}, ...],
  "raids": [{"at", "battle", "result"}, ...],
- "sector": {"seed", "epoch", "cleared": [int, ...], "last_scan", "cc", "capacity": {res: int}}}
+ "sector": {"seed", "epoch", "cleared": [int, ...], "last_scan", "cc", "capacity": {res: int}},
+ "abilities": {"stock": {ability: int}, "levels": {ability: int},
+               "making": [{"building", "units": [ability, ...], "paid_levels", "done_at", "left"}, ...]}}
 ```
 
-Buildings and training queues are listed in id order, and `army` and `unit_levels` in sorted
-unit order with only what differs from a new base (a count above 0, a level above 1); an empty
-queue is left out. So the output is canonical and two states with the same
+Buildings, training queues and making queues are listed in id order, and `army`, `unit_levels`
+and the abilities' `stock` and `levels` in sorted id order with only what differs from a new base
+(a count above 0, a level above 1); an empty queue is left out. So the output is canonical and two states with the same
 contents serialise to the same text (the tests compare `JSON.stringify` of two states).
 
 `BaseState.from_dict(catalog, data)` rebuilds a state from parsed JSON (floats included;
@@ -357,7 +417,9 @@ has no sector: it loads with one seeded from its `now` (0 when absent), at epoch
 cleared, its snapshot taken of the loaded base (after the buildings, before any advance). A saved
 sector is cleaned on load (`Sector.from_dict`: the level clamped, cleared entries kept only when
 they are whole field indices, and `last_scan` brought back to the saved `now` when it is later,
-so a clock set back costs at most one cooldown). The next save is version 5.
+so a clock set back costs at most one cooldown). A save from before version 6 has no abilities:
+it loads with nothing made, every ability at level 1, no making queue and no ability research.
+The next save is version 6.
 Saved raids are loaded as they were, their whole numbers made ints again (`Catalog.ints`) so
 the save stays canonical, the newest `RAID_LOG_SIZE` kept; nothing checks them, since nothing
 in the base reads them.
@@ -369,6 +431,11 @@ dropped, and a queue whose building is gone or already has a queue is dropped, a
 unit its building no longer trains (a paid level is clamped into the unit's levels). A queue
 whose head was dropped starts its new head afresh; one left empty is dropped. An army above the
 housing is kept. `_resume_training()` then runs once, which leaves a consistent save as it was.
+The abilities load after the army (`_load_abilities`) by the same rules: an unknown ability's
+stock, level or research is dropped, a level above the top clamped, a research of an ability at
+its top dropped, a making queue whose building is gone, is not a Foundry or already has a queue
+dropped, as is an unknown queued ability (a queue whose head was dropped starts its new head
+afresh); a stock above the capacity is kept; `_resume_training()` then runs again.
 
 `main.gd` calls `advance_to(now)` on the loaded state, which is the offline progress.
 
