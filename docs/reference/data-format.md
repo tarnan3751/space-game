@@ -32,7 +32,7 @@ A non-whole number stays a float and fails validation wherever an int is require
     "wall_cost_units": 8000
   },
   "expedition": {
-    "scan_seconds": 60, "margin": 4, "jitter": 2, "spacing": 1, "wall_gap_cells": 2, "slack_pct": 125,
+    "scan_seconds": 10800, "margin": 4, "jitter": 2, "spacing": 1, "wall_gap_cells": 2, "slack_pct": 125,
     "bands": [
       { "id": "easy", "fields": 2, "cc_offset": -1, "level_offset": -1, "density_pct": 60,
         "loot_pct": 15, "wall_gaps": 2, "deposits": 2, "hazards": 0 },
@@ -40,6 +40,7 @@ A non-whole number stays a float and fails validation wherever an int is require
       { "id": "hard", "...": "..." }
     ]
   },
+  "premium": { "currency": "antimatter_shards", "skip_minutes_per_shard": 10 },
   "menu_order": ["drone_bay", "metal_extractor", "crystal_harvester", "antimatter_siphon",
                  "metal_silo", "crystal_silo", "antimatter_vault", "hangar", "cadet_academy",
                  "...", "mega_mine", "barrier_wall"],
@@ -63,6 +64,7 @@ A non-whole number stays a float and fails validation wherever an int is require
 | `army` | `housing`: the building type whose `capacity` houses the army; `research`: the building type that researches unit and ability levels; `foundry`: the building type that makes the abilities, whose `capacity` caps their stock. Each names a type in `buildings.json`; `housing` and `research` are required once `units.json` lists a unit, `foundry` once `abilities.json` lists an ability. |
 | `battle` | Optional; the battle sim's rules (`battle.md`). `seconds`: the battle's length, at least 1. `loot_pct`: `{resource: percent}`, 0–100, of the defender's stored amount a raid can take (a resource left out gives none). `wall`: the wall type, the `wall` class. `trap_category`: the category whose types are traps, the `trap` class. `wall_cost_units`: the extra path cost, in field units, of walking into a wall cell, which decides when a ground unit breaks through a wall rather than walk round it. Without the section the catalog has no battle rules and a battle refuses to set up. |
 | `expedition` | Optional; the sector and the outpost generator (`expeditions.md`). `scan_seconds` (whole): the cooldown from one scan to the next. `margin` (at least 1, and less than half the grid): the free cells between every outpost footprint and the field's edge. `jitter`: how far the outpost's centre may move on each axis. `spacing`: the free cells kept between footprints outside the compound. `wall_gap_cells` (at least 1): one gap's width in a wall ring. `slack_pct` (at least 100): the compound's and the middle band's area as a percent of what their buildings take. `bands`, in field order, each `{ "id", "fields", "cc_offset", "level_offset", "density_pct", "loot_pct", "wall_gaps", "deposits", "hazards" }`: `fields` (at least 1) of the sector's fields are in the band, so the field count is their sum; the outpost's Command Center is the player's plus `cc_offset` (any whole number, clamped to the levels); its levels are the highest its Command Center allows plus `level_offset` (0 or less); `density_pct` of each type's `max_count`, rounded half up; `loot_pct` of the player's storage capacity as the loot target; `wall_gaps` openings in each wall ring; `deposits` storages outside the walls, with `hazards` defences each. The shipped bands are easy (Command Center −1, levels −1, 60%, 15% loot, two gaps, two deposits, no hazards), even (+0, 80%, 25%, one gap, one deposit, one hazard) and hard (+1, 85%, 40%, closed, one deposit, two hazards), two fields each. Without the section the catalog has no fields. A block with any error is reported and not kept. |
+| `premium` | Reserved, and read by no code: the premium currency's id and how many minutes of a timer one unit of it would skip. The retune's timers were chosen with that price in mind (the longest, the Command Center's 66 hours to level 10, is 396 at 10 minutes a unit); nothing is sold until PvP exists (`docs/vision.md` §5). |
 | `menu_order` | The build menu's types in order: every type except `command_center`, exactly once. Within a category, this is the order the HUD lists them. |
 | `start.resources` | Starting amounts; each is capped at the starting base's capacity. A resource left out starts at 0. |
 | `start.buildings` | Placed finished at `level` (default 1, and one of the type's levels) when a new base is created. `cell` is the footprint's top-left. An entry of an unknown type is a load error; one that does not fit the grid is skipped. |
@@ -488,7 +490,7 @@ does not.
 default), so the plain catalog keeps its three.
 `expedition_rules.json` and `expedition_buildings.json` are a catalog of their own for the
 expedition tests (`Fixtures.expedition_catalog(change)`, with the units and battle units): a 40×40
-field, the shipped `rules.expedition` block, and seventeen types with ten Command Center levels,
+field, a copy of the development-era `rules.expedition` block (a 60 s scan), and seventeen types with ten Command Center levels,
 so an outpost can be laid out at every level (`fixtures.gd` lists them).
 `test/support/fixtures.gd` loads it (`Fixtures.catalog()`, `Fixtures.new_base(start_time)`,
 `Fixtures.army_base()`, `Fixtures.battle_catalog(size)`, `Fixtures.expedition_catalog(change)`).

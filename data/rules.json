@@ -20,7 +20,7 @@
     "wall_cost_units": 8000
   },
   "expedition": {
-    "scan_seconds": 60,
+    "scan_seconds": 10800,
     "margin": 4,
     "jitter": 2,
     "spacing": 1,
@@ -35,6 +35,7 @@
         "loot_pct": 40, "wall_gaps": 0, "deposits": 1, "hazards": 2 }
     ]
   },
+  "premium": { "currency": "antimatter_shards", "skip_minutes_per_shard": 10 },
   "menu_order": [
     "drone_bay",
     "metal_extractor",
