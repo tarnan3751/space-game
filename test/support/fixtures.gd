@@ -38,11 +38,25 @@ extends RefCounted
 ##   grunt  ground, housing 1, 10 s, 10 crystal (L2: research 100 crystal, 60 s, lab 1; trains for 20)
 ##   flyer  air, housing 2, 20 s, 20 crystal (L2: research 200 crystal, 120 s, lab 2; trains for 30)
 ##   walker ground, housing 5, 30 s, 50 crystal, needs academy level 2, one level
+##
+## The expedition catalog (Fixtures.expedition_catalog; docs/reference/expeditions.md): its own
+## rules and buildings, on a 40x40 field, with ten Command Center levels so an outpost can be laid
+## out at every level, and the units and battle units above. rules.expedition is the shipped
+## block (easy, even, hard, two fields each); rules.battle is the battle fixtures'. The roster:
+##   command_center 3x3 (storage, antimatter from level 4)   drone_bay 1x1
+##   extractor, harvester 2x2 (metal, crystal)   siphon 2x2 (antimatter, from CC 4)
+##   silo, crystal_silo 2x2 (storage)   vault 2x2 (antimatter storage, from CC 4)
+##   hangar 3x3   academy 2x2 (trains every unit)   lab 2x2 (from CC 2)
+##   turret 2x2 ground, range 4   cannon 2x2 both, range 8 (from CC 2)   shield 2x2 (from CC 3)
+##   sentry 1x1 hidden (from CC 4)   mine 1x1 trap (from CC 2)   mega_mine 2x2 trap (from CC 5)
+##   wall 1x1, 30 at CC 1 up to 120 at CC 10
 
 const RULES := "res://test/support/fixtures/rules.json"
 const BUILDINGS := "res://test/support/fixtures/buildings.json"
 const UNITS := "res://test/support/fixtures/units.json"
 const BATTLE_UNITS := "res://test/support/fixtures/battle_units.json"
+const EXPEDITION_RULES := "res://test/support/fixtures/expedition_rules.json"
+const EXPEDITION_BUILDINGS := "res://test/support/fixtures/expedition_buildings.json"
 
 
 static func catalog() -> Catalog:
@@ -68,6 +82,18 @@ static func battle_catalog(size: Vector2i = Vector2i(20, 20)) -> Catalog:
 	var units: Dictionary = JSON.parse_string(FileAccess.get_file_as_string(UNITS))
 	units.merge(JSON.parse_string(FileAccess.get_file_as_string(BATTLE_UNITS)))
 	return Catalog.from_json(JSON.stringify(rules), FileAccess.get_file_as_string(BUILDINGS),
+		JSON.stringify(units))
+
+
+## The expedition catalog: its rules and buildings, with the battle units merged in as
+## battle_catalog does. `change` may edit the parsed rules first.
+static func expedition_catalog(change: Callable = Callable()) -> Catalog:
+	var rules: Dictionary = JSON.parse_string(FileAccess.get_file_as_string(EXPEDITION_RULES))
+	if change.is_valid():
+		change.call(rules)
+	var units: Dictionary = JSON.parse_string(FileAccess.get_file_as_string(UNITS))
+	units.merge(JSON.parse_string(FileAccess.get_file_as_string(BATTLE_UNITS)))
+	return Catalog.from_json(JSON.stringify(rules), FileAccess.get_file_as_string(EXPEDITION_BUILDINGS),
 		JSON.stringify(units))
 
 

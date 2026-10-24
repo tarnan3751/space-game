@@ -524,6 +524,72 @@ func test_shipped_battle_data() -> void:
 				assert_true(int(stats.get("damage", 0)) > 0, "%s level %d has damage" % [type, level])
 
 
+func test_expedition_rules_and_bands() -> void:
+	var catalog := Fixtures.expedition_catalog()
+	assert_eq(catalog.load_error, "")
+	assert_eq(catalog.scan_seconds, 60)
+	assert_eq(catalog.expedition_field_count(), 6)
+	var bands := PackedStringArray()
+	for index: int in 6:
+		bands.append(str(catalog.expedition_band(index)["id"]))
+	assert_eq(bands, PackedStringArray(["easy", "easy", "even", "even", "hard", "hard"]))
+	assert_true(catalog.expedition_band(6).is_empty(), "no band past the last field")
+	assert_true(catalog.expedition_band(-1).is_empty(), "no band before the first")
+	assert_eq(catalog.expedition_band(4)["cc_offset"], 1)
+
+
+func test_no_expedition_rules_is_no_fields() -> void:
+	var catalog := Fixtures.catalog()
+	assert_eq(catalog.load_error, "")
+	assert_eq(catalog.expedition_field_count(), 0)
+	assert_eq(catalog.scan_seconds, 0)
+	assert_true(catalog.expedition_band(0).is_empty())
+
+
+func test_validation_reports_bad_expedition_rules() -> void:
+	var cases := {
+		"rules.expedition must be an object": func(rules: Dictionary) -> void:
+			rules["expedition"] = 6,
+		"rules.expedition.scan_seconds must be a whole number of at least 0": func(rules: Dictionary) -> void:
+			rules["expedition"]["scan_seconds"] = -1,
+		"rules.expedition.margin must be a whole number of at least 1": func(rules: Dictionary) -> void:
+			rules["expedition"]["margin"] = 0,
+		"rules.expedition.margin leaves no room on the grid": func(rules: Dictionary) -> void:
+			rules["expedition"]["margin"] = 20,
+		"rules.expedition.wall_gap_cells must be a whole number of at least 1": func(rules: Dictionary) -> void:
+			rules["expedition"]["wall_gap_cells"] = 0,
+		"rules.expedition.slack_pct must be a whole number of at least 100": func(rules: Dictionary) -> void:
+			rules["expedition"]["slack_pct"] = 90,
+		"rules.expedition.bands must be a non-empty list": func(rules: Dictionary) -> void:
+			rules["expedition"]["bands"] = [],
+		"rules.expedition.bands ids must be unique and not empty": func(rules: Dictionary) -> void:
+			rules["expedition"]["bands"][1]["id"] = "easy",
+		"rules.expedition band 'even'.fields must be at least 1": func(rules: Dictionary) -> void:
+			rules["expedition"]["bands"][1]["fields"] = 0,
+		"rules.expedition band 'hard'.cc_offset must be a whole number": func(rules: Dictionary) -> void:
+			rules["expedition"]["bands"][2]["cc_offset"] = 0.5,
+		"rules.expedition band 'easy'.level_offset must be a whole number, 0 or less": func(rules: Dictionary) -> void:
+			rules["expedition"]["bands"][0]["level_offset"] = 1,
+		"rules.expedition band 'even'.density_pct must be a whole percent, 0-100": func(rules: Dictionary) -> void:
+			rules["expedition"]["bands"][1]["density_pct"] = 120,
+		"rules.expedition band 'hard'.loot_pct must be a whole percent, 0-100": func(rules: Dictionary) -> void:
+			rules["expedition"]["bands"][2]["loot_pct"] = -5,
+		"rules.expedition band 'easy'.deposits must be whole and non-negative": func(rules: Dictionary) -> void:
+			rules["expedition"]["bands"][0]["deposits"] = -1,
+	}
+	for message: String in cases:
+		var catalog := Fixtures.expedition_catalog(cases[message])
+		assert_true(catalog.load_error.contains(message), "%s: %s" % [message, catalog.load_error])
+		assert_eq(catalog.expedition_field_count(), 0, "%s: a refused block gives no fields" % message)
+
+
+func test_shipped_expedition_rules() -> void:
+	var catalog := Catalog.load_default()
+	assert_eq(catalog.load_error, "")
+	assert_eq(catalog.expedition_field_count(), 6)
+	assert_true(catalog.scan_seconds > 0)
+
+
 func test_validation_reports_bad_menu_order() -> void:
 	var error := _error_after(func(rules: Dictionary, _buildings: Dictionary) -> void:
 		rules["menu_order"].erase("wall"))

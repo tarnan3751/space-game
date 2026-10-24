@@ -70,6 +70,11 @@ var battle_seconds: int = 0
 var wall_type: String = ""
 var trap_category: String = ""
 var wall_cost_units: int = 0
+## rules.expedition (docs/reference/expeditions.md), {} when the rules have none: scan_seconds,
+## margin, jitter, spacing, wall_gap_cells, slack_pct and the bands, every number an int. The
+## cooldown between two scans, 0 without the rules.
+var expedition: Dictionary = {}
+var scan_seconds: int = 0
 
 var _buildings: Dictionary = {}
 var _units: Dictionary = {}
@@ -169,6 +174,26 @@ func battle_class(type: String) -> String:
 		if stats.has("produces") or stats.has("storage"):
 			return CLASS_RESOURCE
 	return CLASS_OTHER
+
+
+## The sector's field count: the sum of the bands' `fields`; 0 without rules.expedition.
+func expedition_field_count() -> int:
+	var total := 0
+	for band: Dictionary in _bands():
+		total += int(band["fields"])
+	return total
+
+
+## The band of field `index` (the bands cover the fields in order); the shared empty Dictionary
+## for an index out of range.
+func expedition_band(index: int) -> Dictionary:
+	var first := 0
+	for band: Dictionary in _bands():
+		var fields: int = band["fields"]
+		if index >= first and index < first + fields:
+			return band
+		first += fields
+	return _NONE
 
 
 ## The percent of the defender's stored `res` a raid can take (rules.battle.loot_pct); 0 when unset.
@@ -401,6 +426,7 @@ func _read(rules: Dictionary, buildings: Dictionary, units: Dictionary) -> void:
 	problems.append_array(_validate_start())
 	problems.append_array(_read_army(rules.get("army", {}), units))
 	problems.append_array(_read_battle(rules.get("battle", {})))
+	problems.append_array(_read_expedition(rules.get("expedition", {})))
 	load_error = "; ".join(problems)
 
 
@@ -440,6 +466,58 @@ func _read_battle(battle: Variant) -> PackedStringArray:
 		else:
 			_loot_pct[str(res)] = int(loot_dict[res])
 	return problems
+
+
+## rules.expedition, optional: a catalog without it has no fields. Kept only when it validates.
+func _read_expedition(data: Variant) -> PackedStringArray:
+	var problems := PackedStringArray()
+	if typeof(data) != TYPE_DICTIONARY:
+		problems.append("rules.expedition must be an object")
+		return problems
+	var rules: Dictionary = data
+	if rules.is_empty():
+		return problems
+	var minimums := {"scan_seconds": 0, "margin": 1, "jitter": 0, "spacing": 0, "wall_gap_cells": 1,
+		"slack_pct": 100}
+	for field: String in minimums:
+		if not _is_whole(rules.get(field)) or int(rules[field]) < int(minimums[field]):
+			problems.append("rules.expedition.%s must be a whole number of at least %d" % [field, minimums[field]])
+	if problems.is_empty() and 2 * int(rules["margin"]) >= mini(grid_size.x, grid_size.y):
+		problems.append("rules.expedition.margin leaves no room on the grid")
+	var bands: Variant = rules.get("bands")
+	if typeof(bands) != TYPE_ARRAY or (bands as Array).is_empty():
+		problems.append("rules.expedition.bands must be a non-empty list")
+		return problems
+	var ids := PackedStringArray()
+	for entry: Variant in bands:
+		if typeof(entry) != TYPE_DICTIONARY:
+			problems.append("rules.expedition.bands entries must be objects")
+			continue
+		var band: Dictionary = entry
+		var id := str(band.get("id", ""))
+		if id == "" or ids.has(id):
+			problems.append("rules.expedition.bands ids must be unique and not empty")
+		ids.append(id)
+		if not _is_whole(band.get("fields")) or int(band["fields"]) < 1:
+			problems.append("rules.expedition band '%s'.fields must be at least 1" % id)
+		if typeof(band.get("cc_offset")) != TYPE_INT:
+			problems.append("rules.expedition band '%s'.cc_offset must be a whole number" % id)
+		if typeof(band.get("level_offset")) != TYPE_INT or int(band["level_offset"]) > 0:
+			problems.append("rules.expedition band '%s'.level_offset must be a whole number, 0 or less" % id)
+		for field: String in ["density_pct", "loot_pct"]:
+			if not _is_whole(band.get(field)) or int(band[field]) > 100:
+				problems.append("rules.expedition band '%s'.%s must be a whole percent, 0-100" % [id, field])
+		for field: String in ["wall_gaps", "deposits", "hazards"]:
+			if not _is_whole(band.get(field)):
+				problems.append("rules.expedition band '%s'.%s must be whole and non-negative" % [id, field])
+	if problems.is_empty():
+		expedition = rules
+		scan_seconds = int(rules["scan_seconds"])
+	return problems
+
+
+func _bands() -> Array:
+	return expedition.get("bands", _NO_LIST)
 
 
 ## rules.army and units.json. Every unit is stored, then validated against the buildings.

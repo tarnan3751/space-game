@@ -1,0 +1,286 @@
+{
+  "command_center": {
+    "name": "Command Center",
+    "size": 3,
+    "category": "core",
+    "max_count": [1, 1, 1, 1, 1, 1, 1, 1, 1, 1],
+    "levels": [
+      {"cost": {}, "build_seconds": 0, "hp": 1000, "storage": {"metal": 1000, "crystal": 1000}},
+      {"cost": {"metal": 100}, "build_seconds": 0, "requires_cc": 1, "hp": 1200, "storage": {"metal": 2000, "crystal": 2000}},
+      {"cost": {"metal": 200}, "build_seconds": 0, "requires_cc": 2, "hp": 1400, "storage": {"metal": 3000, "crystal": 3000}},
+      {"cost": {"metal": 300}, "build_seconds": 0, "requires_cc": 3, "hp": 1600, "storage": {"metal": 4000, "crystal": 4000, "antimatter": 400}},
+      {"cost": {"metal": 400}, "build_seconds": 0, "requires_cc": 4, "hp": 1800, "storage": {"metal": 5000, "crystal": 5000, "antimatter": 500}},
+      {"cost": {"metal": 500}, "build_seconds": 0, "requires_cc": 5, "hp": 2000, "storage": {"metal": 6000, "crystal": 6000, "antimatter": 600}},
+      {"cost": {"metal": 600}, "build_seconds": 0, "requires_cc": 6, "hp": 2200, "storage": {"metal": 7000, "crystal": 7000, "antimatter": 700}},
+      {"cost": {"metal": 700}, "build_seconds": 0, "requires_cc": 7, "hp": 2400, "storage": {"metal": 8000, "crystal": 8000, "antimatter": 800}},
+      {"cost": {"metal": 800}, "build_seconds": 0, "requires_cc": 8, "hp": 2600, "storage": {"metal": 9000, "crystal": 9000, "antimatter": 900}},
+      {"cost": {"metal": 900}, "build_seconds": 0, "requires_cc": 9, "hp": 2800, "storage": {"metal": 10000, "crystal": 10000, "antimatter": 1000}}
+    ]
+  },
+  "drone_bay": {
+    "name": "Drone Bay",
+    "size": 1,
+    "category": "resources",
+    "max_count": [1, 1, 2, 2, 2, 2, 2, 2, 2, 2],
+    "levels": [
+      {"cost": {"metal": 10}, "build_seconds": 0, "hp": 100, "builders": 1}
+    ]
+  },
+  "extractor": {
+    "name": "Extractor",
+    "size": 2,
+    "category": "resources",
+    "max_count": [1, 2, 2, 3, 3, 3, 4, 4, 4, 4],
+    "levels": [
+      {"cost": {"metal": 10}, "build_seconds": 0, "hp": 200, "produces": {"metal": 1000}},
+      {"cost": {"metal": 20}, "build_seconds": 0, "requires_cc": 2, "hp": 220, "produces": {"metal": 2000}},
+      {"cost": {"metal": 30}, "build_seconds": 0, "requires_cc": 3, "hp": 240, "produces": {"metal": 3000}},
+      {"cost": {"metal": 40}, "build_seconds": 0, "requires_cc": 4, "hp": 260, "produces": {"metal": 4000}},
+      {"cost": {"metal": 50}, "build_seconds": 0, "requires_cc": 5, "hp": 280, "produces": {"metal": 5000}},
+      {"cost": {"metal": 60}, "build_seconds": 0, "requires_cc": 6, "hp": 300, "produces": {"metal": 6000}},
+      {"cost": {"metal": 70}, "build_seconds": 0, "requires_cc": 7, "hp": 320, "produces": {"metal": 7000}},
+      {"cost": {"metal": 80}, "build_seconds": 0, "requires_cc": 8, "hp": 340, "produces": {"metal": 8000}},
+      {"cost": {"metal": 90}, "build_seconds": 0, "requires_cc": 9, "hp": 360, "produces": {"metal": 9000}},
+      {"cost": {"metal": 100}, "build_seconds": 0, "requires_cc": 10, "hp": 380, "produces": {"metal": 10000}}
+    ]
+  },
+  "harvester": {
+    "name": "Harvester",
+    "size": 2,
+    "category": "resources",
+    "max_count": [1, 2, 2, 3, 3, 3, 4, 4, 4, 4],
+    "levels": [
+      {"cost": {"metal": 10}, "build_seconds": 0, "hp": 200, "produces": {"crystal": 1000}},
+      {"cost": {"metal": 20}, "build_seconds": 0, "requires_cc": 2, "hp": 220, "produces": {"crystal": 2000}},
+      {"cost": {"metal": 30}, "build_seconds": 0, "requires_cc": 3, "hp": 240, "produces": {"crystal": 3000}},
+      {"cost": {"metal": 40}, "build_seconds": 0, "requires_cc": 4, "hp": 260, "produces": {"crystal": 4000}},
+      {"cost": {"metal": 50}, "build_seconds": 0, "requires_cc": 5, "hp": 280, "produces": {"crystal": 5000}},
+      {"cost": {"metal": 60}, "build_seconds": 0, "requires_cc": 6, "hp": 300, "produces": {"crystal": 6000}},
+      {"cost": {"metal": 70}, "build_seconds": 0, "requires_cc": 7, "hp": 320, "produces": {"crystal": 7000}},
+      {"cost": {"metal": 80}, "build_seconds": 0, "requires_cc": 8, "hp": 340, "produces": {"crystal": 8000}},
+      {"cost": {"metal": 90}, "build_seconds": 0, "requires_cc": 9, "hp": 360, "produces": {"crystal": 9000}},
+      {"cost": {"metal": 100}, "build_seconds": 0, "requires_cc": 10, "hp": 380, "produces": {"crystal": 10000}}
+    ]
+  },
+  "siphon": {
+    "name": "Siphon",
+    "size": 2,
+    "category": "resources",
+    "max_count": [0, 0, 0, 1, 1, 1, 1, 2, 2, 2],
+    "levels": [
+      {"cost": {"metal": 10}, "build_seconds": 0, "requires_cc": 4, "hp": 200, "produces": {"antimatter": 100}},
+      {"cost": {"metal": 20}, "build_seconds": 0, "requires_cc": 5, "hp": 220, "produces": {"antimatter": 200}},
+      {"cost": {"metal": 30}, "build_seconds": 0, "requires_cc": 6, "hp": 240, "produces": {"antimatter": 300}},
+      {"cost": {"metal": 40}, "build_seconds": 0, "requires_cc": 7, "hp": 260, "produces": {"antimatter": 400}},
+      {"cost": {"metal": 50}, "build_seconds": 0, "requires_cc": 8, "hp": 280, "produces": {"antimatter": 500}},
+      {"cost": {"metal": 60}, "build_seconds": 0, "requires_cc": 9, "hp": 300, "produces": {"antimatter": 600}},
+      {"cost": {"metal": 70}, "build_seconds": 0, "requires_cc": 10, "hp": 320, "produces": {"antimatter": 700}}
+    ]
+  },
+  "silo": {
+    "name": "Metal Silo",
+    "size": 2,
+    "category": "resources",
+    "max_count": [1, 1, 2, 2, 2, 3, 3, 3, 4, 4],
+    "levels": [
+      {"cost": {"metal": 10}, "build_seconds": 0, "hp": 300, "storage": {"metal": 2000}},
+      {"cost": {"metal": 20}, "build_seconds": 0, "requires_cc": 2, "hp": 330, "storage": {"metal": 4000}},
+      {"cost": {"metal": 30}, "build_seconds": 0, "requires_cc": 3, "hp": 360, "storage": {"metal": 6000}},
+      {"cost": {"metal": 40}, "build_seconds": 0, "requires_cc": 4, "hp": 390, "storage": {"metal": 8000}},
+      {"cost": {"metal": 50}, "build_seconds": 0, "requires_cc": 5, "hp": 420, "storage": {"metal": 10000}},
+      {"cost": {"metal": 60}, "build_seconds": 0, "requires_cc": 6, "hp": 450, "storage": {"metal": 12000}},
+      {"cost": {"metal": 70}, "build_seconds": 0, "requires_cc": 7, "hp": 480, "storage": {"metal": 14000}},
+      {"cost": {"metal": 80}, "build_seconds": 0, "requires_cc": 8, "hp": 510, "storage": {"metal": 16000}},
+      {"cost": {"metal": 90}, "build_seconds": 0, "requires_cc": 9, "hp": 540, "storage": {"metal": 18000}},
+      {"cost": {"metal": 100}, "build_seconds": 0, "requires_cc": 10, "hp": 570, "storage": {"metal": 20000}}
+    ]
+  },
+  "crystal_silo": {
+    "name": "Crystal Silo",
+    "size": 2,
+    "category": "resources",
+    "max_count": [1, 1, 2, 2, 2, 3, 3, 3, 4, 4],
+    "levels": [
+      {"cost": {"metal": 10}, "build_seconds": 0, "hp": 300, "storage": {"crystal": 2000}},
+      {"cost": {"metal": 20}, "build_seconds": 0, "requires_cc": 2, "hp": 330, "storage": {"crystal": 4000}},
+      {"cost": {"metal": 30}, "build_seconds": 0, "requires_cc": 3, "hp": 360, "storage": {"crystal": 6000}},
+      {"cost": {"metal": 40}, "build_seconds": 0, "requires_cc": 4, "hp": 390, "storage": {"crystal": 8000}},
+      {"cost": {"metal": 50}, "build_seconds": 0, "requires_cc": 5, "hp": 420, "storage": {"crystal": 10000}},
+      {"cost": {"metal": 60}, "build_seconds": 0, "requires_cc": 6, "hp": 450, "storage": {"crystal": 12000}},
+      {"cost": {"metal": 70}, "build_seconds": 0, "requires_cc": 7, "hp": 480, "storage": {"crystal": 14000}},
+      {"cost": {"metal": 80}, "build_seconds": 0, "requires_cc": 8, "hp": 510, "storage": {"crystal": 16000}},
+      {"cost": {"metal": 90}, "build_seconds": 0, "requires_cc": 9, "hp": 540, "storage": {"crystal": 18000}},
+      {"cost": {"metal": 100}, "build_seconds": 0, "requires_cc": 10, "hp": 570, "storage": {"crystal": 20000}}
+    ]
+  },
+  "vault": {
+    "name": "Vault",
+    "size": 2,
+    "category": "resources",
+    "max_count": [0, 0, 0, 1, 1, 1, 2, 2, 2, 2],
+    "levels": [
+      {"cost": {"metal": 10}, "build_seconds": 0, "requires_cc": 4, "hp": 300, "storage": {"antimatter": 500}},
+      {"cost": {"metal": 20}, "build_seconds": 0, "requires_cc": 5, "hp": 330, "storage": {"antimatter": 1000}},
+      {"cost": {"metal": 30}, "build_seconds": 0, "requires_cc": 6, "hp": 360, "storage": {"antimatter": 1500}},
+      {"cost": {"metal": 40}, "build_seconds": 0, "requires_cc": 7, "hp": 390, "storage": {"antimatter": 2000}},
+      {"cost": {"metal": 50}, "build_seconds": 0, "requires_cc": 8, "hp": 420, "storage": {"antimatter": 2500}},
+      {"cost": {"metal": 60}, "build_seconds": 0, "requires_cc": 9, "hp": 450, "storage": {"antimatter": 3000}},
+      {"cost": {"metal": 70}, "build_seconds": 0, "requires_cc": 10, "hp": 480, "storage": {"antimatter": 3500}}
+    ]
+  },
+  "hangar": {
+    "name": "Hangar",
+    "size": 3,
+    "category": "army",
+    "max_count": [1, 1, 1, 2, 2, 2, 2, 2, 2, 2],
+    "levels": [
+      {"cost": {"metal": 10}, "build_seconds": 0, "hp": 400, "capacity": 20},
+      {"cost": {"metal": 20}, "build_seconds": 0, "requires_cc": 2, "hp": 440, "capacity": 30},
+      {"cost": {"metal": 30}, "build_seconds": 0, "requires_cc": 3, "hp": 480, "capacity": 40},
+      {"cost": {"metal": 40}, "build_seconds": 0, "requires_cc": 4, "hp": 520, "capacity": 50},
+      {"cost": {"metal": 50}, "build_seconds": 0, "requires_cc": 5, "hp": 560, "capacity": 60},
+      {"cost": {"metal": 60}, "build_seconds": 0, "requires_cc": 6, "hp": 600, "capacity": 70},
+      {"cost": {"metal": 70}, "build_seconds": 0, "requires_cc": 7, "hp": 640, "capacity": 80},
+      {"cost": {"metal": 80}, "build_seconds": 0, "requires_cc": 8, "hp": 680, "capacity": 90},
+      {"cost": {"metal": 90}, "build_seconds": 0, "requires_cc": 9, "hp": 720, "capacity": 100},
+      {"cost": {"metal": 100}, "build_seconds": 0, "requires_cc": 10, "hp": 760, "capacity": 110}
+    ]
+  },
+  "academy": {
+    "name": "Academy",
+    "size": 2,
+    "category": "army",
+    "max_count": [1, 1, 1, 1, 1, 1, 1, 1, 1, 1],
+    "levels": [
+      {"cost": {"metal": 10}, "build_seconds": 0, "hp": 300},
+      {"cost": {"metal": 20}, "build_seconds": 0, "requires_cc": 2, "hp": 300}
+    ]
+  },
+  "lab": {
+    "name": "Lab",
+    "size": 2,
+    "category": "army",
+    "max_count": [0, 1, 1, 1, 1, 1, 1, 1, 1, 1],
+    "levels": [
+      {"cost": {"metal": 10}, "build_seconds": 0, "requires_cc": 2, "hp": 300},
+      {"cost": {"metal": 20}, "build_seconds": 0, "requires_cc": 3, "hp": 330},
+      {"cost": {"metal": 30}, "build_seconds": 0, "requires_cc": 4, "hp": 360},
+      {"cost": {"metal": 40}, "build_seconds": 0, "requires_cc": 5, "hp": 390},
+      {"cost": {"metal": 50}, "build_seconds": 0, "requires_cc": 6, "hp": 420},
+      {"cost": {"metal": 60}, "build_seconds": 0, "requires_cc": 7, "hp": 450},
+      {"cost": {"metal": 70}, "build_seconds": 0, "requires_cc": 8, "hp": 480},
+      {"cost": {"metal": 80}, "build_seconds": 0, "requires_cc": 9, "hp": 510},
+      {"cost": {"metal": 90}, "build_seconds": 0, "requires_cc": 10, "hp": 540}
+    ]
+  },
+  "turret": {
+    "name": "Turret",
+    "size": 2,
+    "category": "defense",
+    "targets": "ground",
+    "max_count": [1, 1, 2, 2, 3, 3, 3, 4, 4, 4],
+    "levels": [
+      {"cost": {"metal": 10}, "build_seconds": 0, "hp": 400, "damage": 10, "range_cells": 4, "fire_ms": 1000},
+      {"cost": {"metal": 20}, "build_seconds": 0, "requires_cc": 2, "hp": 440, "damage": 12, "range_cells": 4, "fire_ms": 1000},
+      {"cost": {"metal": 30}, "build_seconds": 0, "requires_cc": 3, "hp": 480, "damage": 14, "range_cells": 4, "fire_ms": 1000},
+      {"cost": {"metal": 40}, "build_seconds": 0, "requires_cc": 4, "hp": 520, "damage": 16, "range_cells": 4, "fire_ms": 1000},
+      {"cost": {"metal": 50}, "build_seconds": 0, "requires_cc": 5, "hp": 560, "damage": 18, "range_cells": 4, "fire_ms": 1000},
+      {"cost": {"metal": 60}, "build_seconds": 0, "requires_cc": 6, "hp": 600, "damage": 20, "range_cells": 4, "fire_ms": 1000},
+      {"cost": {"metal": 70}, "build_seconds": 0, "requires_cc": 7, "hp": 640, "damage": 22, "range_cells": 4, "fire_ms": 1000},
+      {"cost": {"metal": 80}, "build_seconds": 0, "requires_cc": 8, "hp": 680, "damage": 24, "range_cells": 4, "fire_ms": 1000},
+      {"cost": {"metal": 90}, "build_seconds": 0, "requires_cc": 9, "hp": 720, "damage": 26, "range_cells": 4, "fire_ms": 1000},
+      {"cost": {"metal": 100}, "build_seconds": 0, "requires_cc": 10, "hp": 760, "damage": 28, "range_cells": 4, "fire_ms": 1000}
+    ]
+  },
+  "cannon": {
+    "name": "Cannon",
+    "size": 2,
+    "category": "defense",
+    "targets": "both",
+    "max_count": [0, 1, 1, 1, 2, 2, 2, 2, 3, 3],
+    "levels": [
+      {"cost": {"metal": 10}, "build_seconds": 0, "requires_cc": 2, "hp": 500, "damage": 20, "range_cells": 8, "fire_ms": 2000},
+      {"cost": {"metal": 20}, "build_seconds": 0, "requires_cc": 3, "hp": 550, "damage": 24, "range_cells": 8, "fire_ms": 2000},
+      {"cost": {"metal": 30}, "build_seconds": 0, "requires_cc": 4, "hp": 600, "damage": 28, "range_cells": 8, "fire_ms": 2000},
+      {"cost": {"metal": 40}, "build_seconds": 0, "requires_cc": 5, "hp": 650, "damage": 32, "range_cells": 8, "fire_ms": 2000},
+      {"cost": {"metal": 50}, "build_seconds": 0, "requires_cc": 6, "hp": 700, "damage": 36, "range_cells": 8, "fire_ms": 2000},
+      {"cost": {"metal": 60}, "build_seconds": 0, "requires_cc": 7, "hp": 750, "damage": 40, "range_cells": 8, "fire_ms": 2000},
+      {"cost": {"metal": 70}, "build_seconds": 0, "requires_cc": 8, "hp": 800, "damage": 44, "range_cells": 8, "fire_ms": 2000},
+      {"cost": {"metal": 80}, "build_seconds": 0, "requires_cc": 9, "hp": 850, "damage": 48, "range_cells": 8, "fire_ms": 2000},
+      {"cost": {"metal": 90}, "build_seconds": 0, "requires_cc": 10, "hp": 900, "damage": 52, "range_cells": 8, "fire_ms": 2000}
+    ]
+  },
+  "shield": {
+    "name": "Shield",
+    "size": 2,
+    "category": "defense",
+    "max_count": [0, 0, 1, 1, 1, 1, 1, 1, 1, 1],
+    "levels": [
+      {"cost": {"metal": 10}, "build_seconds": 0, "requires_cc": 3, "hp": 300, "range_cells": 3, "shield_hp": 100, "shield_regen": 20, "shield_delay_ms": 1000},
+      {"cost": {"metal": 20}, "build_seconds": 0, "requires_cc": 4, "hp": 330, "range_cells": 3, "shield_hp": 120, "shield_regen": 20, "shield_delay_ms": 1000},
+      {"cost": {"metal": 30}, "build_seconds": 0, "requires_cc": 5, "hp": 360, "range_cells": 3, "shield_hp": 140, "shield_regen": 20, "shield_delay_ms": 1000},
+      {"cost": {"metal": 40}, "build_seconds": 0, "requires_cc": 6, "hp": 390, "range_cells": 3, "shield_hp": 160, "shield_regen": 20, "shield_delay_ms": 1000},
+      {"cost": {"metal": 50}, "build_seconds": 0, "requires_cc": 7, "hp": 420, "range_cells": 3, "shield_hp": 180, "shield_regen": 20, "shield_delay_ms": 1000},
+      {"cost": {"metal": 60}, "build_seconds": 0, "requires_cc": 8, "hp": 450, "range_cells": 3, "shield_hp": 200, "shield_regen": 20, "shield_delay_ms": 1000},
+      {"cost": {"metal": 70}, "build_seconds": 0, "requires_cc": 9, "hp": 480, "range_cells": 3, "shield_hp": 220, "shield_regen": 20, "shield_delay_ms": 1000},
+      {"cost": {"metal": 80}, "build_seconds": 0, "requires_cc": 10, "hp": 510, "range_cells": 3, "shield_hp": 240, "shield_regen": 20, "shield_delay_ms": 1000}
+    ]
+  },
+  "sentry": {
+    "name": "Sentry",
+    "size": 1,
+    "category": "defense",
+    "hidden": true,
+    "targets": "both",
+    "max_count": [0, 0, 0, 1, 1, 1, 2, 2, 2, 2],
+    "levels": [
+      {"cost": {"metal": 10}, "build_seconds": 0, "requires_cc": 4, "hp": 300, "damage": 10, "range_cells": 2, "fire_ms": 500},
+      {"cost": {"metal": 20}, "build_seconds": 0, "requires_cc": 5, "hp": 300, "damage": 12, "range_cells": 2, "fire_ms": 500},
+      {"cost": {"metal": 30}, "build_seconds": 0, "requires_cc": 6, "hp": 300, "damage": 14, "range_cells": 2, "fire_ms": 500},
+      {"cost": {"metal": 40}, "build_seconds": 0, "requires_cc": 7, "hp": 300, "damage": 16, "range_cells": 2, "fire_ms": 500},
+      {"cost": {"metal": 50}, "build_seconds": 0, "requires_cc": 8, "hp": 300, "damage": 18, "range_cells": 2, "fire_ms": 500},
+      {"cost": {"metal": 60}, "build_seconds": 0, "requires_cc": 9, "hp": 300, "damage": 20, "range_cells": 2, "fire_ms": 500},
+      {"cost": {"metal": 70}, "build_seconds": 0, "requires_cc": 10, "hp": 300, "damage": 22, "range_cells": 2, "fire_ms": 500}
+    ]
+  },
+  "mine": {
+    "name": "Mine",
+    "size": 1,
+    "category": "traps",
+    "hidden": true,
+    "targets": "ground",
+    "max_count": [0, 1, 2, 2, 3, 3, 4, 4, 4, 4],
+    "levels": [
+      {"cost": {"metal": 10}, "build_seconds": 0, "requires_cc": 2, "damage": 50, "range_cells": 1}
+    ]
+  },
+  "mega_mine": {
+    "name": "Mega Mine",
+    "size": 2,
+    "category": "traps",
+    "hidden": true,
+    "targets": "ground",
+    "max_count": [0, 0, 0, 0, 1, 1, 1, 2, 2, 2],
+    "levels": [
+      {"cost": {"metal": 10}, "build_seconds": 0, "requires_cc": 5, "damage": 200, "range_cells": 2}
+    ]
+  },
+  "wall": {
+    "name": "Wall",
+    "size": 1,
+    "category": "walls",
+    "max_count": [30, 40, 50, 60, 70, 80, 90, 100, 110, 120],
+    "levels": [
+      {"cost": {"metal": 10}, "build_seconds": 0, "hp": 100},
+      {"cost": {"metal": 20}, "build_seconds": 0, "requires_cc": 2, "hp": 150},
+      {"cost": {"metal": 30}, "build_seconds": 0, "requires_cc": 3, "hp": 200},
+      {"cost": {"metal": 40}, "build_seconds": 0, "requires_cc": 4, "hp": 250},
+      {"cost": {"metal": 50}, "build_seconds": 0, "requires_cc": 5, "hp": 300},
+      {"cost": {"metal": 60}, "build_seconds": 0, "requires_cc": 6, "hp": 350},
+      {"cost": {"metal": 70}, "build_seconds": 0, "requires_cc": 7, "hp": 400},
+      {"cost": {"metal": 80}, "build_seconds": 0, "requires_cc": 8, "hp": 450},
+      {"cost": {"metal": 90}, "build_seconds": 0, "requires_cc": 9, "hp": 500},
+      {"cost": {"metal": 100}, "build_seconds": 0, "requires_cc": 10, "hp": 550}
+    ]
+  }
+}

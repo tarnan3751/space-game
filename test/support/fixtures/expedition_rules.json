@@ -1,0 +1,48 @@
+{
+  "resources": [
+    { "id": "metal", "name": "Metal", "color": "c8d3e0" },
+    { "id": "crystal", "name": "Crystal", "color": "e2a4ff" },
+    { "id": "antimatter", "name": "Antimatter", "color": "b48cff" }
+  ],
+  "categories": [
+    { "id": "resources", "name": "Resources" },
+    { "id": "army", "name": "Army" },
+    { "id": "defense", "name": "Defence" },
+    { "id": "traps", "name": "Traps" },
+    { "id": "walls", "name": "Walls" }
+  ],
+  "grid": { "width": 40, "height": 40 },
+  "army": { "housing": "hangar", "research": "lab" },
+  "battle": {
+    "seconds": 60,
+    "loot_pct": { "metal": 50, "crystal": 50, "antimatter": 50 },
+    "wall": "wall",
+    "trap_category": "traps",
+    "wall_cost_units": 8000
+  },
+  "expedition": {
+    "scan_seconds": 60,
+    "margin": 4,
+    "jitter": 2,
+    "spacing": 1,
+    "wall_gap_cells": 2,
+    "slack_pct": 125,
+    "bands": [
+      { "id": "easy", "fields": 2, "cc_offset": -1, "level_offset": -1, "density_pct": 60,
+        "loot_pct": 15, "wall_gaps": 2, "deposits": 2, "hazards": 0 },
+      { "id": "even", "fields": 2, "cc_offset": 0, "level_offset": 0, "density_pct": 80,
+        "loot_pct": 25, "wall_gaps": 1, "deposits": 1, "hazards": 1 },
+      { "id": "hard", "fields": 2, "cc_offset": 1, "level_offset": 0, "density_pct": 85,
+        "loot_pct": 40, "wall_gaps": 0, "deposits": 1, "hazards": 2 }
+    ]
+  },
+  "menu_order": ["drone_bay", "extractor", "harvester", "siphon", "silo", "crystal_silo", "vault", "hangar",
+                 "academy", "lab", "turret", "cannon", "shield", "sentry", "mine", "mega_mine", "wall"],
+  "start": {
+    "resources": { "metal": 500, "crystal": 500, "antimatter": 0 },
+    "buildings": [
+      { "type": "command_center", "cell": [18, 18], "level": 1 },
+      { "type": "drone_bay", "cell": [22, 18], "level": 1 }
+    ]
+  }
+}

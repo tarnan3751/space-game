@@ -32,6 +32,7 @@ read-only is `apply_dev_cheats()`, below.
 | `category_of(type)`, `is_hidden(type)`, `targets_of(type)` | The type's `category`, `hidden` (default `false`) and `targets` (`""` when it has none). The battle sim reads both (`battle.md`). |
 | `battle_class(type)` | The type's class in battle, one of `CLASS_HQ`, `CLASS_WALL`, `CLASS_TRAP`, `CLASS_DEFENSE`, `CLASS_RESOURCE`, `CLASS_OTHER` (`data-format.md`, **Battle classes**). |
 | `battle_seconds`, `wall_type`, `trap_category`, `wall_cost_units`, `loot_pct(res)` | `rules.battle`: 0, `""` and 0 when the rules have none. |
+| `expedition`, `scan_seconds`, `expedition_field_count()`, `expedition_band(index)` | `rules.expedition` (`expeditions.md`): the validated block (`{}` when the rules have none or it has an error), the scan cooldown, the sector's field count (the sum of the bands' `fields`, 0 without the block), and the band of a field index (the bands cover the fields in order; the shared empty dictionary out of range). |
 | `max_level(type)` | The number of entries in the type's `levels`. |
 | `level_stats(type, level)` | The stats dictionary for a 1-based level, or a shared, read-only empty dictionary when the type or level does not exist (callers only read it). |
 | `max_count(type, cc_level)` | `max_count[cc_level - 1]`, with `cc_level` clamped into the list; `0` when the list is empty. |
