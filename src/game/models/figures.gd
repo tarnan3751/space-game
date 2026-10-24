@@ -19,7 +19,10 @@ extends RefCounted
 ##   own from its joint's transform, the segment hanging along the joint's -Y, so posing is only
 ##   changing angles, and a unit pipeline can later build each segment on its own. joints() hands
 ##   the posed skeleton to a caller that adds to a figure or seats it.
-## - Nothing here moves: there are no moving parts and no Motion. The poses are static.
+## - Nothing here moves: there are no moving parts and no Motion. The poses are static, but for a
+##   rigged build: built in the neutral() pose with a Rigging (walk_rig), its segments carry rig
+##   channels (Rig, LowPolyMesh.rig) that the shaders turn in battle, the legs walking and the arms
+##   following their channel. Without one (the study poses, the seated pilot) nothing is rigged.
 ## - A figure's ink line is FIGURE_INK of the full width (LowPolyMesh.ink): each builder sets it
 ##   for its own parts and puts the mesh's value back after, so a figure in a building's mesh (the
 ##   escort troopers) is thin and the rest of that mesh is not.
@@ -98,6 +101,17 @@ class Body:
 	var forearm := 0.0
 
 
+## The rig stamps a rigged figure's segments carry (LowPolyMesh.rig, rig2; Rig.part), from walk_rig:
+## each thigh turns about its hip, each shin and foot about its knee and then with the thigh about
+## the hip, the arms (upper arm, forearm, hand, both sides) as one group on `arms`, and the head and
+## the torso not at all. Pairs are [left, right].
+class Rigging:
+	extends RefCounted
+	var hips: Array[Vector4] = [Vector4.ZERO, Vector4.ZERO]
+	var knees: Array[Vector4] = [Vector4.ZERO, Vector4.ZERO]
+	var arms := Vector4.ZERO
+
+
 ## A posed skeleton: a Transform3D per joint, in the mesh's space. Each pair is [left, right].
 class Joints:
 	extends RefCounted
@@ -127,6 +141,38 @@ static func stance() -> Pose:
 	pose.knee = PackedFloat32Array([16.0, 10.0])
 	pose.foot_pitch = PackedFloat32Array([-6.0, 5.0])
 	return pose
+
+
+## Standing straight, for a rigged build (walk_rig), which turns the legs from it: the legs straight
+## down but for a touch of knee, a little apart, the torso tilted a few degrees forward with no
+## twist (so the shoulders stay on one line across the figure, about which an arm group turns), the
+## head level, the arms hanging a little forward and out. A caller sets the arms it holds a weapon
+## with.
+static func neutral() -> Pose:
+	var pose := Pose.new()
+	pose.torso = Vector3(4, 0, 0)
+	pose.head = Vector3(-4, 0, 0)
+	pose.shoulder_swing = PackedFloat32Array([6.0, 6.0])
+	pose.shoulder_out = PackedFloat32Array([10.0, 10.0])
+	pose.elbow = PackedFloat32Array([20.0, 20.0])
+	pose.hip_swing = PackedFloat32Array([0.0, 0.0])
+	pose.hip_out = PackedFloat32Array([5.0, 5.0])
+	pose.knee = PackedFloat32Array([6.0, 6.0])
+	pose.foot_pitch = PackedFloat32Array([0.0, 0.0])
+	return pose
+
+
+## The walking rig of a figure posed as `j` (neutral(), joints()): the legs on the hip and knee
+## channels, and the arms on `arm_channel` (Rig.AIM for a gun held in both hands) about the
+## shoulders' midpoint, or not rigged at 0.
+static func walk_rig(j: Joints, arm_channel: int = 0) -> Rigging:
+	var rigging := Rigging.new()
+	for s: int in 2:
+		rigging.hips[s] = Rig.part(Rig.HIP_L if s == 0 else Rig.HIP_R, j.hips[s].origin)
+		rigging.knees[s] = Rig.part(Rig.KNEE_L if s == 0 else Rig.KNEE_R, j.knees[s].origin)
+	if arm_channel != 0:
+		rigging.arms = Rig.part(arm_channel, (j.shoulders[0].origin + j.shoulders[1].origin) * 0.5)
+	return rigging
 
 
 ## Mid-stride: walking upright, the left leg reaching forward with its knee bent and its heel coming
@@ -168,9 +214,10 @@ static func seated() -> Pose:
 ## stripe on a ring collar, a broad suit tapering to a belt, orange shoulder pads and chest plate
 ## with a glowing lamp, round-jointed tapered limbs, big gloves and boots, a backpack with a tank.
 ## Without `legs`, the thighs, shins and boots are left out (the legs still set where it sits): a
-## pilot whose legs are hidden in its machine's hull.
+## pilot whose legs are hidden in its machine's hull. With `rigging` (walk_rig) its segments carry
+## their rig stamps.
 static func colonist(m: LowPolyMesh, foot: Vector3, yaw: float, pose: Pose, heads: float = PRIMARY_HEADS,
-		scale: float = 1.0, legs: bool = true) -> void:
+		scale: float = 1.0, legs: bool = true, rigging: Rigging = null) -> void:
 	var b := _colonist_body(heads, scale)
 	var j := _skeleton(b, pose, foot, yaw)
 	var ink := m.ink
@@ -178,22 +225,27 @@ static func colonist(m: LowPolyMesh, foot: Vector3, yaw: float, pose: Pose, head
 	_helmet(m, j.neck, b)
 	_suit_torso(m, j.waist, b)
 	for s: int in 2:
+		_rig_arm(m, rigging)
 		_suit_upper_arm(m, j.shoulders[s], b)
 		_suit_forearm(m, j.elbows[s], b)
 		_glove(m, j.wrists[s], b)
 		if legs:
+			_rig_thigh(m, rigging, s)
 			_suit_thigh(m, j.hips[s], b)
+			_rig_shin(m, rigging, s)
 			_suit_shin(m, j.knees[s], b)
 			_boot(m, j.ankles[s], b)
+		_rig_none(m, rigging)
 	m.ink = ink
 
 
 ## An automaton, the humanoid robot, on the colonist's skeleton: a cream sensor block for a head
 ## with one wide glowing visor slit and a short antenna, a cream chest armoured orange round a
 ## glowing core, gunmetal joint orbs at every joint, hull-mid tapered limbs with pistons along the
-## forearms and shins, gunmetal hands, broad flat foot pads and a dorsal power unit.
+## forearms and shins, gunmetal hands, broad flat foot pads and a dorsal power unit. With `rigging`
+## (walk_rig, on joints(..., true)) its segments carry their rig stamps.
 static func automaton(m: LowPolyMesh, foot: Vector3, yaw: float, pose: Pose, heads: float = PRIMARY_HEADS,
-		scale: float = 1.0) -> void:
+		scale: float = 1.0, rigging: Rigging = null) -> void:
 	var b := _automaton_body(heads, scale)
 	var j := _skeleton(b, pose, foot, yaw)
 	var ink := m.ink
@@ -201,12 +253,16 @@ static func automaton(m: LowPolyMesh, foot: Vector3, yaw: float, pose: Pose, hea
 	_sensor_head(m, j.neck, b)
 	_robot_torso(m, j.waist, b)
 	for s: int in 2:
+		_rig_arm(m, rigging)
 		_robot_upper_arm(m, j.shoulders[s], b)
 		_robot_forearm(m, j.elbows[s], b, SIDES[s])
 		_robot_hand(m, j.wrists[s], b)
+		_rig_thigh(m, rigging, s)
 		_robot_thigh(m, j.hips[s], b)
+		_rig_shin(m, rigging, s)
 		_robot_shin(m, j.knees[s], b, SIDES[s])
 		_foot_pad(m, j.ankles[s], b)
+		_rig_none(m, rigging)
 	m.ink = ink
 
 
@@ -216,6 +272,32 @@ static func automaton(m: LowPolyMesh, foot: Vector3, yaw: float, pose: Pose, hea
 static func joints(foot: Vector3, yaw: float, pose: Pose, heads: float = PRIMARY_HEADS, scale: float = 1.0,
 		robot: bool = false) -> Joints:
 	return _skeleton(_automaton_body(heads, scale) if robot else _colonist_body(heads, scale), pose, foot, yaw)
+
+
+# --- The rig stamps (none without a Rigging) -----------------------------------------
+
+static func _rig_arm(m: LowPolyMesh, rigging: Rigging) -> void:
+	if rigging != null:
+		m.rig = rigging.arms
+		m.rig2 = Vector4.ZERO
+
+
+static func _rig_thigh(m: LowPolyMesh, rigging: Rigging, s: int) -> void:
+	if rigging != null:
+		m.rig = rigging.hips[s]
+		m.rig2 = Vector4.ZERO
+
+
+static func _rig_shin(m: LowPolyMesh, rigging: Rigging, s: int) -> void:
+	if rigging != null:
+		m.rig = rigging.knees[s]
+		m.rig2 = rigging.hips[s]
+
+
+static func _rig_none(m: LowPolyMesh, rigging: Rigging) -> void:
+	if rigging != null:
+		m.rig = Vector4.ZERO
+		m.rig2 = Vector4.ZERO
 
 
 # --- The skeleton ----------------------------------------------------------------
