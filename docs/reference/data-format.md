@@ -80,11 +80,11 @@ An object keyed by building type. Each type:
   "targets": "air",
   "max_count": [0, 0, 0, 2, 4],
   "levels": [
-    { "cost": { "metal": 4000 }, "build_seconds": 60, "requires_cc": 4, "damage": 100,
+    { "cost": { "metal": 4000 }, "build_seconds": 3600, "requires_cc": 4, "damage": 100,
       "range_cells": 3 },
-    { "cost": { "metal": 10000 }, "build_seconds": 180, "requires_cc": 4, "damage": 130,
+    { "cost": { "metal": 10000 }, "build_seconds": 7200, "requires_cc": 4, "damage": 130,
       "range_cells": 3 },
-    { "cost": { "metal": 25000, "antimatter": 20 }, "build_seconds": 360, "requires_cc": 5,
+    { "cost": { "metal": 14000, "antimatter": 11 }, "build_seconds": 12000, "requires_cc": 5,
       "damage": 160, "range_cells": 3 }
   ]
 }
@@ -338,16 +338,22 @@ The curve, which `test_catalog.gd` checks for affordability and for never going 
   level's tier (`art-style.md`, **Tiers**) is set by its `requires_cc`. Every type's final level
   requires Command Center 10, and no count goes down from one Command Center level to the next.
   The Command Center's level k requires k-1.
-- **Costs** rise about ×2.5 per level to Command Center 5 and about ×2.2 per level beyond it,
-  rounded to two significant figures. Collectors and storages cost the other main resource
+- **Costs** were built rising about ×2.5 per level to Command Center 5 and about ×2.2 per level
+  beyond it, rounded to two significant figures; the retune (`docs/plans/retune.md`) then
+  multiplied every level but the Command Center's own by a factor set by its `requires_cc`: ×1 to
+  Command Center 4, ×0.55, ×0.65, ×0.8, ×1.1, ×1.3 and ×1.5 at 5 to 10, rounded to two
+  significant figures again (half to even: 1,850 becomes 1,800, 1,950 becomes 2,000), capped at
+  95% of the storage reachable at that level (itself rounded to two figures) and never below the
+  level before. Collectors and storages cost the other main resource
   (the Extractor and the Siphon crystal, the Harvester and the Vault metal, each silo the other
   silo's resource, the Drone Bay metal); army and defences cost metal plus about a quarter as
   much crystal; traps and walls cost metal. The Command Center costs 1,500 metal to reach
   level 2, rising to 25,000 metal and 10,000 crystal for level 5, then 60,000/25,000,
   150,000/60,000, 350,000/150,000 + 1,000 antimatter, 800,000/350,000 + 3,000 and
-  2,000,000/800,000 + 10,000 (metal/crystal) for levels 6 to 10.
-- **Antimatter, by tier.** It first appears on the levels that require Command Center 5 of
-  army, defence and trap types, and on the Siphon's and the Vault's top levels there: 20 to
+  2,000,000/800,000 + 10,000 (metal/crystal) for levels 6 to 10 (the retune left them).
+- **Antimatter, by tier**, as built (the retune's cost factors above then scaled it with the
+  rest). It first appears on the levels that require Command Center 5 of army, defence and
+  trap types, and on the Siphon's and the Vault's top levels there: 20 to
   300. A type that pays it keeps paying it, at least as much each level. The Siphon and the
   Vault carry it ×2.2 a level, uncapped (up to 2,400 and 3,500 at Command Center 9). Army and
   defence types carry it ×2.2 too, but their Obsidian levels (requiring Command Center 8–9)
@@ -359,13 +365,16 @@ The curve, which `test_catalog.gd` checks for affordability and for never going 
   66,000, 120,000, 240,000, 480,000, 960,000, 2,000,000 and 3,840,000 (the Command Center plus
   its silos); antimatter is 500, 2,100, 4,200, 8,400, 16,800, 33,600 and 67,200 at 4–10 (the
   Command Center plus its vaults). Every price fits the storage at its level's `requires_cc`.
-- **Build times** run from 10–30 s at level 1 of a cheap building to 10–20 min at the levels
-  requiring Command Center 5; the levels requiring Command Center 6, 7, 8, 9 and 10 take 15,
-  20, 25, 30 and 40 min for a 3×3 or bigger building and two thirds of that for a 2×2 one or a
-  trap, never less than the type's level before. The Command Center takes 2, 10, 30, 60, 75,
-  90, 105, 120 and 150 min to reach levels 2 to 10; walls and the Drone Bay are instant.
-- **Production** per hour: Extractor and Harvester 1,800, 3,000, 4,500, 6,500, 9,000, 12,600,
-  17,600, 24,600, 34,400, 48,200; Siphon 20, 40, 70, 105, 160, 240, 360, 540. **Storage**: silos
+- **Build times**: the levels requiring Command Center 1 take 10–20 s; a 3×3 or bigger
+  building's highest level requiring Command Center 2, 3, 4, 5, 6, 7, 8, 9 and 10 takes 15 min,
+  1 h 30, 3 h, 5 h, 8 h, 14 h, 22 h, 30 h and 40 h, each lower level of the type requiring the
+  same Command Center level half the one above it, a 2×2 building or a trap two thirds of that,
+  and never less than the type's level before. The Command Center takes 5 min, 1 h, 4 h, 8 h,
+  14 h, 20 h, 30 h, 48 h and 66 h to reach levels 2 to 10, the longest timer in the game;
+  walls and the Drone Bay are instant.
+- **Production** per hour: Extractor and Harvester 900, 1,000, 1,300, 1,800, 2,600, 3,600, 5,000,
+  6,500, 9,000, 14,000 (at a maxed count, 72% of the reachable storage an hour at Command Center 1,
+  falling to 6% at 7 and 2.5% at 10); Siphon 20, 40, 70, 105, 160, 240, 360, 540. **Storage**: silos
   1,500, 3,500, 7,000, 14,000, 25,000, 50,000, 100,000, 200,000, 420,000, 800,000 (level 9 is
   420,000 rather than a doubled 400,000 so that the Command Center's level 10 fits at 9); Vault
   100, 300, 800, 1,600, 3,200, 6,400, 12,800, 25,600; Command Center 1,000 to 640,000 of each
@@ -375,7 +384,7 @@ The curve, which `test_catalog.gd` checks for affordability and for never going 
 - **Combat fields**: `hp` and `damage` rise with level (beyond Command Center 5
   about ×1.15 and ×1.2 a level); `range_cells` and `fire_ms` are fixed per type and grow with
   tier. Traps have no `hp` or `fire_ms`.
-- **Battle specials**, development values: the Plasma Mortar's shell splashes 1,500 units and
+- **Battle specials**: the Plasma Mortar's shell splashes 1,500 units and
   lands after 1,000 ms, the Orbital Cannon's 2,000 after 2,000 ms; the Shield Generator's pool is
   400, 550, 750, 1,000, 1,350, 1,800, 2,400 and 3,200, recharging a tenth of that a second after
   3,000 ms; the Gravity Well holds for 1,500, 1,750, 2,000, 2,250, 2,500 and 3,000 ms, the EMP
