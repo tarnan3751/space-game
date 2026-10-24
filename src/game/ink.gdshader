@@ -10,8 +10,8 @@ render_mode cull_front, unshaded;
 // 2 / |PROJECTION_MATRIX[1][1]| world units span the viewport (abs, because the Compatibility
 // renderer flips the projection's Y when it draws into a render target). Each part's line is
 // that times its ink factor, which the outline mesh carries in UV.x as the line's thinning,
-// 1 - ink (LowPolyMesh.ink): 0, the full line, but on a figure's parts (Figures.FIGURE_INK), and
-// on any mesh with no UV at all (the terrain's hull). One material, one width uniform; the factor lives in
+// 1 - ink (LowPolyMesh.ink): 0, the full line, but on a figure's parts (Figures.FIGURE_INK and
+// FIGURE_INK_MASS), and on any mesh with no UV at all (the terrain's hull). One material, one width uniform; the factor lives in
 // the vertices, so the selected outline's override keeps it.
 //
 // The push never takes a vertex below the ground (world y = 0) unless it already was, so a

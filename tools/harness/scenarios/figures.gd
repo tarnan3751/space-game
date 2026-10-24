@@ -12,8 +12,8 @@ extends HarnessScenario
 ## GROUND_SLACK, so no foot sinks into it or floats over it) and that each stance figure stands its
 ## height (Figures.COLONIST_HEIGHT, or Figures.AUTOMATON_HEIGHT to the head under its antenna).
 ## It reads the ink factor every outline vertex carries (LowPolyMesh.ink, as 1 - UV.x) back from
-## the outline meshes and checks it: Figures.FIGURE_INK on a figure's, 1.0 on its pad's and the
-## academy's.
+## the outline meshes and checks it: on a figure's, Figures.FIGURE_INK (its limbs and small parts)
+## or Figures.FIGURE_INK_MASS (its big masses), each on some; 1.0 on its pad's and the academy's.
 ## Rendered, the screenshots, each a different frame:
 ## - "row-24": the whole row at camera size 24, the gameplay view: does a figure read as a
 ##   character at the zoom the game is played at?
@@ -94,9 +94,12 @@ func run(main: MainScript) -> void:
 		p.body.box_chamfered(Vector3(PAD_SIDE, PAD_HEIGHT, PAD_SIDE), 0.03, Vector3.ZERO, Parts.CONCRETE_PAD)
 		var node := BuildingModels.instantiate(p)
 		var inks := _outline_inks(node)
-		check(_all_near(inks.slice(0, figure_outline), Figures.FIGURE_INK) and _all_near(inks.slice(figure_outline), 1.0),
-			"%s: its %d outline vertices carry ink %.2f, its pad's %d carry 1.00" % [spec[0], figure_outline, Figures.FIGURE_INK,
-				inks.size() - figure_outline])
+		var figure_inks := inks.slice(0, figure_outline)
+		var thin := _count_near(figure_inks, Figures.FIGURE_INK)
+		var mass := _count_near(figure_inks, Figures.FIGURE_INK_MASS)
+		check(thin > 0 and mass > 0 and thin + mass == figure_outline and _all_near(inks.slice(figure_outline), 1.0),
+			"%s: its %d outline vertices carry ink %.2f (%d) or %.2f (%d), its pad's %d carry 1.00" % [spec[0], figure_outline,
+				Figures.FIGURE_INK, thin, Figures.FIGURE_INK_MASS, mass, inks.size() - figure_outline])
 		node.position = across * (first + SPACING * k)
 		node.rotation.y = deg_to_rad(facing + (STRIDE_TURN - TURN if walking else 0.0))
 		root.add_child(node)
@@ -147,6 +150,15 @@ func _outline_inks(node: Node) -> PackedFloat32Array:
 		for uv: Vector2 in uvs:
 			inks.append(1.0 - uv.x)
 	return inks
+
+
+## How many values in `values` are within 0.001 of `expected`.
+func _count_near(values: PackedFloat32Array, expected: float) -> int:
+	var count := 0
+	for value: float in values:
+		if absf(value - expected) <= 0.001:
+			count += 1
+	return count
 
 
 ## Whether every value in `values` is within 0.001 of `expected`.

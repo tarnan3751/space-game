@@ -23,9 +23,12 @@ extends RefCounted
 ##   rigged build: built in the neutral() pose with a Rigging (walk_rig), its segments carry rig
 ##   channels (Rig, LowPolyMesh.rig) that the shaders turn in battle, the legs walking and the arms
 ##   following their channel. Without one (the study poses, the seated pilot) nothing is rigged.
-## - A figure's ink line is FIGURE_INK of the full width (LowPolyMesh.ink): each builder sets it
-##   for its own parts and puts the mesh's value back after, so a figure in a building's mesh (the
-##   escort troopers) is thin and the rest of that mesh is not.
+## - A figure's ink line is FIGURE_INK of the full width (LowPolyMesh.ink) on its limbs, hands, feet
+##   and small parts, and FIGURE_INK_MASS on its three big masses (the helmet's orb or the
+##   automaton's head block, the torso, the backpack or the power unit), so the figure keeps an
+##   outline at the battle zoom: each builder sets it for its own parts and puts the mesh's value
+##   back after, so a figure in a building's mesh (the escort troopers) is thin and the rest of that
+##   mesh is not.
 
 ## How tall each figure stands at scale 1, and the primary proportion, in head units.
 const COLONIST_HEIGHT := 0.8
@@ -33,8 +36,11 @@ const AUTOMATON_HEIGHT := 0.9
 const PRIMARY_HEADS := 3.5
 
 ## The share of the full ink width a figure is outlined at: about 25 pixels tall at the gameplay
-## zoom, it would drown in the buildings' line.
+## zoom, it would drown in the buildings' line. FIGURE_INK on the limbs, hands, feet and small
+## parts; FIGURE_INK_MASS on the big masses (the helmet's orb, the torso, the backpack), whose line
+## at FIGURE_INK went under a pixel at camera size 24 and left the figure soft.
 const FIGURE_INK := 0.5
+const FIGURE_INK_MASS := 0.75
 
 ## The figure's left (+X, since it faces +Z) and right sides, indexing a Pose's and Joints' pairs.
 const SIDES: Array[float] = [1.0, -1.0]
@@ -434,7 +440,10 @@ static func _helmet(m: LowPolyMesh, xf: Transform3D, b: Body) -> void:
 		Vector2(0, 0.014 * k),
 	]), 12, xf.origin, Parts.HULL_MID_ROUND, _rot(xf))
 	var centre := Vector3(0, b.head * 0.925 - r, 0)
+	var ink := m.ink
+	m.ink = FIGURE_INK_MASS
 	m.orb(r, 16, 6, xf * centre, Parts.HULL_LIGHT_ROUND, _rot(xf))
+	m.ink = ink
 	_shell(m, xf, centre, r * 1.03, r * 0.08, -32.0, 26.0, 38.0, 142.0, VISOR, 2)
 	_shell(m, xf, centre, r * 1.045, r * 0.02, 12.0, 19.0, 62.0, 98.0, VISOR_GLINT, 1)
 	# The stripe: a band round the helmet's X axis, from the nape over the crown to the visor's top.
@@ -449,11 +458,14 @@ static func _helmet(m: LowPolyMesh, xf: Transform3D, b: Body) -> void:
 static func _suit_torso(m: LowPolyMesh, xf: Transform3D, b: Body) -> void:
 	var k := b.k
 	var top := b.neck_y - 0.015 * k
+	var ink := m.ink
+	m.ink = FIGURE_INK_MASS
 	m.lathe(PackedVector2Array([
 		Vector2(0.078 * k, -0.06 * k), Vector2(0.088 * k, -0.015 * k), Vector2(0.078 * k, top * 0.2),
 		Vector2(0.104 * k, top * 0.62), Vector2(0.098 * k, top * 0.86), Vector2(0.07 * k, top * 0.98),
 		Vector2(0, top),
 	]), 12, xf.origin, Parts.HULL_LIGHT_ROUND, _rot(xf))
+	m.ink = ink
 	m.lathe(PackedVector2Array([
 		Vector2(0.088 * k, top * 0.12), Vector2(0.088 * k, top * 0.25), Vector2(0.06 * k, top * 0.27),
 	]), 12, xf.origin, Parts.GUNMETAL, _rot(xf))
@@ -467,6 +479,7 @@ static func _suit_torso(m: LowPolyMesh, xf: Transform3D, b: Body) -> void:
 		m.dome(0.066 * k, 0.056 * k, 12, 2, xf * Vector3(side * b.shoulder_x, b.shoulder_y + 0.008 * k, 0), ARMY_SMALL,
 			_rot(xf, Vector3(0, 0, -side * 28.0)))
 	var pack := Vector3(0, top * 0.36, -0.1 * k)
+	m.ink = FIGURE_INK_MASS
 	m.box_chamfered(Vector3(0.17, 0.21, 0.09) * k, 0.035 * k, xf * pack, Parts.HULL_MID_ROUND, _rot(xf))
 	# The tank: a capsule lying across the top of the pack, its rounded ends orange caps.
 	var length := 0.18 * k
@@ -478,6 +491,7 @@ static func _suit_torso(m: LowPolyMesh, xf: Transform3D, b: Body) -> void:
 	m.lathe(PackedVector2Array([Vector2(tank_radius, cap), Vector2(tank_radius, length - cap)]), 10, tank, Parts.GUNMETAL,
 		along)
 	m.lathe(PackedVector2Array([Vector2(tank_radius, length - cap), Vector2(0, length)]), 10, tank, ARMY_SMALL, along)
+	m.ink = ink
 
 
 ## The upper arm from the shoulder joint `xf`: a puffy tapered sleeve, its top under the shoulder
@@ -539,7 +553,10 @@ static func _sensor_head(m: LowPolyMesh, xf: Transform3D, b: Body) -> void:
 	var base := b.head * 0.14
 	var tall := b.head * 0.925 - base
 	var depth := 0.17 * k
+	var ink := m.ink
+	m.ink = FIGURE_INK_MASS
 	m.box_chamfered(Vector3(0.2 * k, tall, depth), 0.045 * k, xf * Vector3(0, base, 0), Parts.HULL_LIGHT_ROUND, _rot(xf))
+	m.ink = ink
 	var face := depth * 0.5
 	m.box_chamfered(Vector3(0.18 * k, tall * 0.36, 0.03 * k), 0.012 * k, xf * Vector3(0, base + tall * 0.42, face - 0.01 * k),
 		Parts.HULL_DARK, _rot(xf))
@@ -563,10 +580,13 @@ static func _robot_torso(m: LowPolyMesh, xf: Transform3D, b: Body) -> void:
 	m.lathe(PackedVector2Array([
 		Vector2(0.06 * k, 0.0), Vector2(0.064 * k, top * 0.1), Vector2(0.056 * k, top * 0.3),
 	]), 12, xf.origin, Parts.GUNMETAL, _rot(xf))
+	var ink := m.ink
+	m.ink = FIGURE_INK_MASS
 	m.lathe(PackedVector2Array([
 		Vector2(0.07 * k, top * 0.26), Vector2(0.094 * k, top * 0.5), Vector2(0.104 * k, top * 0.76),
 		Vector2(0.096 * k, top * 0.92), Vector2(0.06 * k, top), Vector2(0, top),
 	]), 12, xf.origin, Parts.HULL_LIGHT_ROUND, _rot(xf))
+	m.ink = ink
 	m.lathe(PackedVector2Array([
 		Vector2(0.097 * k, top * 0.46), Vector2(0.109 * k, top * 0.74), Vector2(0.1 * k, top * 0.9),
 		Vector2(0.08 * k, top * 0.9), Vector2(0.09 * k, top * 0.74), Vector2(0.078 * k, top * 0.46),
@@ -577,7 +597,9 @@ static func _robot_torso(m: LowPolyMesh, xf: Transform3D, b: Body) -> void:
 	for side: float in SIDES:
 		m.orb(0.05 * k, 8, 4, xf * Vector3(side * b.shoulder_x, b.shoulder_y, 0), Parts.GUNMETAL, _rot(xf))
 	var unit := Vector3(0, top * 0.4, -0.095 * k)
+	m.ink = FIGURE_INK_MASS
 	m.box_chamfered(Vector3(0.15, 0.19, 0.08) * k, 0.035 * k, xf * unit, Parts.HULL_DARK_ROUND, _rot(xf))
+	m.ink = ink
 	var fan := unit + Vector3(0, 0.1 * k, -0.04 * k)
 	Parts.drum(m, 0.05 * k, 0.025 * k, 0.01 * k, 10, xf * fan, Parts.GUNMETAL, _rot(xf, Vector3(-90, 0, 0)))
 	m.disc(0.034 * k, 10, xf * (fan + Vector3(0, 0, -0.026 * k)), Parts.ESCORT_EYE, _rot(xf, Vector3(-90, 0, 0)))

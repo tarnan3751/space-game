@@ -2,10 +2,11 @@ extends RefCounted
 ## The infantry's models (docs/reference/art-style.md, **Units**): the ranger, the breacher and the
 ## jet trooper, colonists (Figures.colonist), and the brawler, an automaton (Figures.automaton),
 ## each with what it wears and carries built on the figure's joints (Figures.joints), each piece a
-## function of its own taking its joint's transform. What a figure wears and carries is drawn in
-## the figures' thinner ink (Figures.FIGURE_INK), like the figure. The tier repaints the trim, the
-## glows and the brawler's armour (UnitModels.trim, UnitModels.glow, UnitModels.hull); the suits keep
-## the colonist's paint.
+## function of its own taking its joint's transform. What a figure wears and carries is drawn in the
+## figures' thinner ink (Figures.FIGURE_INK), like the figure's limbs, but for the packs on their
+## backs, in the figures' heavier line for their masses (Figures.FIGURE_INK_MASS), as the backpack.
+## The tier repaints the trim, the glows and the brawler's armour (UnitModels.trim, UnitModels.glow,
+## UnitModels.hull); the suits keep the colonist's paint.
 
 ## The ranger's rifle, held at low ready: how far it reaches behind the grip hand and past the
 ## fore hand, the way it points (forward and 30 degrees down, raised level when it aims: Rig.AIM)
@@ -226,8 +227,11 @@ static func _holster(m: LowPolyMesh, hip: Transform3D, k: float, side: float, ti
 ## The ranger's pack on the waist `xf`'s back (the torso `top` high): a shell over the lower part
 ## of the suit's backpack, under its tank, orange to Gold, the tier's hull from Chrome.
 static func _ranger_pack(m: LowPolyMesh, xf: Transform3D, top: float, tier: int) -> void:
+	var ink := m.ink
+	m.ink = Figures.FIGURE_INK_MASS
 	m.box_chamfered(Vector3(0.18, 0.17, 0.1), 0.035, xf * Vector3(0, top * 0.36 - 0.005, -0.1), _gear(tier),
 		UnitModels.euler(xf))
+	m.ink = ink
 
 
 # --- The breacher's ------------------------------------------------------------------------
@@ -288,10 +292,13 @@ static func _charge_pack(m: LowPolyMesh, xf: Transform3D, top: float, k: float) 
 	var pack := Vector3(0, top * 0.1, -0.175 * k)
 	var tall := 0.46 * k
 	var cap := 0.16 * k
+	var ink := m.ink
+	m.ink = Figures.FIGURE_INK_MASS
 	m.box_chamfered(Vector3(0.28 * k, tall - cap, 0.15 * k), 0.045 * k, xf * pack, Parts.HULL_DARK, UnitModels.euler(xf))
 	m.box_chamfered(Vector3(0.29 * k, cap, 0.16 * k), 0.045 * k, xf * (pack + Vector3(0, tall - cap, 0)), HAZARD_YELLOW,
 		UnitModels.euler(xf))
 	m.box(Vector3(0.296, 0.035, 0.166) * k, xf * (pack + Vector3(0, tall - cap * 0.62, 0)), HAZARD_BAND, UnitModels.euler(xf))
+	m.ink = ink
 	m.box_chamfered(Vector3(0.16, 0.05, 0.09) * k, 0.018 * k, xf * (pack + Vector3(0, tall - 0.01 * k, 0)), Parts.GUNMETAL,
 		UnitModels.euler(xf))
 	var mast := pack + Vector3(0.045 * k, tall + 0.035 * k, 0)
@@ -321,7 +328,10 @@ static func _carbine(m: LowPolyMesh, wrist: Transform3D, tier: int) -> void:
 ## the legs, and two orange stub wings out of its sides, swept back.
 static func _jetpack(m: LowPolyMesh, xf: Transform3D, top: float, tier: int) -> void:
 	var pack := Vector3(0, top * 0.22, -0.165)
+	var ink := m.ink
+	m.ink = Figures.FIGURE_INK_MASS
 	m.box_chamfered(Vector3(0.24, 0.25, 0.11), 0.035, xf * pack, _gear(tier), UnitModels.euler(xf))
+	m.ink = ink
 	for side: float in Figures.SIDES:
 		_nozzle(m, xf * Transform3D(Basis.from_euler(Vector3(deg_to_rad(-20), 0, deg_to_rad(side * 14))),
 			pack + Vector3(side * 0.105, 0.01, -0.01)))

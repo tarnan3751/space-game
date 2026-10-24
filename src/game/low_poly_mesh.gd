@@ -24,8 +24,8 @@ extends RefCounted
 ## Surf.NO_OUTLINE's flags, with the face normals averaged by position across the whole mesh, so
 ## the hull the ink shader pushes out along them stays closed at hard edges. Each part's line is
 ## `ink` times the full width, as `ink` was when the part was added: 1.0, the full line, but on
-## the figures' parts (Figures.FIGURE_INK). It goes into the outline's UV as the line's thinning,
-## 1 - ink, so a mesh without UV draws the full line.
+## the figures' parts (Figures.FIGURE_INK and FIGURE_INK_MASS). It goes into the outline's UV as
+## the line's thinning, 1 - ink, so a mesh without UV draws the full line.
 ##
 ## A part added while `spin` is set spins in the shaders (Surf.SPIN): about the vertical line
 ## through spin's xyz, at spin.w radians a second on the animation clock, as Motion.spin turns a
