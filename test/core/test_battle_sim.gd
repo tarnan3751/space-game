@@ -118,6 +118,33 @@ func test_an_ability_left_keeps_a_battle_without_units_going() -> void:
 	assert_eq(sim.result()["abilities_used"], {"burst": 1})
 
 
+func test_a_defence_s_target_is_the_unit_it_fires_on() -> void:
+	# The hunter walks in from out of the turret's range; the turret takes it as its target on its
+	# first shot. The Command Center never fires, and a fallen turret has no target.
+	var setup := Fixtures.battle_setup([["command_center", 0, 18], ["turret", 10, 10]], {"hunter": 1},
+		[Fixtures.deploy(0, "hunter", 10, 17)])
+	var sim := BattleSim.create(Fixtures.battle_catalog(), setup)
+	var twin := BattleSim.create(Fixtures.battle_catalog(), setup)
+	assert_eq(sim.building_target(2), 0)
+	var shot := false
+	var guard := 0
+	while not shot and guard < 400:
+		assert_eq(sim.building_target(2), 0, "no target before its first shot")
+		sim.step()
+		twin.step()
+		guard += 1
+		for i: int in sim.events.count:
+			shot = shot or (sim.events.kind[i] == BattleEvents.SHOT and sim.events.source[i] == 2)
+	assert_true(shot)
+	assert_eq(sim.building_target(2), 1)
+	assert_eq(sim.building_target(1), 0, "the Command Center does not fire")
+	assert_eq(sim.state_hash(), twin.state_hash(), "reading it changes nothing")
+	sim.combat.damage_building(1, 5000)
+	sim.step()
+	assert_true(sim.is_destroyed(2))
+	assert_eq(sim.building_target(2), 0, "a fallen defence has no target")
+
+
 func test_the_result_shape() -> void:
 	var result := BattleSim.run(Fixtures.battle_catalog(), Fixtures.battle_setup([["academy", 10, 10]],
 		{"melee": 2, "drone": 1}, [Fixtures.deploy(0, "melee", 13, 10)]))

@@ -291,6 +291,15 @@ func building_disabled(id: int) -> bool:
 	return combat.is_disabled(layout.index_of(id), tick)
 
 
+## The unit id a defence is aiming at: the one it last chose to fire on, kept until its next shot
+## (BattleCombat.aim), though that unit may have died since; 0 for none, for a building that does
+## not fire, and once it has fallen. Read-only, for the view's turning heads.
+func building_target(id: int) -> int:
+	var b := layout.index_of(id)
+	var u := combat.aim[b]
+	return u + 1 if u >= 0 and layout.destroyed[b] == 0 else 0
+
+
 ## A shield generator's pool; 0 for any other building and once it has fallen.
 func shield_hp(id: int) -> int:
 	return combat.shield_of(layout.index_of(id))
