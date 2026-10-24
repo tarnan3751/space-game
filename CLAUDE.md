@@ -114,7 +114,9 @@ validation and replayable PvP possible later, so treat these as hard rules.
 - `rules.json` (resources with names and colours, build-menu categories, grid, start layout,
   build menu) and `buildings.json` (per type: size, category, hidden, targets, max_count per CC
   level; per level: cost, build_seconds, requires_cc, produces, storage, builders, capacity, hp,
-  damage, range_cells, fire_ms).
+  damage, range_cells, fire_ms) and `units.json` (per unit type: producer and producer_level,
+  class, crew, housing, train_seconds, battle fields; per level: train_cost, research_cost,
+  research_seconds, requires_lab, hp, damage, fire_ms, range_units).
 - The server will load the same files. Change numbers here, not in code.
 - `Catalog` converts JSON numbers to ints on load (Godot parses all JSON numbers as float).
   `test_shipped_data_is_valid` checks the real files.
@@ -122,7 +124,7 @@ validation and replayable PvP possible later, so treat these as hard rules.
 ## Folder layout
 
 ```
-data/            game data shared with the server
+data/            rules.json, buildings.json, units.json: game data shared with the server
 docs/            project_overview.md (scope, status, roadmap, decisions); vision.md (the design the
                  roadmap builds towards); reference/ (one file per area); plans/ (one record per pass)
 scenes/          main.tscn only

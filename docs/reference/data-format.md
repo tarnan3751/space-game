@@ -288,6 +288,38 @@ The curve, which `test_catalog.gd` checks for affordability and for never going 
   about ×1.15 and ×1.2 a level); `range_cells` and `fire_ms` are fixed per type and grow with
   tier. Traps have no `hp` or `fire_ms`.
 
+### The units
+
+Eleven unit types: three colonists on foot from the Cadet Academy, six machines a colonist
+pilots and two autonomous ones. The ids are provisional until the owner has seen the names.
+
+| Unit | Name | Producer, level (CC) | Class | Crew | Housing | Train (s) | Prefers | Levels | Notes |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| `ranger` | Ranger | Cadet Academy 1 (1) | ground | human | 1 | 5 | any | 8 | rifle, range 3.5 cells |
+| `breacher` | Breacher | Cadet Academy 2 (2) | ground | human | 2 | 10 | wall | 8 | ×10 against walls, splash, spent by its attack |
+| `jet_trooper` | Jet Trooper | Cadet Academy 4 (4) | air | human | 2 | 15 | any | 7 | jetpack |
+| `brawler` | Brawler | Fabricator 1 (2) | ground | autonomous | 2 | 8 | any | 8 | melee robot |
+| `dune_runner` | Dune Runner | Fabricator 3 (3) | ground | piloted | 2 | 8 | resource | 7 | fast buggy, ×2 against resource buildings |
+| `skimmer` | Skimmer | Fabricator 6 (6) | air | autonomous | 2 | 12 | defense | 5 | hover drone |
+| `siege_walker` | Siege Walker | Heavy Fabricator 1 (4) | ground | piloted | 6 | 30 | defense | 7 | armoured biped |
+| `hover_tank` | Hover Tank | Heavy Fabricator 3 (5) | ground | piloted | 8 | 45 | any | 6 | range 4.5 cells, splash |
+| `titan` | Titan | Heavy Fabricator 5 (7) | ground | piloted | 25 | 120 | defense | 4 | giant walker, splash |
+| `gunship` | Gunship | Drydock 1 (5) | air | piloted | 10 | 60 | any | 6 | splash |
+| `bomber` | Bomber | Drydock 3 (6) | air | piloted | 6 | 45 | defense | 5 | bombs with a wide splash |
+
+- **Training** costs crystal only, 20 (the Ranger) to 4,000 (the Titan) at level 1, about ×1.35
+  a level; `train_seconds` is the same at every level.
+- **Research** of a level needing lab level L costs about 30% of the crystal a base can store at
+  the Command Center level that lab level needs (2,800 at labs 1 and 2, up to 1,200,000 at lab
+  10), plus 40, 90, 200, 440, 970 and 2,100 antimatter at labs 5 to 10; it takes 30, 60, 120,
+  240, 420, 600, 900, 1,200, 1,500 and 1,800 s at labs 1 to 10. A unit's levels spread its lab
+  levels evenly from its unlock to lab 10, which every final level requires.
+- **Battle fields**: `hp` and `damage` rise about ×1.12 a level; `speed`, `fire_ms`,
+  `range_units` and `splash_units` are fixed per type.
+- `test_catalog.gd` checks that every training and research price fits the storage a base can
+  reach when it unlocks, that one unit of each type fits the Hangars then, that no unit curve
+  goes down, and that every final level requires the top lab level.
+
 **These are development values**, timed in seconds and minutes so a change can be seen in one
 sitting. The retune to production time scales is a later change to `data/` alone.
 

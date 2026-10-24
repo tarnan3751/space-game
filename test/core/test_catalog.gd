@@ -74,6 +74,55 @@ func test_shipped_counts_never_go_down() -> void:
 				"%s max_count goes down at Command Center %d" % [type, cc])
 
 
+func test_shipped_units_fit_what_a_base_can_reach() -> void:
+	# A unit's training and research prices fit the storage a base can have when they unlock,
+	# and one unit fits the housing it can have then. The Command Center level of a unit is
+	# the one its producer level needs; of a research level, the one its lab level needs.
+	var catalog := Catalog.load_default()
+	assert_eq(catalog.load_error, "")
+	assert_false(catalog.unit_types().is_empty())
+	for type: String in catalog.unit_types():
+		var producer_cc := _requires_cc(catalog, catalog.unit_producer(type), catalog.unit_producer_level(type))
+		assert_true(catalog.unit_housing(type) <= _reachable_housing(catalog, producer_cc),
+			"%s's housing fits the Hangars at CC %d" % [type, producer_cc])
+		for level: int in range(1, catalog.unit_max_level(type) + 1):
+			var stats := catalog.unit_level_stats(type, level)
+			var cc := producer_cc
+			if level > 1:
+				cc = maxi(cc, _requires_cc(catalog, catalog.research_type, int(stats["requires_lab"])))
+			for field: String in ["train_cost", "research_cost"]:
+				var cost: Dictionary = stats.get(field, {})
+				for res: Variant in cost:
+					var reachable := _reachable_storage(catalog, str(res), cc)
+					assert_true(int(cost[res]) <= reachable, "%s level %d %s is %d %s; storage at CC %d is %d" % [
+						type, level, field, int(cost[res]), res, cc, reachable])
+
+
+func test_shipped_unit_curves_never_go_down() -> void:
+	var catalog := Catalog.load_default()
+	assert_eq(catalog.load_error, "")
+	for type: String in catalog.unit_types():
+		for level: int in range(2, catalog.unit_max_level(type) + 1):
+			var before := catalog.unit_level_stats(type, level - 1)
+			var after := catalog.unit_level_stats(type, level)
+			for field: String in ["train_cost", "research_cost"]:
+				for res: String in catalog.resources:
+					assert_true(_amount(after, field, res) >= _amount(before, field, res),
+						"%s level %d %s.%s goes down" % [type, level, field, res])
+			for field: String in ["research_seconds", "requires_lab", "hp", "damage"]:
+				assert_true(int(after.get(field, 0)) >= int(before.get(field, 0)),
+					"%s level %d %s goes down" % [type, level, field])
+
+
+func test_shipped_unit_final_levels_require_the_top_lab() -> void:
+	var catalog := Catalog.load_default()
+	assert_eq(catalog.load_error, "")
+	var top := catalog.max_level(catalog.research_type)
+	for type: String in catalog.unit_types():
+		var stats := catalog.unit_level_stats(type, catalog.unit_max_level(type))
+		assert_eq(int(stats.get("requires_lab", 0)), top, "%s's final level" % type)
+
+
 func test_json_numbers_become_ints() -> void:
 	var catalog := Fixtures.catalog()
 	assert_eq(catalog.level_stats("extractor", 1)["build_seconds"], 60)
@@ -494,6 +543,22 @@ static func _reachable_storage(catalog: Catalog, res: String, cc: int) -> int:
 				best = maxi(best, _amount(stats, "storage", res))
 		total += catalog.max_count(type, cc) * best
 	return total
+
+
+## The Command Center level a building type's `level` requires.
+static func _requires_cc(catalog: Catalog, type: String, level: int) -> int:
+	return int(catalog.level_stats(type, level).get("requires_cc", 1))
+
+
+## The army housing a base can have at a Command Center level: every allowed housing building at
+## its best allowed level.
+static func _reachable_housing(catalog: Catalog, cc: int) -> int:
+	var best := 0
+	for level: int in range(1, catalog.max_level(catalog.housing_type) + 1):
+		var stats := catalog.level_stats(catalog.housing_type, level)
+		if int(stats.get("requires_cc", 1)) <= cc:
+			best = maxi(best, int(stats.get("capacity", 0)))
+	return catalog.max_count(catalog.housing_type, cc) * best
 
 
 static func _amount(stats: Dictionary, field: String, res: String) -> int:
