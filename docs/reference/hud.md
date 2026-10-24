@@ -3,7 +3,8 @@
 `src/game/hud.gd`: the on-screen UI, a `CanvasLayer` built in code. It reads `BaseState` for
 display and reports presses as signals; it never changes game state. `main.gd` wires the
 signals to `PlacementController` (`input-camera.md`). Two controls of its own draw in code:
-`HudIcon` (`hud_icon.gd`), the vector icons, and `DroneRing` (`drone_ring.gd`), the drones.
+`HudIcon` (`hud_icon.gd`), the vector icons and the unit glyphs, and `DroneRing`
+(`drone_ring.gd`), the drones.
 `ModelPreview` (`model_preview.gd`), a node under it, renders the build cards' pictures.
 
 ## The touch rule
@@ -11,7 +12,7 @@ signals to `PlacementController` (`input-camera.md`). Two controls of its own dr
 `WorldInput` uses `_unhandled_input`, so any `Control` that is not `MOUSE_FILTER_IGNORE`
 swallows every touch over it and the world underneath stops responding. Layout-only containers
 that span empty screen space — the root, the top bar's column and its rows, the place bar's
-row, the build panel's rows — are set to `MOUSE_FILTER_IGNORE`. Panels and buttons keep the
+row, the build panel's rows, the army panel's rows and pages — are set to `MOUSE_FILTER_IGNORE`. Panels and buttons keep the
 default and block, which is what they should do. A new container must be IGNORE unless it is
 meant to block. The meters and the drone ring block too, like the panels: an opaque part of the
 HUD never lets a tap through to select or drag what lies under it. Each meter's root and the
@@ -23,7 +24,9 @@ The build cards are the one exception: they are `MOUSE_FILTER_PASS`, so a drag t
 a card also reaches the `ScrollContainer` and scrolls the strip (with the default `STOP` it
 does not). The build panel's `PanelContainer` behind them is `STOP`, so a touch anywhere on the
 open panel never reaches the world. Each card's content (its stripe, its picture and a
-`VBoxContainer` of labels) is IGNORE, so the button itself is what a touch lands on.
+`VBoxContainer` of labels) is IGNORE, so the button itself is what a touch lands on. The army
+panel's unit cards and queue entries are the same: `PASS` buttons whose content is IGNORE, on a
+`STOP` panel.
 
 ## Theme
 
@@ -54,12 +57,13 @@ the building view's timer label included, wider.
 | Card disabled `CARD_DISABLED` | `2E2B55` | a card or button that cannot be pressed now, a busy drone |
 | Text `TEXT` | `F4F2FF` | names, amounts |
 | Text dim `TEXT_DIM` | `9A95C4` | counts, reasons, the scroll bar's grabber |
-| Accent `ACCENT` | `58E8FF` | the selected tab, Place, free drones |
+| Accent `ACCENT` | `58E8FF` | the selected tab, Place, Train and Research, free drones, the unit glyphs' visors, canopies and eyes |
 | Build gold `GOLD` | `FFC13B`, pressed `E0A52A` | the Build button, the upgrade button |
 | Trough `TROUGH` | `17162A` | the meters' troughs |
-| Warning `WARNING` | `FFB37A` | the info panel's note |
+| Warning `WARNING` | `FFB37A` | the info panel's note, a research card's lab level the lab lacks |
 | Resource colours | `rules.json`, `Catalog.resource_color` | costs, the meters' fills and icons |
 | Category stripes `CATEGORY_STRIPE` | `MaterialKit` roles: resources `ENERGY`, army `ARMY`, defense `DEFENCE`, traps `HAZARD` | the stripe along a card's top; a category not listed takes `ACCENT` |
+| Army accent | `MaterialKit.ARMY`, `FF7F11` | the army meter's fill and figure, the unit glyphs, the stripe along a unit card's top |
 
 **Shapes.** A `StyleBoxFlat` with a flat fill, a 3 px ink border (`BORDER`), round corners
 (12; tabs, the meters and the toast 10) and a flat shadow, the ink at 60 % offset 4 px down
@@ -79,15 +83,17 @@ so its parts — the Build button above all — draw over the panel.
 
 | Part | Where | Contents |
 | --- | --- | --- |
-| Top bar | top, `MARGIN` (16) in, a column across the width | First row, from the left: a meter per resource in catalog order, then the drone ring (**Top bar**). |
+| Top bar | top, `MARGIN` (16) in, a column across the width | First row, from the left: a meter per resource in catalog order, the army meter, then the drone ring (**Top bar**). |
 | Build button | bottom right, `MARGIN` from the safe area's corner, 128×64 | "BUILD" on gold; toggles the build panel (**Build panel**). Hidden while placing or painting. |
 | Build panel | bottom, the screen's full width | Slides up over the bottom of the screen (**Build panel**). |
 | Place bar | bottom centre | A panel holding `Cancel` and `Place` (170×72); `Place` is disabled unless the ghost is valid. While walls are painted it reads `Done` and is always enabled: there is nothing to confirm. |
-| Info panel | bottom centre, 460 wide | Title `"Name   Lv N"` with a `Close` button; detail lines (**Info panel**); the upgrade button; a note under it. |
+| Info panel | bottom centre, 460 wide | Title `"Name   Lv N"` with Train or Research (a finished producer or research building only) and a `Close` button; detail lines (**Info panel**); the upgrade button; a note under it. |
+| Army panel | bottom, the screen's full width | Slides up in the build panel's place: a producer's training or the lab's research (**Army panel**). |
 | Toast | top centre, 96 down | A small panel with a centred line that fades out after 1.8 s over 0.6 s, then hides. |
 | Debug row | debug builds only (`OS.is_debug_build()`): the top bar's second row, right-aligned | Template base, which emits `template_pressed`, then Reset base, which emits `reset_pressed`, 16 apart. On a row of its own so a long top bar never runs under it. |
 
-The place bar and the info panel are anchored to the bottom edge and grow upward
+The army panel is built after the build panel and before the root, outside it like the build
+panel, so the Build button draws over it too. The place bar and the info panel are anchored to the bottom edge and grow upward
 (`_anchor_bottom`).
 
 ## Top bar
@@ -109,6 +115,13 @@ part of the trough right of the icon, in Lilita One 18 px white with a 2 px ink 
 resource's icon (a `HudIcon`, 40×40) sits over the trough's left end like a badge. With the dev
 cheats on (`Hud.cheats`, set by `main.gd`) every meter shows, full, reading `∞` (Lilita One has
 no `∞`; the meters' fallback, the engine's font, draws it, **Theme**).
+
+**Army meter.** Right of the resource meters, a meter like theirs: its icon the army's figure
+and its fill the army accent, filled by `state.housing_used()` over `state.housing_capacity()`
+and reading `"used / capacity"` (`Format.short`). It is hidden while the housing capacity is 0,
+so it appears once a Hangar is finished, as a resource's meter appears once the base can store
+it; the dev cheats leave it as it is. Its glint follows the last resource's by `GLINT_STAGGER`;
+it never flashes.
 
 **The meters move.** The stripes are drawn through `meter.gdshader`, one `ShaderMaterial` per
 meter (its tint, its phase, the fill's width), all on the one animation clock, `anim_time`
@@ -141,7 +154,19 @@ lighter facet and an ink eye at its front. Its parts keep inside a circle of abo
 round the box's centre, so at the ring's 30 px about 2 px lie between the rotors and the
 sectors (on two diagonals the ring's and the icon's own shadows fall there) and they read as
 four rotors round a small body. Any other
-resource gets a plain cut gem. `HudIcon.paint(pen, kind, rect, color)` adds one to a `HudIcon.Pen`.
+resource gets a plain cut gem. **army**, the army meter's, is a figure: a head over a pair of
+rounded shoulders, each with a lighter facet. `HudIcon.paint(pen, kind, rect, color, wing)` adds
+one to a `HudIcon.Pen`.
+
+**Unit glyphs.** The army panel's cards and queue entries show a unit by its crew
+(`catalog.unit_crew`), drawn the same way in the army accent until the unit models exist and
+`ModelPreview` renders them: **human** a space helmet from the front, a dome over two cheek guards
+with a cyan visor across it; **piloted** a cyan cockpit canopy on a hull over a track with three
+wheels; **autonomous** a block head with an ink sensor slit and a cyan eye, an antenna with a cyan
+bulb on top, over a darker shoulder bar. An air unit (`unit_class` `air`, `HudIcon.winged`) adds a
+wing mark at the box's lower right, a swept white wing with its ink outline. `show_icon(kind,
+winged)` swaps a glyph in place, redrawing only when either changed, as a queue entry does when
+the queue moves.
 
 **One draw call each.** The renderer draws every `draw_colored_polygon` and `draw_polyline` on
 its own, so an icon drawn with them would cost a draw call per part. `HudIcon.Pen` builds a whole
@@ -172,11 +197,21 @@ the device's changed (**Safe area**), updates the meters and the drone ring, the
 
 - **placing** (painting included) → the build panel closes, Build hides and the place bar shows;
 - **a building selected** (`selected_id` in `state.buildings`) → the build panel closes and the
-  info panel shows;
+  info panel shows, unless the army panel is open on that building;
 - **otherwise** → neither bar nor panel shows; Build does.
 
-The cards are refreshed only while the build panel is open (and when it opens), and only the
-selected tab's.
+The army panel belongs to the building it opened on: placing, a deselection or the selection of
+another building closes it. The cards are refreshed only while the build panel is open (and when
+it opens), and only the selected tab's. The army panel's content is rebuilt on `BaseState.changed`,
+which the HUD connects to itself from the state `refresh` is given (`_watch`; `main.gd`'s handler,
+connected first, has refreshed by then), and when it opens: the cards, the queue (copied once by
+`queue_of` and kept until the next change) and the research line's words. A `refresh` while it is
+open, the one-second tick's included, only counts down (`_tick_army`): it reads the head's
+`training_status` and `training_seconds_left`, or `research_seconds_left`, none of which copies
+anything, and sets the head's or the research line's text only when the value it shows changed. So
+a tick with no state change copies nothing from the state and builds one short string, the new
+time left, while a countdown runs; a tick that changes the state (production paid, a unit trained)
+emits `changed` and rebuilds.
 
 `refresh_placing(state, selected_id, placing, ghost_ok, painting)` takes `placing_changed`,
 which fires when placement begins or ends and on every move of the ghost
@@ -188,14 +223,16 @@ they catch up on the next state change or tick.
 ## Build panel
 
 **Opening and closing.** Closed at start. The Build button toggles it; opening it over a
-selected building's info panel first emits `close_pressed`, as the panel's Close would, so the
-two never show together. The close button closes it, and so do picking a card, starting
+selected building's info panel, or over the army panel, first emits `close_pressed`, as the info
+panel's Close would, so the two never show together. The close button closes it, and so do picking a card, starting
 placement or painting, and selecting a building in the world (`refresh`). `is_menu_open()` is
 true from the press that opens it until the one that closes it. It slides by a `Tween` on its
 position: up from below the screen's bottom edge over 0.18 s (`MENU_OPEN_SECONDS`, cubic ease
 out), down over 0.14 s (`MENU_CLOSE_SECONDS`, cubic ease in), after which it is hidden so it
 blocks nothing; a new slide kills the one under way. A resize, or a new safe area, while it
-slides open stops the slide and sets it open on the new bottom edge (`apply_safe_area`).
+slides open stops the slide and sets it open on the new bottom edge (`apply_safe_area`). Once up, a panel rests on its anchors, so it stays on
+the bottom edge if its content's height changes; the slide aims at its minimum size, which has
+caught up with its content before its size has (`_slide`, which the army panel shares).
 
 **Shape.** A `PanelContainer` under the `CanvasLayer` itself, outside the root: it spans the
 screen's whole width and reaches its bottom edge, and a `MarginContainer` pads its content into
@@ -274,6 +311,7 @@ constructed), one line each, only when the level has the stat, in this order:
 | Stores 1,500 Metal | `storage`, one line per resource above 0 |
 | Houses 1 drone | `builders` above 0 |
 | Capacity 20 | `capacity` (army) |
+| Army housed 12 / 20 | the Hangar (`catalog.housing_type`): the base's `housing_used()` / `housing_capacity()` |
 | Damage 12   Range 7 | `damage` and `range_cells`; either alone when the level has only one |
 | Fires every 0.8 s | `fire_ms` |
 | Targets ground / air / air and ground | `catalog.targets_of(type)` |
@@ -293,15 +331,64 @@ the top level, else "Upgrade to Lv N   cost   (duration)", disabled with the rea
 note when `state.check_upgrade` fails. Pressing emits `upgrade_pressed`; `Close` emits
 `close_pressed`.
 
+Beside `Close`, a finished producer (a type `catalog.units_of_producer` names, at level 1 or
+more) shows **Train** and the finished research building (`catalog.research_type`) **Research**,
+112×44, cyan with ink text in Bangers 22 like Place. Pressing it opens the army panel on that page
+in the info panel's place (**Army panel**).
+
+## Army panel
+
+Shaped like the build panel and in its place: a `PanelContainer` outside the root, the screen's
+full width at its bottom edge, its content padded into the safe area (`apply_safe_area`), the same
+slide (`_slide`, **Build panel**), and the same column kept clear on the right for the Build
+button. Its height is its content's, with the build panel's (288 at 720p) as the minimum: the
+training page is about 308 at 720p (310 once the queue strip scrolls and shows its bar), the
+research page about 290. A header, the building's `"Name   Lv N"` in Bangers 24 with the close button (48×48,
+"X") at the right, over one of two pages. The panel stops every touch on it; its layout
+containers take none. The close button slides it down and shows the building's info panel again,
+still selected. Hidden while closed.
+
+**Training panel.** A horizontal strip of unit cards (200×140), one per unit the producer's type
+trains, in `units.json` order (`catalog.unit_types()`; a card per unit is built up front and the
+page shows its producer's). A card has the army accent's stripe along its top, the unit's glyph
+(48×48, **Unit glyphs**), its name (Lilita One 20, a 2 px ink outline), a row of its train cost at
+its current level (`unit_level`), each amount in its resource's colour, or "Free", and its train
+time (`Format.duration`, dim), then "Housing N   Housed M" (16 px, dim: the unit's housing and
+`army_count`). A unit the producer's finished level does not train yet (`unit_producer_level`) is
+locked: the card is disabled, its glyph, name and cost at 55 %, its last line "Needs <producer>
+<level>" (15 px, dim). Tapping a card emits `train_pressed(id, unit)`; `main.gd` queues one through
+`PlacementController.train` and toasts the error when it fails.
+
+Under the cards, the **queue strip**, scrolled like the cards: an entry (180×48) per queued unit,
+oldest first (`queue_of`), each a 32 px glyph beside the unit's name (16 px); the head adds its
+state under the name (15 px, dim): its time left, "12s left" (`training_seconds_left`), "Waiting
+for room" (`training_status` `waiting`) or "Paused" (`paused`, its producer upgrading). With no
+queue the strip reads "Nothing in training". Tapping an entry emits
+`cancel_training_pressed(id, unit)`; `main.gd` cancels the newest queued unit of that type
+(`PlacementController.cancel_training`, which need not be the entry tapped) and toasts
+"Refunded". Entries are made as the queue first grows that long and kept; after that a rebuild
+only sets text and swaps glyphs, and nothing is allocated per frame (**Refresh**).
+
+**Research panel.** Under the header a line naming the research running, "Researching Ranger to
+Lv 2: 30s left" (`research_unit`, `research_seconds_left`), or "No research running"; under it a
+strip of cards (200×164), one per unit the base has unlocked (`is_unit_unlocked`), in `units.json`
+order: the glyph, the name, "Level N" (18 px), then the next level's research cost and time, and
+"Needs Lab L" (its `requires_lab`), "Researching" on the unit being researched, or, at the unit's
+top level, "Max level" with no cost. A card whose lab level the lab lacks, or at the top, is shown
+at 55 % with its lab level in the warning colour, but still takes a tap. Tapping a card emits
+`research_pressed(unit)`; `main.gd` starts the research through `PlacementController.research`
+or toasts why not, in `research_error_text` (**Messages**). There is nothing to cancel.
+
 ## Safe area
 
-The root holds every part but the build panel, so their anchors and margins are relative to the
+The root holds every part but the build panel and the army panel, so their anchors and margins are relative to the
 safe area, the part of the screen clear of notches and the home indicator.
 
 `apply_safe_area(inset: Rect2)` lays the root out inside `inset`, a rect in the HUD's own
 coordinates (the viewport's visible rect: 1280×720 on a 16:9 screen under the `canvas_items`
-stretch), by setting its offsets. It pads the build panel's content by the same inset on the
-left, the right and the bottom, and sets the panel's height for the screen's. `_fit_safe_area`
+stretch), by setting its offsets. It pads the build panel's content, and the army panel's, by
+the same inset on the left, the right and the bottom, and sets their height for the screen's.
+`_fit_safe_area`
 fits it to the device in `setup`, on `get_viewport().size_changed`, and on every `refresh` (the
 1 s tick's included), since turning a phone over moves the notch to the other side without a
 resize: `DisplayServer.get_display_safe_area()`, in screen pixels, is clipped to the window
@@ -324,6 +411,9 @@ that inset stays until the device's safe area changes.
 | `close_pressed` | Close; Build, opening the panel over the info panel | `placement.select(0)` |
 | `reset_pressed` | Reset base | `main._reset_base` |
 | `template_pressed` | Template base | `main._template_base` |
+| `train_pressed(id, unit)` | a training card | `main._on_train_pressed`: `placement.train`, an error toasted |
+| `cancel_training_pressed(id, unit)` | a queue entry | `main._on_cancel_training_pressed`: `placement.cancel_training`, "Refunded" or the error toasted |
+| `research_pressed(unit)` | a research card | `main._on_research_pressed`: `placement.research`, an error toasted in `research_error_text` |
 
 ## Queries for the harness
 
@@ -338,6 +428,14 @@ is the top bar's meter for a resource and `resource_fill(res)` its fill, whose p
 `place_button()` is the place bar's `Place` (or `Done`); `drones_panel()` is the `DroneRing`,
 whose `free_count()` and `total_count()` are the counts it shows; `reset_button()` and
 `template_button()` are the debug row's Reset base and Template base (null in a release build).
+The army: `army_meter()`, `army_meter_text()` and `army_fill()` are the army meter, its text and
+its fill; `action_button()` is the info panel's Train or Research; `army_panel()` the army panel,
+`is_training_open()` and `is_research_open()` which page it shows (open or opening),
+`army_close_button()` its close button and `army_title()` its header; `train_card(unit)` and
+`train_card_info(unit)` a training card and its last line; `queue_shown()` the queued units the
+strip shows, `queue_entry(index)` an entry and `queue_head_status()` the head's state;
+`research_card(unit)`, `research_card_lines(unit)` (its level line and its last line) and
+`research_line()` the research page's; `toast_text()` the toast's text while it shows.
 `MENU_OPEN_SECONDS` and `MENU_CLOSE_SECONDS` say how long to wait for a slide.
 
 ## Messages
@@ -355,7 +453,18 @@ is none:
 | `insufficient_resources` | Not enough resources |
 | `busy` | Already under construction |
 | `max_level` | Already at max level |
+| `unknown_unit` | Unknown unit |
+| `not_a_producer` | This building does not train that |
+| `bad_count` | Bad count |
+| `needs_producer_level` | Needs a higher building level |
+| `not_enough_housing` | Not enough room in the Hangars |
+| `not_queued` | Nothing like that is queued |
+| `needs_lab_level` | Needs a higher Research Lab |
 
-`PlacementController.command_failed` is connected to `show_error`; `_reset_base` shows "Base
-reset" and `_template_base` "Template base". Amounts, costs and durations are formatted by
+`research_error_text(code)` is the research panel's: `busy` there means the lab's one research
+slot is taken, "Research already running"; any other code is `error_text(code)`.
+
+`PlacementController.command_failed` is connected to `show_error`; the army's commands return
+their error to `main.gd`, which toasts it (**Army panel**) and "Refunded" on a cancel;
+`_reset_base` shows "Base reset" and `_template_base` "Template base". Amounts, costs and durations are formatted by
 `Format` (`input-camera.md`).
