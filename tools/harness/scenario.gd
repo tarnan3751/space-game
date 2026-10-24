@@ -55,9 +55,34 @@ func screenshot(name: String, may_repeat: bool = false) -> void:
 ## as one PNG (four frames to a row, each 640x360), numbered with the screenshots. The log line
 ## gives the gaps measured, the camera's size and how many frames repeat the one before. Headless
 ## runs log and skip it. A strip is one shot for the guard against repeated frames. `crop` takes
-## the centre half of the window each way, for a close subject.
+## the centre half of the window each way, for a close subject (frame_span's `crop`).
 func strip(name: String, count: int, step_ms: int, crop: bool = false) -> void:
 	await harness.strip(name, count, step_ms, crop)
+
+
+## Sets the camera to `size` with `world_pos` at the screen's centre, so every close-up is framed
+## the same way. A size under the camera's own closest zoom (IsoCamera.MIN_ZOOM_SIZE) is set
+## directly, as no gesture can.
+func frame_world(main: MainScript, size: float, world_pos: Vector3) -> void:
+	var centre := main.get_viewport().get_visible_rect().size * 0.5
+	main.camera.zoom_at(main.camera.size / maxf(size, IsoCamera.MIN_ZOOM_SIZE), centre)
+	main.camera.size = size
+	main.camera.pan(centre, centre - main.camera.unproject_position(world_pos))
+
+
+## Frames `a` and `b` together: the camera centred between them, sized so the tile shows their
+## projected span (the larger of its height and its width over the screen's aspect) plus
+## `margin`, and at least `minimum`, in world units of the view's height; twice that when the
+## strip will crop the centre half of the window (`crop`). Returns the camera size set.
+func frame_span(main: MainScript, a: Vector3, b: Vector3, margin: float, minimum: float, crop: bool = false) -> float:
+	var middle := (a + b) * 0.5
+	frame_world(main, main.camera.size, middle)
+	var screen := main.get_viewport().get_visible_rect().size
+	var span := (main.camera.unproject_position(a) - main.camera.unproject_position(b)).abs() \
+		* main.camera.size / screen.y
+	var size := maxf(minimum, maxf(span.y, span.x / (screen.x / screen.y)) + margin) * (2.0 if crop else 1.0)
+	frame_world(main, size, middle)
+	return size
 
 
 ## Opens the build panel the way the player does: presses the Build button (unless the panel

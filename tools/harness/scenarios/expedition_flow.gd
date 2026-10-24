@@ -199,7 +199,7 @@ func run(main: MainScript) -> void:
 		var building: Dictionary = entry
 		if str(building["type"]) == Catalog.HQ_TYPE:
 			hq = Vector2i(int(building["cell"][0]), int(building["cell"][1])) + Vector2i.ONE * (catalog.size_of(Catalog.HQ_TYPE) / 2)
-	_frame(main, BATTLE_ZOOM, view.field.cell_to_world(hq, 1))
+	frame_world(main, BATTLE_ZOOM, view.field.cell_to_world(hq, 1))
 	while view.sim.tick < BATTLE_TICK and not view.sim.is_over():
 		await frames(1)
 	await screenshot("battle")
@@ -378,7 +378,7 @@ func _shoot_outpost(main: MainScript, view: BattleView, name: String) -> void:
 	for entry: Variant in buildings:
 		var building: Dictionary = entry
 		sum += Vector2i(int(building["cell"][0]), int(building["cell"][1]))
-	_frame(main, BATTLE_ZOOM, view.field.cell_to_world(sum / maxi(1, buildings.size()), 1))
+	frame_world(main, BATTLE_ZOOM, view.field.cell_to_world(sum / maxi(1, buildings.size()), 1))
 	await frames(6)
 	await screenshot(name)
 	view.speed = 1
@@ -438,10 +438,3 @@ func _building_of(node: Node, view: BattleView) -> bool:
 			return true
 		at = at.get_parent()
 	return false
-
-
-## Sets the camera to `size` with `target` at the screen's centre.
-func _frame(main: MainScript, size: float, target: Vector3) -> void:
-	var centre := main.get_viewport().get_visible_rect().size * 0.5
-	main.camera.zoom_at(main.camera.size / size, centre)
-	main.camera.pan(centre, centre - main.camera.unproject_position(target))
