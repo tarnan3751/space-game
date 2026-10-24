@@ -137,7 +137,9 @@ at the game camera's zoom: a strong silhouette, a few big masses, chamfered and 
 ink outlines, a readable accent, and parts pivoted so it can walk. A spacesuit with a visor is
 the natural human of this world; a humanoid robot shares the skeleton with a sensor head and
 visible joints. The study delivers both, rendered for the owner to judge, before any unit model
-is built on them.
+is built on them. It is built and approved (2026-10-24; `docs/reference/art-style.md`,
+**Figures**): the colonist at 3.5 heads and the automaton are the base of every figure, and
+figures carry a thinner ink line than buildings so they stay readable at the gameplay zoom.
 
 ## 5. Progression, time and money
 
