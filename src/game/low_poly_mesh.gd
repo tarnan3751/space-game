@@ -49,6 +49,10 @@ var _inks := PackedFloat32Array()
 ## The share of the full ink width the parts added from now on are outlined at: 1.0, the full
 ## line, but where a caller thins it for its own parts and puts it back after.
 var ink: float = 1.0
+## Flags added to every part added from now on (Surf.flags), as `ink` is kept: none, but where a
+## caller sets Surf.BOB for a hovering unit's whole build, its figures' parts included, and puts
+## it back after.
+var flags: int = 0
 
 
 ## Triangles in the body mesh, both surfaces.
@@ -552,7 +556,7 @@ func _emit(a: Vector3, b: Vector3, c: Vector3, uv_a: Vector2, uv_b: Vector2, uv_
 	_normals.append(normal)
 	_normals.append(normal)
 	_normals.append(normal)
-	var uv2 := Vector2(surf.layer, surf.flags)
+	var uv2 := Vector2(surf.layer, surf.flags | flags)
 	_uv2s.append(uv2)
 	_uv2s.append(uv2)
 	_uv2s.append(uv2)
@@ -563,7 +567,7 @@ func _emit(a: Vector3, b: Vector3, c: Vector3, uv_a: Vector2, uv_b: Vector2, uv_
 	_colors.append(tint)
 	_colors.append(tint)
 	_face_normals.append(normal)
-	_outlined.append(1 if surf.outline and (surf.flags & Surf.NO_OUTLINE) == 0 else 0)
+	_outlined.append(1 if surf.outline and ((surf.flags | flags) & Surf.NO_OUTLINE) == 0 else 0)
 	_hard.append(1 if hard else 0)
 	_inks.append(ink)
 
