@@ -24,7 +24,7 @@ material kit, `LowPolyMesh`, the shaders, the outlines, the view states, the wal
 4. The HUD's signals are wired to the controller (`build_pressed` → `begin_place`,
    `confirm_pressed` → `confirm_place`, `cancel_pressed` → `cancel_place`, `upgrade_pressed` →
    `upgrade_selected`, `close_pressed` → `select(0)`, `reset_pressed` → `_reset_base`,
-   `template_pressed` → `_template_base`); the controller's `selection_changed` refreshes the
+   `template_pressed` → `_template_base`, `practice_pressed` → `_practice_raid`); the controller's `selection_changed` refreshes the
    HUD, `placing_changed` calls `hud.refresh_placing` (`_on_placing_changed`; a ghost move
    updates only the Place button), and `command_failed` shows a toast.
 5. The state is loaded or created (`_load_or_create`) and installed (`_set_state`: disconnects
@@ -47,6 +47,13 @@ another file. The gate's headless boot and the harness pass one, so a tool run n
 the owner's save. Loading parses the JSON, calls `BaseState.from_dict`, then `advance_to(now)`
 for offline progress; an unreadable file starts a new base with a warning. `_reset_base`
 (the debug row's Reset base) creates a new base and saves at once.
+
+**A battle.** `open_battle(setup, practice)` runs a `BattleView` in the base's place: the base's
+`BaseView` and `WorldInput` leave the tree, the HUD is hidden, the camera is bounded to the
+battle's field; on the view's `finished` they come back (`battle-view.md`, **Entering and
+leaving**). `battle` is the view while one runs, else null. The debug row's Practice raid
+(`_practice_raid`) opens `practice_setup()`, the template base raided by the Hangars' army, and
+applies nothing.
 
 **The template base.** `_template_base` (the debug row's Template base, `hud.md`) installs a
 showcase base the same way and saves at once: `TemplateBase.build(catalog, grid, now)`

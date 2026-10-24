@@ -60,8 +60,8 @@ scenario that does not parse ends the run at once with `HARNESS FAIL: <scenario>
 to load` and exit code 1. A watchdog ends a scenario still running 300 seconds after it started
 (the driver's `HARNESS_TIMEOUT_SECONDS`; `--timeout <s>` sets another) with `HARNESS FAIL:
 <scenario>, timed out after N s (last check: <message>)` and exit code 1, so one awaiting a
-signal that never comes cannot hang the run; the longest real run, `model_gallery` rendered,
-takes about half a minute. A runtime error inside `run()` ends the scenario where it happened;
+signal that never comes cannot hang the run; the longest real run, `battle_view`, takes under two
+minutes. A runtime error inside `run()` ends the scenario where it happened;
 Godot logs it as a `SCRIPT ERROR`, which fails the run in `run.sh`.
 
 ## How a run is isolated
@@ -97,10 +97,11 @@ through the game layer as the player would, and read the state through `BaseStat
 |---|---|
 | `main.placement` | `begin_place(type)`, `confirm_place()`, `cancel_place()`, `select(id)`, `upgrade_selected()`, `train(id, unit)`, `cancel_training(id, unit)`, `research(unit)`, `is_placing()`, `is_painting()`, `ghost_is_valid()`, `ghost_cell()`, `selected_id` |
 | `main.world_input` signals | `tapped`, `drag_started`, `dragged`, `drag_ended`, `pinched`, `panned`; emit them to simulate a gesture (`tap_cell` below does) |
-| `main.hud` signals | `build_pressed`, `confirm_pressed`, `cancel_pressed`, `upgrade_pressed`, `close_pressed`, `reset_pressed`, `template_pressed`, `train_pressed`, `cancel_training_pressed`, `research_pressed`; emit them to press a button |
-| `main.hud` queries | `build_button()`, `is_menu_open()`, `build_panel()`, `close_button()`, `tab_button(category)`, `entry_button(type)`, `entry_status(type)`, `entry_preview(type)`, `previews_done()`, `entry_strip()`, `resource_panel(res)`, `resource_fill(res)`, `army_meter()`, `army_meter_text()`, `army_fill()`, `place_button()`, `drones_panel()` (the `DroneRing`: `free_count()`, `total_count()`), `reset_button()`, `template_button()`, `action_button()`, `army_panel()`, `is_training_open()`, `is_research_open()`, `army_close_button()`, `army_title()`, `train_card(unit)`, `train_card_info(unit)`, `queue_shown()`, `queue_entry(index)`, `queue_head_status()`, `research_card(unit)`, `research_card_lines(unit)`, `research_line()`, `toast_text()` (`docs/reference/hud.md`); `apply_safe_area(inset)` to try a notch-like inset |
+| `main.hud` signals | `build_pressed`, `confirm_pressed`, `cancel_pressed`, `upgrade_pressed`, `close_pressed`, `reset_pressed`, `template_pressed`, `practice_pressed`, `train_pressed`, `cancel_training_pressed`, `research_pressed`; emit them to press a button |
+| `main.hud` queries | `build_button()`, `is_menu_open()`, `build_panel()`, `close_button()`, `tab_button(category)`, `entry_button(type)`, `entry_status(type)`, `entry_preview(type)`, `previews_done()`, `entry_strip()`, `resource_panel(res)`, `resource_fill(res)`, `army_meter()`, `army_meter_text()`, `army_fill()`, `place_button()`, `drones_panel()` (the `DroneRing`: `free_count()`, `total_count()`), `reset_button()`, `template_button()`, `practice_button()`, `action_button()`, `army_panel()`, `is_training_open()`, `is_research_open()`, `army_close_button()`, `army_title()`, `train_card(unit)`, `train_card_info(unit)`, `queue_shown()`, `queue_entry(index)`, `queue_head_status()`, `research_card(unit)`, `research_card_lines(unit)`, `research_line()`, `toast_text()` (`docs/reference/hud.md`); `apply_safe_area(inset)` to try a notch-like inset |
 | `main.state` | the `BaseState`: `buildings`, `resources`, `capacity()`, `builders_free()`, `seconds_left(id)`, `check_*` |
 | `main.camera`, `main.base_view` | `IsoCamera` and `BaseView`, for cell and screen mapping |
+| `main.open_battle(setup, practice)`, `main.practice_setup()`, `main.battle` | a battle in the base's place and its `BattleView` while it runs: `sim` (read only), `script_commands(list)`, `deploy(unit, cell)`, `surrender()`, `speed`, `deploy_unit`, `input` (its own `WorldInput`), `field` (its `BaseView`), `units`, `step_ms()`, `slowest_tick()`, `clock()`, `finished` (`docs/reference/battle-view.md`) |
 
 Helpers on `HarnessScenario`:
 
@@ -158,6 +159,24 @@ cleared exactly when the attack took a star (which one it gets is the developmen
 it is logged), and the raid logged with the field's inputs, not its layout; then the first scan
 must start epoch 1 with every field new and the next scan wait. `main.state` is untouched.
 Headless; no screenshots.
+
+`scenarios/battle_view.gd` drives the battle view (`docs/reference/battle-view.md`) on the debug
+build's Practice raid: the Practice raid button with the Hangars empty is refused with its toast;
+then the practice setup on the template base, given the battle scenario's army at its top levels
+and seed 7, is opened through `main.open_battle` (the base's view and input out of the tree, the
+HUD hidden), the army deployed in the battle scenario's three groups, each spread over the deploy
+cells within two of its point and sent live through `script_commands`, but one Ranger deployed by
+a tap through the view's own `WorldInput`. It runs at 1x to tick 200, then at 2x to its end.
+Screenshots: ticks 0 and 200 framed on the first group at camera size 18, tick 1,000 and the end at
+the widest zoom, and the base after it. Rendered only, once the whole army is down, the battle is
+paused (`speed` 0) and measured at the widest zoom in a 1600×900 window, as `template_base`
+measures the base: the draw calls, primitives and render CPU a frame against the same ceilings
+(1,600, 2.1 million, 6 ms), with the slowest frame's process time, the frame rate and the units
+drawn. It checks the sim's step under 5 ms on average and logs its longest and the tick it fell on;
+the result against a headless `BattleSim.run` of the setup with the commands the view sent (equal
+text, hash included); every unit deployed; something fallen; the base back with the toast
+"Practice: nothing applied" and its save as it was but for its clock. About 100 s headless, under
+two minutes rendered.
 
 `scenarios/model_gallery.gd` shows every building model: one `BuildingView` per type and level
 in the catalog, laid out on the grid in rows by category (`"core"`, then

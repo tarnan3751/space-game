@@ -53,7 +53,7 @@ the building view's timer label included, wider.
 | --- | --- | --- |
 | Ink `INK` | `1B1A2E` | every outline, text outlines; `SHADOW` is the ink at 60 %, every flat shadow |
 | Panel `PANEL` | `262348` at 96 % | the build panel, the info panel, the place bar, the toast |
-| Card `CARD` | `3B3670` | cards, unselected tabs, the close button, Cancel, Close, Template base, Reset base |
+| Card `CARD` | `3B3670` | cards, unselected tabs, the close button, Cancel, Close, Practice raid, Template base, Reset base |
 | Card disabled `CARD_DISABLED` | `2E2B55` | a card or button that cannot be pressed now, a busy drone |
 | Text `TEXT` | `F4F2FF` | names, amounts |
 | Text dim `TEXT_DIM` | `9A95C4` | counts, reasons, the scroll bar's grabber |
@@ -90,7 +90,7 @@ so its parts — the Build button above all — draw over the panel.
 | Info panel | bottom centre, 460 wide | Title `"Name   Lv N"` with Train or Research (a finished producer or research building only) and a `Close` button; detail lines (**Info panel**); the upgrade button; a note under it. |
 | Army panel | bottom, the screen's full width | Slides up in the build panel's place: a producer's training or the lab's research (**Army panel**). |
 | Toast | top centre, 96 down | A small panel with a centred line that fades out after 1.8 s over 0.6 s, then hides. |
-| Debug row | debug builds only (`OS.is_debug_build()`): the top bar's second row, right-aligned | Template base, which emits `template_pressed`, then Reset base, which emits `reset_pressed`, 16 apart. On a row of its own so a long top bar never runs under it. |
+| Debug row | debug builds only (`OS.is_debug_build()`): the top bar's second row, right-aligned | Practice raid, which emits `practice_pressed`, Template base, which emits `template_pressed`, then Reset base, which emits `reset_pressed`, 16 apart. On a row of its own so a long top bar never runs under it. |
 
 The army panel is built after the build panel and before the root, outside it like the build
 panel, so the Build button draws over it too. The place bar and the info panel are anchored to the bottom edge and grow upward
@@ -411,6 +411,7 @@ that inset stays until the device's safe area changes.
 | `close_pressed` | Close; Build, opening the panel over the info panel | `placement.select(0)` |
 | `reset_pressed` | Reset base | `main._reset_base` |
 | `template_pressed` | Template base | `main._template_base` |
+| `practice_pressed` | Practice raid | `main._practice_raid` (`battle-view.md`) |
 | `train_pressed(id, unit)` | a training card | `main._on_train_pressed`: `placement.train`, an error toasted |
 | `cancel_training_pressed(id, unit)` | a queue entry | `main._on_cancel_training_pressed`: `placement.cancel_training`, "Refunded" or the error toasted |
 | `research_pressed(unit)` | a research card | `main._on_research_pressed`: `placement.research`, an error toasted in `research_error_text` |
@@ -427,7 +428,8 @@ gone through); `entry_strip()` the `ScrollContainer` the cards scroll in; `resou
 is the top bar's meter for a resource and `resource_fill(res)` its fill, whose parent is the track it grows across;
 `place_button()` is the place bar's `Place` (or `Done`); `drones_panel()` is the `DroneRing`,
 whose `free_count()` and `total_count()` are the counts it shows; `reset_button()` and
-`template_button()` are the debug row's Reset base and Template base (null in a release build).
+`template_button()` are the debug row's Reset base and Template base, and `practice_button()` its
+Practice raid (null in a release build).
 The army: `army_meter()`, `army_meter_text()` and `army_fill()` are the army meter, its text and
 its fill; `action_button()` is the info panel's Train or Research; `army_panel()` the army panel,
 `is_training_open()` and `is_research_open()` which page it shows (open or opening),
@@ -466,5 +468,6 @@ slot is taken, "Research already running"; any other code is `error_text(code)`.
 
 `PlacementController.command_failed` is connected to `show_error`; the army's commands return
 their error to `main.gd`, which toasts it (**Army panel**) and "Refunded" on a cancel;
-`_reset_base` shows "Base reset" and `_template_base` "Template base". Amounts, costs and durations are formatted by
+`_reset_base` shows "Base reset" and `_template_base` "Template base"; a Practice raid with no
+units "Train some units first", and its end "Practice: nothing applied" (`battle-view.md`). Amounts, costs and durations are formatted by
 `Format` (`input-camera.md`).

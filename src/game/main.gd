@@ -12,6 +12,12 @@ extends Node3D
 ## (Catalog.apply_dev_cheats: every level free and built in one second at most) and the HUD
 ## shows the resources as infinite. A `--no-cheats` user argument keeps the real numbers; the
 ## harness passes it.
+##
+## A battle (BattleView) takes the base's place while it runs: open_battle() takes the base's view
+## and input out of the tree, hides the HUD and adds the battle in their place; when it finishes,
+## the base comes back. Until the sector map exists, the only battle is the debug build's Practice
+## raid (practice_setup): the template base raided by the army in the Hangars, whose result is
+## never applied, so the save and the real base are untouched by it.
 
 const DEFAULT_SAVE_PATH := "user://base.json"
 const SAVE_PATH_ARG := "--save-path="
@@ -30,7 +36,12 @@ var camera: IsoCamera
 var world_input: WorldInput
 var placement: PlacementController
 var hud: Hud
+## The battle running in the base's place; null when there is none.
+var battle: BattleView
 var _ticks: int = 0
+## Where the camera looked at the base, and its zoom, when a battle opened: put back after it.
+var _base_focus: Vector3 = Vector3.ZERO
+var _base_zoom: float = IsoCamera.START_ZOOM_SIZE
 
 
 func _ready() -> void:
@@ -76,6 +87,7 @@ func _ready() -> void:
 	hud.close_pressed.connect(func() -> void: placement.select(0))
 	hud.reset_pressed.connect(_reset_base)
 	hud.template_pressed.connect(_template_base)
+	hud.practice_pressed.connect(_practice_raid)
 	hud.train_pressed.connect(_on_train_pressed)
 	hud.cancel_training_pressed.connect(_on_cancel_training_pressed)
 	hud.research_pressed.connect(_on_research_pressed)
@@ -185,6 +197,77 @@ func _template_base() -> void:
 	_set_state(BaseState.from_dict(catalog, TemplateBase.build(catalog, catalog.grid_size, _now())))
 	_save()
 	hud.show_message("Template base")
+
+
+## Debug builds only: raids the template base (TemplateBase, as the battle scenario builds it) with
+## the army in the Hangars at its researched levels; nothing is applied when it ends.
+func _practice_raid() -> void:
+	var setup := practice_setup()
+	if (setup["attacker"]["army"] as Dictionary).is_empty():
+		hud.show_message("Train some units first")
+		return
+	var error := open_battle(setup, true)
+	if error != "":
+		push_warning("The practice raid was refused: " + error)
+
+
+## A practice raid's setup (docs/reference/battle.md): the template base's buildings and
+## resources defending, the base's army at its levels attacking, a seed from the clock (so each
+## practice stands in a landscape of its own), no commands.
+func practice_setup() -> Dictionary:
+	var template := TemplateBase.build(catalog, catalog.grid_size, _now())
+	var army := {}
+	var levels := {}
+	for unit: String in catalog.unit_types():
+		if state.army_count(unit) > 0:
+			army[unit] = state.army_count(unit)
+			levels[unit] = state.unit_level(unit)
+	return {
+		"seed": _now() & SeededRng.MASK_32,
+		"attacker": {"army": army, "unit_levels": levels, "abilities": {}},
+		"defender": {"buildings": template["buildings"], "resources": template["resources"]},
+		"commands": [],
+	}
+
+
+## Runs the battle of `setup` in the base's place: "" or why the setup was refused. `practice`:
+## its result is not applied (the only battle until the sector map).
+func open_battle(setup: Dictionary, practice: bool) -> String:
+	if battle != null:
+		push_error("A battle is already open")
+		return "a battle is already open"
+	var view := BattleView.new()
+	var error := view.setup(catalog, setup, camera)
+	if error != "":
+		view.free()
+		return error
+	placement.cancel_place()
+	placement.select(0)
+	remove_child(base_view)
+	remove_child(world_input)
+	hud.visible = false
+	battle = view
+	add_child(battle)
+	_base_focus = camera.focus
+	_base_zoom = camera.size
+	camera.setup(battle.area())
+	battle.finished.connect(_on_battle_finished.bind(practice))
+	return ""
+
+
+## The battle ended and was left: the base comes back. A practice applies nothing.
+func _on_battle_finished(_setup: Dictionary, _result: Dictionary, practice: bool) -> void:
+	battle.queue_free()
+	battle = null
+	add_child(base_view)
+	add_child(world_input)
+	camera.setup(base_view.area())
+	camera.size = _base_zoom
+	camera.nudge(_base_focus - camera.focus)
+	hud.visible = true
+	_refresh_hud()
+	if practice:
+		hud.show_message("Practice: nothing applied")
 
 
 func _load_or_create() -> BaseState:

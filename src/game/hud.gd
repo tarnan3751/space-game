@@ -24,6 +24,8 @@ signal upgrade_pressed
 signal close_pressed
 signal reset_pressed
 signal template_pressed
+## Debug builds: a practice raid on the template base.
+signal practice_pressed
 ## A training card: queue one `unit` at producer `id`.
 signal train_pressed(id: int, unit: String)
 ## A queue entry: cancel the newest queued `unit` at producer `id`.
@@ -207,6 +209,7 @@ var _toast_label: Label
 var _toast_tween: Tween
 var _reset_button: Button
 var _template_button: Button
+var _practice_button: Button
 ## The building selected at the last refresh, 0 for none.
 var _selected_id: int = 0
 ## The info panel's Train or Research button, shown for a finished producer or research building.
@@ -519,6 +522,11 @@ func drones_panel() -> DroneRing:
 ## The debug Reset base button; null in a release build.
 func reset_button() -> Button:
 	return _reset_button
+
+
+## The debug Practice raid button; null in a release build.
+func practice_button() -> Button:
+	return _practice_button
 
 
 ## The debug Template base button; null in a release build.
@@ -1607,15 +1615,20 @@ func _build_toast() -> void:
 	_toast.add_child(_toast_label)
 
 
-## Debug builds only: start over without digging through user:// for the save file, or swap
-## the base for the template, every type at its top level (TemplateBase). On a row of its own
-## under the top bar, right-aligned, so a long top bar never runs under it.
+## Debug builds only: start over without digging through user:// for the save file, swap the
+## base for the template, every type at its top level (TemplateBase), or raid the template with
+## the army in the Hangars (Practice raid, main.gd). On a row of its own under the top bar,
+## right-aligned, so a long top bar never runs under it.
 func _build_debug_buttons() -> void:
 	var row := HBoxContainer.new()
 	row.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	row.alignment = BoxContainer.ALIGNMENT_END
 	row.add_theme_constant_override("separation", 16)
 	_top.add_child(row)
+	var practice := _button("Practice raid", Vector2(150, 48), &"DebugButton")
+	practice.pressed.connect(func() -> void: practice_pressed.emit())
+	row.add_child(practice)
+	_practice_button = practice
 	var template := _button("Template base", Vector2(150, 48), &"DebugButton")
 	template.pressed.connect(func() -> void: template_pressed.emit())
 	row.add_child(template)

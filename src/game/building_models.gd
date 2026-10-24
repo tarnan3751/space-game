@@ -40,6 +40,7 @@ const DefenseModels := preload("res://src/game/models/defense.gd")
 const TrapModels := preload("res://src/game/models/traps.gd")
 const WallModels := preload("res://src/game/models/walls.gd")
 const DroneModels := preload("res://src/game/models/drone.gd")
+const RubbleModels := preload("res://src/game/models/rubble.gd")
 
 ## [the footprint size a model is built for, the levels it has models for] per type.
 const MODELS := {
@@ -182,6 +183,31 @@ static func create_scaffold(size: int) -> Node3D:
 	var root := Node3D.new()
 	_add_parts(root, meshes)
 	return root
+
+
+## The heap a building of `size` cells leaves when it falls in battle (models/rubble.gd), built once
+## per size and cached like a model.
+static func create_rubble(size: int) -> Node3D:
+	var key := "rubble/%d" % size
+	var meshes: Meshes = _cache.get(key)
+	if meshes == null:
+		var p := Parts.new()
+		RubbleModels.build_rubble(p, size)
+		meshes = _store(key, p)
+	var root := Node3D.new()
+	_add_parts(root, meshes)
+	return root
+
+
+## The strip a wall leaves when it falls in battle: its body and outline meshes, cached, for a
+## caller that draws every fallen wall from one MultiMesh (BattleView).
+static func wall_rubble() -> Meshes:
+	var meshes: Meshes = _cache.get("rubble/wall")
+	if meshes == null:
+		var p := Parts.new()
+		RubbleModels.build_wall_rubble(p)
+		meshes = _store("rubble/wall", p)
+	return meshes
 
 
 ## The construction drone (ConstructionDrone): its body and its outline, built once and cached

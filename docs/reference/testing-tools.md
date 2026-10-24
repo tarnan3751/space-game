@@ -91,7 +91,9 @@ checks them. `tools/harness/README.md` documents the driver, the clock, the isol
 write a scenario; `scenarios/place_and_build.gd` is the example.
 
 `scenarios/battle.gd` runs a scripted attack on the template base through the battle sim,
-headless, and applies its result to a copy of the base (`battle.md`, **Tools**).
+headless, and applies its result to a copy of the base (`battle.md`, **Tools**);
+`scenarios/battle_view.gd` runs the same attack through the battle view on the Practice raid,
+measures its cost and checks its result against a headless run (`battle-view.md`).
 `scenarios/expedition.gd` lays out the template base's six expedition fields, fights the even
 one with the same army and applies the result with the expedition key, then scans, headless
 (`expeditions.md`).

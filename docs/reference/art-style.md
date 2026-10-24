@@ -22,6 +22,7 @@ camera and the views' wiring are in `input-camera.md`.
 | `src/game/base_view.gd` | builds the ground, the perimeter, the terrain ring, the rocks and the outcrops (**Environment**) |
 | `src/game/building_models.gd`, `src/game/models/` | the dispatcher and one model file per category, `Parts` in `models/parts.gd` |
 | `src/game/construction_drone.gd`, `src/game/models/drone.gd` | the builder drone over a busy site, its flight and its laser (**Construction drone**) |
+| `src/game/models/rubble.gd` | the heap a building leaves when it falls in battle, one per footprint size, and a fallen wall's strip (`battle-view.md`) |
 | `src/game/models/figures.gd` | `Figures`: the colonist and the automaton, posed (**Figures**) |
 | `src/game/unit_models.gd`, `src/game/models/infantry.gd`, `vehicles.gd`, `aircraft.gd` | `UnitModels`: the army's unit models, their dispatcher, tier palette and shared helpers, and their builders (**Units**) |
 | `assets/textures/kit/` | the twenty layers, committed PNGs |
@@ -1452,3 +1453,9 @@ vertex and a fragment, and no draw; a moving part costs two draws (its body and 
 plus the body's shadow draw, and a mesh with HOLO parts one more draw in the transparent pass.
 The finished walls are one merged mesh, a fixed handful of draws however many there are
 (`input-camera.md`, **Walls**).
+
+**A battle** on the maxed base with a full army (the `battle_view` scenario's 167 units, 280
+housing) is held to the same ceilings at the widest zoom: 974 draw calls, 2.00 million primitives
+and 1.6 ms of render CPU a frame on the development Mac, the units in their far versions
+(`battle-view.md`, **Cost**). Every unit of a type is three draws (one MultiMesh for the body, one
+for its outline, the body's shadow), every effect kind one.
