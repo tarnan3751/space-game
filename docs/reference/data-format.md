@@ -146,16 +146,16 @@ An object keyed by unit type; its order is the training menu's order. Each type:
   "class": "ground",
   "crew": "human",
   "housing": 2,
-  "train_seconds": 10,
+  "train_seconds": 60,
   "speed": 2200,
   "prefers": "wall",
   "splash_units": 1500,
   "damage_pct": { "wall": 1000 },
   "self_destruct": true,
   "levels": [
-    { "train_cost": { "crystal": 60 }, "hp": 40, "damage": 30, "fire_ms": 1000, "range_units": 500 },
-    { "train_cost": { "crystal": 81 }, "research_cost": { "crystal": 2800 }, "research_seconds": 60,
-      "requires_lab": 2, "hp": 45, "damage": 34, "fire_ms": 1000, "range_units": 500 }
+    { "train_cost": { "crystal": 36 }, "hp": 34, "damage": 26, "fire_ms": 1000, "range_units": 500 },
+    { "train_cost": { "crystal": 49 }, "research_cost": { "crystal": 2800 }, "research_seconds": 1800,
+      "requires_lab": 2, "hp": 38, "damage": 29, "fire_ms": 1000, "range_units": 500 }
   ]
 }
 ```
@@ -400,27 +400,36 @@ pilots and two autonomous ones. The ids are provisional until the owner has seen
 
 | Unit | Name | Producer, level (CC) | Class | Crew | Housing | Train (s) | Prefers | Levels | Notes |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| `ranger` | Ranger | Cadet Academy 1 (1) | ground | human | 1 | 5 | any | 8 | rifle, range 3.5 cells |
-| `breacher` | Breacher | Cadet Academy 2 (2) | ground | human | 2 | 10 | wall | 8 | ×10 against walls, splash, spent by its attack |
-| `jet_trooper` | Jet Trooper | Cadet Academy 4 (4) | air | human | 2 | 15 | any | 7 | jetpack |
-| `brawler` | Brawler | Fabricator 1 (2) | ground | autonomous | 2 | 8 | any | 8 | melee robot |
-| `dune_runner` | Dune Runner | Fabricator 3 (3) | ground | piloted | 2 | 8 | resource | 7 | fast buggy, ×2 against resource buildings |
-| `skimmer` | Skimmer | Fabricator 6 (6) | air | autonomous | 2 | 12 | defense | 5 | hover drone |
-| `siege_walker` | Siege Walker | Heavy Fabricator 1 (4) | ground | piloted | 6 | 30 | defense | 7 | armoured biped |
-| `hover_tank` | Hover Tank | Heavy Fabricator 3 (5) | ground | piloted | 8 | 45 | any | 6 | range 4.5 cells, splash |
-| `titan` | Titan | Heavy Fabricator 5 (7) | ground | piloted | 25 | 120 | defense | 4 | giant walker, splash |
-| `gunship` | Gunship | Drydock 1 (5) | air | piloted | 10 | 60 | any | 6 | splash |
-| `bomber` | Bomber | Drydock 3 (6) | air | piloted | 6 | 45 | defense | 5 | bombs with a wide splash |
+| `ranger` | Ranger | Cadet Academy 1 (1) | ground | human | 1 | 30 | any | 8 | rifle, range 3.5 cells |
+| `breacher` | Breacher | Cadet Academy 2 (2) | ground | human | 2 | 60 | wall | 8 | ×10 against walls, splash, spent by its attack |
+| `jet_trooper` | Jet Trooper | Cadet Academy 4 (4) | air | human | 2 | 90 | any | 7 | jetpack |
+| `brawler` | Brawler | Fabricator 1 (2) | ground | autonomous | 2 | 48 | any | 8 | melee robot |
+| `dune_runner` | Dune Runner | Fabricator 3 (3) | ground | piloted | 2 | 48 | resource | 7 | fast buggy, ×2 against resource buildings |
+| `skimmer` | Skimmer | Fabricator 6 (6) | air | autonomous | 2 | 72 | defense | 5 | hover drone |
+| `siege_walker` | Siege Walker | Heavy Fabricator 1 (4) | ground | piloted | 6 | 180 | defense | 7 | armoured biped |
+| `hover_tank` | Hover Tank | Heavy Fabricator 3 (5) | ground | piloted | 8 | 270 | any | 6 | range 4.5 cells, splash |
+| `titan` | Titan | Heavy Fabricator 5 (7) | ground | piloted | 25 | 720 | defense | 4 | giant walker, splash |
+| `gunship` | Gunship | Drydock 1 (5) | air | piloted | 10 | 360 | any | 6 | splash |
+| `bomber` | Bomber | Drydock 3 (6) | air | piloted | 6 | 270 | defense | 5 | bombs with a wide splash |
 
-- **Training** costs crystal only, 20 (the Ranger) to 4,000 (the Titan) at level 1, about ×1.35
-  a level; `train_seconds` is the same at every level.
+- **Training** costs crystal only, 12 (the Ranger) to 3,600 (the Titan) at level 1. The prices
+  were built about ×1.35 a level; the retune multiplied each level's by a factor set by the
+  Command Center level the level needs (its lab level's, or its producer level's for level 1):
+  ×0.6 to Command Center 3, ×0.7 at 4–5, ×0.8, ×0.9, ×1.2, ×1.5 and ×1.9 at 6 to 10, never
+  below the level before, so a full army costs 5–8% of the crystal storage of its Command
+  Center level. `train_seconds` is the same at every level: the development values ×6, so the
+  top army takes about 26 minutes on its slowest producer and a Command Center 3 army about 10.
 - **Research** of a level needing lab level L costs about 30% of the crystal a base can store at
   the Command Center level that lab level needs (2,800 at labs 1 and 2, up to 1,200,000 at lab
-  10), plus 40, 90, 200, 440, 970 and 2,100 antimatter at labs 5 to 10; it takes 30, 60, 120,
-  240, 420, 600, 900, 1,200, 1,500 and 1,800 s at labs 1 to 10. A unit's levels spread its lab
+  10), plus 40, 90, 200, 440, 970 and 2,100 antimatter at labs 5 to 10; it takes 15 min, 30
+  min, 1 h, 2 h, 4 h, 6 h, 9 h, 12 h, 18 h and 24 h at labs 1 to 10. A unit's levels spread its lab
   levels evenly from its unlock to lab 10, which every final level requires.
-- **Battle fields**: `hp` and `damage` rise about ×1.12 a level; `speed`, `fire_ms`,
-  `range_units` and `splash_units` are fixed per type.
+- **Battle fields**: `hp` and `damage` were built rising about ×1.12 a level; the retune
+  multiplied them by a factor set by the same Command Center level as training: ×0.85 to 3,
+  ×1.35, ×1.6, ×1.45, ×1.3, ×1.3, ×1.28 and ×1.25 at 4 to 10, each level at least 5% above the
+  one before, so a full army of each Command Center level beats the expedition fields of its
+  level (`docs/plans/retune.md`). `speed`, `fire_ms`, `range_units` and `splash_units` are fixed
+  per type.
 - `test_catalog.gd` checks that every training and research price fits the storage a base can
   reach when it unlocks, that one unit of each type fits the Hangars then, that no unit curve
   goes down, and that every final level requires the top lab level.
