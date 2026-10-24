@@ -32,10 +32,16 @@ signal train_pressed(id: int, unit: String)
 signal cancel_training_pressed(id: int, unit: String)
 ## A research card: research `unit`'s next level.
 signal research_pressed(unit: String)
+## A making card: queue one `ability` at Foundry `id`.
+signal make_pressed(id: int, ability: String)
+## A queue entry on the making page: cancel the newest queued `ability` at Foundry `id`.
+signal cancel_making_pressed(id: int, ability: String)
+## An ability's research card: research `ability`'s next level.
+signal research_ability_pressed(ability: String)
 
-## What the army panel shows: nothing (closed or closing), a producer's training or the lab's
-## research.
-enum ArmyPage { NONE, TRAIN, RESEARCH }
+## What the army panel shows: nothing (closed or closing), a producer's training, the lab's
+## research, or the Foundry's making.
+enum ArmyPage { NONE, TRAIN, RESEARCH, MAKE }
 
 const ERROR_TEXT := {
 	BaseState.ERR_BLOCKED: "That spot is taken",
@@ -55,6 +61,12 @@ const ERROR_TEXT := {
 	BaseState.ERR_BAD_RAID: "That battle does not add up",
 	BaseState.ERR_NOT_ENOUGH_UNITS: "Not enough units for that battle",
 	BaseState.ERR_UNKNOWN_ABILITY: "Unknown ability",
+	BaseState.ERR_SCAN_COOLDOWN: "The scanner is still cooling down",
+	BaseState.ERR_BAD_EXPEDITION: "That expedition does not add up",
+	BaseState.ERR_NOT_ENOUGH_ABILITIES: "Not enough abilities for that battle",
+	BaseState.ERR_NOT_FOUNDRY: "This building does not make that",
+	BaseState.ERR_FOUNDRY_LEVEL: "Needs a higher Nanite Foundry",
+	BaseState.ERR_STOCK_ROOM: "The Foundry's stock is full",
 }
 
 # The UI palette (docs/reference/hud.md, **Theme**).
@@ -138,6 +150,12 @@ const MENU_OPEN_SECONDS := 0.18
 const MENU_CLOSE_SECONDS := 0.14
 ## Pressing the selected tab again scrolls its strip back to the start over this long.
 const STRIP_RETURN_SECONDS := 0.2
+## Each ability effect's glyph colour (HudIcon kinds "swarm", "emp", "strike").
+const ABILITY_COLORS := {
+	"swarm": MaterialKit.NANITE_GREEN,
+	"emp": MaterialKit.ARC_BLUE,
+	"strike": MaterialKit.DEFENCE,
+}
 ## A unit level with no train_cost, shared so a lookup builds none.
 const _NO_COST := {}
 ## The info panel's Train button, beside Close.
@@ -229,6 +247,11 @@ var _army_title: Label
 var _army_close: Button
 var _train_page: Control
 var _train_scroll: ScrollContainer
+## The making page's cards, in the training page's place over the same queue strip.
+var _make_scroll: ScrollContainer
+var _make_cards: Dictionary[String, ArmyCard] = {}
+## The research page's ability cards, after the units'.
+var _research_ability_cards: Dictionary[String, ArmyCard] = {}
 ## One card per unit type, in units.json order; the panel shows its producer's.
 var _train_cards: Dictionary[String, ArmyCard] = {}
 ## The queue strip's entries, made as the queue first grows that long and reused after; the
@@ -560,6 +583,36 @@ func is_training_open() -> bool:
 	return _army_page == ArmyPage.TRAIN
 
 
+## Whether the army panel shows a Foundry's making (open or opening).
+func is_making_open() -> bool:
+	return _army_page == ArmyPage.MAKE
+
+
+## An ability's making card.
+func make_card(ability: String) -> Button:
+	return _make_cards[ability].button
+
+
+## A making card's last line: "In stock N", or why it is locked.
+func make_card_info(ability: String) -> String:
+	return _make_cards[ability].info.text
+
+
+## An ability's research card.
+func research_ability_card(ability: String) -> Button:
+	return _research_ability_cards[ability].button
+
+
+## An ability's research card's level line and last line.
+func research_ability_card_lines(ability: String) -> PackedStringArray:
+	return PackedStringArray([_research_ability_cards[ability].level.text, _research_ability_cards[ability].info.text])
+
+
+## The info panel's lines of stats, one a line.
+func info_detail() -> String:
+	return _info_detail.text
+
+
 ## Whether the army panel shows the research (open or opening).
 func is_research_open() -> bool:
 	return _army_page == ArmyPage.RESEARCH
@@ -713,6 +766,8 @@ func _on_action_pressed() -> void:
 func _page_for(type: String) -> ArmyPage:
 	if _producers.has(type):
 		return ArmyPage.TRAIN
+	if type == _catalog.foundry_type and _catalog.foundry_type != "":
+		return ArmyPage.MAKE
 	return ArmyPage.RESEARCH if type == _catalog.research_type else ArmyPage.NONE
 
 
@@ -721,7 +776,10 @@ func _open_army(page: ArmyPage) -> void:
 		return
 	_army_page = page
 	_army_id = _selected_id
-	_train_page.visible = page == ArmyPage.TRAIN
+	_train_page.visible = page == ArmyPage.TRAIN or page == ArmyPage.MAKE
+	_train_scroll.visible = page == ArmyPage.TRAIN
+	_make_scroll.visible = page == ArmyPage.MAKE
+	_make_scroll.scroll_horizontal = 0
 	_research_page.visible = page == ArmyPage.RESEARCH
 	_info_panel.visible = false
 	_train_scroll.scroll_horizontal = 0
@@ -767,7 +825,7 @@ func _on_state_changed() -> void:
 ## The one-second tick while the panel is open: only the countdown. It calls no query that
 ## copies (queue_of does) and sets text only where the shown value changed.
 func _tick_army(state: BaseState) -> void:
-	if _army_page == ArmyPage.TRAIN:
+	if _army_page == ArmyPage.TRAIN or _army_page == ArmyPage.MAKE:
 		_refresh_head(state)
 	else:
 		_tick_research(state)
@@ -779,6 +837,8 @@ func _refresh_army(state: BaseState) -> void:
 	_army_title.text = "%s   Lv %d" % [_catalog.display_name(building.type), building.level]
 	if _army_page == ArmyPage.TRAIN:
 		_refresh_training(state, building)
+	elif _army_page == ArmyPage.MAKE:
+		_refresh_making(state, building)
 	else:
 		_refresh_research(state)
 	_set_pictures(state)
@@ -787,6 +847,8 @@ func _refresh_army(state: BaseState) -> void:
 ## The shown cards' pictures, each its unit at its researched level's tier (UnitModels.tier_of);
 ## those not rendered yet are asked of the preview, and come in _on_preview_rendered.
 func _set_pictures(state: BaseState) -> void:
+	if _army_page == ArmyPage.MAKE:
+		return
 	var cards := _train_cards if _army_page == ArmyPage.TRAIN else _research_cards
 	var missing := PackedStringArray()
 	for unit: String in cards:
@@ -824,11 +886,31 @@ func _refresh_training(state: BaseState, building: BuildingState) -> void:
 	_refresh_queue(state)
 
 
-## The queue strip: an entry per queued unit, oldest first, the head's with its state. Entries
+## The Foundry's ability cards, then its queue (the training page's strip). A card is locked,
+## disabled and dimmed, until the Foundry's finished level makes the ability.
+func _refresh_making(state: BaseState, building: BuildingState) -> void:
+	for ability: String in _make_cards:
+		var card := _make_cards[ability]
+		var stats := _catalog.ability_level_stats(ability, state.ability_level(ability))
+		_set_card_cost(card, stats.get("make_cost", _NO_COST), _catalog.ability_make_seconds(ability))
+		var needed := _catalog.ability_requires_foundry(ability)
+		var locked := building.level < needed
+		card.button.disabled = locked
+		card.heading.modulate.a = DISABLED_ALPHA if locked else 1.0
+		card.info.theme_type_variation = &"CardReason" if locked else &"CardCount"
+		if locked:
+			card.info.text = "Needs %s %d" % [_catalog.display_name(building.type), needed]
+		else:
+			card.info.text = "In stock %d" % state.stock(ability)
+	_refresh_queue(state)
+
+
+## The queue strip: an entry per queued unit (or ability, on the making page), oldest first, the head's with its state. Entries
 ## are made only as the queue first grows that long; after that a rebuild only sets text.
 func _refresh_queue(state: BaseState) -> void:
 	# A copy, built per call: taken here, on a state change, and kept for the ticks between.
-	_queue_units = state.queue_of(_army_id)
+	var making := _army_page == ArmyPage.MAKE
+	_queue_units = state.making_queue_of(_army_id) if making else state.queue_of(_army_id)
 	while _queue_entries.size() < _queue_units.size():
 		_queue_entries.append(_build_queue_entry(_queue_entries.size()))
 	for i: int in _queue_entries.size():
@@ -837,12 +919,20 @@ func _refresh_queue(state: BaseState) -> void:
 		if not entry.button.visible:
 			continue
 		var unit := _queue_units[i]
-		entry.glyph.show_icon(_catalog.unit_crew(unit), _catalog.unit_class(unit) == "air")
-		entry.title.text = _catalog.unit_name(unit)
+		if making:
+			show_ability_glyph(entry.glyph, _catalog, unit)
+			entry.title.text = _catalog.ability_name(unit)
+		else:
+			if entry.glyph.color != MaterialKit.ARMY:
+				entry.glyph.color = MaterialKit.ARMY
+				entry.glyph.queue_redraw()
+			entry.glyph.show_icon(_catalog.unit_crew(unit), _catalog.unit_class(unit) == "air")
+			entry.title.text = _catalog.unit_name(unit)
 		entry.info.visible = i == 0
 	_head_seconds = -1
 	_refresh_head(state)
 	_queue_empty.visible = _queue_units.is_empty()
+	_queue_empty.text = "Nothing being made" if making else "Nothing in training"
 
 
 ## The head entry's state: its time left, "Waiting for room" or "Paused". The queries it reads
@@ -850,8 +940,9 @@ func _refresh_queue(state: BaseState) -> void:
 func _refresh_head(state: BaseState) -> void:
 	if _queue_units.is_empty():
 		return
-	var status := state.training_status(_army_id)
-	var seconds := state.training_seconds_left(_army_id)
+	var making := _army_page == ArmyPage.MAKE
+	var status := state.making_status(_army_id) if making else state.training_status(_army_id)
+	var seconds := state.making_seconds_left(_army_id) if making else state.training_seconds_left(_army_id)
 	if status == _head_status and seconds == _head_seconds:
 		return
 	_head_status = status
@@ -870,11 +961,16 @@ func _refresh_head(state: BaseState) -> void:
 ## yet, or at the top, is dimmed but still takes a tap, which toasts why.
 func _refresh_research(state: BaseState) -> void:
 	var running := state.research_unit
+	var running_ability := state.research_ability
 	_research_prefix = ""
-	if running == "":
+	if running == "" and running_ability == "":
 		_research_line.text = "No research running"
 	else:
-		_research_prefix = "Researching %s to Lv %d: " % [_catalog.unit_name(running), state.unit_level(running) + 1]
+		if running != "":
+			_research_prefix = "Researching %s to Lv %d: " % [_catalog.unit_name(running), state.unit_level(running) + 1]
+		else:
+			_research_prefix = "Researching %s to Lv %d: " % [_catalog.ability_name(running_ability),
+				state.ability_level(running_ability) + 1]
 		_research_seconds = -1
 		_tick_research(state)
 	for unit: String in _research_cards:
@@ -896,6 +992,29 @@ func _refresh_research(state: BaseState) -> void:
 			var lab := int(stats.get("requires_lab", 1))
 			dim = state.lab_level() < lab
 			card.info.text = "Researching" if unit == running else "Needs Lab %d" % lab
+			card.info.theme_type_variation = &"CardWarning" if dim else &"CardCount"
+		card.heading.modulate.a = DISABLED_ALPHA if dim else 1.0
+	for ability: String in _research_ability_cards:
+		var card := _research_ability_cards[ability]
+		var level := state.ability_level(ability)
+		card.level.text = "Level %d" % level
+		var top := level >= _catalog.ability_max_level(ability)
+		card.cost_row.visible = not top
+		var dim := top
+		if top:
+			card.info.text = "Max level"
+			card.info.theme_type_variation = &"CardCount"
+		else:
+			var stats := _catalog.ability_level_stats(ability, level + 1)
+			_set_card_cost(card, stats.get("research_cost", _NO_COST), int(stats.get("research_seconds", 0)))
+			var lab := int(stats.get("requires_lab", 1))
+			if not state.is_ability_unlocked(ability):
+				dim = true
+				card.info.text = "Needs %s %d" % [_catalog.display_name(_catalog.foundry_type),
+					_catalog.ability_requires_foundry(ability)]
+			else:
+				dim = state.lab_level() < lab
+				card.info.text = "Researching" if ability == running_ability else "Needs Lab %d" % lab
 			card.info.theme_type_variation = &"CardWarning" if dim else &"CardCount"
 		card.heading.modulate.a = DISABLED_ALPHA if dim else 1.0
 
@@ -929,13 +1048,21 @@ func _on_train_card(unit: String) -> void:
 	train_pressed.emit(_army_id, unit)
 
 
+func _on_make_card(ability: String) -> void:
+	make_pressed.emit(_army_id, ability)
+
+
 func _on_research_card(unit: String) -> void:
 	research_pressed.emit(unit)
 
 
 ## An entry cancels the newest queued unit of its type, not necessarily itself.
 func _on_queue_entry(index: int) -> void:
-	if index < _queue_units.size():
+	if index >= _queue_units.size():
+		return
+	if _army_page == ArmyPage.MAKE:
+		cancel_making_pressed.emit(_army_id, _queue_units[index])
+	else:
 		cancel_training_pressed.emit(_army_id, _queue_units[index])
 
 
@@ -1052,6 +1179,8 @@ func _refresh_info(state: BaseState, building: BuildingState) -> void:
 		lines.append("Capacity %s" % _level_stat(stats, next, "capacity"))
 	if type == _catalog.housing_type:
 		lines.append("Army housed %s / %s" % [Format.amount(state.housing_used()), Format.amount(state.housing_capacity())])
+	if type == _catalog.foundry_type:
+		lines.append("Stock %d / %d" % [state.stock_total(), state.foundry_capacity()])
 	var combat := PackedStringArray()
 	if stats.has("damage"):
 		combat.append("Damage %s" % _level_stat(stats, next, "damage"))
@@ -1075,7 +1204,11 @@ func _refresh_info(state: BaseState, building: BuildingState) -> void:
 	# A finished producer trains; a finished research building researches.
 	var page := _page_for(type)
 	_action_button.visible = page != ArmyPage.NONE and building.level >= 1
-	_action_button.text = "Research" if page == ArmyPage.RESEARCH else "Train"
+	_action_button.text = "Train"
+	if page == ArmyPage.RESEARCH:
+		_action_button.text = "Research"
+	elif page == ArmyPage.MAKE:
+		_action_button.text = "Make"
 
 	_upgrade_note.text = ""
 	if building.is_busy():
@@ -1452,6 +1585,13 @@ func _build_army_panel() -> void:
 		card.button.pressed.connect(_on_train_card.bind(unit))
 		cards.add_child(card.button)
 		_train_cards[unit] = card
+	var make_cards := _strip(_train_page, TRAIN_CARD_SIZE.y + 18)
+	_make_scroll = make_cards.get_parent().get_parent() as ScrollContainer
+	for ability: String in _catalog.ability_types():
+		var card := _build_army_card(ability, TRAIN_CARD_SIZE, true)
+		card.button.pressed.connect(_on_make_card.bind(ability))
+		make_cards.add_child(card.button)
+		_make_cards[ability] = card
 	_queue_strip = _strip(_train_page, QUEUE_ENTRY_SIZE.y + 12)
 	_queue_strip.add_theme_constant_override("separation", 8)
 	_queue_empty = _card_label(_queue_strip, "Nothing in training", &"CardCount")
@@ -1475,6 +1615,13 @@ func _build_army_panel() -> void:
 		card.button.pressed.connect(_on_research_card.bind(unit))
 		research_cards.add_child(card.button)
 		_research_cards[unit] = card
+	for ability: String in _catalog.ability_types():
+		var card := _build_army_card(ability, RESEARCH_CARD_SIZE, true)
+		card.level = _card_label(card.heading, "", &"CardCost")
+		card.heading.move_child(card.level, card.title.get_index() + 1)
+		card.button.pressed.connect(func() -> void: research_ability_pressed.emit(ability))
+		research_cards.add_child(card.button)
+		_research_ability_cards[ability] = card
 
 
 ## A horizontal ScrollContainer under `parent`, `height` high (its cards' with room for their
@@ -1502,7 +1649,7 @@ func _strip(parent: Control, height: float) -> HBoxContainer:
 ## _set_pictures, empty until the preview has rendered it), its name and a
 ## row of its cost and time, then the line under them that the refresh fills. PASS, like a build
 ## card, so a drag on it scrolls the strip; its content takes no touch.
-func _build_army_card(unit: String, card_size: Vector2) -> ArmyCard:
+func _build_army_card(unit: String, card_size: Vector2, ability: bool = false) -> ArmyCard:
 	var card := ArmyCard.new()
 	card.button = _button("", card_size)
 	card.button.mouse_filter = Control.MOUSE_FILTER_PASS
@@ -1531,14 +1678,19 @@ func _build_army_card(unit: String, card_size: Vector2) -> ArmyCard:
 	heading.add_theme_constant_override("separation", 0)
 	content.add_child(heading)
 	card.heading = heading
-	card.picture = TextureRect.new()
-	card.picture.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	card.picture.custom_minimum_size = PICTURE_SIZE
-	card.picture.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
-	card.picture.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
-	card.picture.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
-	heading.add_child(card.picture)
-	card.title = _card_label(heading, _catalog.unit_name(unit), &"CardName")
+	if ability:
+		card.glyph = _glyph(heading, "", PICTURE_SIZE)
+		show_ability_glyph(card.glyph, _catalog, unit)
+	else:
+		card.picture = TextureRect.new()
+		card.picture.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		card.picture.custom_minimum_size = PICTURE_SIZE
+		card.picture.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
+		card.picture.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+		card.picture.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+		heading.add_child(card.picture)
+	card.title = _card_label(heading, _catalog.ability_name(unit) if ability else _catalog.unit_name(unit),
+		&"CardName")
 	card.title.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
 	var cost_row := HBoxContainer.new()
 	cost_row.mouse_filter = Control.MOUSE_FILTER_IGNORE
@@ -1605,6 +1757,15 @@ func _glyph(parent: Control, unit: String, glyph_size: Vector2) -> HudIcon:
 		glyph.show_icon(_catalog.unit_crew(unit), _catalog.unit_class(unit) == "air")
 	parent.add_child(glyph)
 	return glyph
+
+
+## Shows `ability`'s glyph on `glyph` (HudIcon): its effect's shape in its effect's colour
+## (ABILITY_COLORS). Shared with the battle's abilities bar (BattleHud).
+static func show_ability_glyph(glyph: HudIcon, catalog: Catalog, ability: String) -> void:
+	var effect := catalog.ability_effect(ability)
+	glyph.color = ABILITY_COLORS.get(effect, MaterialKit.ARMY)
+	glyph.show_icon(effect, false)
+	glyph.queue_redraw()
 
 
 ## Cancel and Place on a panel at the bottom centre.

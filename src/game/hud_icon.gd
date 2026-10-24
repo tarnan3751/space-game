@@ -16,7 +16,8 @@ const EDGE := 2.0
 const SHADOW_OFFSET := Vector2(2, 2)
 
 ## "metal", "crystal", "antimatter", "drones", "army" (the army meter's figure), or a unit's
-## crew, "human", "piloted" or "autonomous"; anything else draws a plain gem.
+## crew, "human", "piloted" or "autonomous", or an ability's effect, "swarm", "emp" or "strike";
+## anything else draws a plain gem.
 var kind: String = ""
 var color: Color = Color.WHITE
 ## A wing mark at the lower right: an air unit.
@@ -61,6 +62,12 @@ static func paint(pen: Pen, icon: String, rect: Rect2, tint: Color, wing: bool =
 				_tracked(pen, tint)
 			"autonomous":
 				_sensor_head(pen, tint)
+			"swarm":
+				_swarm(pen, tint)
+			"emp":
+				_burst(pen, tint)
+			"strike":
+				_strike(pen, tint)
 			_:
 				_gem(pen, tint)
 		if wing:
@@ -218,6 +225,54 @@ static func _rounded_square(centre: Vector2, half: float, radius: float) -> Pack
 		var at := centre + Vector2(signf(cos(angle + PI / 4.0)), signf(sin(angle + PI / 4.0))) * inset
 		points.append_array(_ellipse(at, Vector2(radius, radius), angle, angle + PI / 2.0, 4))
 	return points
+
+
+## The repair swarm: a cluster of seven small round nanites, each with a lighter facet.
+static func _swarm(pen: Pen, tint: Color) -> void:
+	var spots: Array[Vector2] = [Vector2(20, 20), Vector2(11, 15), Vector2(29, 15), Vector2(11, 26),
+		Vector2(29, 26), Vector2(20, 9), Vector2(20, 31)]
+	for k: int in spots.size():
+		var radius := 5.5 if k == 0 else 4.2
+		var dot := _ellipse(spots[k], Vector2(radius, radius), 0.0, TAU, 12)
+		pen.shape(dot, tint)
+		pen.facet(_ellipse(spots[k] - Vector2(1.3, 1.3), Vector2(radius * 0.4, radius * 0.4), 0.0, TAU, 8),
+			tint.lightened(0.55))
+		pen.outline(dot)
+
+
+## The EMP burst: a ring with eight sparks shooting out of it round a bright core.
+static func _burst(pen: Pen, tint: Color) -> void:
+	var centre := Vector2(20, 20)
+	for k: int in 8:
+		var angle := TAU * k / 8.0
+		var along := Vector2(cos(angle), sin(angle))
+		var side := Vector2(-along.y, along.x)
+		var spark := PackedVector2Array([centre + along * 12.0 + side * 2.2, centre + along * 19.0,
+			centre + along * 12.0 - side * 2.2])
+		pen.shape(spark, tint.lightened(0.3))
+		pen.outline(spark)
+	var ring := _ellipse(centre, Vector2(11, 11), 0.0, TAU, 24)
+	pen.shape(ring, tint)
+	pen.outline(ring)
+	var core := _ellipse(centre, Vector2(5.5, 5.5), 0.0, TAU, 16)
+	pen.facet(core, tint.lightened(0.6))
+	pen.outline(core)
+
+
+## The orbital strike: a crosshair ring with its ticks, and a bolt falling into it from the upper
+## right.
+static func _strike(pen: Pen, tint: Color) -> void:
+	var centre := Vector2(18, 23)
+	var ring := _ellipse(centre, Vector2(12, 12), 0.0, TAU, 24)
+	pen.band(ring + PackedVector2Array([ring[0]]), tint)
+	for tick: Vector2 in [Vector2(1, 0), Vector2(-1, 0), Vector2(0, 1), Vector2(0, -1)]:
+		pen.band(PackedVector2Array([centre + tick * 7.0, centre + tick * 16.0]), tint)
+	var bolt := PackedVector2Array([Vector2(36, 2), Vector2(29, 13), Vector2(33, 13), Vector2(21, 24),
+		Vector2(25, 14), Vector2(21, 14), Vector2(28, 2)])
+	pen.shape(bolt, MaterialKit.HAZARD)
+	pen.facet(PackedVector2Array([Vector2(28, 2), Vector2(32, 2), Vector2(26, 11), Vector2(23, 11)]),
+		MaterialKit.HAZARD.lightened(0.5))
+	pen.outline(bolt)
 
 
 ## A cut gem, for a resource with no silhouette of its own.
