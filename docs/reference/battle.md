@@ -284,8 +284,9 @@ not recompute its segment every tick.
 ## Tools
 
 - `tools/harness/scenarios/battle.gd` (headless): a scripted attack of five of the eleven unit
-  types (Rangers, Brawlers, Jet Troopers, Hover Tanks, Gunships; 280 housing) on the template
-  base, logged (duration, destruction, stars, loot, wall time), run twice to check it
-  repeats, and its result applied to a copy of the game's base.
+  types (Rangers, Brawlers, Jet Troopers, Hover Tanks, Gunships; 280 housing) and one Orbital
+  Strike (called at tick 40 on the first defence, which must have lost hull when it lands) on the
+  template base, logged (duration, destruction, stars, loot, wall time), run twice to check it
+  repeats, and its result applied to a copy of the game's base, the units and the strike spent.
 - `tools/sim_battles.gd`: N seeds of a scripted attack against the template base or a save
-  file, one CSV row each (`testing-tools.md`).
+  file, with abilities when `--abilities` names them, one CSV row each (`testing-tools.md`).

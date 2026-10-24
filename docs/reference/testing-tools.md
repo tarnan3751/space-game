@@ -93,10 +93,10 @@ and every scenario runs on the real numbers; `scenarios/dev_cheats.gd` applies t
 checks them. `tools/harness/README.md` documents the driver, the clock, the isolation and how to
 write a scenario; `scenarios/place_and_build.gd` is the example.
 
-`scenarios/battle.gd` runs a scripted attack on the template base through the battle sim,
-headless, and applies its result to a copy of the base (`battle.md`, **Tools**);
-`scenarios/battle_view.gd` runs the same attack through the battle view on the Practice raid,
-measures its cost and checks its result against a headless run (`battle-view.md`).
+`scenarios/battle.gd` runs a scripted attack with an Orbital Strike on the template base through
+the battle sim, headless, and applies its result to a copy of the base (`battle.md`, **Tools**);
+`scenarios/battle_view.gd` runs the same army, without the strike, through the battle view on the
+Practice raid, measures its cost and checks its result against a headless run (`battle-view.md`).
 `scenarios/expedition.gd` lays out the template base's six expedition fields, fights the even
 one with the same army and applies the result with the expedition key, then scans, headless
 (`expeditions.md`).
@@ -112,15 +112,19 @@ touches the static body counted for review.
 
 ```
 $GODOT --headless --path . -s res://tools/sim_battles.gd -- [--seeds=10] \
-    [--army=ranger:100,brawler:40] [--level=3] [--layout=<save.json>] [--out=<file.csv>]
+    [--army=ranger:100,brawler:40] [--level=3] [--abilities=repair_swarm:2,emp_burst:1] \
+    [--layout=<save.json>] [--out=<file.csv>]
 ```
 
 A headless `SceneTree` script, run after an import, for balance (`battle.md`): N seeds of a
 scripted attack on the shipped data against the template base (`TemplateBase`), or the layout
 and resources of a save file, which it only reads. Each seed draws one to four deploy points and
-each unit's deploy tick in the first three seconds from the tool's own `SeededRng`. It writes
-one CSV row a seed (seed, ticks, destruction, stars, loot per resource, units deployed, wall
-time in ms) to `--out` or stdout. The gate does not run it.
+each unit's deploy tick in the first three seconds from the tool's own `SeededRng`; then, for each
+ability `--abilities` names (none by default; at `--level`, clamped), a tick from 3 to 8 seconds
+and a cell: a swarm on one of the deploy points, a burst or a strike on a defence's cell. The
+abilities are drawn after the deploys, so an attack without them is the same as before. It writes
+one CSV row a seed (seed, ticks, destruction, stars, loot per resource, units deployed, abilities
+used, wall time in ms) to `--out` or stdout. The gate does not run it.
 
 ## Outposts: `tools/gen_outposts.gd`
 

@@ -141,12 +141,15 @@ checks that nothing was spent and that one `advance(1)` later the building is fi
 `scenarios/battle.gd` runs the battle sim on the real data (`docs/reference/battle.md`): the
 five of the eleven unit types (100 Rangers, 40 Brawlers, 20 Jet Troopers, 5 Hover Tanks and 2
 Gunships, the Hangars' 280 housing) at their top levels, deployed in three groups on the
-template base (`TemplateBase`), two in the open pockets it leaves inside and one below it, run
+template base (`TemplateBase`), two in the open pockets it leaves inside and one below it, with
+one Orbital Strike at its top level called at tick 40 on the template's first defence (stepped
+to its landing in a second copy, which must show the defence's hull lowered), run
 to the end and logged (battle seconds and ticks,
 destruction, stars, loot, and the wall time of the run, which the scenario reads as the
 performance budget's measure, never the sim); the same setup run again must repeat its result
 and hash, and the result applied with `raid_result` to a copy of the game's base given the
-army must spend the units deployed and bring the loot home up to storage. `main.state` itself
+army and the strike must spend the units deployed and the strike and bring the loot home up to
+storage. `main.state` itself
 is untouched, since no player action leads to a raid yet. Headless; no screenshots.
 
 `scenarios/expedition.gd` runs an expedition on the real data

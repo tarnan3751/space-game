@@ -108,7 +108,7 @@ in one second at most (`Catalog.apply_dev_cheats`; `-- --no-cheats` for the real
 | 2b | The model feedback pass (`docs/plans/model-feedback.md`): the owner's review of every max-level model folded in: no robot above defence buildings, every robot tailored to its building (a security bot, an ore hauler, a collector, a marshaller, welders), one slow lightning crackle, rising smoke, the Command Center's broader base, the academy and fabricator reshaped, the mortar's plasma and the orbital cannon's spire | Built |
 | 3 | Milestone 2, the offline game (`docs/vision.md` §7) — the figures and the army: the humanoid design study (a human in a spacesuit and a humanoid robot, in the comic style, rendered for the owner to approve), then the unit roster in data, training queues, Hangar housing, Research Lab upgrades and unit models | Built: the humanoid study is built (`Figures`, the `figures` harness scenario) and approved at 3.5 heads; the figures' thinner ink line is built (`Figures.FIGURE_INK`); the army is built in core (`docs/reference/core-economy.md`, **The army**): eleven unit types in `data/units.json`, a training queue per producer building, Hangar housing, Research Lab levels, save version 3; the training HUD is built (`docs/reference/hud.md`, **Army panel**: Train and Research from the info panel, unit cards with drawn glyphs, the queue strip, the army meter; the `train_units` harness scenario); the unit models are built (`UnitModels`, one per type, the tier as palette; the `unit_gallery` harness scenario; `docs/reference/art-style.md`, **Units**) |
 | 4 | The battle sim in `src/core/battle/`: fixed-point integer positions (1 cell = 1000 units), fixed tick, pathing round and through walls, targeting, defences, traps, status effects; replay = seed + layouts + deploy commands; byte-identical results tested headless; batch simulations for balance; the result applied to the base (`raid_result`) | Built (`docs/reference/battle.md`): 20 ticks a second, the deploy zone opening as buildings fall, every special and trap, loot by storage, save version 4 keeping the last five raids, the `battle` harness scenario and `tools/sim_battles.gd`; a full battle simulates in 0.15 to 1.6 s headless on the development Mac |
-| 4b | Abilities: `data/abilities.json` (a repair swarm, an EMP burst, an orbital strike), made in the Nanite Foundry as a timed queue with a stock, their effects in the battle sim, spent through `raid_result` | Planned |
+| 4b | Abilities: `data/abilities.json` (a repair swarm, an EMP burst, an orbital strike), made in the Nanite Foundry as a timed queue with a stock, their effects in the battle sim, spent through `raid_result` | Core built (`docs/reference/core-economy.md`, **The Foundry**; `docs/reference/battle.md`, **Abilities**): three abilities of five levels, the Foundry's making queue and its stock capped by its `capacity`, ability levels researched in the lab's one slot, the swarm, the burst and the strike in the sim, the spend through `raid_result`, save version 6, a strike in the `battle` harness scenario and `--abilities` in `tools/sim_battles.gd`. The Foundry's HUD panel and the attack HUD's abilities bar are planned |
 | 5 | The battle view: units moving, projectiles, damage and destruction, the attack HUD; the phone target fixed, and the maxed base and a full battle measured on it | Planned |
 | 6 | Expeditions: the sector map, the outpost generator (the player's roster with a faction tint, loot deposits, hazards), loot into `BaseState` through a new command, re-training; then the real-timer retune (6a). Milestone 2 complete: a game that plays end to end offline | Core built (`docs/reference/expeditions.md`): the sector of six fields (two easy, two even, two hard) derived from a seed, the `scan` command on a cooldown, the outpost generator (walled compound, defences, collectors, deposits and hazards outside the walls, traps; loot sized to the player's capacity), `raid_result` clearing a field with a star, save version 5, the `expedition` harness scenario and `tools/gen_outposts.gd`. The sector map screen and the faction tint are planned |
 | 7 | Milestone 3, the online game — the server: Nakama with accounts, base storage, migration of the local save and command validation; battles verified by replaying them in headless Godot running the same `src/core` | Planned |
@@ -145,7 +145,13 @@ in one second at most (`Catalog.apply_dev_cheats`; `-- --no-cheats` for the real
   and the specials' fields in `data/buildings.json`, and a unit's battle fields in
   `data/units.json`, drive the battle sim (`docs/reference/battle.md`), but no player action
   starts a battle until the battle view (step 5) and expeditions (step 6). `capacity` drives the
-  army's housing on the Hangar and is display-only on the Alliance Beacon.
+  army's housing on the Hangar and the ability stock's cap on the Nanite Foundry, and is
+  display-only on the Alliance Beacon.
+- **Abilities have no HUD yet**: making, the stock and ability research are in core
+  (`docs/reference/core-economy.md`, **The Foundry**) and the sim runs their effects, but no
+  panel queues them, the lab's card shows no ability research, the HUD's error text has none of
+  the Foundry's codes, and no attack carries them (an expedition's setup brings none) until the
+  Foundry panel and the attack HUD's abilities bar.
 - **The army's models are not on screen yet**: the HUD trains, houses and researches it, and its
   cards show drawn glyphs by crew; the unit models (`UnitModels`) are built but shown only by the
   `unit_gallery` harness scenario, each in one static pose, until the cards render them and the
@@ -253,6 +259,24 @@ in one second at most (`Catalog.apply_dev_cheats`; `-- --no-cheats` for the real
   sim has a reference file of its own; the deploy zone (every footprint, walls in, grown by one
   cell) opens as buildings fall, cell by cell, and traps stay out of it, so a deploy on a trap's
   cell is allowed and sets it off.
+
+- **Abilities** (the coordinator under the owner's mandate, 2026-10-24; the step 4b plan;
+  `docs/reference/battle.md`, **Abilities**; `docs/reference/core-economy.md`, **The Foundry**):
+  three abilities in `data/abilities.json`, each with an `effect` (swarm, emp, strike) the sim
+  runs, so it never keys on an id; `rules.army.foundry` names the making building; the Foundry's
+  queue is a `TrainingQueue` reused unchanged, its `units` holding ability ids; the stock is by
+  id and carries no level, capped in total by the Foundry's `capacity` (2 to 6), the queue limit
+  the capacity as housing is the training's; ability research is `{"op": "research", "ability"}`
+  in the lab's one slot, `research_ability` beside `research_unit` sharing `research_done_at`;
+  the repair swarm heals every unit in its radius each tick for its duration; the EMP burst
+  disables every defence whose centre is in its radius, a disabled shield generator neither
+  recharging nor counting its delay while its pool still absorbs; the orbital strike lands after
+  its delay on buildings and walls, hidden ones without revealing them, traps left out, through
+  the shields, and on the attacker's own units too (friendly fire, the comic and tactical
+  choice); effect times are floored to ticks; a battle with no unit standing goes on while an
+  ability is left or a strike is on its way; `raid_result` spends `abilities_used`, which must
+  match the battle's ability commands; save version 6; an expedition's setup brings no abilities
+  until the HUD wiring; the numbers are development values.
 
 - **Expeditions in core** (the coordinator under the owner's mandate, 2026-10-24; the step 6
   core plan; `docs/reference/expeditions.md`): the sector is renewable: six fields from

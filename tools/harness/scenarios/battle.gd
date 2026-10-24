@@ -1,11 +1,11 @@
 extends HarnessScenario
 ## The battle sim on the real data (docs/reference/battle.md): a scripted attack on the debug
 ## build's template base (TemplateBase: every type at its Command Center 10 count and top level,
-## every resource at its cap), run to the end headless, with its duration, destruction, stars and
-## loot logged, then run again to check the result and its hash repeat. The result is applied to
-## a copy of the game's base given the attacking army, never to main.state, since no player
-## action leads to a raid yet: the deployed units must be spent and the loot capped by the copy's
-## storage.
+## every resource at its cap), with one Orbital Strike called on a defence two seconds in, run to
+## the end headless, with its duration, destruction, stars and loot logged, then run again to
+## check the result and its hash repeat. The result is applied to a copy of the game's base given
+## the attacking army and the strike, never to main.state, since no player action leads to a raid
+## yet: the deployed units and the strike must be spent and the loot capped by the copy's storage.
 ##
 ## It also logs the run's wall time, read here in the tool and never in the sim, as the
 ## performance budget's measure: a full battle in well under 2 s on the development Mac.
@@ -14,6 +14,10 @@ extends HarnessScenario
 ## clamped).
 const ARMY := {"ranger": 100, "brawler": 40, "jet_trooper": 20, "hover_tank": 5, "gunship": 2}
 const LEVEL := 8
+## One Orbital Strike at its top level (clamped), called at tick 40 on the first defence.
+const ABILITIES := {"orbital_strike": 1}
+const ABILITY_LEVEL := 5
+const STRIKE_TICK := 40
 
 
 func run(main: MainScript) -> void:
@@ -24,7 +28,8 @@ func run(main: MainScript) -> void:
 		levels[unit] = LEVEL
 	var setup := {
 		"seed": 7,
-		"attacker": {"army": ARMY, "unit_levels": levels, "abilities": {}},
+		"attacker": {"army": ARMY, "unit_levels": levels, "abilities": ABILITIES,
+			"ability_levels": {"orbital_strike": ABILITY_LEVEL}},
 		"defender": {"buildings": template["buildings"], "resources": template["resources"]},
 		"commands": [],
 	}
@@ -50,8 +55,28 @@ func run(main: MainScript) -> void:
 			var cell := points[n % 3]
 			commands.append({"op": "deploy", "tick": (n % 3) * 20, "unit": unit, "cell": [cell.x, cell.y]})
 			n += 1
+	var aim := {}
+	for entry: Dictionary in template["buildings"]:
+		if catalog.battle_class(str(entry["type"])) == Catalog.CLASS_DEFENSE:
+			aim = entry
+			break
+	var aim_cell: Array = aim["cell"]
 	commands.sort_custom(func(a: Dictionary, b: Dictionary) -> bool: return int(a["tick"]) < int(b["tick"]))
+	# Inserted after the sort, which is not stable, so the deploys keep the order they had without it.
+	var at := 0
+	while at < commands.size() and int(commands[at]["tick"]) <= STRIKE_TICK:
+		at += 1
+	commands.insert(at, {"op": "ability", "tick": STRIKE_TICK, "ability": "orbital_strike", "cell": aim_cell})
 	setup["commands"] = commands
+	var landing := STRIKE_TICK + int(catalog.ability_level_stats("orbital_strike", ABILITY_LEVEL)["delay_ms"]) \
+		/ BattleSim.TICK_MS
+	var watch := BattleSim.create(catalog, setup)
+	var aim_id := int(aim["id"])
+	while watch.tick <= landing:
+		watch.step()
+	check(watch.is_destroyed(aim_id) or watch.building_hp(aim_id) < watch.building_max_hp(aim_id),
+		"the strike on %s %d at %s landed at tick %d: %d of %d hull left" % [aim["type"], aim_id, aim_cell,
+			landing, watch.building_hp(aim_id), watch.building_max_hp(aim_id)])
 
 	var started := Time.get_ticks_usec()
 	var result := BattleSim.run(catalog, setup)
@@ -69,10 +94,12 @@ func run(main: MainScript) -> void:
 	check(ms < 2000, "a battle simulates in under 2 s (%d ms)" % ms)
 	var again := BattleSim.run(catalog, setup)
 	check(JSON.stringify(again) == JSON.stringify(result), "the same setup gives the same result, hash %d" % result["hash"])
+	check(result["abilities_used"] == {"orbital_strike": 1}, "the strike is used: %s" % result["abilities_used"])
 
 	var base := BaseState.from_dict(catalog, main.state.to_dict())
 	for unit: String in ARMY:
 		base.army[unit] = int(ARMY[unit])
+	base.ability_stock["orbital_strike"] = 1
 	var battle := setup.duplicate(true)
 	battle["commands"] = result["commands"]
 	var carried := result.duplicate(true)
@@ -86,6 +113,7 @@ func run(main: MainScript) -> void:
 	for unit: String in ARMY:
 		spent = spent and base.army_count(unit) == int(ARMY[unit]) - int(deployed_dict.get(unit, 0))
 	check(spent, "the deployed units are spent")
+	check(base.stock("orbital_strike") == 0, "the strike is spent")
 	var capped := true
 	var loot: Dictionary = result["loot"]
 	for res: String in catalog.resources:
