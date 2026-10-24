@@ -51,6 +51,15 @@ func screenshot(name: String, may_repeat: bool = false) -> void:
 	await harness.screenshot(name, may_repeat)
 
 
+## Saves a strip of `count` consecutive frames of the window, about `step_ms` of real time apart,
+## as one PNG (four frames to a row, each 640x360), numbered with the screenshots. The log line
+## gives the gaps measured, the camera's size and how many frames repeat the one before. Headless
+## runs log and skip it. A strip is one shot for the guard against repeated frames. `crop` takes
+## the centre half of the window each way, for a close subject.
+func strip(name: String, count: int, step_ms: int, crop: bool = false) -> void:
+	await harness.strip(name, count, step_ms, crop)
+
+
 ## Opens the build panel the way the player does: presses the Build button (unless the panel
 ## is already open), waits for the panel to slide up, and checks that it is open.
 func open_build_menu(main: MainScript) -> void:

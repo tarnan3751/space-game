@@ -28,6 +28,12 @@ const SCENARIO_DIR := "res://tools/harness/scenarios"
 const MAIN_SCENE := "res://scenes/main.tscn"
 const CLOCK_LEAD := 1_000_000
 const HARNESS_TIMEOUT_SECONDS := 300
+## A strip's frames: each downscaled to STRIP_FRAME, laid left to right STRIP_COLUMNS to a row.
+const STRIP_FRAME := Vector2i(640, 360)
+const STRIP_COLUMNS := 4
+## How early a strip's frame may be taken, in ms: half a 120 Hz frame, so frame timing's jitter
+## does not push a step to the frame after it.
+const STRIP_EARLY_MS := 4
 const MainScript := preload("res://src/game/main.gd")
 
 var scenario_name: String = ""
@@ -188,5 +194,59 @@ func screenshot(name: String, may_repeat: bool = false) -> void:
 	var error := image.save_png(path)
 	if error == OK:
 		say("screenshot %s (%dx%d)%s" % [file_name, image.get_width(), image.get_height(), marker])
+	else:
+		check(false, "could not save %s: %s" % [path, error_string(error)])
+
+
+## `count` frames of the window about `step_ms` of real time apart, each downscaled to
+## STRIP_FRAME and laid out in reading order, STRIP_COLUMNS to a row, saved as one NN-<name>.png
+## (numbered with the screenshots). Frames are taken as frames arrive, the first at or after
+## step_ms - STRIP_EARLY_MS since the last, so the log line gives the gaps actually measured, the
+## camera's size and how many frames were byte-identical to the one before (a still subject, or a
+## stalled one). `crop` takes the centre half of the window each way instead of the whole of it,
+## twice the pixels on a close subject. The composed PNG is one shot for run.sh's stale-frame
+## guard. Headless runs log and skip it.
+func strip(name: String, count: int, step_ms: int, crop: bool = false) -> void:
+	if count <= 0:
+		check(count > 0, "strip %s has at least one frame (%d)" % [name, count])
+		return
+	_screenshots += 1
+	var file_name := "%02d-%s.png" % [_screenshots, name]
+	if headless:
+		say("strip %s skipped (headless)" % file_name)
+		return
+	await process_frame
+	await process_frame
+	var rows := (count + STRIP_COLUMNS - 1) / STRIP_COLUMNS
+	var sheet: Image = null
+	var previous := PackedByteArray()
+	var identical := 0
+	var gaps := PackedStringArray()
+	var last := 0
+	for i: int in count:
+		if i > 0:
+			await process_frame
+			while Time.get_ticks_usec() - last < (step_ms - STRIP_EARLY_MS) * 1000:
+				await process_frame
+			gaps.append(str((Time.get_ticks_usec() - last) / 1000))
+		last = Time.get_ticks_usec()
+		var frame := root.get_texture().get_image()
+		if crop:
+			frame = frame.get_region(Rect2i(frame.get_size() / 4, frame.get_size() / 2))
+		frame.resize(STRIP_FRAME.x, STRIP_FRAME.y, Image.INTERPOLATE_BILINEAR)
+		if sheet == null:
+			sheet = Image.create(STRIP_FRAME.x * mini(count, STRIP_COLUMNS), STRIP_FRAME.y * rows, false,
+				frame.get_format())
+		var data := frame.get_data()
+		if i > 0 and data == previous:
+			identical += 1
+		previous = data
+		sheet.blit_rect(frame, Rect2i(Vector2i.ZERO, STRIP_FRAME),
+			Vector2i(i % STRIP_COLUMNS, i / STRIP_COLUMNS) * STRIP_FRAME)
+	var path := out_dir.path_join(file_name)
+	var error := sheet.save_png(path)
+	if error == OK:
+		say("strip %s (%d frames, %d ms, %d identical; camera size %.1f%s; gaps %s ms)" % [file_name, count,
+			step_ms, identical, _main.camera.size, ", centre half" if crop else "", " ".join(gaps)])
 	else:
 		check(false, "could not save %s: %s" % [path, error_string(error)])
