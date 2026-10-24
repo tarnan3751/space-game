@@ -351,7 +351,7 @@ line) replaces it, which is how the gate and the harness keep off the real save.
 
 ```json
 {
-  "version": 2,
+  "version": 3,
   "grid": { "width": 48, "height": 48 },
   "now": 1760400000,
   "next_id": 4,
@@ -359,6 +359,12 @@ line) replaces it, which is how the gate and the harness keep off the real save.
   "remainders": { "metal": 0, "crystal": 0, "antimatter": 0 },
   "buildings": [
     { "id": 1, "type": "command_center", "cell": [22, 22], "level": 1, "target_level": 1, "finish_at": 0 }
+  ],
+  "army": { "ranger": 12 },
+  "unit_levels": { "ranger": 2 },
+  "research": { "unit": "brawler", "done_at": 1760400300 },
+  "training": [
+    { "building": 9, "units": ["ranger", "ranger"], "paid_levels": [2, 2], "done_at": 1760400010, "left": 0 }
   ]
 }
 ```
@@ -372,5 +378,13 @@ base.
 `grid` is the field the base was laid out on (`rules.json`'s `grid`), from version 2. A version
 1 save has none: every version 1 save was laid out on the 40×40 field, so `BaseState.from_dict`
 moves its buildings by half the field's growth since (floored at zero), (4, 4) on 48×48, and the
-base stays centred; the next save is version 2. A save with no `version` reads as version 1. A change to this shape keeps old saves loading or bumps `version` with a migration
+base stays centred. A save with no `version` reads as version 1.
+
+`army` (housed units per type), `unit_levels` (each type's level), `research` (the unit being
+researched and when it completes, `{}` when none) and `training` (each producer's queue: the
+units oldest first, the level each was paid for, and the head's `done_at` while it runs or
+`left`, its seconds to go, while it is stopped) are from version 3; a version 1 or 2 save has
+none and loads with no army, every unit at level 1. Units the catalog no longer has, levels
+above a unit's top and queues on a building that is gone or no longer trains the unit are
+dropped or clamped on load (`core-economy.md`). The next save is version 3. A change to this shape keeps old saves loading or bumps `version` with a migration
 (`CLAUDE.md`, **Agent workflow**, tier A).

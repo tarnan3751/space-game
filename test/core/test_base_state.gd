@@ -195,7 +195,7 @@ func test_save_from_before_the_third_resource_loads() -> void:
 	var saved := state.to_dict()
 	assert_eq(saved["resources"], {"metal": 400, "crystal": 300, "antimatter": 0})
 	assert_eq(saved["remainders"], {"metal": 0, "crystal": 1800, "antimatter": 0})
-	assert_eq(saved["version"], 2)
+	assert_eq(saved["version"], 3)
 
 
 func test_version_1_save_is_centred_on_a_grown_field() -> void:
@@ -212,7 +212,7 @@ func test_version_1_save_is_centred_on_a_grown_field() -> void:
 	assert_eq(state.grid.occupant_at(Vector2i(43, 40)), 4)
 	assert_eq(state.grid.occupant_at(Vector2i(39, 36)), 0, "the wall's old cell is free")
 	var saved := state.to_dict()
-	assert_eq(saved["version"], 2)
+	assert_eq(saved["version"], 3)
 	assert_eq(saved["grid"], {"width": 48, "height": 48})
 	assert_eq(saved["now"], 100)
 	assert_eq(saved["next_id"], 5)
@@ -324,6 +324,93 @@ func test_a_base_without_a_command_center_reads_as_level_one() -> void:
 	assert_eq(state.count_of(Catalog.HQ_TYPE), 0)
 	assert_eq(state.cc_level(), 1)
 	assert_eq(state.builders_free(), 1)
+
+
+func test_save_round_trip_with_the_army() -> void:
+	# Mid-way through everything: a queue running, one paused by an upgrade, a research.
+	var state := Fixtures.army_base()
+	state.resources["metal"] = 1000
+	state.apply({"op": "upgrade", "id": CC_ID}, 30)
+	state.advance_to(130)
+	state.apply(_place("lab", 5, 5), 130)
+	state.apply(_place("academy", 8, 9), 160)
+	state.apply({"op": "train", "id": 4, "unit": "grunt", "count": 3}, 160)
+	state.apply({"op": "train", "id": 4, "unit": "flyer"}, 160)
+	state.apply({"op": "train", "id": 6, "unit": "grunt", "count": 2}, 160)
+	state.apply({"op": "research", "unit": "grunt"}, 165)
+	state.apply({"op": "upgrade", "id": 6}, 175)
+	state.advance_to(180)
+	var saved := state.to_dict()
+	assert_eq(saved["version"], BaseState.SAVE_VERSION)
+	assert_eq(saved["army"], {"grunt": 3})
+	assert_eq(saved["research"], {"unit": "grunt", "done_at": 225})
+	assert_eq(saved["training"], [
+		{"building": 4, "units": ["grunt", "flyer"], "paid_levels": [1, 1], "done_at": 190, "left": 0},
+		{"building": 6, "units": ["grunt"], "paid_levels": [1], "done_at": 0, "left": 5},
+	])
+	var json := JSON.stringify(saved)
+	var restored := BaseState.from_dict(Fixtures.catalog(), JSON.parse_string(json))
+	assert_eq(JSON.stringify(restored.to_dict()), json)
+	assert_eq(restored.training_status(6), BaseState.TRAINING_PAUSED)
+	restored.advance_to(400)
+	state.advance_to(400)
+	assert_eq(JSON.stringify(restored.to_dict()), JSON.stringify(state.to_dict()))
+	assert_eq(restored.unit_level("grunt"), 2)
+	assert_eq(restored.army_count("grunt"), 5)
+	assert_eq(restored.army_count("flyer"), 1)
+
+
+func test_saving_leaves_the_unit_order_alone() -> void:
+	var state := Fixtures.army_base()
+	state.apply({"op": "train", "id": 4, "unit": "flyer"}, 30)
+	state.advance_to(50)
+	var saved := state.to_dict()
+	assert_eq(saved["army"], {"flyer": 1})
+	assert_eq(state.catalog.unit_types(), PackedStringArray(["grunt", "flyer", "walker"]), "units.json order")
+	assert_eq(state.catalog.units_of_producer("academy"), PackedStringArray(["grunt", "flyer", "walker"]))
+
+
+func test_saves_before_the_army_load_with_none() -> void:
+	for version: int in [1, 2]:
+		var data := _version_1_save()
+		data["version"] = version
+		var state := BaseState.from_dict(Fixtures.catalog_with_grid(Vector2i(48, 48)), data)
+		assert_eq(state.army, {"grunt": 0, "flyer": 0, "walker": 0}, "version %d" % version)
+		assert_eq(state.unit_levels, {"grunt": 1, "flyer": 1, "walker": 1}, "version %d" % version)
+		assert_eq(state.training.size(), 0)
+		assert_eq(state.research_unit, "")
+		var saved := state.to_dict()
+		assert_eq(saved["version"], 3)
+		assert_eq(saved["army"], {})
+		assert_eq(saved["unit_levels"], {})
+		assert_eq(saved["research"], {})
+		assert_eq(saved["training"], [])
+
+
+func test_load_drops_army_entries_that_no_longer_fit() -> void:
+	var data := Fixtures.army_base().to_dict()
+	data["army"] = {"grunt": 25, "ghost": 3}
+	data["unit_levels"] = {"grunt": 9, "ghost": 2}
+	data["research"] = {"unit": "grunt", "done_at": 99}
+	data["training"] = [
+		{"building": 4, "units": ["ghost", "grunt", "walker"], "paid_levels": [1, 5, 1], "done_at": 35,
+			"left": 0},
+		{"building": 3, "units": ["grunt"], "paid_levels": [1], "done_at": 40, "left": 0},
+		{"building": 77, "units": ["grunt"], "paid_levels": [1], "done_at": 40, "left": 0},
+	]
+	var state := BaseState.from_dict(Fixtures.catalog(), data)
+	assert_eq(state.army, {"grunt": 25, "flyer": 0, "walker": 0}, "an army above the housing is kept")
+	assert_eq(state.unit_level("grunt"), 2, "clamped to the top level")
+	assert_eq(state.research_unit, "", "a unit at its top level is not researched")
+	assert_eq(state.queue_of(4), PackedStringArray(["grunt", "walker"]))
+	assert_eq(state.training[4].paid_levels, PackedInt32Array([2, 1]))
+	assert_eq(state.training_seconds_left(4), 10, "the head was dropped: the next starts afresh")
+	assert_false(state.training.has(3), "the hangar trains nothing")
+	assert_false(state.training.has(77), "the building is gone")
+	assert_eq(state.check_train(4, "grunt"), BaseState.ERR_HOUSING)
+	state.advance_to(1000)
+	assert_eq(state.army_count("grunt"), 25, "waits for room")
+	assert_eq(state.training_status(4), BaseState.TRAINING_WAITING)
 
 
 ## A version 1 save: the fixture's Command Center and drone bay in its corner, an extractor

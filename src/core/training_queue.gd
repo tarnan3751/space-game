@@ -21,3 +21,28 @@ func is_empty() -> bool:
 
 func is_running() -> bool:
 	return done_at > 0
+
+
+func to_dict() -> Dictionary:
+	return {
+		"building": building_id,
+		"units": Array(units),
+		"paid_levels": Array(paid_levels),
+		"done_at": done_at,
+		"left": left,
+	}
+
+
+## Rebuilds a queue from to_dict() output (JSON-parsed data, floats included). BaseState checks
+## what it holds against the base and the catalog.
+static func from_dict(data: Dictionary) -> TrainingQueue:
+	var queue := TrainingQueue.new()
+	queue.building_id = int(data.get("building", 0))
+	var unit_list: Array = data.get("units", [])
+	var level_list: Array = data.get("paid_levels", [])
+	for i: int in unit_list.size():
+		queue.units.append(str(unit_list[i]))
+		queue.paid_levels.append(int(level_list[i]) if i < level_list.size() else 1)
+	queue.done_at = int(data.get("done_at", 0))
+	queue.left = int(data.get("left", 0))
+	return queue

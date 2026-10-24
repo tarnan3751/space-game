@@ -19,7 +19,8 @@ signal changed
 const SECONDS_PER_HOUR := 3600
 ## The save's shape (to_dict). Version 2 records the field it was laid out on; every version 1
 ## save was laid out on V1_FIELD, and from_dict centres it on a field that has grown since.
-const SAVE_VERSION := 2
+## Version 3 adds the army; an older save loads with none.
+const SAVE_VERSION := 3
 const V1_FIELD := Vector2i(40, 40)
 
 const ERR_UNKNOWN_OP := "unknown_op"
@@ -475,6 +476,24 @@ func to_dict() -> Dictionary:
 	for res: String in catalog.resources:
 		resource_data[res] = resources[res]
 		remainder_data[res] = _remainders[res]
+	# Unit types in sorted order, and only what differs from a new base, so the save is canonical.
+	# A copy: the catalog's array shares its buffer, and sorting it would reorder the menu.
+	var unit_types := catalog.unit_types().duplicate()
+	unit_types.sort()
+	var army_data := {}
+	var level_data := {}
+	for unit: String in unit_types:
+		if army[unit] > 0:
+			army_data[unit] = army[unit]
+		if unit_levels[unit] > 1:
+			level_data[unit] = unit_levels[unit]
+	var research_data := {}
+	if research_unit != "":
+		research_data = {"unit": research_unit, "done_at": research_done_at}
+	var training_list := []
+	for id: int in _sorted_ids():
+		if training.has(id) and not training[id].is_empty():
+			training_list.append(training[id].to_dict())
 	return {
 		"version": SAVE_VERSION,
 		"grid": {"width": catalog.grid_size.x, "height": catalog.grid_size.y},
@@ -483,12 +502,17 @@ func to_dict() -> Dictionary:
 		"resources": resource_data,
 		"remainders": remainder_data,
 		"buildings": building_list,
+		"army": army_data,
+		"unit_levels": level_data,
+		"research": research_data,
+		"training": training_list,
 	}
 
 
 ## Rebuilds a base from to_dict() output (works on JSON-parsed data, floats included). A version
 ## 1 save (or one with no version) was laid out on V1_FIELD: its buildings move by half the
-## field's growth since, so the base stays centred; a field that did not grow moves nothing.
+## field's growth since, so the base stays centred; a field that did not grow moves nothing. A
+## save from before version 3 has no army, so it loads with none, every unit at level 1.
 static func from_dict(base_catalog: Catalog, data: Dictionary) -> BaseState:
 	var state := BaseState.new(base_catalog)
 	var shift := Vector2i.ZERO
@@ -513,10 +537,56 @@ static func from_dict(base_catalog: Catalog, data: Dictionary) -> BaseState:
 		state.buildings[building.id] = building
 		state.grid.occupy(building.id, building.cell, base_catalog.size_of(building.type))
 		state._next_id = maxi(state._next_id, building.id + 1)
+	state._load_army(data)
 	return state
 
 
 # --- Internals -----------------------------------------------------------------
+
+## The army half of from_dict, after the buildings. Data changes can leave a save naming a
+## unit the catalog no longer has, a level above a unit's top, or a queue whose building is
+## gone or no longer trains that unit: those are dropped or clamped rather than kept. An army
+## above the housing is kept.
+func _load_army(data: Dictionary) -> void:
+	var army_data: Dictionary = data.get("army", {})
+	for unit: Variant in army_data:
+		if catalog.has_unit(str(unit)):
+			army[str(unit)] = maxi(0, int(army_data[unit]))
+	var level_data: Dictionary = data.get("unit_levels", {})
+	for unit: Variant in level_data:
+		if catalog.has_unit(str(unit)):
+			unit_levels[str(unit)] = clampi(int(level_data[unit]), 1, catalog.unit_max_level(str(unit)))
+	var research_data: Dictionary = data.get("research", {})
+	var researching := str(research_data.get("unit", ""))
+	if catalog.has_unit(researching) and unit_levels[researching] < catalog.unit_max_level(researching):
+		research_unit = researching
+		research_done_at = int(research_data.get("done_at", 0))
+	for entry: Variant in data.get("training", []):
+		var saved := TrainingQueue.from_dict(entry)
+		if not buildings.has(saved.building_id) or training.has(saved.building_id):
+			continue
+		var producer := buildings[saved.building_id].type
+		var queue := TrainingQueue.new()
+		queue.building_id = saved.building_id
+		var head_kept := false
+		for i: int in saved.units.size():
+			var unit := saved.units[i]
+			if catalog.has_unit(unit) and catalog.unit_producer(unit) == producer:
+				queue.units.append(unit)
+				queue.paid_levels.append(clampi(saved.paid_levels[i], 1, catalog.unit_max_level(unit)))
+				head_kept = head_kept or i == 0
+		if queue.is_empty():
+			continue
+		if head_kept:
+			queue.done_at = saved.done_at
+			queue.left = saved.left
+		else:
+			_start_head(queue)
+		training[queue.building_id] = queue
+	# A consistent save is already in line; this mends one that is not (a head running on a
+	# busy producer, or stopped on an idle one).
+	_resume_training()
+
 
 func _place(type: String, cell: Vector2i) -> String:
 	var error := check_place(type, cell)

@@ -259,15 +259,20 @@ upgrade. `seconds_left(id)` is `finish_at - now`, floored at 0.
 
 ### Save and load
 
-`to_dict()` returns the save, version 2 (`SAVE_VERSION`), with the field it was laid out on:
+`to_dict()` returns the save, version 3 (`SAVE_VERSION`), with the field it was laid out on and
+the army:
 
 ```
-{"version": 2, "grid": {"width": int, "height": int}, "now": int, "next_id": int,
+{"version": 3, "grid": {"width": int, "height": int}, "now": int, "next_id": int,
  "resources": {res: int}, "remainders": {res: int},
- "buildings": [{"id", "type", "cell": [x, y], "level", "target_level", "finish_at"}, ...]}
+ "buildings": [{"id", "type", "cell": [x, y], "level", "target_level", "finish_at"}, ...],
+ "army": {unit: int}, "unit_levels": {unit: int}, "research": {"unit", "done_at"} or {},
+ "training": [{"building", "units": [unit, ...], "paid_levels": [int, ...], "done_at", "left"}, ...]}
 ```
 
-Buildings are listed in id order, so the output is canonical and two states with the same
+Buildings and training queues are listed in id order, and `army` and `unit_levels` in sorted
+unit order with only what differs from a new base (a count above 0, a level above 1); an empty
+queue is left out. So the output is canonical and two states with the same
 contents serialise to the same text (the tests compare `JSON.stringify` of two states).
 
 `BaseState.from_dict(catalog, data)` rebuilds a state from parsed JSON (floats included;
@@ -280,7 +285,16 @@ version, was laid out on the 40×40 field (`V1_FIELD`): before the fit check eac
 moves by half the field's growth since, `(grid_size - V1_FIELD) / 2` floored at zero per axis,
 (4, 4) on 48×48, so the base stays centred; a field that did not grow (the fixture's 10×10) moves
 nothing. A version 2 save loads where it was; its `grid` is recorded for later migrations, not
-read.
+read. A version 1 or 2 save has no army keys, so it loads with no army, every unit at level 1,
+no queues and no research; the next save is version 3.
+
+The army loads after the buildings (`_load_army`), and what a data change has made wrong is
+dropped or clamped: an army count or level of a unit the catalog no longer has is dropped, a
+level above a unit's top is clamped to it, a research of an unknown unit or of one at its top is
+dropped, and a queue whose building is gone or already has a queue is dropped, as is a queued
+unit its building no longer trains (a paid level is clamped into the unit's levels). A queue
+whose head was dropped starts its new head afresh; one left empty is dropped. An army above the
+housing is kept. `_resume_training()` then runs once, which leaves a consistent save as it was.
 
 `main.gd` calls `advance_to(now)` on the loaded state, which is the offline progress.
 

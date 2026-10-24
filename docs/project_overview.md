@@ -85,7 +85,7 @@ matchmaking, an attack log, revenge and shields, then alliances. The design of e
 | Command Center gates | Built | `requires_cc` per level; `max_count` per CC level |
 | Grid occupancy | Built | `BaseGrid`; footprints; a move may overlap its own old spot |
 | Seeded RNG | Built | `SeededRng`, xorshift32; sequence frozen by test; used for scenery today |
-| Save and load | Built | `user://base.json`, version 2 (records the field; a version 1 base is centred on a grown field); offline progress on load; buildings that no longer fit are dropped |
+| Save and load | Built | `user://base.json`, version 3 (records the field and the army; a version 1 base is centred on a grown field, and a version 1 or 2 base loads with no army); offline progress on load; buildings that no longer fit are dropped |
 | Camera | Built | Fixed isometric orthographic; pan, pinch and wheel zoom; focus clamped to the grid |
 | Touch input | Built | Tap, drag, two-finger pinch and pan; trackpad gestures; HUD gets touches first |
 | Placement | Built | Ghost with valid/invalid footprint, Place/Cancel; select; drag the selected building to move; walls painted by tapping and dragging until Done; the camera scrolls while a drag nears the screen edge |
@@ -121,8 +121,8 @@ for the real numbers).
 - **Models are built in code** (`BuildingModels`, from `LowPolyMesh` parts painted from the
   generated material kit); imported models in `assets/` may replace them later, keeping the
   model contract in `docs/reference/art-style.md`.
-- **The save is local, at `"version": 2`** (one migration: version 1 bases are centred on the
-  grown field); the server will hold the base
+- **The save is local, at `"version": 3`** (two migrations: version 1 bases are centred on the
+  grown field, and version 1 and 2 bases load with no army); the server will hold the base
   later and nothing below `main.gd` changes.
 - **Phones are unmeasured for the maxed base.** At the Command Center 10 counts the template
   base is 1,140 draw calls and 1.7 million primitives a frame at the widest zoom on the
