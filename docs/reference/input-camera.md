@@ -174,6 +174,13 @@ and colours the footprint by `state.check_move`; on release, if the cell changed
 `{"op": "move", "id", "cell"}` and then re-syncs the view (which also drops a failed move back).
 `upgrade_selected()` applies `{"op": "upgrade", "id"}`.
 
+**The army's commands.** `train(id, unit)` applies `{"op": "train", "id", "unit", "count": 1}`,
+`cancel_training(id, unit)` `{"op": "cancel_training", "id", "unit"}` and `research(unit)`
+`{"op": "research", "unit"}`, each at `clock.call()`. Unlike the other commands they return the
+error code (`""` on success) instead of emitting `command_failed`, so the caller words the
+result: `main.gd` connects the HUD's training and research panels to them and toasts the outcome
+(`hud.md`, **Training panel**, **Research panel**).
+
 Pinches go to `camera.zoom_at`, two-finger pans and camera drags to `camera.pan`.
 
 **Edge scroll.** A still finger sends no events, so the controller keeps the last finger

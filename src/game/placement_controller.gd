@@ -4,7 +4,8 @@ extends Node
 ## ones (ghost + confirm, like Clash), and dragging the selected building to move it.
 ## Walls are painted instead: until Done, a tap places one, and a drag one on every free
 ## cell the finger crosses. The ground's cell grid shows only during these (_show_grid).
-## This is the only game-layer code that calls BaseState.apply().
+## It also applies the army's commands the HUD's panels ask for: train, cancel_training and
+## research. This is the only game-layer code that calls BaseState.apply().
 ##
 ## While the ghost, a building or the wall brush is dragged with the finger near the
 ## screen's edge, the camera scrolls toward that edge and the dragged thing keeps following
@@ -212,6 +213,25 @@ func upgrade_selected() -> void:
 	var error := state.apply({"op": "upgrade", "id": selected_id}, clock.call())
 	if error != "":
 		command_failed.emit(error)
+
+
+# --- The army --------------------------------------------------------------------
+
+## Queues one `unit` at producer `id`. Returns the error code ("" on success) rather than
+## emitting command_failed: the HUD's training panel shows it.
+func train(id: int, unit: String) -> String:
+	return state.apply({"op": "train", "id": id, "unit": unit, "count": 1}, clock.call())
+
+
+## Cancels the newest queued `unit` at producer `id`, refunding it. Returns the error code.
+func cancel_training(id: int, unit: String) -> String:
+	return state.apply({"op": "cancel_training", "id": id, "unit": unit}, clock.call())
+
+
+## Starts the research of `unit`'s next level. Returns the error code: the research panel
+## words `busy` its own way.
+func research(unit: String) -> String:
+	return state.apply({"op": "research", "unit": unit}, clock.call())
 
 
 # --- Gestures --------------------------------------------------------------------
