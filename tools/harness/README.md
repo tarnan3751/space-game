@@ -137,6 +137,17 @@ type through `PlacementController`: it builds for one second on the only drone. 
 checks that nothing was spent and that one `advance(1)` later the building is finished at level
 1. It takes no screenshots, so it is meant to run headless.
 
+`scenarios/battle.gd` runs the battle sim on the real data (`docs/reference/battle.md`): the
+five of the eleven unit types (100 Rangers, 40 Brawlers, 20 Jet Troopers, 5 Hover Tanks and 2
+Gunships, the Hangars' 280 housing) at their top levels, deployed in three groups on the
+template base (`TemplateBase`), two in the open pockets it leaves inside and one below it, run
+to the end and logged (battle seconds and ticks,
+destruction, stars, loot, and the wall time of the run, which the scenario reads as the
+performance budget's measure, never the sim); the same setup run again must repeat its result
+and hash, and the result applied with `raid_result` to a copy of the game's base given the
+army must spend the units deployed and bring the loot home up to storage. `main.state` itself
+is untouched, since no player action leads to a raid yet. Headless; no screenshots.
+
 `scenarios/model_gallery.gd` shows every building model: one `BuildingView` per type and level
 in the catalog, laid out on the grid in rows by category (`"core"`, then
 `catalog.categories`), under a node of its own, with the base's own views hidden. The roster

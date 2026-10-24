@@ -85,7 +85,7 @@ matchmaking, an attack log, revenge and shields, then alliances. The design of e
 | Command Center gates | Built | `requires_cc` per level; `max_count` per CC level |
 | Grid occupancy | Built | `BaseGrid`; footprints; a move may overlap its own old spot |
 | Seeded RNG | Built | `SeededRng`, xorshift32; sequence frozen by test; used for scenery today |
-| Save and load | Built | `user://base.json`, version 3 (records the field and the army; a version 1 base is centred on a grown field, and a version 1 or 2 base loads with no army); offline progress on load; buildings that no longer fit are dropped |
+| Save and load | Built | `user://base.json`, version 4 (records the field, the army and the last five raids; a version 1 base is centred on a grown field, a version 1 or 2 base loads with no army, and a version 1 to 3 base with no raids); offline progress on load; buildings that no longer fit are dropped |
 | Camera | Built | Fixed isometric orthographic; pan, pinch and wheel zoom; focus clamped to the grid |
 | Touch input | Built | Tap, drag, two-finger pinch and pan; trackpad gestures; HUD gets touches first |
 | Placement | Built | Ghost with valid/invalid footprint, Place/Cancel; select; drag the selected building to move; walls painted by tapping and dragging until Done; the camera scrolls while a drag nears the screen edge |
@@ -107,7 +107,8 @@ in one second at most (`Catalog.apply_dev_cheats`; `-- --no-cheats` for the real
 | 2a | The upgrade pass (`docs/plans/upgrade-pass.md`): the Command Center and every type to Command Center 10 (ten levels for the staples), the five tiers, 138 new level models with Crown escorts, the 48×48 field with a version 2 save migration, the maxed base measured | Built |
 | 2b | The model feedback pass (`docs/plans/model-feedback.md`): the owner's review of every max-level model folded in: no robot above defence buildings, every robot tailored to its building (a security bot, an ore hauler, a collector, a marshaller, welders), one slow lightning crackle, rising smoke, the Command Center's broader base, the academy and fabricator reshaped, the mortar's plasma and the orbital cannon's spire | Built |
 | 3 | Milestone 2, the offline game (`docs/vision.md` §7) — the figures and the army: the humanoid design study (a human in a spacesuit and a humanoid robot, in the comic style, rendered for the owner to approve), then the unit roster in data, training queues, Hangar housing, Research Lab upgrades and unit models | Built: the humanoid study is built (`Figures`, the `figures` harness scenario) and approved at 3.5 heads; the figures' thinner ink line is built (`Figures.FIGURE_INK`); the army is built in core (`docs/reference/core-economy.md`, **The army**): eleven unit types in `data/units.json`, a training queue per producer building, Hangar housing, Research Lab levels, save version 3; the training HUD is built (`docs/reference/hud.md`, **Army panel**: Train and Research from the info panel, unit cards with drawn glyphs, the queue strip, the army meter; the `train_units` harness scenario); the unit models are built (`UnitModels`, one per type, the tier as palette; the `unit_gallery` harness scenario; `docs/reference/art-style.md`, **Units**) |
-| 4 | The battle sim in `src/core/battle/`: fixed-point integer positions (1 cell = 1000 units), fixed tick, pathing round and through walls, targeting, defences, traps, status effects, abilities; replay = seed + layouts + deploy commands; byte-identical results tested headless; batch simulations for balance | Planned |
+| 4 | The battle sim in `src/core/battle/`: fixed-point integer positions (1 cell = 1000 units), fixed tick, pathing round and through walls, targeting, defences, traps, status effects; replay = seed + layouts + deploy commands; byte-identical results tested headless; batch simulations for balance; the result applied to the base (`raid_result`) | Built (`docs/reference/battle.md`): 20 ticks a second, the deploy zone opening as buildings fall, every special and trap, loot by storage, save version 4 keeping the last five raids, the `battle` harness scenario and `tools/sim_battles.gd`; a full battle simulates in 0.15 to 1.6 s headless on the development Mac |
+| 4b | Abilities: `data/abilities.json` (a repair swarm, an EMP burst, an orbital strike), made in the Nanite Foundry as a timed queue with a stock, their effects in the battle sim, spent through `raid_result` | Planned |
 | 5 | The battle view: units moving, projectiles, damage and destruction, the attack HUD; the phone target fixed, and the maxed base and a full battle measured on it | Planned |
 | 6 | Expeditions: the sector map, the outpost generator (the player's roster with a faction tint, loot deposits, hazards), loot into `BaseState` through a new command, re-training; then the real-timer retune (6a). Milestone 2 complete: a game that plays end to end offline | Planned |
 | 7 | Milestone 3, the online game — the server: Nakama with accounts, base storage, migration of the local save and command validation; battles verified by replaying them in headless Godot running the same `src/core` | Planned |
@@ -121,8 +122,8 @@ in one second at most (`Catalog.apply_dev_cheats`; `-- --no-cheats` for the real
 - **Models are built in code** (`BuildingModels`, from `LowPolyMesh` parts painted from the
   generated material kit); imported models in `assets/` may replace them later, keeping the
   model contract in `docs/reference/art-style.md`.
-- **The save is local, at `"version": 3`** (two migrations: version 1 bases are centred on the
-  grown field, and version 1 and 2 bases load with no army); the server will hold the base
+- **The save is local, at `"version": 4`** (three migrations: version 1 bases are centred on the
+  grown field, version 1 and 2 bases load with no army, and version 1 to 3 bases with no raids); the server will hold the base
   later and nothing below `main.gd` changes.
 - **Phones are unmeasured for the maxed base.** At the Command Center 10 counts the template
   base is 1,140 draw calls and 1.7 million primitives a frame at the widest zoom on the
@@ -130,15 +131,19 @@ in one second at most (`Catalog.apply_dev_cheats`; `-- --no-cheats` for the real
   measurement decides whether the Crown robots stay.
 - **Build times are on the development scale**: 27 to 40 minutes at the top levels (the walls
   and the Drone Bay instant), the Command Center's 75 to 150 minutes at levels 6 to 10
-  (`docs/reference/data-format.md`); the retune is parked until the economy is tuned.
+  (`docs/reference/data-format.md`); the retune is parked until the economy is tuned. The
+  battle numbers are development values too: a 280-housing army at its top levels deployed all
+  on one edge of the template base reaches 2% from the bottom edge, 0% from the left, 65% and two
+  stars from the right, and the top edge has no deploy cells (its full-width fences of Crown
+  walls); the `battle` scenario, deploying in the base's open pockets, reaches 38%. The retune
+  has to weigh it.
 - **The template base fills 46 of the field's 48 rows** at the Command Center 10 counts, so more
   walls or another type at the top needs its layout reworked (`docs/reference/input-camera.md`).
-- `hp`, `damage`, `range_cells`, `fire_ms`, `hidden` and `targets` in `data/buildings.json` are
-  display-only: the HUD's info panel shows each where it exists, and none of them drives anything
-  until the battle sim (step 4). So are a unit's battle fields in `data/units.json` (`speed`,
-  `prefers`, `splash_units`, `damage_pct`, `self_destruct`, `hp`, `damage`, `fire_ms`,
-  `range_units`). `capacity` drives the army's housing on the Hangar and is display-only on the
-  Alliance Beacon.
+- **Battles have no view yet**: `hp`, `damage`, `range_cells`, `fire_ms`, `hidden`, `targets`
+  and the specials' fields in `data/buildings.json`, and a unit's battle fields in
+  `data/units.json`, drive the battle sim (`docs/reference/battle.md`), but no player action
+  starts a battle until the battle view (step 5) and expeditions (step 6). `capacity` drives the
+  army's housing on the Hangar and is display-only on the Alliance Beacon.
 - **The army's models are not on screen yet**: the HUD trains, houses and researches it, and its
   cards show drawn glyphs by crew; the unit models (`UnitModels`) are built but shown only by the
   `unit_gallery` harness scenario, each in one static pose, until the cards render them and the
@@ -233,6 +238,19 @@ in one second at most (`Catalog.apply_dev_cheats`; `-- --no-cheats` for the real
   surface flags, with at most two moving parts (the gunship's rotors); budgets are study values
   until step 5. The glass stays opaque, so a pilot shows over a low windscreen rather than through
   a see-through canopy, which would cost a draw a unit (the developer's call, for review).
+
+- **The battle sim's rules** (the coordinator under the owner's mandate, 2026-10-24; the step 4
+  plan; `docs/reference/battle.md`): a surrender command ends a battle on its tick and is logged
+  like any command; the sim draws no random number, and its seed is kept for later rules; a
+  wall cell costs a ground unit's path a fixed 8,000 units (eight cells) from the data, so a
+  short detour is walked and a long one broken through; defences keep their target while it is
+  alive and in range; the buildings' battle classes are hq, wall, trap, defense (a type with
+  `targets` or a range), resource (with `produces` or `storage`) and other; a collector's loot
+  weight is one hour of its production; abilities are step 4b; the base keeps its last five
+  raids in save version 4; the battle tools may read the wall clock, the sim never does; the
+  sim has a reference file of its own; the deploy zone (every footprint, walls in, grown by one
+  cell) opens as buildings fall, cell by cell, and traps stay out of it, so a deploy on a trap's
+  cell is allowed and sets it off.
 
 ### 3.2 Open
 

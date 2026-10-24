@@ -69,6 +69,7 @@ or `data/`.
 | Area | Code | Reference |
 |---|---|---|
 | Core and economy: catalog, base state, commands, timers, production, grid, seeded RNG | `src/core/` | `docs/reference/core-economy.md` |
+| Battle sim: the setup and replay, ticks, pathing, targeting, defences, specials, traps, loot, the result, determinism | `src/core/battle/` | `docs/reference/battle.md` |
 | Data format: `rules.json`, `buildings.json`, the fixtures, the save file | `data/`, `test/support/fixtures/` | `docs/reference/data-format.md` |
 | Input and camera: the scene, camera, gestures, placement, views | `src/game/` (all but the HUD's and the art style's files) | `docs/reference/input-camera.md` |
 | Art style: the look, light, colours, the material kit, `LowPolyMesh`, outlines, models, unit models, animation, the construction drone, view states | `src/game/models/`, `unit_models.gd`, `construction_drone.gd`, `src/game/*.gdshader*`, `material_kit.gd`, `surf.gd`, `motion.gd`, `low_poly_mesh.gd`, `assets/textures/kit/`, `assets/textures/*.png`, `tools/gen_textures.gd` | `docs/reference/art-style.md` |
@@ -129,7 +130,8 @@ data/            rules.json, buildings.json, units.json: game data shared with t
 docs/            project_overview.md (scope, status, roadmap, decisions); vision.md (the design the
                  roadmap builds towards); reference/ (one file per area); plans/ (one record per pass)
 scenes/          main.tscn only
-src/core/        catalog, base_state, building_state, training_queue, base_grid, seeded_rng
+src/core/        catalog, base_state, building_state, training_queue, base_grid, seeded_rng;
+                 battle/, the battle sim
 src/game/        main, template_base, iso_camera, world_input, placement_controller, base_view,
                  building_view, construction_drone, building_models, unit_models, wall_mesh, low_poly_mesh, surf,
                  motion, material_kit, hud, hud_icon, drone_ring, format, model_preview, toon.gdshader,

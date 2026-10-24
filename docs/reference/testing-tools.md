@@ -39,8 +39,14 @@ when that level unlocks, and no curve (cost, `build_seconds`, `hp`, `produces`, 
 | File | Covers |
 | --- | --- |
 | `test/core/test_base_grid.gd` | Bounds, occupancy, own cells counting as free. |
+| `test/core/test_battle_combat.gd` | Battle damage: unit cadence, damage percent and level, splash, self-destruction; defence cadence, shells landing late where aimed, shields (absorbing, recharging after their delay, the lower id first, gone with their generator, not covering themselves), the gravity well's hold, the EMP's stun, the later end kept, the cloaked sentry, mines once for their class, the throw trap. |
+| `test/core/test_battle_field.gd` | The deploy zone (grown footprints, walls in, traps out), the deploy refusals, a deploy on a trap, units at cell centres in deploy order, the zone opening as buildings fall (a cell under two footprints opening when both have), level-0 buildings left out, every setup refusal. |
+| `test/core/test_battle_pathing.gd` | A straight walk, round a building, no corner cutting, a short detour round walls, a long wall line broken through, a shut-in target waited for, the search budget and shared searches. |
+| `test/core/test_battle_sim.gd` | The end (timer, 100%, no army, surrender), destruction and stars, loot spread and taken, command refusals, the result's shape, determinism (the same hash at every tick, stepped, live and replayed battles agreeing, the seed unused), a 150-building, 280-unit battle on 48×48. |
+| `test/core/test_battle_targeting.gd` | Ground by path and air by straight line, preferences and their fallback, traps never targets, ties to the lowest id, a new target after a fall, the unrevealed sentry as the last resort, defences by class and range, keeping their target. |
 | `test/core/test_base_state.gd` | Start layout, place and its refusals, the Command Center level checked before the limit, instant buildings, walls, timers, upgrades and their rules, moves, bad commands, the `changed` signal, the clock going backwards, the save round trip, a save from before the third resource, a version 1 save centred on a grown field (`Fixtures.catalog_with_grid`) and left in place on one that did not grow, dropping buildings that no longer fit, the army's save round trip mid-way (queues running and paused, a research), saving leaving the catalog's unit order alone, version 1 and 2 saves loading with no army, and army entries that no longer fit dropped or clamped (an army above the housing kept, waiting). |
 | `test/core/test_catalog.gd` | The shipped data (validity, start layout, affordability, curves, final levels at the top Command Center, counts; for units, prices and housing within reach, curves, final levels at the top lab), int conversion, level, count, resource, category, display-field and unit lookups, one validation message per rule (units, `rules.army` and `rules.battle` included), the battle classes and a catalog without battle rules, the shipped battle data (a hull on every type but the traps, each special's fields at every level), the dev cheats (every level free and one second at most, nothing else changed; units free to train and research in one second at most; a base building what it could not afford). |
+| `test/core/test_raid_result.gd` | `raid_result`: a real battle's result applied (units spent, loot home), loot capped by storage and never removing, every refusal through its check and `apply` changing nothing, a waiting unit housed in the room a raid frees, the last five raids kept, the save round trip, a version 3 save loading with none. |
 | `test/core/test_production.gd` | Production starting at completion, carried remainders, tick-size independence, storage caps, caps rising when a silo finishes, busy buildings not producing, a third resource. |
 | `test/core/test_research.gd` | Research: no lab, pay and level up (training at the new price), max level, lab level gating (an upgrade under way not counting), research going on while the lab upgrades, one at a time, the unit unlocked first, funds, the dev cheats, and one-second ticks equal to one big tick with a building, the research and a unit finishing in one second. |
 | `test/core/test_seeded_rng.gd` | The frozen sequences for seeds 1 and 12345, range bounds, the zero seed. **These expected values never change.** |
@@ -78,12 +84,29 @@ and every scenario runs on the real numbers; `scenarios/dev_cheats.gd` applies t
 checks them. `tools/harness/README.md` documents the driver, the clock, the isolation and how to
 write a scenario; `scenarios/place_and_build.gd` is the example.
 
+`scenarios/battle.gd` runs a scripted attack on the template base through the battle sim,
+headless, and applies its result to a copy of the base (`battle.md`, **Tools**).
+
 Two scenarios check every model of the roster against the art style's contract
 (`art-style.md`, **Budget and checks**): `model_gallery` (instances, outlines, kit layers,
 triangle budgets, reach and height per type and level, with screenshots of every page, row and
 row's first model) and `model_clash`, headless, the clash rule's check: no two moving parts of a
 model cross over their whole motion, rigid and with BOB applied, and the poses at which each
 touches the static body counted for review.
+
+## Batch battles: `tools/sim_battles.gd`
+
+```
+$GODOT --headless --path . -s res://tools/sim_battles.gd -- [--seeds=10] \
+    [--army=ranger:100,brawler:40] [--level=3] [--layout=<save.json>] [--out=<file.csv>]
+```
+
+A headless `SceneTree` script, run after an import, for balance (`battle.md`): N seeds of a
+scripted attack on the shipped data against the template base (`TemplateBase`), or the layout
+and resources of a save file, which it only reads. Each seed draws one to four deploy points and
+each unit's deploy tick in the first three seconds from the tool's own `SeededRng`. It writes
+one CSV row a seed (seed, ticks, destruction, stars, loot per resource, units deployed, wall
+time in ms) to `--out` or stdout. The gate does not run it.
 
 ## The texture generator: `tools/gen_textures.gd`
 

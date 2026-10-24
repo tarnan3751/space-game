@@ -1,0 +1,95 @@
+extends HarnessScenario
+## The battle sim on the real data (docs/reference/battle.md): a scripted attack on the debug
+## build's template base (TemplateBase: every type at its Command Center 10 count and top level,
+## every resource at its cap), run to the end headless, with its duration, destruction, stars and
+## loot logged, then run again to check the result and its hash repeat. The result is applied to
+## a copy of the game's base given the attacking army, never to main.state, since no player
+## action leads to a raid yet: the deployed units must be spent and the loot capped by the copy's
+## storage.
+##
+## It also logs the run's wall time, read here in the tool and never in the sim, as the
+## performance budget's measure: a full battle in well under 2 s on the development Mac.
+
+## Five of the eleven unit types, the Hangars' 280 housing, each at its top level (a level is
+## clamped).
+const ARMY := {"ranger": 100, "brawler": 40, "jet_trooper": 20, "hover_tank": 5, "gunship": 2}
+const LEVEL := 8
+
+
+func run(main: MainScript) -> void:
+	var catalog: Catalog = main.catalog
+	var template := TemplateBase.build(catalog, catalog.grid_size, now())
+	var levels := {}
+	for unit: String in ARMY:
+		levels[unit] = LEVEL
+	var setup := {
+		"seed": 7,
+		"attacker": {"army": ARMY, "unit_levels": levels, "abilities": {}},
+		"defender": {"buildings": template["buildings"], "resources": template["resources"]},
+		"commands": [],
+	}
+	var probe := BattleSim.create(catalog, setup)
+	check(probe.setup_error == "", "the template base sets up a battle: '%s'" % probe.setup_error)
+	if probe.setup_error != "":
+		return
+	var cells: Array[Vector2i] = []
+	for y: int in catalog.grid_size.y:
+		for x: int in catalog.grid_size.x:
+			if probe.is_deploy_cell(Vector2i(x, y)):
+				cells.append(Vector2i(x, y))
+	check(not cells.is_empty(), "%d deploy cells round the template base" % cells.size())
+	# The army in three groups a second apart: in the open pockets the template leaves at the
+	# right of the resources and army bands, and below the base.
+	var points: Array[Vector2i] = [Vector2i(42, 9), Vector2i(40, 19), Vector2i(24, catalog.grid_size.y - 1)]
+	for point: Vector2i in points:
+		check(probe.is_deploy_cell(point), "%s is a deploy cell" % point)
+	var commands := []
+	var n := 0
+	for unit: String in ARMY:
+		for k: int in int(ARMY[unit]):
+			var cell := points[n % 3]
+			commands.append({"op": "deploy", "tick": (n % 3) * 20, "unit": unit, "cell": [cell.x, cell.y]})
+			n += 1
+	commands.sort_custom(func(a: Dictionary, b: Dictionary) -> bool: return int(a["tick"]) < int(b["tick"]))
+	setup["commands"] = commands
+
+	var started := Time.get_ticks_usec()
+	var result := BattleSim.run(catalog, setup)
+	var ms := (Time.get_ticks_usec() - started) / 1000
+	say("battle: %d buildings, %d units, %d s of battle (%d ticks) in %d ms" % [
+		probe.layout.count, n, int(result["ticks"]) / BattleSim.TICKS_PER_SECOND, result["ticks"], ms])
+	say("battle: destruction %d%%, %d stars, loot %s" % [result["destruction"], result["stars"], result["loot"]])
+	check(int(result["ticks"]) > 0 and int(result["ticks"]) <= probe.ticks_total(), "the battle ran and ended")
+	var deployed := 0
+	var deployed_dict: Dictionary = result["deployed"]
+	for unit: String in deployed_dict:
+		deployed += int(deployed_dict[unit])
+	check(deployed == n, "all %d units deployed (%d)" % [n, deployed])
+	check(int(result["destruction"]) > 0, "the attack destroyed something")
+	check(ms < 2000, "a battle simulates in under 2 s (%d ms)" % ms)
+	var again := BattleSim.run(catalog, setup)
+	check(JSON.stringify(again) == JSON.stringify(result), "the same setup gives the same result, hash %d" % result["hash"])
+
+	var base := BaseState.from_dict(catalog, main.state.to_dict())
+	for unit: String in ARMY:
+		base.army[unit] = int(ARMY[unit])
+	var battle := setup.duplicate(true)
+	battle["commands"] = result["commands"]
+	var carried := result.duplicate(true)
+	carried.erase("commands")
+	var before := {}
+	for res: String in catalog.resources:
+		before[res] = base.resources[res]
+	var error := base.apply({"op": "raid_result", "battle": battle, "result": carried}, now())
+	check(error == "", "the result applies to a copy of the base: '%s'" % error)
+	var spent := true
+	for unit: String in ARMY:
+		spent = spent and base.army_count(unit) == int(ARMY[unit]) - int(deployed_dict.get(unit, 0))
+	check(spent, "the deployed units are spent")
+	var capped := true
+	var loot: Dictionary = result["loot"]
+	for res: String in catalog.resources:
+		var expected := maxi(int(before[res]), mini(base.capacity(res), int(before[res]) + int(loot[res])))
+		capped = capped and base.resources[res] == expected
+	check(capped, "the loot came home up to storage: %s" % base.resources)
+	check(base.raids.size() == 1, "the battle is kept with its result")
