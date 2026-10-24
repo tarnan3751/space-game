@@ -22,6 +22,7 @@ camera and the views' wiring are in `input-camera.md`.
 | `src/game/base_view.gd` | builds the ground, the perimeter, the terrain ring, the rocks and the outcrops (**Environment**) |
 | `src/game/building_models.gd`, `src/game/models/` | the dispatcher and one model file per category, `Parts` in `models/parts.gd` |
 | `src/game/construction_drone.gd`, `src/game/models/drone.gd` | the builder drone over a busy site, its flight and its laser (**Construction drone**) |
+| `src/game/models/figures.gd` | `Figures`: the colonist and the automaton, posed (**Figures**) |
 | `assets/textures/kit/` | the twenty layers, committed PNGs |
 | `assets/textures/field.png` | the field texture, a committed PNG |
 | `assets/textures/terrain_rock.png` | the terrain's rock texture, a committed PNG |
@@ -583,6 +584,73 @@ While a building is constructed or upgraded, a builder drone works over it
   and the flare, four, made at spawn; nothing is allocated per frame. The holograms add one draw
   in the transparent pass. Only the body casts a shadow. Drones exist only while a building is busy
   (and for the 0.7 s of leaving), so there are about as many as the base has busy drones.
+
+### Figures
+
+The humans and humanoid robots of the army (`docs/vision.md` §2, §4), built by `Figures`
+(`src/game/models/figures.gd`) as a design study for the owner to judge before any unit is
+modelled on them: the **colonist**, the human crew in a spacesuit, and the **automaton**, the
+humanoid robot on the same skeleton. The `figures` harness scenario (`tools/harness/README.md`)
+renders them. They replace the all-box trooper and cadet, rejected as a blocky toy: a few boxes at
+even proportions with no neck, no joints, no taper and no hands or feet.
+
+- **Design language**: comic, chunky and heroic. A big head, short legs, shoulders wider than the
+  hips, a torso broad at the chest tapering to a belt, hands and feet clearly bigger than the limb
+  they end. No bare box anywhere: every part is a lathe (a tapered limb, a capsule, a chest
+  profile), an orb, a dome or a chamfered box, chamfered at least 0.03 at 0.8 tall but for the two
+  boxed parts too small for it, the automaton's visor band (0.012) and its visor slit (0.01).
+  Round parts are smooth and take 12 to 16 sides: the helmet 16 and 6 rings, the torsos and the
+  colonist's limbs 12. Small ones take 8 to 10: joint orbs 8, gloves, boots, ears, the tank and
+  the fan 10, and the automaton's limbs 10, since at 12 they would take it to 1,516 triangles,
+  over the budget.
+- **Scale**: one cell is one unit; the colonist stands 0.8 (`COLONIST_HEIGHT`) to its helmet's
+  top, the automaton 0.9 (`AUTOMATON_HEIGHT`) to its head's top, its antenna about 0.1 above: a
+  little under half a Base-tier 3×3.
+- **Proportions**, in head units (the height over the head: the helmet's diameter, the automaton's
+  neck and head block): `PRIMARY_HEADS` 3.5, the helmet 0.23 across at 0.8 tall, the biggest
+  single mass. The legs (to the hip joints, standing straight) are 0.3 of the height at 3.5 heads,
+  shorter with a bigger head and longer with a smaller one, by 0.06 of the height a head unit; the
+  arms and the widths stay the same at every proportion. The study renders the colonist at 3, 3.5
+  and 4.25 heads.
+- **Joint structure**: a `Figures.Pose` is the joint angles (the torso's lean and twist, the
+  head's nod and turn, and per side the shoulder's swing and out, the elbow's bend, the hip's
+  swing and out, the knee's bend and the foot's pitch). The skeleton turns it into a transform per
+  joint from the pelvis out (waist, neck; shoulder, elbow, wrist; hip, knee, ankle), the feet kept
+  level but for their pitch, and the pelvis lowered so the lower sole, at its heel or its toe as
+  its foot is pitched, stands on the ground. Each segment (the head, the torso, the upper arm,
+  forearm, hand, thigh, shin and foot) is a function of its own taking its joint's transform,
+  hanging along the joint's -Y, so posing is only changing angles and a unit pipeline can later
+  move segments as step 5 decides. A figure is one `LowPolyMesh`, the caller's; nothing in it is a
+  moving part and it uses no `Motion`. Two poses: `stance()` (feet about shoulder width apart,
+  knees a little bent, the torso a few degrees forward and twisted, the elbows bent and the arms a
+  little out, the sides unalike) and `stride()` (walking upright: the left leg reaching forward
+  with its knee bent and its heel coming down, the right nearly straight behind pushing off its
+  toe, the arms counter-swung, the torso only a little forward and the head level).
+- **The colonist**: a round helmet on a ring collar (its neck); a dark glossy visor band curving
+  across the helmet's front (glass layer, `1F2A4D`) with an `ENERGY` glint streak; an `ARMY`
+  stripe over the crown, nape to visor; a suit lathe broad at the chest, in at the waist and out
+  at the hips, round a gunmetal belt; an orange chest plate curving over the chest, a small
+  `ENERGY` chest lamp on it (the one emissive element); orange half-dome shoulder pads over the
+  arm joints; tapered limbs, two segments each, with `HULL_MID` joint orbs at the elbows and
+  knees; `HULL_DARK` mitts and boots (a round shaft and a domed toe cap); a `HULL_DARK` backpack
+  with a gunmetal tank lying across its top, so the figure reads from behind. The suit is
+  `HULL_LIGHT`.
+- **The automaton**: a cream sensor block for a head with a dark visor band and one wide glowing
+  `ENERGY` slit, gunmetal sensor ears and a short antenna with an orange bulb: friendly, not
+  menacing; gunmetal joint orbs at the neck, shoulders, elbows, hips, knees and ankles; a gunmetal
+  pelvis block and waist under a cream chest plated `ARMY` orange round a glowing `ENERGY` core in
+  a gunmetal rim; `HULL_MID` tapered limbs with a thin rod piston along each forearm and shin
+  (`Parts.ROD`, not inked); gunmetal hands; broad flat `HULL_DARK` foot pads; a `HULL_DARK` dorsal
+  power unit with a fan glowing `ENERGY` on its back. Its cream, gunmetal and hull-mid are the
+  security bot's and the ore hauler's surfaces (`Parts.HULL_LIGHT_ROUND`, `GUNMETAL`,
+  `HULL_MID_ROUND`), so it reads as their cousin.
+- **Ink**: every part over 0.06 across is inked by default; the chest lamp, the automaton's core
+  and antenna bulb, the glint and the pistons are under it and are not. At camera size 24 the
+  2.2-pixel line is a large share of a figure about 25 pixels tall, so the outline carries much of
+  its read there.
+- **Budget**: a study value, not the unit budget, which step 5 fixes after the phone measurement:
+  at most 1,500 body triangles a figure. The colonist is 1,456 at every proportion and pose (the
+  proportion changes lengths, not parts), the automaton 1,484.
 
 ## Animation
 
