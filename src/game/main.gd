@@ -14,10 +14,11 @@ extends Node3D
 ## harness passes it.
 ##
 ## A battle (BattleView) takes the base's place while it runs: open_battle() takes the base's view
-## and input out of the tree, hides the HUD and adds the battle in their place; when it finishes,
-## the base comes back. Until the sector map exists, the only battle is the debug build's Practice
-## raid (practice_setup): the template base raided by the army in the Hangars, whose result is
-## never applied, so the save and the real base are untouched by it.
+## and input out of the tree, hides the HUD and adds the battle and its attack HUD (BattleHud) in
+## their place; when it finishes (the result panel's Return), the base comes back. Until the
+## sector map exists, the only battle is the debug build's Practice raid (practice_setup): the
+## template base raided by the army in the Hangars, whose result is never applied, so the save
+## and the real base are untouched by it.
 
 const DEFAULT_SAVE_PATH := "user://base.json"
 const SAVE_PATH_ARG := "--save-path="
@@ -36,8 +37,9 @@ var camera: IsoCamera
 var world_input: WorldInput
 var placement: PlacementController
 var hud: Hud
-## The battle running in the base's place; null when there is none.
+## The battle running in the base's place and its HUD; null when there is none.
 var battle: BattleView
+var battle_hud: BattleHud
 var _ticks: int = 0
 ## Where the camera looked at the base, and its zoom, when a battle opened: put back after it.
 var _base_focus: Vector3 = Vector3.ZERO
@@ -248,6 +250,9 @@ func open_battle(setup: Dictionary, practice: bool) -> String:
 	hud.visible = false
 	battle = view
 	add_child(battle)
+	battle_hud = BattleHud.new()
+	battle_hud.setup(catalog, hud.ui_theme(), hud.preview(), battle)
+	add_child(battle_hud)
 	_base_focus = camera.focus
 	_base_zoom = camera.size
 	camera.setup(battle.area())
@@ -259,6 +264,8 @@ func open_battle(setup: Dictionary, practice: bool) -> String:
 func _on_battle_finished(_setup: Dictionary, _result: Dictionary, practice: bool) -> void:
 	battle.queue_free()
 	battle = null
+	battle_hud.queue_free()
+	battle_hud = null
 	add_child(base_view)
 	add_child(world_input)
 	camera.setup(base_view.area())

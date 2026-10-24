@@ -4,7 +4,7 @@ How a battle is drawn and driven: the scene that runs a `BattleSim` (`battle.md`
 tick and draws the defender's field, the units, the shots and the falls, and how it takes the
 base's place. The sim's rules and the API the view reads are in `battle.md`; the look (the kit, the
 outlines, the shader effects) in `art-style.md`; the camera and the gestures in `input-camera.md`.
-The attack HUD is step 5's second half; until then a tap deploys.
+The attack HUD, `BattleHud`, is in `hud.md`, **Battle HUD**.
 
 | File | What |
 | --- | --- |
@@ -18,8 +18,10 @@ The attack HUD is step 5's second half; until then a tap deploys.
 `main.gd` runs a battle in the base's place: `open_battle(setup, practice)` makes a `BattleView`
 from the setup (a refused setup returns `BattleSim.setup_error` and changes nothing), cancels any
 placement, takes the base's `BaseView` and `WorldInput` out of the tree, hides the HUD, adds the
-battle and bounds the camera to its field. When the view emits `finished(setup, result)` the
-battle is freed and the base's view, input and HUD come back. The base keeps running meanwhile:
+battle and its `BattleHud` (`main.battle`, `main.battle_hud`) and bounds the camera to its field.
+When the battle ends the view emits `ended(result)` and the HUD shows its result panel; its Return
+calls `leave()`, which emits `finished(setup, result)` once, and the battle and its HUD are freed
+and the base's view, input and HUD come back. The base keeps running meanwhile:
 the game's tick advances it and saves it as ever.
 
 Until the sector map exists (step 6) the only battle is the debug build's **Practice raid** (the
@@ -50,7 +52,7 @@ and headings are interpolated between the last two ticks by `alpha`, the accumul
 tick; a shell's flight is the ticks between its `SHELL` and its landing. The sim's step time is
 measured round each `step()` (`step_ms()`: the average and the longest).
 
-`finished` is emitted `END_HOLD_SECONDS` (3) of real time after the sim ends.
+The view stays on the field after the end, its last effects finishing, until `leave()`.
 
 ## The field and the buildings
 
@@ -125,19 +127,40 @@ impacts are hologram discs that grow and fade by their custom data's w (`holo.gd
 unshaded quads facing the fixed camera, drawn over everything. None casts a shadow or has an
 outline (sparks and arcs never do, `art-style.md`).
 
-## Input and the camera
+## Input, deploying and the camera
 
 The view has a `WorldInput` of its own (main's is out of the tree): a pinch, the wheel or a
-two-finger pan zooms and pans the base's `IsoCamera`, bounded to the field; a one-finger drag
-pans; a tap deploys one unit of `deploy_unit` on the cell under it (the first type in sorted order
-with units left when it is ""), refused silently where the sim refuses it.
+two-finger pan zooms and pans the base's `IsoCamera`, bounded to the field.
+
+- **Selecting.** `select_unit(unit)` (the deploy bar's cards) sets `deploy_unit`, the type a tap or
+  a drag deploys; "" selects none. While one is selected the ground shows the deploy mask: a
+  48×48 texture, one texel a cell, white where `is_deploy_cell` refuses, drawn by `ground.gdshader`
+  as a faint hatched red (`BaseView.set_deploy_mask`, strength `MASK_STRENGTH` 0.32) over the
+  zone; it is rewritten from the sim at the end of a frame in which a building fell, so the zone
+  opens as the base falls (`is_masked(cell)` reads it). The ends of the battle let the type go.
+- **A tap** with a type selected deploys one on the cell under it (`deploy`), now. With none
+  selected it does nothing.
+- **A drag** with a type selected smears: the cell pressed and every cell the finger crosses (the
+  ones between two drag events filled in, so a fast stroke leaves no gap) are queued, each once a
+  drag (a cell crossed again, back and forth, takes no second unit), and before each step the first
+  one that takes a unit gets one: one unit a tick at most, as Clash's smear. Cells refused for the
+  zone are skipped; running out of the type, or letting it go, ends the smear and the rest of the
+  drag pans. With none selected a drag pans.
+- **Refusals** are emitted as `deploy_failed(code)` (the HUD toasts `blocked` and `none_left`); a
+  refusal for the zone (`blocked`) flashes the red to `MASK_FLASH` (0.75), fading back over
+  `MASK_FLASH_SECONDS`.
+
+The harness also sends commands each at its own tick (`script_commands`). `falls()` counts the
+buildings fallen so far, so the HUD reads the loot (`BattleSim.loot()`, which builds a dictionary)
+only when it can have moved; the HUD's refresh on `stepped` allocates nothing when nothing it
+shows changed (`hud.md`, **Battle HUD**).
 
 ## Cost
 
 Measured by the `battle_view` scenario (`tools/harness/README.md`) in a 1600×900 window at the
 widest zoom (camera size 44), the battle paused once the whole scripted army (the battle scenario's
-167 units, 280 housing) is down, the template base standing: 974 draw calls, 2.00 million
-primitives and 1.6 ms of render CPU a frame, 174 fps, against the maxed base's ceilings
+167 units, 280 housing) is down, the template base standing: 974 draw calls (1,031 with the
+attack HUD over it), 2.00 million primitives and 1.6 ms of render CPU a frame, 174 fps, against the maxed base's ceilings
 (`art-style.md`, **Cost**: 1,600, 2.1 million, 6 ms). The units in their near versions would have
 been 2.40 million primitives (2.12 million without their shadows). The sim's step averages about
 0.2 ms a tick over the battle; the longest, 7.5 to 10 ms, falls on the first tick or on the one

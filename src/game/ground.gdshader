@@ -40,6 +40,13 @@ uniform float line_width = 0.04;
 uniform float line_strength = 0.1;
 // Towards the key light across the ground, in cell x and y (world x and z): BaseView's SUN_ACROSS.
 uniform vec2 sun_across = vec2(-0.5, 0.866);
+// A battle's deploy mask (BaseView.set_deploy_mask): one texel a cell, red over 0 where a unit
+// cannot be deployed, tinted in deploy_color at deploy_strength (0, the default, draws nothing),
+// with a hatch of diagonal stripes so the zone reads as forbidden ground.
+uniform sampler2D deploy_mask : filter_nearest, repeat_disable;
+uniform vec4 deploy_color : source_color = vec4(0.902, 0.224, 0.275, 1.0);
+uniform float deploy_strength = 0.0;
+const float HATCH_CELLS = 0.5;
 
 // Cells a tile of the field texture spans.
 const float TILE = 4.0;
@@ -74,7 +81,13 @@ void fragment() {
 	vec2 to_edge = min(cell, grid_size - cell);
 	float line = 1.0 - smoothstep(0.0, line_width, min(to_line.x, to_line.y));
 	line = max(line, 1.0 - smoothstep(0.0, 2.0 * line_width, min(to_edge.x, to_edge.y)));
-	ALBEDO = mix(albedo, line_color.rgb, line * line_strength);
+	albedo = mix(albedo, line_color.rgb, line * line_strength);
+	if (deploy_strength > 0.0) {
+		float blocked = texture(deploy_mask, cell / grid_size).r;
+		float hatch = step(0.5, fract((cell.x + cell.y) / HATCH_CELLS));
+		albedo = mix(albedo, deploy_color.rgb, blocked * deploy_strength * (0.6 + 0.4 * hatch));
+	}
+	ALBEDO = albedo;
 	SPECULAR = 0.0;
 	ROUGHNESS = 1.0;
 }

@@ -1,26 +1,36 @@
 extends HarnessScenario
-## The battle view (docs/reference/battle-view.md) on the debug build's Practice raid: the template
-## base (Template base, pressed through the HUD) raided by a scripted army, drawn by BattleView in
-## the base's place and run to its end.
+## The battle view and its attack HUD (docs/reference/battle-view.md, docs/reference/hud.md,
+## **Battle HUD**) on the debug build's Practice raid: the template base (Template base, pressed
+## through the HUD) raided by a scripted army, drawn by BattleView in the base's place and run
+## until the HUD's End.
 ##
 ## First the Practice raid button with the Hangars empty: refused with a toast, no battle. Then the
 ## practice setup (main.practice_setup) given the battle scenario's army (ARMY at LEVEL, the
-## Hangars' 280 housing) and SEED, opened through main.open_battle: the base's view and input out of
-## the tree, the HUD hidden. The army is deployed as the battle scenario deploys it, in three groups
-## a second apart, each spread over the deploy cells within SPREAD of its point, sent live through
-## BattleView.script_commands at their ticks, but one Ranger, deployed by a tap on the field (the
-## view's own WorldInput). Screenshots at ticks 0 and 200 framed on the first group, at 1,000 and at
-## the end at the widest zoom; rendered only, once the whole army is down, the battle is paused
+## Hangars' 280 housing) and SEED, not the base's scenery seed, opened through main.open_battle:
+## the field in a landscape of its own, the base's view and input out of the tree, its HUD hidden,
+## the BattleHud shown with a card per type, the first selected and the red zone up. Through the
+## HUD: the Ranger's card selects it; a tap deploys one and a tap in the zone is refused with a
+## toast; a drag over SMEAR cells deploys one a cell, one a tick; a drag back and forth over two cells
+## deploys two. One Ranger is kept back. The rest of the army is deployed
+## as the battle scenario deploys it, in three groups a second apart from SCRIPT_TICK, each spread
+## over the deploy cells within SPREAD of its point, sent live through
+## BattleView.script_commands. Rendered only, once the whole army is down, the battle is paused
 ## (speed 0) and measured at the widest zoom in a MEASURE window (_measure): the draw calls,
 ## primitives and render CPU time a frame against the Cost ceilings, the slowest frame's process
-## time, the frame rate and the units drawn. The sim's step time is checked against STEP_CEILING.
-## The battle runs at 1x to tick 200, then at 2x (BattleView.speed) to its end.
+## time, the frame rate and the units drawn. The top bar is checked against the sim; the speed
+## button takes the battle to 2x; at tick 1,000 End asks (a real touch beside it, the kept Ranger
+## selected, deploys nothing), Keep fighting goes back, End battle
+## surrenders, and the result panel replaces the deploy bar; the battle stays until Return.
+## Screenshots: tick 0 (the red zone and the toast), the smear, tick 200, tick 1,000, the
+## confirmation, the result panel, the base after it. The sim's step time is checked against
+## STEP_CEILING.
 ##
 ## At the end: the sim's result equals a headless BattleSim.run of the same setup with the
-## commands the view sent (so the view altered nothing), the tap's deploy among them; the units
-## were drawn and something fell; `finished` brought the base back (its view and input in the tree,
-## the HUD shown, the toast "Practice: nothing applied"), and the base's save is as it was but for
-## its clock.
+## commands the view sent (so the view altered nothing), the HUD's deploys among them; every unit
+## was deployed and something fell; `finished` brought the base back (its view and input in the
+## tree, its HUD shown, the toast "Practice: nothing applied", the camera where it was), and the
+## base's save is as it was but for its clock. Last, a practice battle bringing one of every unit
+## type: the deploy bar ends left of the Build column (it scrolls), then End and Return.
 
 const ARMY := {"ranger": 100, "brawler": 40, "jet_trooper": 20, "hover_tank": 5, "gunship": 2}
 const LEVEL := 8
@@ -29,8 +39,17 @@ const SEED := 1793856615
 ## The deploy points (the battle scenario's): open pockets right of the resources and army bands,
 ## and below the base.
 const POINTS: Array[Vector2i] = [Vector2i(42, 9), Vector2i(40, 19), Vector2i(24, 47)]
-## How far round its point a group spreads, in cells.
+## How far round its point a group spreads, in cells; the tick the scripted groups start at,
+## after the HUD's own deploys; the Rangers a drag deploys.
 const SPREAD := 2
+const SCRIPT_TICK := 60
+const SMEAR := 4
+## The Rangers a back-and-forth drag over two cells deploys (one a cell, never more), and the
+## one kept back, selected, for the touch beside the End confirmation.
+const BACK_AND_FORTH := 2
+const KEPT := 1
+## The Rangers the HUD deploys: a tap, the smear and the back-and-forth.
+const BY_HUD := 1 + SMEAR + BACK_AND_FORTH
 ## The ticks shot while the battle runs, and the camera size the first two are taken at.
 const CLOSE_TICKS: Array[int] = [0, 200]
 const LATE_TICK := 1000
@@ -46,7 +65,7 @@ const PRIMITIVE_CEILING := 2100000
 const RENDER_CPU_CEILING := 6.0
 const STEP_CEILING := 5.0
 ## The tick from which every scripted unit is down.
-const ALL_DOWN := 41
+const ALL_DOWN := SCRIPT_TICK + 41
 
 var _result: Dictionary = {}
 var _finished: bool = false
@@ -77,16 +96,24 @@ func run(main: MainScript) -> void:
 	if error != "":
 		return
 	var view: BattleView = main.battle
+	var hud: BattleHud = main.battle_hud
 	view.finished.connect(func(_setup: Dictionary, result: Dictionary) -> void:
 		_result = result
 		_finished = true)
 	check(view.field.scenery_seed == SEED and SEED != BaseView.SCENERY_SEED and view.field.mesas != main.base_view.mesas,
 		"the field stands in the landscape of the battle's seed, not the base's (mesas %s)" % [view.field.mesas])
-	check(view.is_inside_tree() and not main.base_view.is_inside_tree() and not main.world_input.is_inside_tree()
-		and not main.hud.visible, "the battle took the base's place: its view and input out, the HUD hidden")
+	check(view.is_inside_tree() and hud.is_inside_tree() and not main.base_view.is_inside_tree()
+		and not main.world_input.is_inside_tree() and not main.hud.visible,
+		"the battle and its HUD took the base's place: its view and input out, its HUD hidden")
+	var brought := view.units_brought()
+	check(view.deploy_unit == brought[0] and view.field.deploy_strength() > 0.0,
+		"the first card (%s) starts selected, the red zone showing" % view.deploy_unit)
+	for unit: String in brought:
+		check(hud.card(unit).is_visible_in_tree() and hud.card_count(unit) == "x%d" % int(ARMY[unit]),
+			"%s's card shows x%d (%s)" % [unit, int(ARMY[unit]), hud.card_count(unit)])
 
-	# Each group spread over the deploy cells within SPREAD of its point, so the units do not stand
-	# on one another.
+	# The scripted groups, each spread over the deploy cells within SPREAD of its point, from tick
+	# SCRIPT_TICK, so the HUD's own deploys come first.
 	var spots: Array[Array] = []
 	for point: Vector2i in POINTS:
 		var cells: Array[Vector2i] = []
@@ -98,31 +125,76 @@ func run(main: MainScript) -> void:
 	var commands: Array[Dictionary] = []
 	var n := 0
 	for unit: String in ARMY:
-		for k: int in int(ARMY[unit]) - (1 if unit == "ranger" else 0):
+		for k: int in int(ARMY[unit]) - (BY_HUD + KEPT if unit == "ranger" else 0):
 			var group: Array = spots[n % 3]
 			var cell: Vector2i = group[(n / 3) % group.size()]
-			commands.append({"op": "deploy", "tick": (n % 3) * 20, "unit": unit, "cell": [cell.x, cell.y]})
+			commands.append({"op": "deploy", "tick": SCRIPT_TICK + (n % 3) * 20, "unit": unit, "cell": [cell.x, cell.y]})
 			n += 1
 	view.script_commands(commands)
-	view.deploy_unit = "ranger"
 	var focus := main.base_view.cell_to_world(Vector2i(38, 14), 1)
 	_frame(main, CLOSE_ZOOM, focus)
-	# The tapped Ranger lands on the first deploy cell beside the first group's.
-	var tap_cell := POINTS[0]
-	for step: Vector2i in [Vector2i(1, 0), Vector2i(0, 1), Vector2i(-1, 0), Vector2i(0, -1), Vector2i(1, 1)]:
-		if view.sim.is_deploy_cell(POINTS[0] + step):
-			tap_cell = POINTS[0] + step
-			break
-	view.input.tapped.emit(main.camera.unproject_position(view.field.cell_to_world(tap_cell, 1)))
+
+	# The Ranger's card selects it; a tap deploys one; a tap in the zone is refused with a toast.
+	hud.card("ranger").pressed.emit()
+	check(view.deploy_unit == "ranger" and hud.card("ranger").theme_type_variation == &"TabSelected",
+		"the Ranger's card selected the Ranger")
+	var tap_cell: Vector2i = spots[0][0]
+	view.input.tapped.emit(_screen(main, view, tap_cell))
 	check(view.sim.unit_count() == 1 and view.sim.unit_type(1) == "ranger"
 		and view.sim.unit_position(1) == Vector2i(tap_cell.x * 1000 + 500, tap_cell.y * 1000 + 500),
 		"a tap deployed a Ranger on %s (%d units)" % [tap_cell, view.sim.unit_count()])
+	var blocked := Vector2i(2, 2)
+	check(view.is_masked(blocked), "%s is red in the deploy mask" % blocked)
+	view.input.tapped.emit(_screen(main, view, blocked))
+	check(view.sim.unit_count() == 1 and hud.toast_text() == "Can't deploy there",
+		"a tap in the zone deploys nothing: '%s'" % hud.toast_text())
 	await frames(2)
+	check(hud.card_count("ranger") == "x%d" % (int(ARMY["ranger"]) - 1), "the Ranger's card counts down: %s"
+		% hud.card_count("ranger"))
 	await screenshot("tick-%d" % CLOSE_TICKS[0])
 
+	# A drag over SMEAR cells in a row deploys one a cell, one a tick at most.
+	var row: Array[Vector2i] = []
+	for cell: Variant in spots[1]:
+		var at: Vector2i = cell
+		if at.y == (spots[1][0] as Vector2i).y and row.size() < SMEAR:
+			row.append(at)
+	var start := view.sim.unit_count()
+	var tick := view.sim.tick
+	view.input.drag_started.emit(_screen(main, view, row[0]))
+	for k: int in range(1, row.size()):
+		view.input.dragged.emit(_screen(main, view, row[k]), _screen(main, view, row[k]) - _screen(main, view, row[k - 1]))
+	view.input.drag_ended.emit(_screen(main, view, row[row.size() - 1]))
+	while view.sim.unit_count() < start + row.size() and view.sim.tick < tick + 4 * SMEAR:
+		await frames(1)
+	check(row.size() == SMEAR and view.sim.unit_count() == start + SMEAR and view.sim.tick - tick >= SMEAR,
+		"a drag over %d cells deployed %d Rangers over %d ticks" % [row.size(), view.sim.unit_count() - start,
+		view.sim.tick - tick])
+	await screenshot("smear")
+
+	# Back and forth over two cells side by side: each cell takes one unit, however often crossed.
+	var pair: Array[Vector2i] = []
+	for cell: Variant in spots[2]:
+		var at: Vector2i = cell
+		if pair.is_empty() and view.sim.is_deploy_cell(at + Vector2i.RIGHT):
+			pair = [at, at + Vector2i.RIGHT]
+	start = view.sim.unit_count()
+	tick = view.sim.tick
+	var a := _screen(main, view, pair[0])
+	var b := _screen(main, view, pair[1])
+	view.input.drag_started.emit(a)
+	for k: int in 4:
+		view.input.dragged.emit(b if k % 2 == 0 else a, (b - a) * (1.0 if k % 2 == 0 else -1.0))
+	view.input.drag_ended.emit(a)
+	while view.sim.tick < tick + 4 * SMEAR:
+		await frames(1)
+	check(pair.size() == 2 and view.sim.unit_count() == start + BACK_AND_FORTH,
+		"a drag back and forth over %s deployed %d (expected %d)" % [pair, view.sim.unit_count() - start, BACK_AND_FORTH])
+
 	await _until_tick(view, ALL_DOWN)
-	check(view.sim.unit_count() == n + 1 and view.units.drawn() > 0,
-		"all %d units deployed (%d), %d drawn" % [n + 1, view.sim.unit_count(), view.units.drawn()])
+	check(view.sim.unit_count() == n + BY_HUD and view.units.drawn() > 0,
+		"all %d units but the one kept back deployed (%d), %d drawn" % [n + BY_HUD, view.sim.unit_count(),
+		view.units.drawn()])
 	if harness.headless:
 		say("the battle's draw calls and frame time skipped (headless)")
 	else:
@@ -135,15 +207,39 @@ func run(main: MainScript) -> void:
 	_frame(main, CLOSE_ZOOM, focus)
 	await _until_tick(view, CLOSE_TICKS[1])
 	await screenshot("tick-%d" % CLOSE_TICKS[1])
+	check(hud.timer_text() == "%d:%02d" % [view.sim.seconds_left() / 60, view.sim.seconds_left() % 60]
+		and hud.destruction_text() == "%d%% destruction" % view.sim.destruction_pct()
+		and hud.stars_lit() == view.sim.stars(),
+		"the top bar: %s, %s, %d stars" % [hud.timer_text(), hud.destruction_text(), hud.stars_lit()])
 
-	view.speed = 2
+	hud.speed_button().pressed.emit()
+	check(view.speed == 2 and hud.speed_button().text == "2x", "the speed button runs the battle at 2x")
 	_frame(main, IsoCamera.MAX_ZOOM_SIZE, Vector3.ZERO)
 	await _until_tick(view, LATE_TICK)
 	if not view.sim.is_over():
 		await screenshot("tick-%d" % LATE_TICK)
+		hud.end_button().pressed.emit()
+		await frames(2)
+		check(hud.is_confirm_open() and not view.sim.is_over(), "End asks before it ends the battle")
+		# A real touch beside the open confirmation, on a deploy cell with the kept Ranger selected,
+		# reaches nothing.
+		var units_now := view.sim.unit_count()
+		var beside: Vector2i = spots[0][0]
+		await _touch(main, _screen(main, view, beside))
+		check(view.deploy_unit == "ranger" and view.sim.left_to_deploy("ranger") == KEPT
+			and view.sim.unit_count() == units_now and hud.is_confirm_open(),
+			"a touch beside the open confirmation deploys nothing (%d units)" % view.sim.unit_count())
+		await screenshot("confirm")
+		hud.keep_button().pressed.emit()
+		check(not hud.is_confirm_open() and not view.sim.is_over(), "Keep fighting goes back to the battle")
+		hud.end_button().pressed.emit()
+		hud.confirm_end_button().pressed.emit()
+		check(view.sim.is_over(), "End battle surrenders")
 	while not view.sim.is_over():
 		await frames(1)
-	await frames(2)
+	await frames(4)
+	check(hud.is_result_open() and not hud.deploy_bar().visible, "the result panel replaces the deploy bar: %s"
+		% ", ".join(hud.result_lines()))
 	await screenshot("end")
 	var step := view.step_ms()
 	say("the battle: %d ticks, destruction %d%%, %d stars, loot %s; the sim's step %.3f ms on average, %.3f ms at the longest (tick %d)"
@@ -151,6 +247,9 @@ func run(main: MainScript) -> void:
 		view.slowest_tick()])
 	check(step.x <= STEP_CEILING, "the sim's step averages under %.0f ms (%.3f)" % [STEP_CEILING, step.x])
 	check(view.sim.destruction_pct() > 0, "something fell (%d%%)" % view.sim.destruction_pct())
+	await frames(30)
+	check(not _finished, "the battle stays until Return")
+	hud.return_button().pressed.emit()
 	while not _finished:
 		await frames(1)
 
@@ -163,16 +262,56 @@ func run(main: MainScript) -> void:
 	var by_unit: Dictionary = _result.get("deployed", {})
 	for unit: String in by_unit:
 		deployed += int(by_unit[unit])
-	check(deployed == n + 1, "%d units deployed in the result" % deployed)
+	check(deployed == n + BY_HUD, "%d units deployed in the result" % deployed)
 	await frames(2)
-	check(main.battle == null and main.base_view.is_inside_tree() and main.world_input.is_inside_tree()
-		and main.hud.visible and main.hud.toast_text() == "Practice: nothing applied",
+	check(main.battle == null and main.battle_hud == null and main.base_view.is_inside_tree()
+		and main.world_input.is_inside_tree() and main.hud.visible and main.hud.toast_text() == "Practice: nothing applied",
 		"the base came back: '%s'" % main.hud.toast_text())
 	check(is_equal_approx(main.camera.size, zoom) and main.camera.focus.is_equal_approx(focus_before),
 		"the camera is back where it was over the base: size %.1f (%.1f)" % [main.camera.size, zoom])
 	check(_kept(main.state) == before, "the base's buildings, resources, army and raids are as they were")
 	await frames(4)
 	await screenshot("back")
+
+	# Every unit type brought, one each: the deploy bar scrolls rather than reach the Build column.
+	var every := {}
+	for unit: String in catalog.unit_types():
+		every[unit] = 1
+	var wide := main.practice_setup()
+	wide["attacker"] = {"army": every, "unit_levels": {}, "abilities": {}}
+	_finished = false
+	check(main.open_battle(wide, true) == "", "a battle with one of every type opens")
+	await frames(4)
+	var bar := main.battle_hud.deploy_bar().get_global_rect()
+	var safe := Hud.safe_area(main.get_viewport())
+	var column := safe.end.x - Hud.MARGIN - Hud.BUILD_SIZE.x
+	check(bar.end.x <= column, "with %d types the deploy bar ends at x %.0f, left of the Build column at %.0f"
+		% [every.size(), bar.end.x, column])
+	await screenshot("every-type")
+	main.battle.finished.connect(func(_setup: Dictionary, _result: Dictionary) -> void: _finished = true)
+	main.battle_hud.end_button().pressed.emit()
+	main.battle_hud.confirm_end_button().pressed.emit()
+	await frames(2)
+	main.battle_hud.return_button().pressed.emit()
+	while not _finished:
+		await frames(1)
+	await frames(2)
+	check(main.battle == null, "it ends and the base comes back")
+
+
+## A real touch at `point` (a press and a release), through the input events.
+func _touch(main: MainScript, point: Vector2) -> void:
+	for pressed: bool in [true, false]:
+		var touch := InputEventScreenTouch.new()
+		touch.position = main.get_viewport().get_final_transform() * point
+		touch.pressed = pressed
+		Input.parse_input_event(touch)
+		await frames(2)
+
+
+## The screen point of `cell`'s centre on the battle's field.
+func _screen(main: MainScript, view: BattleView, cell: Vector2i) -> Vector2:
+	return main.camera.unproject_position(view.field.cell_to_world(cell, 1))
 
 
 ## What a battle could have changed in the base: its save without the clock and the production

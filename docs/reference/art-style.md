@@ -1455,7 +1455,8 @@ The finished walls are one merged mesh, a fixed handful of draws however many th
 (`input-camera.md`, **Walls**).
 
 **A battle** on the maxed base with a full army (the `battle_view` scenario's 167 units, 280
-housing) is held to the same ceilings at the widest zoom: 974 draw calls, 2.00 million primitives
+housing) is held to the same ceilings at the widest zoom: 974 draw calls (1,031 with the attack
+HUD), 2.00 million primitives
 and 1.6 ms of render CPU a frame on the development Mac, the units in their far versions
 (`battle-view.md`, **Cost**). Every unit of a type is three draws (one MultiMesh for the body, one
 for its outline, the body's shadow), every effect kind one.

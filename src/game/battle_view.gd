@@ -18,16 +18,24 @@ extends Node3D
 ## a faint dome while it is up. The camera is the base's IsoCamera, free over the field.
 ##
 ## Input comes from a WorldInput of its own (main.gd takes the base's out of the tree for the
-## battle): a pinch or a two-finger pan moves the camera, a drag pans it, and a tap on the field
-## deploys one unit of `deploy_unit` there (the first type with units left by default).
+## battle): a pinch or a two-finger pan moves the camera. With a unit type selected (select_unit,
+## the attack HUD's deploy bar), the ground shows where it cannot go in red (the deploy mask, one
+## texel a cell, BaseView.set_deploy_mask), a tap on the field deploys one there, and a drag deploys
+## one on every cell it crosses, one a tick at most (Clash's smear); with none selected a drag pans.
+## A refusal is told through `deploy_failed`, and a refusal for the zone flashes the red brighter.
 ##
-## main.gd makes it, adds it in place of the base's view and frees it on `finished`, which it
-## emits END_HOLD_SECONDS after the battle ends, with the setup and the sim's result.
+## main.gd makes it, adds it in place of the base's view with its BattleHud, and frees both on
+## `finished`, which leave() emits (the result panel's Return) with the setup and the sim's result;
+## `ended` tells the HUD the battle is over.
 
 signal finished(setup: Dictionary, result: Dictionary)
 ## The sim stepped (one or more ticks this frame): the attack HUD (series B's BattleHud) refreshes
 ## on it.
 signal stepped
+## The battle ended (BattleSim.is_over), with its result.
+signal ended(result: Dictionary)
+## A deploy was refused (BattleSim's code: blocked, none_left, battle_over).
+signal deploy_failed(error: String)
 
 ## Seconds of battle a tick is, and the most ticks one frame steps.
 const TICK_SECONDS := 1.0 / BattleSim.TICKS_PER_SECOND
@@ -36,8 +44,11 @@ const MAX_STEPS_PER_FRAME := 4
 ## button (series B's BattleHud) steps through. `speed` 0, which the harness sets while it
 ## measures, pauses it: no tick is stepped and the effects' clock stands still.
 const SPEEDS: Array[int] = [1, 2]
-## How long the field stays after the end before `finished`.
-const END_HOLD_SECONDS := 3.0
+## The deploy mask's strength while a type is selected, after a refusal for the zone, and how long
+## that flash takes to fade back.
+const MASK_STRENGTH := 0.32
+const MASK_FLASH := 0.75
+const MASK_FLASH_SECONDS := 0.5
 ## A hit's flash and shake on a building, and how far it shakes.
 const FLASH_SECONDS := 0.08
 const SHAKE_SECONDS := 0.18
@@ -68,7 +79,7 @@ var battle_setup: Dictionary = {}
 var catalog: Catalog
 ## 1 or 2 (SPEEDS): ticks a 50 ms of real time; 0 pauses (the harness's measuring).
 var speed: int = 1
-## The unit type a tap deploys; "" deploys the first type with units left.
+## The unit type selected to deploy (select_unit); "" for none.
 var deploy_unit: String = ""
 var camera: IsoCamera
 ## The defender's field: ground, scenery, the merged walls.
@@ -108,10 +119,24 @@ var _arc_towers: Dictionary[int, bool] = {}
 ## units).
 var _reach: Dictionary[String, int] = {}
 var _splash: Dictionary[String, float] = {}
-## When the battle ended on the clock, -1 while it runs, and the real seconds since.
+## When the battle ended on the clock, -1 while it runs.
 var _ended_at: float = -1.0
-var _held: float = 0.0
 var _finished: bool = false
+## The deploy mask, one texel a cell (255 where a unit cannot go), its texture, whether a fall
+## changed it this frame, and when a refusal for the zone flashed it.
+var _mask_image: Image
+var _mask: ImageTexture
+var _mask_changed: bool = false
+var _mask_flash_at: float = -10.0
+## A drag deploying (a smear): whether one is under way, the last cell it reached, and the cells
+## it crossed still to deploy on, one a tick.
+var _smearing: bool = false
+var _smear_cell: Vector2i = Vector2i(-1, -1)
+var _smear: Array[Vector2i] = []
+## Every cell this drag has reached, so crossing one again deploys nothing more.
+var _smear_seen: Dictionary[Vector2i, bool] = {}
+## Buildings fallen so far, walls included: the HUD reads the loot again when it moves.
+var _falls: int = 0
 ## The sim's step time: total and longest, in microseconds, and the steps counted.
 var _step_usec: int = 0
 var _step_usec_max: int = 0
@@ -202,9 +227,14 @@ func setup(battle_catalog: Catalog, setup_data: Dictionary, iso_camera: IsoCamer
 	input = WorldInput.new()
 	add_child(input)
 	input.tapped.connect(_on_tapped)
-	input.dragged.connect(func(at: Vector2, delta: Vector2) -> void: camera.pan(at, delta))
+	input.drag_started.connect(_on_drag_started)
+	input.dragged.connect(_on_dragged)
+	input.drag_ended.connect(func(_at: Vector2) -> void: _smearing = false)
 	input.pinched.connect(func(factor: float, at: Vector2) -> void: camera.zoom_at(factor, at))
 	input.panned.connect(func(at: Vector2, delta: Vector2) -> void: camera.pan(at, delta))
+	_mask_image = Image.create(grid.x, grid.y, false, Image.FORMAT_L8)
+	_mask = ImageTexture.create_from_image(_mask_image)
+	_update_mask()
 	return ""
 
 
@@ -272,6 +302,9 @@ func _process(delta: float) -> void:
 	if sim.is_over() and _ended_at < 0.0:
 		_ended_at = _clock
 		_accumulator = TICK_SECONDS
+		_smear.clear()
+		select_unit("")
+		ended.emit(sim.result())
 	var alpha := clampf(_accumulator / TICK_SECONDS, 0.0, 1.0)
 	effects.begin_bars()
 	units.draw(alpha, _clock, shown, effects, camera.size >= BattleUnits.FAR_ZOOM)
@@ -281,11 +314,40 @@ func _process(delta: float) -> void:
 	if _walls_changed:
 		_walls_changed = false
 		field.walls.rebuild_cells(catalog, _walls)
-	if _ended_at >= 0.0 and not _finished:
-		_held += delta
-		if _held >= END_HOLD_SECONDS:
-			_finished = true
-			finished.emit(battle_setup, sim.result())
+	if _mask_changed:
+		_mask_changed = false
+		_update_mask()
+	if deploy_unit != "":
+		var flash := clampf(1.0 - (_clock - _mask_flash_at) / (MASK_FLASH_SECONDS * maxi(speed, 1)), 0.0, 1.0)
+		field.set_deploy_mask(_mask, lerpf(MASK_STRENGTH, MASK_FLASH, flash))
+
+
+## Selects the unit type a tap or a drag deploys, "" for none: the red zone shows while one is.
+## Letting the type go ends a smear under way; the rest of that drag pans.
+func select_unit(unit: String) -> void:
+	deploy_unit = unit
+	_smear.clear()
+	if unit == "":
+		_smearing = false
+	field.set_deploy_mask(_mask, MASK_STRENGTH if unit != "" else 0.0)
+
+
+## Buildings fallen so far, walls included; it moves only when the loot can have.
+func falls() -> int:
+	return _falls
+
+
+## Whether the cell is red in the deploy mask now (a unit cannot be deployed on it).
+func is_masked(cell: Vector2i) -> bool:
+	return _mask_image.get_pixel(cell.x, cell.y).r > 0.5
+
+
+## Leaves the battle once it is over (the result panel's Return): `finished`, once.
+func leave() -> void:
+	if _finished or not sim.is_over():
+		return
+	_finished = true
+	finished.emit(battle_setup, sim.result())
 
 
 func _step() -> void:
@@ -294,6 +356,7 @@ func _step() -> void:
 		_next_script += 1
 		if int(scripted["tick"]) == sim.tick:
 			sim.command(scripted)
+	_deploy_smear()
 	var started := Time.get_ticks_usec()
 	sim.step()
 	var spent := Time.get_ticks_usec() - started
@@ -349,6 +412,7 @@ func _read_events() -> void:
 					effects.impact(_point(events.from_x[i], events.from_y[i]), 1.0, DEFENCE_SHOT, _clock)
 			BattleEvents.FALL:
 				_fall(source)
+				_mask_changed = true
 			BattleEvents.DEATH:
 				units.die(target, _clock)
 
@@ -385,6 +449,7 @@ func _on_arrived(building: int, unit: int) -> void:
 ## Building `id` fell: a wall leaves the merged mesh for its strip, a trap is gone, any other
 ## building is replaced by its rubble with a burst of dust.
 func _fall(id: int) -> void:
+	_falls += 1
 	var cell: Vector2i = _cells.get(id, Vector2i.ZERO)
 	var size: int = _sizes.get(id, 1)
 	var at := field.cell_to_world(cell, size)
@@ -448,21 +513,86 @@ func _draw_buildings(shown: float) -> void:
 		_bar_until.erase(id)
 
 
-## A tap on the field deploys one unit of `deploy_unit` (or the first type with units left) on the
-## cell under it.
+## A tap on the field deploys one unit of the selected type on the cell under it.
 func _on_tapped(screen_pos: Vector2) -> void:
+	if deploy_unit == "":
+		return
+	var cell := _cell_at(screen_pos)
+	if cell.x < 0:
+		return
+	_report(deploy(deploy_unit, cell))
+
+
+## A drag with a type selected deploys along its way (a smear), starting on the cell it was
+## pressed on; with none selected it pans.
+func _on_drag_started(screen_pos: Vector2) -> void:
+	_smearing = deploy_unit != "" and not sim.is_over()
+	_smear_seen.clear()
+	if _smearing:
+		_smear_cell = _cell_at(screen_pos)
+		if _smear_cell.x >= 0:
+			_smear.append(_smear_cell)
+			_smear_seen[_smear_cell] = true
+
+
+func _on_dragged(screen_pos: Vector2, delta: Vector2) -> void:
+	if not _smearing:
+		camera.pan(screen_pos, delta)
+		return
+	var cell := _cell_at(screen_pos)
+	if cell.x < 0 or cell == _smear_cell:
+		return
+	# Every cell on the way from the last one, so a fast stroke leaves no gaps.
+	var from := _smear_cell if _smear_cell.x >= 0 else cell
+	var steps := maxi(absi(cell.x - from.x), absi(cell.y - from.y))
+	for k: int in range(1, steps + 1):
+		var on := Vector2i(roundi(lerpf(from.x, cell.x, float(k) / steps)), roundi(lerpf(from.y, cell.y, float(k) / steps)))
+		if not _smear_seen.has(on):
+			_smear_seen[on] = true
+			_smear.append(on)
+	_smear_cell = cell
+
+
+## Before a step: one unit on the first cell of the smear that takes one; cells refused for the
+## zone are skipped, and running out of the type ends the smear (the rest of the drag pans).
+func _deploy_smear() -> void:
+	while not _smear.is_empty():
+		var cell: Vector2i = _smear.pop_front()
+		var error := deploy(deploy_unit, cell)
+		if error == "":
+			return
+		if error != BattleSim.ERR_BLOCKED:
+			_smear.clear()
+			_smearing = false
+			_report(error)
+			return
+
+
+## A refused deploy: told through deploy_failed; one refused for the zone flashes the red brighter.
+func _report(error: String) -> void:
+	if error == "":
+		return
+	if error == BattleSim.ERR_BLOCKED:
+		_mask_flash_at = _clock
+	deploy_failed.emit(error)
+
+
+## The field cell under a screen point; (-1, -1) off the ground.
+func _cell_at(screen_pos: Vector2) -> Vector2i:
 	var point: Variant = camera.ground_point(screen_pos)
 	if typeof(point) != TYPE_VECTOR3:
-		return
-	var unit := deploy_unit
-	if unit == "":
-		for name: String in units_brought():
-			if sim.left_to_deploy(name) > 0:
-				unit = name
-				break
-	if unit != "":
-		var ground: Vector3 = point
-		deploy(unit, field.world_to_cell(ground))
+		return Vector2i(-1, -1)
+	var ground: Vector3 = point
+	return field.world_to_cell(ground)
+
+
+## Rewrites the deploy mask from the sim: 255 on every cell a unit cannot be deployed on.
+func _update_mask() -> void:
+	var grid := catalog.grid_size
+	for y: int in grid.y:
+		for x: int in grid.x:
+			_mask_image.set_pixel(x, y, Color.BLACK if sim.is_deploy_cell(Vector2i(x, y)) else Color.WHITE)
+	_mask.update(_mask_image)
 
 
 ## The unit types the attacker brought, in sorted order.

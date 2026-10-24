@@ -6,7 +6,8 @@ signals to `PlacementController` (`input-camera.md`). Two controls of its own dr
 `HudIcon` (`hud_icon.gd`), the vector icons and the unit glyphs, and `DroneRing`
 (`drone_ring.gd`), the drones.
 `ModelPreview` (`model_preview.gd`), a node under it, renders the cards' pictures, the buildings'
-and the units'.
+and the units'. The battle's attack HUD, `BattleHud` (`battle_hud.gd`), is a `CanvasLayer` of its
+own in the same theme (**Battle HUD**).
 
 ## The touch rule
 
@@ -304,7 +305,8 @@ Units' pictures are keyed `ModelPreview.unit_key(unit, tier)` and rendered from
 the queue's front and builds the viewport again if it was freed. The army panel asks for its shown
 cards' pictures (each unit at its researched level's tier, `UnitModels.tier_of`) when it opens
 and on each refresh, and the preview runs while the build panel or the army panel is open
-(`_run_preview`); a card is blank until its picture comes (`rendered`).
+(`_run_preview`); a card is blank until its picture comes (`rendered`). The battle's deploy bar
+shares the preview (`Hud.preview()`).
 
 ## Info panel
 
@@ -396,7 +398,7 @@ coordinates (the viewport's visible rect: 1280×720 on a 16:9 screen under the `
 stretch), by setting its offsets. It pads the build panel's content, and the army panel's, by
 the same inset on the left, the right and the bottom, and sets their height for the screen's.
 `_fit_safe_area`
-fits it to the device (the rect is `Hud.safe_area(viewport)`, static) in `setup`, on `get_viewport().size_changed`, and on every `refresh` (the
+fits it to the device (the rect is `Hud.safe_area(viewport)`, static, which `BattleHud` uses too) in `setup`, on `get_viewport().size_changed`, and on every `refresh` (the
 1 s tick's included), since turning a phone over moves the notch to the other side without a
 resize: `DisplayServer.get_display_safe_area()`, in screen pixels, is clipped to the window
 (`window_get_position`, `window_get_size`), made relative to it, and scaled by the visible
@@ -406,6 +408,34 @@ it the result is the whole visible rect, and a window reaching outside it (over 
 say) is inset to the part inside. A window with no size (a headless run) gets the whole
 visible rect. The harness calls `apply_safe_area` to try a notch-like inset on a desktop window;
 that inset stays until the device's safe area changes.
+
+## Battle HUD
+
+`src/game/battle_hud.gd`, `BattleHud`: the attack HUD, a `CanvasLayer` `main.gd` adds beside a
+battle (`battle-view.md`) while the base's HUD is hidden. It takes the base HUD's theme
+(`Hud.ui_theme()`) and its pictures (`Hud.preview()`), reads the `BattleView` and its sim, and
+reports presses to the view (`select_unit`, `speed`, `surrender`, `leave`); it never changes the
+sim itself. Its root takes no touch and sits in the safe area (`Hud.safe_area`, fitted on a resize
+and when the timer's second changes); its panels and buttons take theirs.
+
+| Part | Where | What |
+| --- | --- | --- |
+| Status panel | top left | the time left as `m:ss` (`seconds_left`, Bangers 24), "N% destruction" (`destruction_pct`) and three stars drawn in code (`BattleHud.Star`: a five-pointed fill over an ink shadow, ink-outlined, gold once won, `CARD_DISABLED` violet until) |
+| Speed and End | top right | `1x`/`2x`, toggling `BattleView.speed` through `SPEEDS`; End, which opens the confirmation |
+| Loot | top right, under them | "Loot" over a row per resource: its icon (`HudIcon`) and the amount taken so far (`loot()`, `Format.short`) in its colour |
+| Deploy bar | along the bottom from the left margin, as wide as its cards (and scrolling when they would reach the Build button's column, which stays clear), the rest of the bottom edge left to the field | a `MenuPanel` with a strip of cards (124×136), one per unit type brought in sorted order: the unit's picture (64×64, its attacker's level's tier), its name and "xN" left (`left_to_deploy`). A press selects the type (the accent fill, `TabSelected`, its text in ink) or, on the selected card, lets it go; the first card starts selected. A type run out is let go and its card shown at 55 %. Cards PASS, so a drag on one scrolls the strip |
+| Confirmation | centred, over a faint ink dim across the whole screen that takes every touch while it is open, so no tap or drag beside the panel reaches the field | "End the battle?", Keep fighting (accent) and End battle, which surrenders (`BattleView.surrender`) |
+| Result panel | centred, on `ended` | "Victory!" with a star or more, else "Defeat"; the stars (64×64); "N% destruction"; the loot per resource; "Units deployed" with each type's picture and "Name xN" (the result's `deployed`), or "No units deployed"; Return, which leaves the battle (`BattleView.leave`). The deploy bar hides and Speed and End are disabled |
+| Toast | top centre | a refused deploy (`deploy_failed`): "Can't deploy there" (`blocked`), "None of those left" (`none_left`: a tap never meets it, since a card run out is let go at once, but a smear can when a frame steps several ticks and the type runs out between two), faded after a second |
+
+The top bar's text is set on the view's `stepped`, only where what it shows changed: the time,
+the destruction, the stars and each card's count are kept as ints and formatted only when one
+moves, and the loot is read (`BattleSim.loot()` builds a dictionary) only after a building has
+fallen (`BattleView.falls()`), so a refresh with nothing changed allocates nothing. Queries for
+the harness: `card(unit)`, `card_count(unit)`, `card_picture(unit)`, `timer_text()`,
+`destruction_text()`, `stars_lit()`, `loot_text(res)`, `speed_button()`, `end_button()`,
+`is_confirm_open()`, `confirm_end_button()`, `keep_button()`, `is_result_open()`,
+`result_lines()`, `return_button()`, `deploy_bar()`, `toast_text()`.
 
 ## Signals
 
@@ -437,7 +467,8 @@ is the top bar's meter for a resource and `resource_fill(res)` its fill, whose p
 whose `free_count()` and `total_count()` are the counts it shows; `reset_button()` and
 `template_button()` are the debug row's Reset base and Template base, and `practice_button()` its
 Practice raid (null in a release build). `train_card_picture(unit)` is a training card's picture
-(null until rendered); `ui_theme()` and `preview()` hand out the theme and the pictures.
+(null until rendered); `ui_theme()` and `preview()` hand the theme and the pictures to the battle's
+HUD.
 The army: `army_meter()`, `army_meter_text()` and `army_fill()` are the army meter, its text and
 its fill; `action_button()` is the info panel's Train or Research; `army_panel()` the army panel,
 `is_training_open()` and `is_research_open()` which page it shows (open or opening),

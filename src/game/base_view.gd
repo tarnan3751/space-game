@@ -280,6 +280,19 @@ func set_grid_highlight(on: bool) -> void:
 	_ground_material.set_shader_parameter("line_strength", GRID_LINES_PLACING if on else GRID_LINES)
 
 
+## A battle's deploy mask over the ground (BattleView): `mask` one texel a cell, red over 0 where a
+## unit cannot be deployed, tinted at `strength`; 0 hides it.
+func set_deploy_mask(mask: Texture2D, strength: float) -> void:
+	_ground_material.set_shader_parameter("deploy_mask", mask)
+	_ground_material.set_shader_parameter("deploy_strength", strength)
+
+
+## The deploy mask's strength now (set_deploy_mask); 0 when it is hidden.
+func deploy_strength() -> float:
+	var strength: Variant = _ground_material.get_shader_parameter("deploy_strength")
+	return float(strength) if strength != null else 0.0
+
+
 ## Whether the cell grid is shown (set_grid_highlight).
 func is_grid_shown() -> bool:
 	var strength: float = _ground_material.get_shader_parameter("line_strength")
