@@ -215,9 +215,10 @@ the origin, cell (x, y) on world (x, z).
 | `craters`, `mesas`, `outcrop_spots` | The terrain's craters as (x, z, radius) and mesas as (x, z, radius, top height), and each crystal outcrop's centre on the ground. |
 | `mesa_profile(k, turn)`, `mesa_ledges`, `mesa_indices` | Mesa `k`'s profile `turn` radians round it, as (distance from its middle, height) from the top's inner ring through the rim (`MESA_RIM`) and the wall's rings to the fillet (from `MESA_FILLET_TOP`), which the mesh and `terrain_height` share; each mesa's ledge as (start, length, step out); and each mesa's triangles in the terrain body's index array as (first index, end), for the harness. |
 
-`setup(size)` builds the ground and the scenery once; the terrain, the rocks and the outcrops are
-drawn from `SeededRng.new(SCENERY_SEED)` (7) in that order, so every player's base sits in the
-same landscape. How each looks is in `art-style.md`, **Environment**:
+`setup(size, landscape_seed = SCENERY_SEED)` builds the ground and the scenery once; the terrain,
+the rocks and the outcrops are drawn from `SeededRng.new(landscape_seed)` in that order: the base's
+from `SCENERY_SEED` (7), so every player's base sits in the same landscape, and a battle's field
+from the battle's seed (`battle-view.md`); `scenery_seed` keeps it. How each looks is in `art-style.md`, **Environment**:
 
 - **The ground**: a `PlaneMesh` of the grid's size, flat at y = 0 (the camera picks against that
   plane), with `ground.gdshader` on the field texture (`assets/textures/field.png`, an atlas of
@@ -330,6 +331,7 @@ level's piece.
 | --- | --- |
 | `body`, `outline` | Its two `MeshInstance3D`: the pieces' bodies and their ink outlines. The outline casts no shadow. |
 | `draws(building)` | Static: whether the merged mesh draws a building, a wall (type `PlacementController.PAINT_TYPE`, `"barrier_wall"`, 1x1) with `level >= 1`. |
+| `rebuild_cells(catalog, levels)` | The same from a map of wall levels by cell, for a caller with no `BaseState` (the battle's field, whose walls fall); `rebuild` collects its map and calls it. |
 | `rebuild(state, skip_id)` | Collects every wall `draws` accepts but `skip_id`, computes each one's mask from the others' cells and its lower mask from their solid tops, and appends each piece's body and outline arrays, moved to its cell, into one `ArrayMesh` for each. The copy is the engine's bulk calls (`Transform3D * PackedVector3Array`, `append_array`), nothing per vertex in script. |
 | `mask_at(cell)` | The mask of the wall drawn on a cell at the last rebuild, `-1` when none is. |
 

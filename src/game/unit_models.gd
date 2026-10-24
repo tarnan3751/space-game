@@ -72,12 +72,18 @@ static func tier_of(catalog: Catalog, type: String, level: int) -> int:
 
 ## The model of `type` built for `tier` (tier_of), cached by type and tier.
 static func create(type: String, tier: int) -> Node3D:
+	return BuildingModels.assemble(meshes(type, tier))
+
+
+## The meshes of `type` built for `tier`, cached by type and tier: the body and its outline, for a
+## caller that draws them itself (BattleView's MultiMeshes).
+static func meshes(type: String, tier: int) -> BuildingModels.Meshes:
 	var key := "%s/%d" % [type, tier]
-	var meshes: BuildingModels.Meshes = _cache.get(key)
-	if meshes == null:
-		meshes = BuildingModels.meshes_of(build(type, tier))
-		_cache[key] = meshes
-	return BuildingModels.assemble(meshes)
+	var built: BuildingModels.Meshes = _cache.get(key)
+	if built == null:
+		built = BuildingModels.meshes_of(build(type, tier))
+		_cache[key] = built
+	return built
 
 
 ## A model's nodes for parts `p` a caller built, uncached.

@@ -44,11 +44,18 @@ static func draws(building: BuildingState) -> bool:
 
 ## Rebuilds the mesh from every wall of `state` that draws() accepts, except `skip_id`.
 func rebuild(state: BaseState, skip_id: int) -> void:
-	_levels.clear()
+	var levels: Dictionary[Vector2i, int] = {}
 	for id: int in state.buildings:
 		var building: BuildingState = state.buildings[id]
 		if id != skip_id and draws(building):
-			_levels[building.cell] = building.level
+			levels[building.cell] = building.level
+	rebuild_cells(state.catalog, levels)
+
+
+## Rebuilds the mesh from the walls in `levels` (each wall's level by its cell): for a caller with
+## no BaseState (BattleView, whose walls fall).
+func rebuild_cells(catalog: Catalog, levels: Dictionary[Vector2i, int]) -> void:
+	_levels = levels.duplicate()
 	if _levels.is_empty():
 		body.mesh = null
 		outline.mesh = null
@@ -57,7 +64,7 @@ func rebuild(state: BaseState, skip_id: int) -> void:
 	var outlines := Merged.new()
 	for cell: Vector2i in _levels:
 		var level := _levels[cell]
-		var tier := BuildingModels.tier_of(state.catalog, PlacementController.PAINT_TYPE, level)
+		var tier := BuildingModels.tier_of(catalog, PlacementController.PAINT_TYPE, level)
 		var piece := WallModels.piece(level, tier, mask_at(cell), _lower_mask_at(cell))
 		var at := Transform3D(Basis(), _base_view.cell_to_world(cell, 1))
 		bodies.append(piece.body, at)

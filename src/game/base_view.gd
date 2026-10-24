@@ -7,12 +7,11 @@ extends Node3D
 ## (x, y) maps to world (x, z).
 ##
 ## The terrain, the rocks and the crystal outcrops are generated from SCENERY_SEED, so every
-## player's base sits in the same landscape: a ring of dunes, craters, mesas and a dry channel
-## rising from low, rough ground beside the curb along an edge that wanders, smooth shaded, tinted
-## by slope and drawn over by the terrain shader (the field's marks, wind ripples, rock strata),
-## with chamfered rocks, small ones strewn beside the curb as rubble, and glowing crystal clusters
-## on it. Each is one mesh with its ink
-## outline.
+## player's base sits in the same landscape (a battle's field is given its own seed in setup()): a
+## ring of dunes, craters, mesas and a dry channel rising from low, rough ground beside the curb
+## along an edge that wanders, smooth shaded, tinted by slope and drawn over by the terrain shader
+## (the field's marks, wind ripples, rock strata), with chamfered rocks, small ones strewn beside
+## the curb as rubble, and glowing crystal clusters on it. Each is one mesh with its ink outline.
 
 const GROUND_SHADER := preload("res://src/game/ground.gdshader")
 ## The field texture the ground is drawn from, imported as an Image (tools/gen_textures.gd).
@@ -177,6 +176,8 @@ static var SHARDS: Array[Surf] = [
 ]
 
 var grid_size: Vector2i = Vector2i.ZERO
+## The seed the landscape was generated from (setup).
+var scenery_seed: int = SCENERY_SEED
 var views: Dictionary[int, BuildingView] = {}
 ## Building drawn with a selection tile.
 var selected_id: int = 0
@@ -227,11 +228,14 @@ var _channel: Vector3 = Vector3.ZERO
 var _channel_course: Vector2 = Vector2.ZERO
 
 
-func setup(size: Vector2i) -> void:
+## Builds the field for a `size` grid in the landscape of `landscape_seed`: SCENERY_SEED for the
+## base, a battle's own seed for the field it is fought on (BattleView).
+func setup(size: Vector2i, landscape_seed: int = SCENERY_SEED) -> void:
 	grid_size = size
+	scenery_seed = landscape_seed
 	_build_ground()
 	_build_boundary()
-	var rng := SeededRng.new(SCENERY_SEED)
+	var rng := SeededRng.new(scenery_seed)
 	_build_terrain(rng)
 	var stones := LowPolyMesh.new()
 	var stone_spots := _build_rocks(stones, rng)
@@ -930,7 +934,7 @@ static func _ring_noise(values: PackedFloat32Array, first: int, count: int, turn
 ## Mesa `k`'s jagged rim, rough wall and ledge, drawn from a generator of its own, so the rest of
 ## the scenery keeps its places.
 func _shape_mesa(k: int) -> void:
-	var rng := SeededRng.new((SCENERY_SEED * 7919 + k * 104729 + 12345) & SeededRng.MASK_32)
+	var rng := SeededRng.new((scenery_seed * 7919 + k * 104729 + 12345) & SeededRng.MASK_32)
 	var rim := PackedFloat32Array()
 	for i: int in roundi(360.0 / MESA_JAG_LATTICE):
 		rim.append(rng.range_int(-1000, 1000) / 1000.0)

@@ -1084,7 +1084,8 @@ building; the paint brush is a ghost and keeps plain ink.
 The ground and everything round it, drawn in the buildings' language: a levelled, lit landing
 plain inside a wilder landscape of the same ground, so the base reads as a settlement. `BaseView.setup`
 builds it all once; the terrain, the rocks and the outcrops come from `SeededRng` on
-`SCENERY_SEED` (7), so every base sits in the same landscape (`input-camera.md`, **BaseView**).
+`SCENERY_SEED` (7), so every base sits in the same landscape (`input-camera.md`, **BaseView**); a
+battle's field is the same landscape drawn from the battle's seed.
 
 **The field** (`ground.gdshader`, on the 48×48 `PlaneMesh` at y = 0): one seamless levelled plain
 of regolith with natural marks scattered over it. Everywhere the ground is the plate tint covered
