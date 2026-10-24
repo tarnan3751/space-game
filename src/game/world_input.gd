@@ -26,6 +26,23 @@ var _dragging: bool = false
 var _multi_touch: bool = false
 
 
+## Out of the tree (main.gd takes it out for the sector map and for a battle) it hears no event,
+## so a finger down when it left would never be released: it forgets every finger on leaving and
+## on coming back, and the first touch after is a gesture of its own.
+func _enter_tree() -> void:
+	_reset()
+
+
+func _exit_tree() -> void:
+	_reset()
+
+
+func _reset() -> void:
+	_touches.clear()
+	_dragging = false
+	_multi_touch = false
+
+
 ## A drag that began on the world stays with the world even when the finger passes
 ## over a HUD panel (otherwise the panel would swallow the rest of the drag).
 func _input(event: InputEvent) -> void:

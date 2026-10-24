@@ -15,10 +15,13 @@ extends Node3D
 ##
 ## A battle (BattleView) takes the base's place while it runs: open_battle() takes the base's view
 ## and input out of the tree, hides the HUD and adds the battle and its attack HUD (BattleHud) in
-## their place; when it finishes (the result panel's Return), the base comes back. Until the
-## sector map exists, the only battle is the debug build's Practice raid (practice_setup): the
-## template base raided by the army in the Hangars, whose result is never applied, so the save
-## and the real base are untouched by it.
+## their place; when it finishes (the result panel's Return), the base comes back. An expedition
+## starts from the sector map (SectorMap, over the base while it is open, the world's input out of
+## the tree): the chosen field's outpost (OutpostGenerator) raided by the army in the Hangars,
+## drawn as a rival colony; its result is applied through PlacementController.raid_result, and the
+## map opens again on the base. The debug build's Practice raid (practice_setup) raids the
+## template base instead, and its result is never applied, so the save and the real base are
+## untouched by it.
 
 const DEFAULT_SAVE_PATH := "user://base.json"
 const SAVE_PATH_ARG := "--save-path="
@@ -37,6 +40,8 @@ var camera: IsoCamera
 var world_input: WorldInput
 var placement: PlacementController
 var hud: Hud
+## The expeditions' screen, over the base while it is open.
+var sector_map: SectorMap
 ## The battle running in the base's place and its HUD; null when there is none.
 var battle: BattleView
 var battle_hud: BattleHud
@@ -74,6 +79,9 @@ func _ready() -> void:
 	hud.cheats = cheats
 	add_child(hud)
 	hud.setup(catalog)
+	sector_map = SectorMap.new()
+	sector_map.setup(catalog)
+	hud.add_screen(sector_map)
 
 	placement = PlacementController.new()
 	placement.base_view = base_view
@@ -96,6 +104,10 @@ func _ready() -> void:
 	hud.make_pressed.connect(_on_make_pressed)
 	hud.cancel_making_pressed.connect(_on_cancel_making_pressed)
 	hud.research_ability_pressed.connect(_on_research_ability_pressed)
+	hud.expedition_pressed.connect(open_sector_map)
+	sector_map.closed.connect(_on_sector_map_closed)
+	sector_map.scan_pressed.connect(_on_scan_pressed)
+	sector_map.attack_pressed.connect(_on_attack_pressed)
 	placement.selection_changed.connect(_refresh_hud)
 	placement.placing_changed.connect(_on_placing_changed)
 	placement.command_failed.connect(hud.show_error)
@@ -130,6 +142,8 @@ func _on_tick() -> void:
 	# Timer labels change every second even when nothing else did.
 	base_view.sync(state)
 	_refresh_hud()
+	if sector_map.visible:
+		sector_map.tick(state)
 	_ticks += 1
 	if _ticks % SAVE_EVERY_TICKS == 0:
 		_save()
@@ -139,6 +153,8 @@ func _on_state_changed() -> void:
 	base_view.sync(state)
 	placement.refresh()
 	_refresh_hud()
+	if sector_map.visible:
+		sector_map.refresh(state)
 
 
 func _refresh_hud() -> void:
@@ -265,13 +281,61 @@ func practice_setup() -> Dictionary:
 	}
 
 
+## Opens the sector map over the base, its world input out of the tree so no tap reaches the base;
+## nothing while a battle runs or the map is open.
+func open_sector_map() -> void:
+	if battle != null or sector_map.visible:
+		return
+	placement.cancel_place()
+	placement.select(0)
+	remove_child(world_input)
+	sector_map.open(state)
+
+
+func _on_sector_map_closed() -> void:
+	if not world_input.is_inside_tree():
+		add_child(world_input)
+
+
+## The map's Scan: the next epoch, or why not as a toast.
+func _on_scan_pressed() -> void:
+	var error := placement.scan()
+	if error != "":
+		hud.show_error(error)
+
+
+## The detail's Attack on field `index` (laid out as `field`): the army in the Hangars and the
+## abilities in stock, at their levels, against the outpost, its field's seed the landscape's, the
+## map closed for the battle. With no units it is refused with a toast.
+func _on_attack_pressed(index: int, field: Dictionary) -> void:
+	var army := {}
+	for unit: String in catalog.unit_types():
+		if state.army_count(unit) > 0:
+			army[unit] = state.army_count(unit)
+	if army.is_empty():
+		hud.show_message("Train some units first")
+		return
+	var abilities := {}
+	for ability: String in state.ability_stock:
+		if state.ability_stock[ability] > 0:
+			abilities[ability] = state.ability_stock[ability]
+	var setup := OutpostGenerator.battle_setup(field, army, state.unit_levels, abilities, state.ability_levels)
+	sector_map.close()
+	var error := open_battle(setup, false, {"epoch": state.sector.epoch, "index": index})
+	if error != "":
+		hud.show_error(error)
+		open_sector_map()
+
+
 ## Runs the battle of `setup` in the base's place: "" or why the setup was refused. `practice`:
-## its result is not applied (the only battle until the sector map).
-func open_battle(setup: Dictionary, practice: bool) -> String:
+## its result is not applied. `expedition` ({"epoch", "index"} of its field, empty for none): the
+## defender is drawn as a rival colony, and the result is applied with the field's key.
+func open_battle(setup: Dictionary, practice: bool, expedition: Dictionary = {}) -> String:
 	if battle != null:
 		push_error("A battle is already open")
 		return "a battle is already open"
 	var view := BattleView.new()
+	view.rival = not expedition.is_empty()
 	var error := view.setup(catalog, setup, camera)
 	if error != "":
 		view.free()
@@ -289,12 +353,13 @@ func open_battle(setup: Dictionary, practice: bool) -> String:
 	_base_focus = camera.focus
 	_base_zoom = camera.size
 	camera.setup(battle.area())
-	battle.finished.connect(_on_battle_finished.bind(practice))
+	battle.finished.connect(_on_battle_finished.bind(practice, expedition))
 	return ""
 
 
-## The battle ended and was left: the base comes back. A practice applies nothing.
-func _on_battle_finished(_setup: Dictionary, _result: Dictionary, practice: bool) -> void:
+## The battle ended and was left: the base comes back. A practice applies nothing; an expedition's
+## result is applied (_apply_expedition).
+func _on_battle_finished(setup: Dictionary, result: Dictionary, practice: bool, expedition: Dictionary) -> void:
 	battle.queue_free()
 	battle = null
 	battle_hud.queue_free()
@@ -308,6 +373,32 @@ func _on_battle_finished(_setup: Dictionary, _result: Dictionary, practice: bool
 	_refresh_hud()
 	if practice:
 		hud.show_message("Practice: nothing applied")
+	elif not expedition.is_empty():
+		_apply_expedition(setup, result, expedition)
+
+
+## An expedition's end applied with its field's key: a toast of the field cleared with its stars,
+## or still open, and what came home (the loot up to storage), or the error; then the map again,
+## the field stamped once cleared.
+func _apply_expedition(setup: Dictionary, result: Dictionary, expedition: Dictionary) -> void:
+	var before := state.resources.duplicate()
+	var error := placement.raid_result(setup, result, expedition)
+	if error != "":
+		hud.show_error(error)
+	else:
+		var stars := int(result.get("stars", 0))
+		var text := "Field still open"
+		if stars >= 1:
+			text = "Field cleared: %d %s" % [stars, "star" if stars == 1 else "stars"]
+		var gains := PackedStringArray()
+		for res: String in catalog.resources:
+			var gained := state.resources[res] - int(before[res])
+			if gained > 0:
+				gains.append("+%s %s" % [Format.amount(gained), catalog.resource_name(res).to_lower()])
+		if not gains.is_empty():
+			text += "\n" + ", ".join(gains)
+		hud.show_message(text)
+	open_sector_map()
 
 
 func _load_or_create() -> BaseState:

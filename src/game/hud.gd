@@ -38,6 +38,8 @@ signal make_pressed(id: int, ability: String)
 signal cancel_making_pressed(id: int, ability: String)
 ## An ability's research card: research `ability`'s next level.
 signal research_ability_pressed(ability: String)
+## The Expedition button: open the sector map.
+signal expedition_pressed
 
 ## What the army panel shows: nothing (closed or closing), a producer's training, the lab's
 ## research, or the Foundry's making.
@@ -118,6 +120,9 @@ const PREVIEW_SIZE := Vector2(84, 84)
 ## The category stripe along a card's top, inside its border.
 const STRIPE_HEIGHT := 6
 const BUILD_SIZE := Vector2(128, 64)
+## The Expedition button, bottom left, and the badge of open fields on its corner.
+const EXPEDITION_SIZE := Vector2(176, 64)
+const BADGE_SIZE := Vector2(30, 30)
 const METER_SIZE := Vector2(220, 36)
 ## A meter's icon sits over the left end of its trough, which starts this far in.
 const METER_ICON := Vector2(40, 40)
@@ -193,6 +198,9 @@ var _meter_amounts: Dictionary[String, int] = {}
 var _meters_now: int = 0
 var _drone_ring: DroneRing
 var _build_button: Button
+var _expedition_button: Button
+var _expedition_badge: Control
+var _expedition_count: Label
 ## The build panel, outside the root and under it, so the Build button draws over it.
 var _menu: PanelContainer
 ## Pads the panel's content to the safe area.
@@ -313,6 +321,7 @@ func setup(catalog: Catalog) -> void:
 		_arrow = " → "
 	_build_top_bar()
 	_build_build_button()
+	_build_expedition_button()
 	_build_place_bar()
 	_build_info_panel()
 	_build_toast()
@@ -368,6 +377,10 @@ func refresh(state: BaseState, selected_id: int, placing: bool, ghost_ok: bool, 
 	if _army_page != ArmyPage.NONE and (placing or _selected_id != _army_id):
 		_close_army()
 	_build_button.visible = not placing
+	var open_fields := _catalog.expedition_field_count() - state.sector.cleared.size()
+	_expedition_count.text = str(open_fields)
+	_expedition_badge.visible = open_fields > 0
+	_show_expedition()
 	_place_bar.visible = placing
 	_place_button.text = "Done" if painting else "Place"
 	_place_button.disabled = not ghost_ok and not painting
@@ -461,6 +474,13 @@ func show_error(code: String) -> void:
 	show_message(error_text(code))
 
 
+## Adds a full screen over the base's parts (the sector map): under the root, so it sits on the
+## safe area and takes the theme, and under the toast, which shows over it.
+func add_screen(screen: Control) -> void:
+	_root.add_child(screen)
+	_root.move_child(_toast, -1)
+
+
 static func error_text(code: String) -> String:
 	return str(ERROR_TEXT.get(code, code))
 
@@ -474,6 +494,15 @@ static func research_error_text(code: String) -> String:
 
 func build_button() -> Button:
 	return _build_button
+
+
+## The Expedition button, and its badge's count of open fields ("" while it is hidden).
+func expedition_button() -> Button:
+	return _expedition_button
+
+
+func expedition_badge() -> String:
+	return _expedition_count.text if _expedition_badge.visible else ""
 
 
 ## Whether the build panel is open, or sliding open.
@@ -715,6 +744,7 @@ func _slide_menu(open: bool) -> void:
 		_preview.prioritize(_tab_types(_tab))
 	_run_preview()
 	_menu_tween = _slide(_menu, open, _menu_tween)
+	_show_expedition()
 
 
 ## The pictures render while a panel that shows them is open: the build panel or the army panel.
@@ -787,6 +817,7 @@ func _open_army(page: ArmyPage) -> void:
 	_refresh_army(_state)
 	_run_preview()
 	_army_tween = _slide(_army, true, _army_tween)
+	_show_expedition()
 
 
 ## Slides the army panel down. The selection stays as it is: refresh() shows its info panel.
@@ -796,6 +827,7 @@ func _close_army() -> void:
 	_army_page = ArmyPage.NONE
 	_run_preview()
 	_army_tween = _slide(_army, false, _army_tween)
+	_show_expedition()
 
 
 ## The panel's close button: back to the building's info panel, still selected.
@@ -1521,6 +1553,41 @@ func _build_entry(type: String) -> Button:
 	return button
 
 
+## Bottom left, opposite Build: opens the sector map, with a badge of the open fields on its top
+## right corner. The badge takes no touch.
+func _build_expedition_button() -> void:
+	_expedition_button = _button("EXPEDITION", EXPEDITION_SIZE, &"ExpeditionButton")
+	_expedition_button.pressed.connect(func() -> void: expedition_pressed.emit())
+	_root.add_child(_expedition_button)
+	_expedition_button.set_anchors_preset(Control.PRESET_BOTTOM_LEFT)
+	_expedition_button.grow_vertical = Control.GROW_DIRECTION_BEGIN
+	_expedition_button.offset_left = MARGIN
+	_expedition_button.offset_right = MARGIN + EXPEDITION_SIZE.x
+	_expedition_button.offset_top = -MARGIN - EXPEDITION_SIZE.y
+	_expedition_button.offset_bottom = -MARGIN
+	_expedition_badge = PanelContainer.new()
+	_expedition_badge.theme_type_variation = &"Badge"
+	_expedition_badge.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_expedition_badge.custom_minimum_size = BADGE_SIZE
+	_expedition_button.add_child(_expedition_badge)
+	_expedition_badge.set_anchors_preset(Control.PRESET_TOP_RIGHT)
+	_expedition_badge.offset_left = -BADGE_SIZE.x + 10
+	_expedition_badge.offset_right = 10
+	_expedition_badge.offset_top = -12
+	_expedition_badge.offset_bottom = -12 + BADGE_SIZE.y
+	_expedition_count = Label.new()
+	_expedition_count.theme_type_variation = &"BadgeText"
+	_expedition_count.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	_expedition_count.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	_expedition_badge.add_child(_expedition_count)
+
+
+## The Expedition button shows with Build, and not while a bottom panel (the build panel or the
+## army panel) is open across its corner.
+func _show_expedition() -> void:
+	_expedition_button.visible = _build_button.visible and not _menu_open and _army_page == ArmyPage.NONE
+
+
 ## The army panel: like the build panel, the screen's full width at its bottom edge, its content
 ## padded into the safe area and a column kept clear for the Build button. A header of the
 ## building's name and level and a close button, over one of two pages: the training page, a
@@ -1945,6 +2012,11 @@ func _make_theme() -> Theme:
 	toast.content_margin_bottom = 8
 	ui.set_type_variation(&"Toast", &"PanelContainer")
 	ui.set_stylebox("panel", &"Toast", toast)
+	# A full screen over the base (the sector map, add_screen): the panel's fill, opaque.
+	ui.set_type_variation(&"ScreenPanel", &"PanelContainer")
+	ui.set_stylebox("panel", &"ScreenPanel", _shape(Color(PANEL, 1.0), 12))
+	ui.set_type_variation(&"Badge", &"PanelContainer")
+	ui.set_stylebox("panel", &"Badge", _shape(MaterialKit.DEFENCE, 15, 0.0))
 
 	# The meters: the trough under the fill, and its ink border again over it.
 	ui.set_type_variation(&"MeterTrough", &"Panel")
@@ -1973,6 +2045,7 @@ func _make_theme() -> Theme:
 	ui.set_color("font_disabled_color", "Button", Color(TEXT, DISABLED_ALPHA))
 	ui.set_color("font_outline_color", "Button", INK)
 	_button_variation(ui, &"BuildButton", GOLD, GOLD_PRESSED, 12, DISPLAY_FONT, 30, 4)
+	_button_variation(ui, &"ExpeditionButton", ACCENT, ACCENT.darkened(0.15), 12, DISPLAY_FONT, 30, 0, INK)
 	_button_variation(ui, &"UpgradeButton", GOLD, GOLD_PRESSED, 12, BODY_FONT, 20, 3)
 	_button_variation(ui, &"ConfirmButton", ACCENT, ACCENT.darkened(0.15), 12, DISPLAY_FONT, 22, 0, INK)
 	_button_variation(ui, &"BarButton", CARD, CARD, 12, DISPLAY_FONT, 22, 0)
@@ -1995,6 +2068,7 @@ func _make_theme() -> Theme:
 	_label_variation(ui, &"InfoDetail", 17, TEXT, 0)
 	_label_variation(ui, &"InfoNote", 17, WARNING, 0)
 	_label_variation(ui, &"ToastText", 18, TEXT, 0)
+	_label_variation(ui, &"BadgeText", 17, TEXT, 2)
 
 	# The card strip's scroll bar: a dim grabber on an ink track.
 	var track := _flat(Color(INK, 0.6), 4)
