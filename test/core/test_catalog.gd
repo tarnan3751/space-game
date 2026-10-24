@@ -74,6 +74,17 @@ func test_shipped_counts_never_go_down() -> void:
 				"%s max_count goes down at Command Center %d" % [type, cc])
 
 
+func test_shipped_build_times_stay_within_three_days() -> void:
+	# No timer a builder waits on is longer than three days, the Command Center's included
+	# (docs/plans/retune.md).
+	var catalog := Catalog.load_default()
+	assert_eq(catalog.load_error, "")
+	for type: String in catalog.types():
+		for level: int in range(1, catalog.max_level(type) + 1):
+			var seconds := int(catalog.level_stats(type, level)["build_seconds"])
+			assert_true(seconds <= 3 * 86400, "%s level %d takes %d s" % [type, level, seconds])
+
+
 func test_shipped_units_fit_what_a_base_can_reach() -> void:
 	# A unit's training and research prices fit the storage a base can have when they unlock,
 	# and one unit fits the housing it can have then. The Command Center level of a unit is

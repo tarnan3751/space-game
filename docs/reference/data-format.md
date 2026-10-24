@@ -287,8 +287,8 @@ ticks.
 `test_catalog.gd` checks that the shipped files load cleanly, that the start layout fits, that
 every level's price fits the storage a base can reach when that level unlocks, that no curve
 goes down from one level to the next, that every type's final level requires the top Command
-Center level, and that no count goes down from one Command Center level to the next
-(`testing-tools.md`).
+Center level, that no count goes down from one Command Center level to the next, and that no
+level takes more than three days to build (`testing-tools.md`).
 
 ## The shipped data
 
@@ -370,8 +370,9 @@ The curve, which `test_catalog.gd` checks for affordability and for never going 
   1 h 30, 3 h, 5 h, 8 h, 14 h, 22 h, 30 h and 40 h, each lower level of the type requiring the
   same Command Center level half the one above it, a 2×2 building or a trap two thirds of that,
   and never less than the type's level before. The Command Center takes 5 min, 1 h, 4 h, 8 h,
-  14 h, 20 h, 30 h, 48 h and 66 h to reach levels 2 to 10, the longest timer in the game;
-  walls and the Drone Bay are instant.
+  14 h, 20 h, 30 h, 48 h and 66 h to reach levels 2 to 10, the longest timer in the game (no
+  level takes more than three days, which `test_catalog.gd` checks); walls and the Drone Bay
+  are instant.
 - **Production** per hour: Extractor and Harvester 900, 1,000, 1,300, 1,800, 2,600, 3,600, 5,000,
   6,500, 9,000, 14,000 (at a maxed count, 72% of the reachable storage an hour at Command Center 1,
   falling to 6% at 7 and 2.5% at 10); Siphon 20, 40, 70, 105, 160, 240, 360, 540. **Storage**: silos
