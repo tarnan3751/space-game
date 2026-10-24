@@ -274,7 +274,9 @@ const TOWARD_LENS := Vector3(0.5792, 0.5736, 0.5792)
 ## plinth's faces the camera sees and veins round the deck, the mount and the head, crystal inlays
 ## at the mount's foot, a violet focusing crystal at every muzzle. L9 a targeting ring hovering
 ## over the head, turning. L10 (Crown): gold filigree round the plinth and the head, a big gold
-## crown on a stem over the dome, in the targeting ring, holding the antimatter core up.
+## crown on a stem over the dome, in the targeting ring, holding the antimatter core up. Each
+## barrel's tip is a muzzle socket on the head (muzzle, muzzle_2, and from L7 muzzle_3 and
+## muzzle_4), so in battle the head aims and its shots leave the barrels in turn.
 static func build_laser_turret(p: Parts, level: int) -> void:
 	var m := p.body
 	var plinth := 0.42 if level < 6 else float(LASER_PLINTHS[level - 6])
@@ -339,6 +341,10 @@ static func build_laser_turret(p: Parts, level: int) -> void:
 			head.prism(thick, thick, long, sides, root, barrel, along)
 			head.tube(thick * 0.5, thick + 0.035, 0.12, sides, _at(root, Vector3(0, long - 0.1, 0), along),
 				GOLD if p.tier >= Parts.Tier.GOLD else Parts.GUNMETAL, along)
+			# The muzzle sockets, the shots leaving them in turn: the lower pair's, then the upper's.
+			var barrel_index := pair * 2 + k
+			head.socket("muzzle" if barrel_index == 0 else "muzzle_%d" % (barrel_index + 1),
+				_at(root, Vector3(0, long + 0.03, 0), along), LowPolyMesh.turn(Vector3.UP, along))
 			if level < 8:
 				head.orb(thick * 0.85, sides if pair == 0 else 10, 8 if pair == 0 else 4, _at(root, Vector3(0, long + 0.03, 0), along),
 					LASER_PULSE.phased(0.5 * k))

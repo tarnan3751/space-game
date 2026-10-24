@@ -8,9 +8,11 @@ extends RefCounted
 ## A model is what BuildingModels.create makes: a Node3D holding the body's MeshInstance3D and its
 ## ink outline's, and no moving part (MAX_MOVING): the battle draws every unit of a type from one
 ## MultiMesh (BattleView), so a unit is one mesh and its outline. What turns is a part tagged with
-## LowPolyMesh.spin (the gunship's rotors), which the shaders spin; hovering, bobbing, flames and
-## lamps are surface flags (Surf.BOB, PULSE, BLINK). The meshes are built once per type and tier
-## and shared.
+## LowPolyMesh.spin (the gunship's rotors), which the shaders spin; what moves is a part tagged with
+## LowPolyMesh.rig (the ranger's legs, arms and rifle), which the shaders turn by the battle
+## instance's state (Rig); hovering, bobbing, flames and lamps are surface flags (Surf.BOB, PULSE,
+## BLINK). A unit's muzzle is a socket (LowPolyMesh.socket), which the battle fires from. The
+## meshes are built once per type and tier and shared.
 ##
 ## One shape per type: a unit's tier (Parts.Tier) repaints its machine's hull (hull()), panels
 ## (panel()), trim (trim()) and glows (glow()) only, as the buildings' tiers do. tier_of() takes it from the data: a level researched at a

@@ -7,10 +7,13 @@ extends RefCounted
 ## glows and the brawler's armour (UnitModels.trim, UnitModels.glow, UnitModels.hull); the suits keep
 ## the colonist's paint.
 
-## The ranger's rifle, held across the chest: how far it reaches behind the grip hand and past the
-## fore hand.
+## The ranger's rifle, held at low ready: how far it reaches behind the grip hand and past the
+## fore hand, the way it points (forward and 30 degrees down, raised level when it aims: Rig.AIM)
+## and how far along it the fore hand holds it from the grip.
 const STOCK_LENGTH := 0.1
 const BARREL_LENGTH := 0.13
+const LOW_READY := Vector3(0.0, -0.5, 0.866)
+const FORE_SPAN := 0.07
 
 ## The breacher's colonist scale (0.85 tall) and the brawler's automaton scale (about 1.0 tall to
 ## its antenna, crouched).
@@ -26,17 +29,23 @@ static var FUSE := Surf.make(MaterialKit.Layer.GLOW, MaterialKit.DEFENCE, 1.0, S
 static var ORANGE := Parts.surf("orange")
 
 
-## The ranger: the colonist at ease with a short rifle held across the chest and a pistol in a
-## holster on the right thigh.
+## The ranger: the colonist with a short rifle held at low ready and a pistol in a holster on the
+## right thigh, rigged (Figures.walk_rig): its legs walk, and its arms and rifle are one group on
+## Rig.AIM, raised to aim and kicked by each shot; the rifle's muzzle is its `muzzle` socket.
 static func build_ranger(p: Parts) -> void:
 	var m := p.body
-	var pose := _port_arms()
-	Figures.colonist(m, Vector3.ZERO, 0.0, pose)
+	var pose := _low_ready()
 	var j := Figures.joints(Vector3.ZERO, 0.0, pose)
+	var rigging := Figures.walk_rig(j, Rig.AIM)
+	Figures.colonist(m, Vector3.ZERO, 0.0, pose, Figures.PRIMARY_HEADS, 1.0, true, rigging)
 	var ink := m.ink
 	m.ink = Figures.FIGURE_INK
-	_rifle(m, _hand(j, 1, 1.0), _hand(j, 0, 1.0), p.tier)
+	var grip := _hand(j, 1, 1.0)
+	m.rig = rigging.arms
+	_rifle(m, grip, grip + LOW_READY.normalized() * FORE_SPAN, p.tier)
+	m.rig = rigging.hips[1]
 	_holster(m, j.hips[1], 1.0, -1.0)
+	m.rig = Vector4.ZERO
 	m.ink = ink
 
 
@@ -95,13 +104,14 @@ static func build_brawler(p: Parts) -> void:
 
 # --- Poses ---------------------------------------------------------------------------
 
-## The stance with the rifle held across the chest: the right hand low at the grip, the left high
-## on the fore end, both forearms brought in.
-static func _port_arms() -> Figures.Pose:
-	var pose := Figures.stance()
-	pose.shoulder_swing = PackedFloat32Array([44.0, 22.0])
-	pose.shoulder_out = PackedFloat32Array([-6.0, 4.0])
-	pose.elbow = PackedFloat32Array([96.0, 74.0])
+## Low ready, on the neutral pose (Figures.neutral) the rig walks from: the right hand at the grip
+## in front of the belly, its forearm brought in, the left arm reaching down and forward to the fore
+## end, so the rifle points forward and down (LOW_READY).
+static func _low_ready() -> Figures.Pose:
+	var pose := Figures.neutral()
+	pose.shoulder_swing = PackedFloat32Array([46.0, -10.0])
+	pose.shoulder_out = PackedFloat32Array([-26.0, -40.0])
+	pose.elbow = PackedFloat32Array([0.0, 70.0])
 	return pose
 
 
@@ -166,6 +176,7 @@ static func _rifle(m: LowPolyMesh, grip: Vector3, fore: Vector3, tier: int) -> v
 	var muzzle := fore + along * BARREL_LENGTH
 	Parts.pipe(m, fore + along * 0.02, muzzle, 0.013, Parts.ROD, 8)
 	m.orb(0.022, 8, 3, muzzle, UnitModels.glow(tier, Surf.PULSE, false))
+	m.socket("muzzle", muzzle, along)
 
 
 ## A holster on the thigh from the hip joint `hip`, on its outside (`side`, -1 the right): a dark
