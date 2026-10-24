@@ -11,7 +11,7 @@ extends RefCounted
 ## fore hand, the way it points (forward and 30 degrees down, raised level when it aims: Rig.AIM)
 ## and how far along it the fore hand holds it from the grip.
 const STOCK_LENGTH := 0.1
-const BARREL_LENGTH := 0.13
+const BARREL_LENGTH := 0.15
 const LOW_READY := Vector3(0.0, -0.5, 0.866)
 const FORE_SPAN := 0.07
 
@@ -27,10 +27,13 @@ const JET_HOVER := 0.5
 static var FUSE := Surf.make(MaterialKit.Layer.GLOW, MaterialKit.DEFENCE, 1.0, Surf.UNLIT | Surf.BLINK, true, false)
 ## The jet trooper's stub wings: army-orange plate, flat.
 static var ORANGE := Parts.surf("orange")
+## The army orange on the flat layer, for the infantry's small orange gear (none over 0.25 across),
+## where the plate layer's panel seams would cut a part into quarters.
+static var ORANGE_SMALL := Surf.make(MaterialKit.Layer.FLAT, MaterialKit.ARMY)
 
 
-## The ranger: the colonist with a short rifle held at low ready and a pistol in a holster on the
-## right thigh, rigged (Figures.walk_rig): its legs walk, and its arms and rifle are one group on
+## The ranger: the colonist with a short rifle held at low ready, a pack over its backpack and a
+## pistol in a holster on the right thigh, rigged (Figures.walk_rig): its legs walk, and its arms and rifle are one group on
 ## Rig.AIM, raised to aim and kicked by each shot; the rifle's muzzle is its `muzzle` socket.
 static func build_ranger(p: Parts) -> void:
 	var m := p.body
@@ -44,8 +47,9 @@ static func build_ranger(p: Parts) -> void:
 	m.rig = rigging.arms
 	_rifle(m, grip, grip + LOW_READY.normalized() * FORE_SPAN, p.tier)
 	m.rig = rigging.hips[1]
-	_holster(m, j.hips[1], 1.0, -1.0)
+	_holster(m, j.hips[1], 1.0, -1.0, p.tier)
 	m.rig = Vector4.ZERO
+	_ranger_pack(m, j.waist, _torso_top(j, 1.0), p.tier)
 	m.ink = ink
 
 
@@ -153,6 +157,14 @@ static func _hand(j: Figures.Joints, s: int, k: float) -> Vector3:
 	return j.wrists[s] * Vector3(0, -0.042 * k, 0)
 
 
+## The paint of the gear the infantry wear over their suits (packs, holsters, plates): orange to
+## Gold, so it stays bright, and the tier's hull from Chrome, so the tier shows on it.
+static func _gear(tier: int, smooth: bool = false) -> Surf:
+	if tier < Parts.Tier.CHROME:
+		return Figures.ARMY_SMALL if smooth else ORANGE_SMALL
+	return UnitModels.hull(tier, smooth)
+
+
 ## The torso's height from the waist to its collar (Figures' torso top), of a figure `k` times the
 ## colonist's size.
 static func _torso_top(j: Figures.Joints, k: float) -> float:
@@ -166,26 +178,33 @@ static func _torso_top(j: Figures.Joints, k: float) -> float:
 ## barrel past the fore hand and a glowing muzzle of the tier.
 static func _rifle(m: LowPolyMesh, grip: Vector3, fore: Vector3, tier: int) -> void:
 	var along := (fore - grip).normalized()
-	var under := along.cross(Vector3.RIGHT if absf(along.x) < 0.9 else Vector3.FORWARD).normalized()
-	if under.y > 0.0:
-		under = -under
-	Parts.beam(m, grip - along * 0.02, fore + along * 0.03, 0.05, Parts.GUNMETAL, 0.014)
-	Parts.beam(m, grip - along * STOCK_LENGTH, grip - along * 0.015, 0.042, UnitModels.trim(tier), 0.012)
+	var under := (Vector3.DOWN - along * along.dot(Vector3.DOWN)).normalized()
+	Parts.beam(m, grip - along * 0.02, fore + along * 0.03, 0.065, Parts.GUNMETAL, 0.018)
+	Parts.beam(m, grip - along * STOCK_LENGTH, grip - along * 0.015, 0.05, UnitModels.trim(tier), 0.014)
 	var mag := grip + along * 0.06
-	Parts.beam(m, mag, mag + under * 0.07, 0.034, Parts.HULL_DARK, 0.01)
+	Parts.beam(m, mag, mag + under * 0.07, 0.036, Parts.HULL_DARK, 0.01)
+	Parts.beam(m, fore + along * 0.03, fore + along * 0.09, 0.075, Parts.GUNMETAL, 0.018)
 	var muzzle := fore + along * BARREL_LENGTH
-	Parts.pipe(m, fore + along * 0.02, muzzle, 0.013, Parts.ROD, 8)
-	m.orb(0.022, 8, 3, muzzle, UnitModels.glow(tier, Surf.PULSE, false))
+	Parts.pipe(m, fore + along * 0.09, muzzle, 0.03, Parts.GUNMETAL, 10)
+	m.orb(0.038, 8, 3, muzzle, UnitModels.glow(tier, Surf.PULSE, false))
 	m.socket("muzzle", muzzle, along)
 
 
-## A holster on the thigh from the hip joint `hip`, on its outside (`side`, -1 the right): a dark
-## chamfered pouch with a gunmetal pistol grip standing out of its top.
-static func _holster(m: LowPolyMesh, hip: Transform3D, k: float, side: float) -> void:
-	m.box_chamfered(Vector3(0.036, 0.1, 0.07) * k, 0.012 * k, hip * (Vector3(side * 0.066, -0.15, 0.0) * k), Parts.HULL_DARK,
+## A holster on the thigh from the hip joint `hip`, on its outside (`side`, -1 the right): a
+## chamfered pouch (orange to Gold, the tier's hull from Chrome) with a gunmetal pistol grip
+## standing out of its top.
+static func _holster(m: LowPolyMesh, hip: Transform3D, k: float, side: float, tier: int) -> void:
+	m.box_chamfered(Vector3(0.036, 0.1, 0.07) * k, 0.012 * k, hip * (Vector3(side * 0.066, -0.15, 0.0) * k), _gear(tier),
 		UnitModels.euler(hip))
 	m.box_chamfered(Vector3(0.026, 0.05, 0.034) * k, 0.008 * k, hip * (Vector3(side * 0.066, -0.06, -0.012) * k),
 		Parts.GUNMETAL, UnitModels.euler(hip, Vector3(-12, 0, 0)))
+
+
+## The ranger's pack on the waist `xf`'s back (the torso `top` high): a shell over the lower part
+## of the suit's backpack, under its tank, orange to Gold, the tier's hull from Chrome.
+static func _ranger_pack(m: LowPolyMesh, xf: Transform3D, top: float, tier: int) -> void:
+	m.box_chamfered(Vector3(0.18, 0.17, 0.1), 0.035, xf * Vector3(0, top * 0.36 - 0.005, -0.1), _gear(tier),
+		UnitModels.euler(xf))
 
 
 # --- The breacher's ------------------------------------------------------------------------
