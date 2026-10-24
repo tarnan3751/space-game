@@ -24,6 +24,13 @@ A non-whole number stays a float and fails validation wherever an int is require
   ],
   "grid": { "width": 48, "height": 48 },
   "army": { "housing": "hangar", "research": "research_lab" },
+  "battle": {
+    "seconds": 180,
+    "loot_pct": { "metal": 20, "crystal": 20, "antimatter": 5 },
+    "wall": "barrier_wall",
+    "trap_category": "traps",
+    "wall_cost_units": 8000
+  },
   "menu_order": ["drone_bay", "metal_extractor", "crystal_harvester", "antimatter_siphon",
                  "metal_silo", "crystal_silo", "antimatter_vault", "hangar", "cadet_academy",
                  "...", "mega_mine", "barrier_wall"],
@@ -45,6 +52,7 @@ A non-whole number stays a float and fails validation wherever an int is require
 | `categories` | The build-menu categories in tab order, each `{ "id", "name" }` (the name defaults to the id). Every type but the Command Center belongs to one. `core`, the Command Center's category, is never listed. |
 | `grid` | `width` and `height` in cells, both positive. |
 | `army` | `housing`: the building type whose `capacity` houses the army; `research`: the building type that researches unit levels. Each names a type in `buildings.json`; both are required once `units.json` lists a unit. |
+| `battle` | Optional; the battle sim's rules (`battle.md`). `seconds`: the battle's length, at least 1. `loot_pct`: `{resource: percent}`, 0–100, of the defender's stored amount a raid can take (a resource left out gives none). `wall`: the wall type, the `wall` class. `trap_category`: the category whose types are traps, the `trap` class. `wall_cost_units`: the extra path cost, in field units, of walking into a wall cell, which decides when a ground unit breaks through a wall rather than walk round it. Without the section the catalog has no battle rules and a battle refuses to set up. |
 | `menu_order` | The build menu's types in order: every type except `command_center`, exactly once. Within a category, this is the order the HUD lists them. |
 | `start.resources` | Starting amounts; each is capped at the starting base's capacity. A resource left out starts at 0. |
 | `start.buildings` | Placed finished at `level` (default 1, and one of the type's levels) when a new base is created. `cell` is the footprint's top-left. An entry of an unknown type is a load error; one that does not fit the grid is skipped. |
@@ -77,8 +85,8 @@ An object keyed by building type. Each type:
 | `name` | Display name. Defaults to the type key. |
 | `size` | Footprint side in cells, 1 to 8. Buildings are square. |
 | `category` | Required. One of `rules.categories`; `core` for `command_center`, and only for it. |
-| `hidden` | Optional, default `false`. Hidden from an attacker until it triggers: the traps and the Cloaked Sentry. Display only until the battle sim. |
-| `targets` | Optional: `"ground"`, `"air"` or `"both"`, on the defences and traps that attack. Display only until the battle sim. |
+| `hidden` | Optional, default `false`. Hidden from an attacker until it triggers: the traps and the Cloaked Sentry. In battle, a hidden defence is not targeted until a unit comes within its range (`battle.md`). |
+| `targets` | Optional: `"ground"`, `"air"` or `"both"`, on the defences and traps that attack: which unit class they hit. |
 | `max_count` | How many a base may own at each Command Center level: exactly one whole, non-negative entry per Command Center level (entry 0 is level 1). It is 0 below the type's unlock level (level 1's `requires_cc`) and above 0 at it. |
 | `levels` | One entry per level, level 1 first. Must not be empty; its length is the type's max level. |
 
@@ -93,12 +101,25 @@ Per level:
 | `storage` | core | `{resource: int}` added to the base's capacity while the building is at this level, busy or not. |
 | `builders` | core | Builders (drones) this level supplies. |
 | `capacity` | HUD | Army capacity (the Hangar, the Alliance Beacon), shown as "Capacity". Unrelated to `BaseState.capacity(res)`, which is storage. Reserved for the army. |
-| `hp` | HUD | Shown as "Hull". Reserved for the battle sim. |
-| `damage`, `range_cells` | HUD | Shown as "Damage N   Range N", each part when the level has it. `range_cells` is the reach in cells, a trap's blast radius, or the Shield Generator's bubble radius. Reserved for the battle sim. |
-| `fire_ms` | HUD | Milliseconds between shots, shown as "Fires every N s". Reserved for the battle sim. |
+| `hp` | HUD, battle | Shown as "Hull". The building's hull in battle; every type but the traps has it at every level. |
+| `damage`, `range_cells` | HUD, battle | Shown as "Damage N   Range N", each part when the level has it. `range_cells` is the reach in cells from the building's centre, a trap's trigger and blast radius, or the Shield Generator's bubble radius. |
+| `fire_ms` | HUD, battle | Milliseconds between shots, shown as "Fires every N s". |
+| `splash_units`, `shell_ms` | battle | The Plasma Mortar's and the Orbital Cannon's shell: it lands `shell_ms` after the shot at the point aimed at and hits every unit of its class within `splash_units`. |
+| `shield_hp`, `shield_regen`, `shield_delay_ms` | battle | The Shield Generator's pool, which absorbs damage to the buildings in its bubble; it recharges `shield_regen` a second once `shield_delay_ms` have passed without damage. |
+| `hold_ms` | battle | The Gravity Well: every `fire_ms` it holds every air unit in range this long. |
+| `stun_ms` | battle | The EMP Tower: the ground unit it hits is stunned this long. |
+| `throw_cells` | battle | The Gravity Trap: how far it throws the ground units in range. |
 
-`builders`, `capacity`, `hp`, `damage`, `range_cells` and `fire_ms` are whole and non-negative
-when present.
+`builders`, `capacity`, `hp`, `damage`, `range_cells`, `fire_ms` and the battle fields above are
+whole and non-negative when present.
+
+**Battle classes** (`Catalog.battle_class`), what a unit's `prefers` picks among, decided in this
+order: `hq` the Command Center; `wall` the type `rules.battle.wall` names; `trap` a type in
+`rules.battle.trap_category`; `defense` a type with `targets`, or whose level 1 has
+`range_cells` (so the Shield Generator is one); `resource` a type with `produces` or `storage`
+at some level (the collectors and storages, not the Drone Bay); `other` the rest (the army
+buildings and the Drone Bay). A unit preferring `any` picks among every class but walls and
+traps; a trap is never a target and never counts for destruction.
 
 The type `command_center` must exist: its level is `cc_level()`. One type's `size` applies to
 every level; a building cannot change footprint when it upgrades.
@@ -155,9 +176,8 @@ Per level:
 | `requires_lab` | core | Levels 2 and up only; required there. The research building's finished level needed to research this level, 1 to its level count. |
 | `hp`, `damage`, `fire_ms`, `range_units` | battle | Hull, damage a hit, milliseconds between attacks, and reach in field units (sub-cell, so melee can reach 800). |
 
-The "battle" fields are validated now and read by the battle sim (step 4), which maps buildings
-to the target classes: `hq` the Command Center, `wall` the Barrier Wall, `defense` a type with
-`targets`, `resource` the resources category. Unknown fields are ignored, as for buildings.
+The "battle" fields are read by the battle sim (`battle.md`), against the buildings' battle
+classes (above). Unknown fields are ignored, as for buildings.
 
 ### Validation
 
@@ -180,9 +200,13 @@ to the target classes: `hq` the Command Center, `wall` the Barrier Wall, `defens
   both; `levels` empty; `max_count` empty, not one entry per Command Center level, holding a
   negative or non-whole entry, or not 0 below level 1's `requires_cc` and above 0 at it.
 - Per level: `build_seconds` missing, negative or not whole; `requires_cc` outside 1 to the
-  Command Center's level count; `builders`, `capacity`, `hp`, `damage`, `range_cells` or
-  `fire_ms` negative or not whole; a `cost`, `produces` or `storage` entry naming an unknown
+  Command Center's level count; `builders`, `capacity`, `hp`, `damage`, `range_cells`,
+  `fire_ms` or a battle field negative or not whole; `shell_ms` above 0 with a `fire_ms` below
+  50 (the battle holds a shell until it lands, sized by the fire rate); a `cost`, `produces` or `storage` entry naming an unknown
   resource or holding a non-whole number.
+- `rules.battle` not an object; its `seconds` below 1 or not whole; `wall_cost_units` negative
+  or not whole; `wall` naming an unknown type; `trap_category` not one of `rules.categories`;
+  `loot_pct` not an object, naming an unknown resource, or holding a percent outside 0–100.
 - `units.json` missing or not an object; `rules.army` not an object, naming an unknown type, or
   without `housing` and `research` while there are units.
 - Per unit: not an object; `producer` not a building type; `producer_level` outside 1 to the
@@ -284,9 +308,16 @@ The curve, which `test_catalog.gd` checks for affordability and for never going 
   main resource (doubling from level 4) and 200, 500, 1,000, 2,000, 4,000, 8,000, 16,000
   antimatter at levels 4–10. **Capacity**: Hangar 20 to 70, Alliance Beacon 10 to 40, +5 a level
   beyond Command Center 5.
-- **Combat fields** (display only): `hp` and `damage` rise with level (beyond Command Center 5
+- **Combat fields**: `hp` and `damage` rise with level (beyond Command Center 5
   about ×1.15 and ×1.2 a level); `range_cells` and `fire_ms` are fixed per type and grow with
   tier. Traps have no `hp` or `fire_ms`.
+- **Battle specials**, development values: the Plasma Mortar's shell splashes 1,500 units and
+  lands after 1,000 ms, the Orbital Cannon's 2,000 after 2,000 ms; the Shield Generator's pool is
+  400, 550, 750, 1,000, 1,350, 1,800, 2,400 and 3,200, recharging a tenth of that a second after
+  3,000 ms; the Gravity Well holds for 1,500, 1,750, 2,000, 2,250, 2,500 and 3,000 ms, the EMP
+  Tower stuns for 500 to 1,000 ms in steps of 100, and the Gravity Trap throws 3, 3, 4, 4 and 5
+  cells. A battle lasts 180 s and takes 20% of the defender's metal and crystal and 5% of its
+  antimatter; a wall cell costs a ground unit's path 8,000 units, eight cells' walk.
 
 ### The units
 
@@ -334,13 +365,20 @@ numbers: `extractor` (2×2, 100 crystal, 60 s, 3600 metal/h = 1 per second), `ha
 metal storage), `siphon` (1×1, 50 crystal, instant, 3600 antimatter/h, stores 100 antimatter),
 `hangar` (2×2, `capacity` 20 then 30), `academy` (1×1, instant at level 1, 10 s to level 2, up to
 two), `lab` (2×2, locked until Command Center 2, two levels), `mine` (1×1, hidden, targets ground)
-and `wall` (1×1, instant, up to 25). `rules.army` names the hangar and the lab. Its
+and `wall` (1×1, instant, up to 25). Every type but the traps has an `hp`, and nine more 1×1
+types serve the battle tests: seven defences (`turret`, `tower`, `mortar`, `shield`, `well`,
+`emp`, `sentry`, in the army category) and two traps (`air_mine`, `throw_trap`); their numbers
+are listed in `fixtures.gd`. `rules.army` names the hangar and the lab; `rules.battle` is 60 s,
+50% loot of each resource, `wall` the wall, the traps category, a wall cost of 8,000. Its
 `units.json` has three units, all trained by the academy: `grunt` (ground, housing 1, 10 s,
 10 crystal; level 2 researched for 100 crystal in 60 s at lab 1), `flyer` (air, housing 2, 20 s,
 20 crystal; level 2 for 200 crystal in 120 s at lab 2) and `walker` (ground, housing 5, 30 s,
 50 crystal, needs academy level 2, one level).
+`battle_units.json` holds seven more units for the battle tests (`melee`, `gunner`, `breaker`,
+`raider`, `hunter`, `drone`, `bomber`), merged in only by `Fixtures.battle_catalog(size)` (20×20 by
+default), so the plain catalog keeps its three.
 `test/support/fixtures.gd` loads it (`Fixtures.catalog()`, `Fixtures.new_base(start_time)`,
-`Fixtures.army_base()`).
+`Fixtures.army_base()`, `Fixtures.battle_catalog(size)`).
 Rebalancing `data/` never touches it.
 
 ## The save file

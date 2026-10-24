@@ -18,14 +18,25 @@ const HQ_TYPE := "command_center"
 ## The Command Center's category. It is never a build-menu category.
 const CORE_CATEGORY := "core"
 const TARGETS := ["ground", "air", "both"]
-## Per-level fields that must be whole and non-negative when present.
-const WHOLE_FIELDS := ["builders", "capacity", "hp", "damage", "range_cells", "fire_ms"]
+## Per-level fields that must be whole and non-negative when present. The last eight are the
+## battle sim's specials (docs/reference/battle.md).
+const WHOLE_FIELDS := ["builders", "capacity", "hp", "damage", "range_cells", "fire_ms",
+	"splash_units", "shell_ms", "shield_hp", "shield_regen", "shield_delay_ms", "hold_ms", "stun_ms",
+	"throw_cells"]
 ## A unit's class: walls stop ground units, not air ones.
 const UNIT_CLASSES := ["ground", "air"]
 ## Who is in a unit: a colonist on foot, a machine with a pilot, or none. Display and models only.
 const UNIT_CREWS := ["human", "piloted", "autonomous"]
 ## The building classes a unit prefers as targets and scales its damage against (battle sim).
 const TARGET_CLASSES := ["any", "defense", "resource", "wall", "hq"]
+## A building's class in battle (battle_class): what a unit's `prefers` picks among. A trap is
+## never a target and never counts for destruction.
+const CLASS_HQ := "hq"
+const CLASS_WALL := "wall"
+const CLASS_TRAP := "trap"
+const CLASS_DEFENSE := "defense"
+const CLASS_RESOURCE := "resource"
+const CLASS_OTHER := "other"
 ## Per-type unit fields that must be whole and non-negative when present.
 const UNIT_WHOLE_FIELDS := ["speed", "splash_units"]
 ## Per-level unit fields that must be whole and non-negative when present.
@@ -52,9 +63,18 @@ var housing_type: String = ""
 var research_type: String = ""
 ## Unit type ids in units.json order, the training menu's order.
 var unit_order: PackedStringArray = PackedStringArray()
+## rules.battle (all 0 or "" when the rules have none): the battle's length in seconds, the wall
+## type, the build-menu category whose types are traps, and the extra path cost of entering a
+## wall cell, in field units.
+var battle_seconds: int = 0
+var wall_type: String = ""
+var trap_category: String = ""
+var wall_cost_units: int = 0
 
 var _buildings: Dictionary = {}
 var _units: Dictionary = {}
+## rules.battle.loot_pct: resource -> the percent of the defender's stored amount a raid can take.
+var _loot_pct: Dictionary = {}
 ## id -> its rules entry ({"id", "name", "color"}), in rules order.
 var _resource_defs: Dictionary = {}
 var _category_defs: Dictionary = {}
@@ -121,7 +141,7 @@ func category_of(type: String) -> String:
 	return str(_def(type).get("category", ""))
 
 
-## Hidden from an attacker until it triggers (traps, the Cloaked Sentry). Display only for now.
+## Hidden from an attacker until it triggers (traps, the Cloaked Sentry).
 func is_hidden(type: String) -> bool:
 	return _def(type).get("hidden", false) == true
 
@@ -129,6 +149,31 @@ func is_hidden(type: String) -> bool:
 ## "ground", "air" or "both" for defences and traps; "" when the type has none.
 func targets_of(type: String) -> String:
 	return str(_def(type).get("targets", ""))
+
+
+## The type's class in battle, one of the CLASS_* constants, in this order: the Command Center
+## is hq; rules.battle.wall is wall; a type in rules.battle.trap_category is trap; a type with
+## `targets`, or whose level 1 has `range_cells`, is defense (the Shield Generator has no
+## targets); a type with `produces` or `storage` at some level is resource; the rest are other.
+func battle_class(type: String) -> String:
+	if type == HQ_TYPE:
+		return CLASS_HQ
+	if type == wall_type:
+		return CLASS_WALL
+	if trap_category != "" and category_of(type) == trap_category:
+		return CLASS_TRAP
+	if targets_of(type) != "" or level_stats(type, 1).has("range_cells"):
+		return CLASS_DEFENSE
+	for level: int in range(1, max_level(type) + 1):
+		var stats := level_stats(type, level)
+		if stats.has("produces") or stats.has("storage"):
+			return CLASS_RESOURCE
+	return CLASS_OTHER
+
+
+## The percent of the defender's stored `res` a raid can take (rules.battle.loot_pct); 0 when unset.
+func loot_pct(res: String) -> int:
+	return int(_loot_pct.get(res, 0))
 
 
 ## The number of levels; 0 when `levels` is missing or not a list (validation reports it).
@@ -329,7 +374,46 @@ func _read(rules: Dictionary, buildings: Dictionary, units: Dictionary) -> void:
 
 	problems.append_array(_validate_start())
 	problems.append_array(_read_army(rules.get("army", {}), units))
+	problems.append_array(_read_battle(rules.get("battle", {})))
 	load_error = "; ".join(problems)
+
+
+## rules.battle, optional: a catalog without it has no battle rules (battle_seconds 0).
+func _read_battle(battle: Variant) -> PackedStringArray:
+	var problems := PackedStringArray()
+	if typeof(battle) != TYPE_DICTIONARY:
+		problems.append("rules.battle must be an object")
+		return problems
+	var rules: Dictionary = battle
+	if rules.is_empty():
+		return problems
+	if not _is_whole(rules.get("seconds")) or int(rules["seconds"]) < 1:
+		problems.append("rules.battle.seconds must be a whole number of at least 1")
+	else:
+		battle_seconds = int(rules["seconds"])
+	if not _is_whole(rules.get("wall_cost_units", 0)):
+		problems.append("rules.battle.wall_cost_units must be whole and non-negative")
+	else:
+		wall_cost_units = int(rules.get("wall_cost_units", 0))
+	wall_type = str(rules.get("wall", ""))
+	if rules.has("wall") and not _buildings.has(wall_type):
+		problems.append("rules.battle.wall names unknown type '%s'" % wall_type)
+	trap_category = str(rules.get("trap_category", ""))
+	if rules.has("trap_category") and not categories.has(trap_category):
+		problems.append("rules.battle.trap_category must be one of rules.categories")
+	var loot: Variant = rules.get("loot_pct", {})
+	if typeof(loot) != TYPE_DICTIONARY:
+		problems.append("rules.battle.loot_pct must be an object")
+		return problems
+	var loot_dict: Dictionary = loot
+	for res: Variant in loot_dict:
+		if not resources.has(str(res)):
+			problems.append("rules.battle.loot_pct uses unknown resource '%s'" % res)
+		elif not _is_whole(loot_dict[res]) or int(loot_dict[res]) > 100:
+			problems.append("rules.battle.loot_pct.%s must be a whole percent, 0-100" % res)
+		else:
+			_loot_pct[str(res)] = int(loot_dict[res])
+	return problems
 
 
 ## rules.army and units.json. Every unit is stored, then validated against the buildings.
@@ -546,6 +630,10 @@ func _validate_building(type: String, def: Dictionary) -> PackedStringArray:
 		for field: String in WHOLE_FIELDS:
 			if stats.has(field) and not _is_whole(stats[field]):
 				problems.append("%s.%s must be whole and non-negative" % [where, field])
+		# A shell in flight is held until it lands; the battle sizes that buffer from fire_ms.
+		if _is_whole(stats.get("shell_ms", 0)) and int(stats.get("shell_ms", 0)) > 0 \
+				and (not _is_whole(stats.get("fire_ms")) or int(stats["fire_ms"]) < 50):
+			problems.append("%s fires shells, so its fire_ms must be at least 50" % where)
 		for field: String in ["cost", "produces", "storage"]:
 			if typeof(stats.get(field, {})) != TYPE_DICTIONARY:
 				problems.append("%s.%s must be an object" % [where, field])

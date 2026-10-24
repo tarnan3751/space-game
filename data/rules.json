@@ -12,6 +12,13 @@
   ],
   "grid": { "width": 48, "height": 48 },
   "army": { "housing": "hangar", "research": "research_lab" },
+  "battle": {
+    "seconds": 180,
+    "loot_pct": { "metal": 20, "crystal": 20, "antimatter": 5 },
+    "wall": "barrier_wall",
+    "trap_category": "traps",
+    "wall_cost_units": 8000
+  },
   "menu_order": [
     "drone_bay",
     "metal_extractor",

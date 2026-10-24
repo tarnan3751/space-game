@@ -5,8 +5,10 @@
     "category": "core",
     "max_count": [1, 1],
     "levels": [
-      { "cost": {}, "build_seconds": 0, "storage": { "metal": 1000, "crystal": 1000 } },
-      { "cost": { "metal": 400 }, "build_seconds": 100, "storage": { "metal": 2000, "crystal": 2000 } }
+      { "cost": {}, "build_seconds": 0, "storage": { "metal": 1000, "crystal": 1000 },
+        "hp": 1000 },
+      { "cost": { "metal": 400 }, "build_seconds": 100, "storage": { "metal": 2000, "crystal": 2000 },
+        "hp": 1000 }
     ]
   },
   "drone_bay": {
@@ -15,7 +17,8 @@
     "category": "resources",
     "max_count": [2, 3],
     "levels": [
-      { "cost": { "metal": 100 }, "build_seconds": 0, "builders": 1 }
+      { "cost": { "metal": 100 }, "build_seconds": 0, "builders": 1,
+        "hp": 100 }
     ]
   },
   "extractor": {
@@ -24,8 +27,10 @@
     "category": "resources",
     "max_count": [2, 4],
     "levels": [
-      { "cost": { "crystal": 100 }, "build_seconds": 60, "produces": { "metal": 3600 } },
-      { "cost": { "crystal": 200 }, "build_seconds": 120, "requires_cc": 2, "produces": { "metal": 7200 } }
+      { "cost": { "crystal": 100 }, "build_seconds": 60, "produces": { "metal": 3600 },
+        "hp": 200 },
+      { "cost": { "crystal": 200 }, "build_seconds": 120, "requires_cc": 2, "produces": { "metal": 7200 },
+        "hp": 200 }
     ]
   },
   "silo": {
@@ -34,7 +39,8 @@
     "category": "resources",
     "max_count": [1, 2],
     "levels": [
-      { "cost": { "metal": 100 }, "build_seconds": 30, "storage": { "metal": 1000 } }
+      { "cost": { "metal": 100 }, "build_seconds": 30, "storage": { "metal": 1000 },
+        "hp": 300 }
     ]
   },
   "harvester": {
@@ -43,7 +49,8 @@
     "category": "resources",
     "max_count": [1, 1],
     "levels": [
-      { "cost": { "metal": 50 }, "build_seconds": 0, "produces": { "crystal": 1800 } }
+      { "cost": { "metal": 50 }, "build_seconds": 0, "produces": { "crystal": 1800 },
+        "hp": 100 }
     ]
   },
   "siphon": {
@@ -53,7 +60,8 @@
     "max_count": [1, 1],
     "levels": [
       { "cost": { "crystal": 50 }, "build_seconds": 0, "produces": { "antimatter": 3600 },
-        "storage": { "antimatter": 100 } }
+        "storage": { "antimatter": 100 },
+        "hp": 100 }
     ]
   },
   "hangar": {
@@ -62,8 +70,10 @@
     "category": "army",
     "max_count": [1, 1],
     "levels": [
-      { "cost": { "metal": 100 }, "build_seconds": 30, "capacity": 20 },
-      { "cost": { "metal": 200 }, "build_seconds": 60, "requires_cc": 2, "capacity": 30 }
+      { "cost": { "metal": 100 }, "build_seconds": 30, "capacity": 20,
+        "hp": 200 },
+      { "cost": { "metal": 200 }, "build_seconds": 60, "requires_cc": 2, "capacity": 30,
+        "hp": 200 }
     ]
   },
   "academy": {
@@ -72,8 +82,10 @@
     "category": "army",
     "max_count": [2, 2],
     "levels": [
-      { "cost": { "metal": 10 }, "build_seconds": 0 },
-      { "cost": { "metal": 20 }, "build_seconds": 10 }
+      { "cost": { "metal": 10 }, "build_seconds": 0,
+        "hp": 100 },
+      { "cost": { "metal": 20 }, "build_seconds": 10,
+        "hp": 100 }
     ]
   },
   "lab": {
@@ -82,8 +94,10 @@
     "category": "army",
     "max_count": [0, 1],
     "levels": [
-      { "cost": { "metal": 100 }, "build_seconds": 30, "requires_cc": 2 },
-      { "cost": { "metal": 200 }, "build_seconds": 60, "requires_cc": 2 }
+      { "cost": { "metal": 100 }, "build_seconds": 30, "requires_cc": 2,
+        "hp": 200 },
+      { "cost": { "metal": 200 }, "build_seconds": 60, "requires_cc": 2,
+        "hp": 200 }
     ]
   },
   "mine": {
@@ -104,6 +118,103 @@
     "max_count": [25, 50],
     "levels": [
       { "cost": { "metal": 10 }, "build_seconds": 0, "hp": 100 }
+    ]
+  },
+  "turret": {
+    "name": "Turret",
+    "size": 1,
+    "category": "army",
+    "targets": "ground",
+    "max_count": [4, 4],
+    "levels": [
+      { "cost": { "metal": 10 }, "build_seconds": 0, "hp": 300, "damage": 10, "range_cells": 3, "fire_ms": 1000 }
+    ]
+  },
+  "tower": {
+    "name": "Tower",
+    "size": 1,
+    "category": "army",
+    "targets": "both",
+    "max_count": [4, 4],
+    "levels": [
+      { "cost": { "metal": 10 }, "build_seconds": 0, "hp": 300, "damage": 5, "range_cells": 4, "fire_ms": 500 }
+    ]
+  },
+  "mortar": {
+    "name": "Mortar",
+    "size": 1,
+    "category": "army",
+    "targets": "ground",
+    "max_count": [4, 4],
+    "levels": [
+      { "cost": { "metal": 10 }, "build_seconds": 0, "hp": 300, "damage": 20, "range_cells": 6,
+        "fire_ms": 2000, "splash_units": 1000, "shell_ms": 1000 }
+    ]
+  },
+  "shield": {
+    "name": "Shield",
+    "size": 1,
+    "category": "army",
+    "max_count": [4, 4],
+    "levels": [
+      { "cost": { "metal": 10 }, "build_seconds": 0, "hp": 300, "range_cells": 3, "shield_hp": 100,
+        "shield_regen": 20, "shield_delay_ms": 1000 }
+    ]
+  },
+  "well": {
+    "name": "Well",
+    "size": 1,
+    "category": "army",
+    "targets": "air",
+    "max_count": [4, 4],
+    "levels": [
+      { "cost": { "metal": 10 }, "build_seconds": 0, "hp": 300, "range_cells": 4, "fire_ms": 2000,
+        "hold_ms": 1000 }
+    ]
+  },
+  "emp": {
+    "name": "EMP",
+    "size": 1,
+    "category": "army",
+    "targets": "ground",
+    "max_count": [4, 4],
+    "levels": [
+      { "cost": { "metal": 10 }, "build_seconds": 0, "hp": 300, "damage": 5, "range_cells": 3,
+        "fire_ms": 1000, "stun_ms": 500 }
+    ]
+  },
+  "sentry": {
+    "name": "Sentry",
+    "size": 1,
+    "category": "army",
+    "hidden": true,
+    "targets": "both",
+    "max_count": [4, 4],
+    "levels": [
+      { "cost": { "metal": 10 }, "build_seconds": 0, "hp": 300, "damage": 10, "range_cells": 2,
+        "fire_ms": 500 }
+    ]
+  },
+  "air_mine": {
+    "name": "Air Mine",
+    "size": 1,
+    "category": "traps",
+    "hidden": true,
+    "targets": "air",
+    "max_count": [4, 4],
+    "levels": [
+      { "cost": { "metal": 10 }, "build_seconds": 0, "damage": 50, "range_cells": 1 }
+    ]
+  },
+  "throw_trap": {
+    "name": "Throw Trap",
+    "size": 1,
+    "category": "traps",
+    "hidden": true,
+    "targets": "ground",
+    "max_count": [4, 4],
+    "levels": [
+      { "cost": { "metal": 10 }, "build_seconds": 0, "range_cells": 1, "throw_cells": 3 }
     ]
   }
 }

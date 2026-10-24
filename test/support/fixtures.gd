@@ -15,6 +15,25 @@ extends RefCounted
 ##   mine      1x1: 20 metal, instant, hidden, targets ground, max 2
 ##   wall      1x1: 10 metal, instant, max 25
 ##
+## Battle fixtures (docs/reference/battle.md): every non-trap type above has hp; rules.battle is
+## 60 s, loot 50% of each resource, wall "wall", traps the "traps" category, wall cost 8000.
+## The 1x1 battle types, each hp 300 at level 1 (Fixtures.battle_catalog):
+##   turret  ground, damage 10, range 3, every 1000 ms     tower  both, damage 5, range 4, 500 ms
+##   mortar  ground, damage 20, range 6, 2000 ms, splash 1000, shell 1000 ms
+##   shield  range 3, pool 100, regen 20/s after 1000 ms   well   air, range 4, 2000 ms, hold 1000 ms
+##   emp     ground, damage 5, range 3, 1000 ms, stun 500 ms
+##   sentry  hidden, both, damage 10, range 2, 500 ms
+##   air_mine  trap, air, damage 50, range 1      throw_trap  trap, ground, range 1, throw 3 cells
+## Battle units (battle_units.json, merged after units.json by battle_catalog, so catalog()'s unit
+## list stays grunt, flyer, walker), housing 1 each:
+##   melee   ground any, speed 1000, hp 100, damage 10, 1000 ms, reach 500 (L2 hp 150, damage 15)
+##   gunner  ground any, speed 1000, hp 60, damage 5, 500 ms, reach 3000
+##   breaker ground wall, speed 2000, hp 20, damage 40, reach 500, splash 1000, x10 on walls, self-destructs
+##   raider  ground resource, speed 2000, hp 80, damage 10, 1000 ms, reach 500, x2 on resources
+##   hunter  ground defense, speed 500, hp 1000, damage 30, 2000 ms, reach 800
+##   drone   air any, speed 2000, hp 50, damage 10, 1000 ms, reach 2000
+##   bomber  air defense, speed 1000, hp 200, damage 100, 3000 ms, reach 500, splash 1000
+##
 ## Fixture units (all trained by the academy):
 ##   grunt  ground, housing 1, 10 s, 10 crystal (L2: research 100 crystal, 60 s, lab 1; trains for 20)
 ##   flyer  air, housing 2, 20 s, 20 crystal (L2: research 200 crystal, 120 s, lab 2; trains for 30)
@@ -23,6 +42,7 @@ extends RefCounted
 const RULES := "res://test/support/fixtures/rules.json"
 const BUILDINGS := "res://test/support/fixtures/buildings.json"
 const UNITS := "res://test/support/fixtures/units.json"
+const BATTLE_UNITS := "res://test/support/fixtures/battle_units.json"
 
 
 static func catalog() -> Catalog:
@@ -39,6 +59,16 @@ static func catalog_with_grid(size: Vector2i) -> Catalog:
 	rules["grid"] = {"width": size.x, "height": size.y}
 	return Catalog.from_json(JSON.stringify(rules), FileAccess.get_file_as_string(BUILDINGS),
 		FileAccess.get_file_as_string(UNITS))
+
+
+## The fixture catalog with the battle units merged in, on a field of `size` (20x20 by default).
+static func battle_catalog(size: Vector2i = Vector2i(20, 20)) -> Catalog:
+	var rules: Dictionary = JSON.parse_string(FileAccess.get_file_as_string(RULES))
+	rules["grid"] = {"width": size.x, "height": size.y}
+	var units: Dictionary = JSON.parse_string(FileAccess.get_file_as_string(UNITS))
+	units.merge(JSON.parse_string(FileAccess.get_file_as_string(BATTLE_UNITS)))
+	return Catalog.from_json(JSON.stringify(rules), FileAccess.get_file_as_string(BUILDINGS),
+		JSON.stringify(units))
 
 
 static func new_base(start_time: int = 0) -> BaseState:

@@ -1,0 +1,100 @@
+{
+  "melee": {
+    "name": "Melee",
+    "producer": "academy",
+    "class": "ground",
+    "crew": "autonomous",
+    "housing": 1,
+    "train_seconds": 10,
+    "speed": 1000,
+    "prefers": "any",
+    "levels": [
+      { "train_cost": {}, "hp": 100, "damage": 10, "fire_ms": 1000, "range_units": 500 },
+      { "train_cost": {}, "research_cost": {}, "research_seconds": 10, "requires_lab": 1, "hp": 150,
+        "damage": 15, "fire_ms": 1000, "range_units": 500 }
+    ]
+  },
+  "gunner": {
+    "name": "Gunner",
+    "producer": "academy",
+    "class": "ground",
+    "crew": "human",
+    "housing": 1,
+    "train_seconds": 10,
+    "speed": 1000,
+    "prefers": "any",
+    "levels": [
+      { "train_cost": {}, "hp": 60, "damage": 5, "fire_ms": 500, "range_units": 3000 }
+    ]
+  },
+  "breaker": {
+    "name": "Breaker",
+    "producer": "academy",
+    "class": "ground",
+    "crew": "human",
+    "housing": 1,
+    "train_seconds": 10,
+    "speed": 2000,
+    "prefers": "wall",
+    "splash_units": 1000,
+    "damage_pct": { "wall": 1000 },
+    "self_destruct": true,
+    "levels": [
+      { "train_cost": {}, "hp": 20, "damage": 40, "fire_ms": 1000, "range_units": 500 }
+    ]
+  },
+  "raider": {
+    "name": "Raider",
+    "producer": "academy",
+    "class": "ground",
+    "crew": "piloted",
+    "housing": 1,
+    "train_seconds": 10,
+    "speed": 2000,
+    "prefers": "resource",
+    "damage_pct": { "resource": 200 },
+    "levels": [
+      { "train_cost": {}, "hp": 80, "damage": 10, "fire_ms": 1000, "range_units": 500 }
+    ]
+  },
+  "hunter": {
+    "name": "Hunter",
+    "producer": "academy",
+    "class": "ground",
+    "crew": "piloted",
+    "housing": 1,
+    "train_seconds": 10,
+    "speed": 500,
+    "prefers": "defense",
+    "levels": [
+      { "train_cost": {}, "hp": 1000, "damage": 30, "fire_ms": 2000, "range_units": 800 }
+    ]
+  },
+  "drone": {
+    "name": "Drone",
+    "producer": "academy",
+    "class": "air",
+    "crew": "autonomous",
+    "housing": 1,
+    "train_seconds": 10,
+    "speed": 2000,
+    "prefers": "any",
+    "levels": [
+      { "train_cost": {}, "hp": 50, "damage": 10, "fire_ms": 1000, "range_units": 2000 }
+    ]
+  },
+  "bomber": {
+    "name": "Bomber",
+    "producer": "academy",
+    "class": "air",
+    "crew": "piloted",
+    "housing": 1,
+    "train_seconds": 10,
+    "speed": 1000,
+    "prefers": "defense",
+    "splash_units": 1000,
+    "levels": [
+      { "train_cost": {}, "hp": 200, "damage": 100, "fire_ms": 3000, "range_units": 500 }
+    ]
+  }
+}

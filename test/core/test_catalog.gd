@@ -434,6 +434,96 @@ func test_validation_reports_max_count_disagreeing_with_unlock() -> void:
 	assert_true(error.contains("extractor.max_count must be 0 below Command Center 1 and above 0 at it"), error)
 
 
+func test_battle_rules_and_classes() -> void:
+	var catalog := Fixtures.battle_catalog()
+	assert_eq(catalog.load_error, "")
+	assert_eq(catalog.battle_seconds, 60)
+	assert_eq(catalog.wall_type, "wall")
+	assert_eq(catalog.wall_cost_units, 8000)
+	assert_eq(catalog.loot_pct("metal"), 50)
+	assert_eq(catalog.loot_pct("gold"), 0)
+	var classes := {
+		"command_center": Catalog.CLASS_HQ, "wall": Catalog.CLASS_WALL, "mine": Catalog.CLASS_TRAP,
+		"air_mine": Catalog.CLASS_TRAP, "turret": Catalog.CLASS_DEFENSE, "shield": Catalog.CLASS_DEFENSE,
+		"sentry": Catalog.CLASS_DEFENSE, "extractor": Catalog.CLASS_RESOURCE,
+		"silo": Catalog.CLASS_RESOURCE, "siphon": Catalog.CLASS_RESOURCE,
+		"drone_bay": Catalog.CLASS_OTHER, "hangar": Catalog.CLASS_OTHER, "lab": Catalog.CLASS_OTHER,
+	}
+	for type: String in classes:
+		assert_eq(catalog.battle_class(type), classes[type], type)
+
+
+func test_no_battle_rules_is_no_battle() -> void:
+	var rules: Dictionary = JSON.parse_string(FileAccess.get_file_as_string(Fixtures.RULES))
+	rules.erase("battle")
+	var catalog := Catalog.from_json(JSON.stringify(rules), FileAccess.get_file_as_string(Fixtures.BUILDINGS),
+		FileAccess.get_file_as_string(Fixtures.UNITS))
+	assert_eq(catalog.load_error, "")
+	assert_eq(catalog.battle_seconds, 0)
+	assert_eq(catalog.battle_class("wall"), Catalog.CLASS_OTHER, "no wall type without battle rules")
+
+
+func test_validation_reports_bad_battle_rules() -> void:
+	var cases := {
+		"rules.battle must be an object": func(rules: Dictionary, _buildings: Dictionary) -> void:
+			rules["battle"] = 180,
+		"rules.battle.seconds must be a whole number of at least 1": func(rules: Dictionary, _buildings: Dictionary) -> void:
+			rules["battle"]["seconds"] = 0,
+		"rules.battle.wall_cost_units must be whole and non-negative": func(rules: Dictionary, _buildings: Dictionary) -> void:
+			rules["battle"]["wall_cost_units"] = -1,
+		"rules.battle.wall names unknown type 'fence'": func(rules: Dictionary, _buildings: Dictionary) -> void:
+			rules["battle"]["wall"] = "fence",
+		"rules.battle.trap_category must be one of rules.categories": func(rules: Dictionary, _buildings: Dictionary) -> void:
+			rules["battle"]["trap_category"] = "mines",
+		"rules.battle.loot_pct must be an object": func(rules: Dictionary, _buildings: Dictionary) -> void:
+			rules["battle"]["loot_pct"] = 20,
+		"rules.battle.loot_pct uses unknown resource 'gold'": func(rules: Dictionary, _buildings: Dictionary) -> void:
+			rules["battle"]["loot_pct"]["gold"] = 10,
+		"rules.battle.loot_pct.metal must be a whole percent, 0-100": func(rules: Dictionary, _buildings: Dictionary) -> void:
+			rules["battle"]["loot_pct"]["metal"] = 101,
+	}
+	for message: String in cases:
+		var error := _error_after(cases[message])
+		assert_true(error.contains(message), "%s: %s" % [message, error])
+
+
+func test_validation_reports_a_shell_without_a_fire_rate() -> void:
+	var error := _error_after(func(_rules: Dictionary, buildings: Dictionary) -> void:
+		buildings["mortar"]["levels"][0]["fire_ms"] = 20)
+	assert_true(error.contains("mortar level 1 fires shells, so its fire_ms must be at least 50"), error)
+	error = _error_after(func(_rules: Dictionary, buildings: Dictionary) -> void:
+		buildings["mortar"]["levels"][0].erase("fire_ms"))
+	assert_true(error.contains("mortar level 1 fires shells, so its fire_ms must be at least 50"), error)
+	error = _error_after(func(_rules: Dictionary, buildings: Dictionary) -> void:
+		buildings["mortar"]["levels"][0]["fire_ms"] = 50)
+	assert_eq(error, "")
+
+
+func test_shipped_battle_data() -> void:
+	# Every building that can be hit has a hull; every special carries its fields at every level.
+	var catalog := Catalog.load_default()
+	assert_eq(catalog.load_error, "")
+	assert_true(catalog.battle_seconds > 0)
+	assert_eq(catalog.battle_class(catalog.wall_type), Catalog.CLASS_WALL)
+	for res: String in catalog.resources:
+		assert_true(catalog.loot_pct(res) > 0, "loot_pct.%s" % res)
+	var specials := {
+		"plasma_mortar": ["splash_units", "shell_ms"], "orbital_cannon": ["splash_units", "shell_ms"],
+		"shield_generator": ["shield_hp", "shield_regen", "shield_delay_ms"],
+		"gravity_well": ["hold_ms", "fire_ms"], "emp_tower": ["stun_ms"], "grav_trap": ["throw_cells"],
+	}
+	for type: String in catalog.types():
+		var trap := catalog.battle_class(type) == Catalog.CLASS_TRAP
+		for level: int in range(1, catalog.max_level(type) + 1):
+			var stats := catalog.level_stats(type, level)
+			if not trap:
+				assert_true(int(stats.get("hp", 0)) > 0, "%s level %d has hp" % [type, level])
+			for field: String in specials.get(type, []):
+				assert_true(int(stats.get(field, 0)) > 0, "%s level %d has %s" % [type, level, field])
+			if catalog.targets_of(type) != "" and type != "gravity_well" and type != "grav_trap":
+				assert_true(int(stats.get("damage", 0)) > 0, "%s level %d has damage" % [type, level])
+
+
 func test_validation_reports_bad_menu_order() -> void:
 	var error := _error_after(func(rules: Dictionary, _buildings: Dictionary) -> void:
 		rules["menu_order"].erase("wall"))

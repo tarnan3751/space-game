@@ -12,7 +12,15 @@
   ],
   "grid": { "width": 10, "height": 10 },
   "army": { "housing": "hangar", "research": "lab" },
-  "menu_order": ["extractor", "harvester", "silo", "drone_bay", "siphon", "hangar", "academy", "lab", "mine", "wall"],
+  "battle": {
+    "seconds": 60,
+    "loot_pct": { "metal": 50, "crystal": 50, "antimatter": 50 },
+    "wall": "wall",
+    "trap_category": "traps",
+    "wall_cost_units": 8000
+  },
+  "menu_order": ["extractor", "harvester", "silo", "drone_bay", "siphon", "hangar", "academy", "lab", "mine", "wall",
+                 "turret", "tower", "mortar", "shield", "well", "emp", "sentry", "air_mine", "throw_trap"],
   "start": {
     "resources": { "metal": 500, "crystal": 500, "antimatter": 0 },
     "buildings": [
