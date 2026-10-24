@@ -75,7 +75,7 @@ matchmaking, an attack log, revenge and shields, then alliances. The design of e
 
 | Area | Status | Notes |
 | --- | --- | --- |
-| Catalog and game data | Built | `data/rules.json`, `data/buildings.json`; validated on load; all numbers ints |
+| Catalog and game data | Built | `data/rules.json`, `data/buildings.json`, `data/units.json`; validated on load; all numbers ints |
 | Building roster | Built | 33 types: the Command Center (levels 1–10) and 32 more in four build-menu categories, each with the levels and counts of the upgrade pass's level map (`docs/plans/upgrade-pass.md` §3), every level of every type modelled (259 models); metal, crystal and antimatter (from CC 4); one development-scale curve, checked by tests for affordability and for never going down; the build menu has a tab per category |
 | Tiers | Built | Each level's theme by the Command Center band it unlocks in (its `requires_cc`; the Command Center's by its own level): Base, Gold, Chrome, Obsidian and Crown, so a maxed base reads black and gold with violet cores, crowns and escorts (`docs/reference/art-style.md`, **Tiers**) |
 | The field | Built | 48×48 cells (`data/rules.json`), the start layout at its centre, inside the perimeter (kerb, pylons, hologram fence) and the terrain ring; the debug build's template base lays out every type at its Command Center 10 count in 46 of its 48 rows |
@@ -95,8 +95,8 @@ matchmaking, an attack log, revenge and shields, then alliances. The design of e
 | Tooling | Built | Gate script, landing script, behaviour harness (`tools/`), API dump |
 
 Balance numbers in `data/` are fast development values, not tuned. A debug build goes further:
-every level is free and builds in one second at most (`Catalog.apply_dev_cheats`; `-- --no-cheats`
-for the real numbers).
+every level is free and builds in one second at most, and every unit trains and researches free
+in one second at most (`Catalog.apply_dev_cheats`; `-- --no-cheats` for the real numbers).
 
 ### 2.2 Roadmap
 
@@ -106,7 +106,7 @@ for the real numbers).
 | 2 | Base polish: the building roster, build-menu categories, a third resource (antimatter), low-poly models built in code, HUD category tabs, safe-area margins for notches, painting walls by dragging, edge auto-scroll while dragging | Built |
 | 2a | The upgrade pass (`docs/plans/upgrade-pass.md`): the Command Center and every type to Command Center 10 (ten levels for the staples), the five tiers, 138 new level models with Crown escorts, the 48×48 field with a version 2 save migration, the maxed base measured | Built |
 | 2b | The model feedback pass (`docs/plans/model-feedback.md`): the owner's review of every max-level model folded in: no robot above defence buildings, every robot tailored to its building (a security bot, an ore hauler, a collector, a marshaller, welders), one slow lightning crackle, rising smoke, the Command Center's broader base, the academy and fabricator reshaped, the mortar's plasma and the orbital cannon's spire | Built |
-| 3 | Milestone 2, the offline game (`docs/vision.md` §7) — the figures and the army: the humanoid design study (a human in a spacesuit and a humanoid robot, in the comic style, rendered for the owner to approve), then the unit roster in data, training queues, Hangar housing, Research Lab upgrades and unit models | In progress: the humanoid study is built (`Figures`, the `figures` harness scenario) and approved at 3.5 heads; the figures' thinner ink line is built (`Figures.FIGURE_INK`); next the army plan |
+| 3 | Milestone 2, the offline game (`docs/vision.md` §7) — the figures and the army: the humanoid design study (a human in a spacesuit and a humanoid robot, in the comic style, rendered for the owner to approve), then the unit roster in data, training queues, Hangar housing, Research Lab upgrades and unit models | In progress: the humanoid study is built (`Figures`, the `figures` harness scenario) and approved at 3.5 heads; the figures' thinner ink line is built (`Figures.FIGURE_INK`); the army is built in core (`docs/reference/core-economy.md`, **The army**): eleven unit types in `data/units.json`, a training queue per producer building, Hangar housing, Research Lab levels, save version 3; next the training HUD and the unit models |
 | 4 | The battle sim in `src/core/battle/`: fixed-point integer positions (1 cell = 1000 units), fixed tick, pathing round and through walls, targeting, defences, traps, status effects, abilities; replay = seed + layouts + deploy commands; byte-identical results tested headless; batch simulations for balance | Planned |
 | 5 | The battle view: units moving, projectiles, damage and destruction, the attack HUD; the phone target fixed, and the maxed base and a full battle measured on it | Planned |
 | 6 | Expeditions: the sector map, the outpost generator (the player's roster with a faction tint, loot deposits, hazards), loot into `BaseState` through a new command, re-training; then the real-timer retune (6a). Milestone 2 complete: a game that plays end to end offline | Planned |
@@ -133,9 +133,14 @@ for the real numbers).
   (`docs/reference/data-format.md`); the retune is parked until the economy is tuned.
 - **The template base fills 46 of the field's 48 rows** at the Command Center 10 counts, so more
   walls or another type at the top needs its layout reworked (`docs/reference/input-camera.md`).
-- `hp`, `damage`, `range_cells`, `fire_ms`, `hidden`, `targets` and `capacity` in
-  `data/buildings.json` are display-only: the HUD's info panel shows each where it exists, and
-  none of them drives anything until the battle sim (step 4).
+- `hp`, `damage`, `range_cells`, `fire_ms`, `hidden` and `targets` in `data/buildings.json` are
+  display-only: the HUD's info panel shows each where it exists, and none of them drives anything
+  until the battle sim (step 4). So are a unit's battle fields in `data/units.json` (`speed`,
+  `prefers`, `splash_units`, `damage_pct`, `self_destruct`, `hp`, `damage`, `fire_ms`,
+  `range_units`). `capacity` drives the army's housing on the Hangar and is display-only on the
+  Alliance Beacon.
+- **The army has no HUD or models yet**: it trains, houses and researches in core and saves, and
+  nothing on screen shows it until the training HUD and the unit models (step 3's follow-ups).
 
 ## 3. Decisions
 
@@ -197,6 +202,14 @@ for the real numbers).
   buildings, since at the gameplay zoom a figure is about 25 px tall and the full 2.2 px line
   swallowed it. The study's colonist and automaton are approved as the base of every unit and
   crew figure.
+- **The army's rules** (the step 3 plan, 2026-10-24): a training queue per producer building,
+  trained while it is idle; the army's housing is the sum of every Hangar's `capacity` (20 at
+  Command Center 1, 280 at 10); units in training are not housed, and the army plus every queue
+  must fit the housing, revisited when battles spend units; a cancel refunds what was paid; a
+  unit's level belongs to its whole type, researched one at a time at the Research Lab, which
+  keeps researching while it upgrades. `crew` is flavour: the Cadet Academy trains the human
+  units, and a piloted machine needs no trained colonist. The roster's names and numbers are
+  provisional until the owner has seen them.
 
 ### 3.2 Open
 
@@ -204,5 +217,5 @@ for the real numbers).
   checked against shared golden test cases, or run headless Godot for that too. Decide in step 5.
 - **The name.** "Space Game" is a placeholder.
 - **The phone target** (device and frame rate), to fix before step 5 measures a battle.
-- **The unit roster, the housing rule, and whether deployed units are spent** (Clash's model)
-  or survive with repairs: the step 3 plan.
+- **Whether deployed units are spent** (Clash's model, the step 3 plan's recommendation) or
+  survive with repairs: with the owner. Nothing built in step 3 depends on it.

@@ -155,8 +155,8 @@ figures carry a thinner ink line than buildings so they stay readable at the gam
 ## 6. Platform
 
 Native iOS and Android on the GL Compatibility renderer, light enough for mid-range phones.
-The maxed base is unmeasured on a phone, and a battle with the Hangar's seventy units over a
-hundred buildings is the real test, so Milestone 2 fixes a target device and frame rate and
+The maxed base is unmeasured on a phone, and a battle with a full army at the top (the Hangars'
+280 housing) over a hundred buildings is the real test, so Milestone 2 fixes a target device and frame rate and
 measures on it when the battle view exists (step 5). That measurement decides whether the
 Crown robots stay and what the unit budgets are.
 
