@@ -8,12 +8,17 @@ extends RefCounted
 ## before its hull. The defence phase of a tick lands the shells due, then each defence in id
 ## order (a hidden one first checking whether a unit has come within its range), then each trap,
 ## then recharges the shields. What fell or was revealed is queued for BattleSim to pass on.
+## A defence an EMP burst has disabled (disable) skips its turn while the tick is below
+## disabled_until: it neither reveals itself nor fires, its cooldown and target held, and a
+## disabled shield generator neither recharges nor counts its delay, though its pool still absorbs.
 
 const TICK_MS := 50
 
 ## Per building: the attack cooldown in ms and the unit kept as target (-1 for none).
 var cooldown: PackedInt32Array = PackedInt32Array()
 var aim: PackedInt32Array = PackedInt32Array()
+## Per building: the tick an EMP burst's disabling ends (0 when none has).
+var disabled_until: PackedInt32Array = PackedInt32Array()
 ## Per shield generator: the pool, the ms since it last absorbed damage, and recharge carried.
 var pool: PackedInt32Array = PackedInt32Array()
 var _quiet: PackedInt32Array = PackedInt32Array()
@@ -52,6 +57,8 @@ func _init(layout: BattleLayout, army: BattleArmy) -> void:
 	cooldown.fill(0)
 	aim.resize(n)
 	aim.fill(-1)
+	disabled_until.resize(n)
+	disabled_until.fill(0)
 	pool.resize(n)
 	_quiet.resize(n)
 	_regen_carry.resize(n)
@@ -115,6 +122,15 @@ func damage_building(b: int, amount: int) -> void:
 		fallen_count += 1
 
 
+## Disables building b until tick `until` (a later end kept over an earlier one).
+func disable(b: int, until: int) -> void:
+	disabled_until[b] = maxi(disabled_until[b], until)
+
+
+func is_disabled(b: int, now: int) -> bool:
+	return disabled_until[b] > now
+
+
 ## Shield left on a generator; 0 once it has fallen.
 func shield_of(g: int) -> int:
 	if _layout.destroyed[g] != 0:
@@ -127,13 +143,13 @@ func tick(now: int, events: BattleEvents) -> void:
 	_land_shells(now, events)
 	for i: int in _guns.size():
 		var d := _guns[i]
-		if _layout.destroyed[d] == 0:
+		if _layout.destroyed[d] == 0 and disabled_until[d] <= now:
 			_defend(d, now, events)
 	for i: int in _traps.size():
 		var t := _traps[i]
 		if _layout.destroyed[t] == 0:
 			_trap(t, now, events)
-	_recharge()
+	_recharge(now)
 
 
 func _defend(d: int, now: int, events: BattleEvents) -> void:
@@ -227,11 +243,11 @@ func _trap(t: int, now: int, events: BattleEvents) -> void:
 	fallen_count += 1
 
 
-func _recharge() -> void:
+func _recharge(now: int) -> void:
 	for i: int in _shields.size():
 		var g := _shields[i]
 		var top := _layout.shield_max[g]
-		if _layout.destroyed[g] != 0:
+		if _layout.destroyed[g] != 0 or disabled_until[g] > now:
 			continue
 		if _quiet[g] < _layout.shield_delay_ms[g]:
 			_quiet[g] += TICK_MS
@@ -319,7 +335,7 @@ func _collect(cx: int, cy: int, reach: int, mask: int) -> void:
 ## (BattleSim.state_hash).
 func hash_into(h: int) -> int:
 	for b: int in _layout.count:
-		for value: int in [cooldown[b], aim[b], pool[b], _quiet[b], _regen_carry[b]]:
+		for value: int in [cooldown[b], aim[b], pool[b], _quiet[b], _regen_carry[b], disabled_until[b]]:
 			h = BattleMath.mix(h, value)
 	h = BattleMath.mix(h, shell_count)
 	for i: int in shell_count:

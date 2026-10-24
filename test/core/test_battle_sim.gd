@@ -92,7 +92,7 @@ func test_command_refusals() -> void:
 	var sim := Fixtures.battle([["command_center", 10, 10]], {"melee": 1})
 	assert_eq(sim.command(Fixtures.deploy(3, "melee", 0, 0)), BattleSim.ERR_BAD_TICK)
 	assert_eq(sim.command({"op": "dance", "tick": 0}), BattleSim.ERR_UNKNOWN_OP)
-	assert_eq(sim.command({"op": "ability", "tick": 0, "ability": "orbital_strike", "cell": [0, 0]}),
+	assert_eq(sim.command({"op": "ability", "tick": 0, "ability": "ghost", "cell": [0, 0]}),
 		BattleSim.ERR_UNKNOWN_ABILITY)
 	assert_eq(sim.command(Fixtures.deploy(0, "ghost", 0, 0)), BattleSim.ERR_UNKNOWN_UNIT)
 	assert_eq(sim.command(Fixtures.deploy(0, "melee", 10, 10)), BattleSim.ERR_BLOCKED)
@@ -100,6 +100,22 @@ func test_command_refusals() -> void:
 	assert_eq(sim.result()["commands"], [], "refused commands are not logged")
 	assert_eq(sim.command({"op": "deploy", "unit": "melee", "cell": [0, 0]}), "", "no tick: this one")
 	assert_eq(sim.result()["commands"], [Fixtures.deploy(0, "melee", 0, 0)])
+
+
+func test_an_ability_left_keeps_a_battle_without_units_going() -> void:
+	# No unit standing and none to deploy, but a burst left: the battle runs until it is used.
+	var setup := Fixtures.battle_setup([["command_center", 10, 10]], {})
+	setup["attacker"]["abilities"] = {"burst": 1}
+	var sim := BattleSim.create(Fixtures.battle_catalog(), setup)
+	for i: int in 50:
+		sim.step()
+	assert_false(sim.is_over())
+	assert_eq(sim.left_to_use("burst"), 1)
+	assert_eq(sim.command({"op": "ability", "tick": 50, "ability": "burst", "cell": [10, 10]}), "")
+	sim.step()
+	assert_true(sim.is_over(), "nothing left to deploy or use")
+	assert_eq(sim.tick, 51)
+	assert_eq(sim.result()["abilities_used"], {"burst": 1})
 
 
 func test_the_result_shape() -> void:

@@ -6,7 +6,8 @@ extends RefCounted
 ## Units are indexed 0..count-1 in deploy order (a unit's id is its index + 1), so a tie broken
 ## by the lowest index is broken by the lowest id. The arrays are sized for the whole army at
 ## setup, so a tick allocates nothing but the paths it searches. Only this class writes them; the
-## combat phase goes through damage_unit, stun, hold and throw_unit.
+## combat phase goes through damage_unit, stun, hold and throw_unit, and the abilities through
+## damage_unit and heal.
 ##
 ## Each tick, in two halves (act, then aim_and_act, with the falls of the first passed on
 ## between them): a unit with a target walks or flies (a held unit does not) towards it and
@@ -117,7 +118,8 @@ func _init(layout: BattleLayout, field: BattleField, pathing: BattlePathing) -> 
 
 
 ## Reads the attacker: {unit: count} and {unit: level} (a level is clamped into the unit's
-## levels; 1 when left out). Returns "" or why it is refused. The unit types are taken in sorted
+## levels; 1 when left out). Returns "" or why it is refused, a total above BattleSim.MAX_UNITS
+## included, checked before anything is sized by it. The unit types are taken in sorted
 ## order, whatever order the dictionary holds them in (a JSON round trip sorts it), so the type
 ## indices, and with them the whole battle and its hash, do not depend on it.
 func setup(catalog: Catalog, army: Dictionary, unit_levels: Dictionary) -> String:
@@ -132,6 +134,8 @@ func setup(catalog: Catalog, army: Dictionary, unit_levels: Dictionary) -> Strin
 		var number := BattleMath.whole(army[name])
 		if number < 0:
 			return "the attacker's army has a bad count of %s" % name
+		if number > BattleSim.MAX_UNITS - total:
+			return "the attacker's army has more than %d units" % BattleSim.MAX_UNITS
 		var level := clampi(BattleMath.whole(unit_levels.get(name, 1)), 1, catalog.unit_max_level(name))
 		_add_type(catalog, name, level, number)
 		total += number
@@ -288,6 +292,13 @@ func damage_unit(u: int, amount: int) -> bool:
 	hp[u] = 0
 	_kill(u)
 	return true
+
+
+## Gives `amount` back to a living unit's hull, up to its type's.
+func heal(u: int, amount: int) -> void:
+	if state[u] == DEAD:
+		return
+	hp[u] = mini(max_hp(u), hp[u] + amount)
 
 
 func stun(u: int, until: int) -> void:

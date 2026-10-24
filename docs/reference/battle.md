@@ -6,7 +6,9 @@ layout on the field, run from a setup that is exactly its replay. It is the one 
 against a player's saved base, and the server will replay it in headless Godot. The data it
 reads is in `data-format.md` (`rules.battle`, the buildings' battle fields and classes, the
 units' battle fields); applying a result to the attacker's base is `raid_result`
-(`core-economy.md`). The battle view and its HUD are step 5; abilities are step 4b.
+(`core-economy.md`). The battle view and its HUD are step 5. The abilities the attacker brings
+are made in the Nanite Foundry (`core-economy.md`, **The Foundry**; their data in
+`data-format.md`, `abilities.json`).
 
 Everything here `extends RefCounted`, like the rest of `src/core`: no clock, integers only, ties
 broken by id.
@@ -34,7 +36,8 @@ broken by id.
 | `battle_field.gd` | `BattleField` | Per cell: free, wall or building (`kind`), what stands there, and the deploy zone's cover count. |
 | `battle_pathing.gd` | `BattlePathing` | The ground search and the reach maps (**Pathing**). |
 | `battle_army.gd` | `BattleArmy` | The units in deploy order (a unit's id is its index + 1): stats at the attacker's levels, positions, targets, paths; the unit phase; the unit buckets the defences search. |
-| `battle_combat.gd` | `BattleCombat` | The defences' cooldowns and targets, shells in flight, shields, statuses and traps; `damage_building`; the defence phase. |
+| `battle_combat.gd` | `BattleCombat` | The defences' cooldowns and targets, shells in flight, shields, statuses, traps and the EMP's disabled timers; `damage_building`; the defence phase. |
+| `battle_abilities.gd` | `BattleAbilities` | The abilities brought, left and used, the swarms at work and the strikes on their way; the ability phase (**Abilities**). |
 | `battle_events.gd` | `BattleEvents` | The last tick's events, for the view (**What the view reads**). |
 | `battle_math.gd` | `BattleMath` | Cell centres, `isqrt`, the squared distance to a rectangle, whole-number and cell parsing. |
 
@@ -46,7 +49,8 @@ setup, so a tick allocates nothing in the steady state but the paths it searches
 
 ```
 {"seed": int,
- "attacker": {"army": {unit: count}, "unit_levels": {unit: level}, "abilities": {}},
+ "attacker": {"army": {unit: count}, "unit_levels": {unit: level},
+              "abilities": {ability: count}, "ability_levels": {ability: level}},
  "defender": {"buildings": [{"id", "type", "level", "cell": [x, y]}, ...],
               "resources": {resource: int}},
  "commands": [command, ...]}
@@ -54,15 +58,18 @@ setup, so a tick allocates nothing in the steady state but the paths it searches
 
 - `BattleSim.create(catalog, setup)` builds a battle; `setup_error` is `""` or why it was
   refused (no `rules.battle`; an unknown building type or unit; a level the type does not have;
-  an id that is not a new positive whole number; a footprint off the field or over another; a
-  negative count or stored amount; commands whose ticks are not whole and in order). A refused
+  an id that is not a new positive whole number; a footprint off the field or over another; an
+  unknown ability; a negative count or stored amount; more than `BattleSim.MAX_UNITS` (2,000)
+  units or `MAX_ABILITIES` (200) abilities in all, checked before anything is sized by them, so
+  a setup from elsewhere cannot size the battle at will; abilities or ability levels not objects; commands whose ticks are not whole and in order). A refused
   battle never runs. `BattleSim.run(catalog, setup)` runs one to its end and returns `result()`
   (`{}` when refused). The step 4 plan's `bad_setup` code became this: a refusal is a non-empty
   `setup_error`, the reason in words, not a code.
 - **Defender buildings** take a save's building shape (other keys ignored). A level-0 building
   (under first construction) is left out; one upgrading fights at its finished level.
-- **Attacker levels** are clamped into each unit's levels, 1 when left out. `abilities` is
-  accepted and unused until step 4b.
+- **Attacker levels** are clamped into each unit's levels, 1 when left out; so are the abilities'
+  levels. `abilities` is how many of each the attacker brings (the base's stock), taken in sorted
+  id order like the army.
 - **Commands** in `setup.commands` are applied at the start of their tick, in list order; the
   view sends them live through `command(cmd)` at the current tick. A command naming a tick must
   name the current one. `command` returns `""` or a code, and accepted commands are logged
@@ -71,11 +78,11 @@ setup, so a tick allocates nothing in the steady state but the paths it searches
 | Command | Refusals |
 | --- | --- |
 | `{"op": "deploy", "tick": t, "unit": String, "cell": [x, y]}` | `battle_over`, `bad_tick`, `unknown_unit` (not a catalog unit), `none_left` (none of it left in the army, or none brought), `blocked` (off the field or in the deploy zone) |
-| `{"op": "ability", "tick": t, "ability": String, "cell": [x, y]}` | `unknown_ability`, always, until step 4b |
+| `{"op": "ability", "tick": t, "ability": String, "cell": [x, y]}` | `battle_over`, `bad_tick`, `unknown_ability` (not a catalog ability), `none_left` (none of it left, or none brought), `blocked` (off the field); anywhere in the field is allowed, buildings included (**Abilities**) |
 | `{"op": "surrender", "tick": t}` | `battle_over`, `bad_tick`; ends the battle on its tick |
 | anything else | `unknown_op` |
 
-`check_deploy(unit, cell)` asks the deploy question without acting.
+`check_deploy(unit, cell)` and `check_ability(ability, cell)` ask the question without acting.
 
 **The deploy zone** is every standing footprint, walls included, grown by one cell; traps are
 left out, since they are hidden, so a deploy on a trap's cell is allowed and the trap goes off
@@ -87,26 +94,30 @@ centre.
 ## A tick
 
 1. The commands due.
-2. **The unit phase, first half** (`BattleArmy.act`), units in id order, a stunned one
+2. **The ability phase** (`BattleAbilities.tick`): the strikes due land, in the order they were
+   called, then the swarms at work heal, in the order they were cast; the falls are passed on.
+3. **The unit phase, first half** (`BattleArmy.act`), units in id order, a stunned one
    skipped: a unit with a target walks along its path (ground) or flies straight at it (air,
    not while held), and in reach attacks every `fire_ms`; a unit whose target has fallen drops
    it and wants another.
-3. The falls of the first half are passed on: the field frees the cells and lifts the deploy
+4. The falls of the first half are passed on: the field frees the cells and lifts the deploy
    zone, the reach maps forget the building, its loot share is taken. (The units' fallback
    counts drop the moment a building falls.)
-4. **The unit phase, second half** (`BattleArmy.aim_and_act`), units in id order: every unit
+5. **The unit phase, second half** (`BattleArmy.aim_and_act`), units in id order: every unit
    wanting a target, the newly deployed included, gets one (**Targeting**), so its search sees
    the falls of this tick's first half, and acts on it at once. A target that falls in this
    half is noticed by the units on it in the next tick's first half; its falls are passed on
    in turn.
-5. The unit buckets are rebuilt.
-6. **The defence phase** (`BattleCombat.tick`): shells due land; each defence in id order
+6. The unit buckets are rebuilt.
+7. **The defence phase** (`BattleCombat.tick`): shells due land; each defence in id order
    reveals itself if hidden and a unit is in range, then fires if its cooldown allows; each trap
-   goes off if a unit of its class is in range; the shields recharge.
-7. Its falls and reveals are passed on, the clock moves, and the end is checked.
+   goes off if a unit of its class is in range; the shields recharge. A disabled defence skips
+   all of it (**Abilities**).
+8. Its falls and reveals are passed on, the clock moves, and the end is checked.
 
 The battle ends after a tick at the timer, at 100% destruction (when anything counts), or when
-no unit stands and none is left to deploy; or at once on a surrender.
+no unit stands, none is left to deploy, no ability is left to use and no strike is on its way;
+or at once on a surrender.
 
 ## Pathing
 
@@ -182,6 +193,23 @@ The nearest-unit search reads the unit buckets (4×4 cells) its range touches.
 
 Traps never block, are never targets and never count for destruction.
 
+## Abilities
+
+An ability is used at the centre of its command's cell, at the start of its tick, and acts by its
+`effect` (`data-format.md`, `abilities.json`) at the attacker's level of it. Distances are
+squared field units, as everywhere; the ms fields are floored to ticks (`ms / 50`).
+
+| Effect | Rule |
+| --- | --- |
+| `swarm` (the Repair Swarm) | For `duration_ms / 50` ticks from its own, in each tick's ability phase, it heals every living unit, ground or air, within `radius_units` of its point by `heal_per_second × 50 / 1000`, the remainder carried per swarm from tick to tick as the shields' recharge is, up to the unit's hull. Swarms over one another each heal. |
+| `emp` (the EMP Burst) | At once, every standing defence (class `defense`: the guns, the gravity well, the EMP tower, the shield generator and the cloaked sentry; not traps) whose centre is within `radius_units` is disabled until `tick + stun_ms / 50` (a later end kept): while disabled it skips the defence phase, so it neither reveals itself nor fires, its cooldown and target held as a stunned unit's; a shield generator neither recharges nor counts its delay, though its pool still absorbs. Shells already fired still land. |
+| `strike` (the Orbital Strike) | It lands `delay_ms / 50` ticks later, in that tick's ability phase: `damage` to every standing building whose footprint is within `radius_units` of its point, walls and hidden buildings included (a hidden one is not revealed by it), traps left out, through `damage_building`, so shields absorb it; then `damage` to every living attacking unit within the radius too, ground or air: a strike hurts the attacker's own units. Its falls are passed on before the unit phase. |
+
+`BattleCombat.disabled_until` (per building) and the swarms and strikes of `BattleAbilities`
+(fixed lists sized at setup for every ability brought) are the only state the abilities add; a
+tick allocates nothing for them. An emp and a strike read every building once; a swarm reads
+every unit once a tick.
+
 ## Destruction, stars and loot
 
 - **Destruction** is the buildings destroyed out of those that count (neither walls nor traps),
@@ -199,12 +227,13 @@ Traps never block, are never targets and never count for destruction.
 ## The result
 
 ```
-{"abilities_used": {}, "commands": [accepted commands], "deployed": {unit: n},
+{"abilities_used": {ability: n}, "commands": [accepted commands], "deployed": {unit: n},
  "destruction": int, "hash": int, "loot": {resource: n}, "stars": int, "ticks": int}
 ```
 
 Every key and sub-key is in sorted order, so equal battles give equal text. `deployed` counts
-the units deployed (all are spent, alive or not), `ticks` the ticks run, `hash` the final
+the units deployed (all are spent, alive or not), `abilities_used` the abilities used (only those
+above 0; `{}` when none), `ticks` the ticks run, `hash` the final
 `state_hash()`.
 
 ## What the view reads
@@ -213,21 +242,24 @@ the units deployed (all are spent, alive or not), `ticks` the ticks run, `hash` 
 | --- | --- |
 | `tick`, `ticks_total()`, `seconds_left()`, `is_over()` | The clock. |
 | `step()`, `run_to_end()`, `command(cmd)`, `check_deploy(unit, cell)`, `is_deploy_cell(cell)`, `left_to_deploy(unit)` | Running it and the deploy bar. |
+| `check_ability(ability, cell)`, `left_to_use(ability)` | The abilities bar. |
 | `unit_count()`; per unit id: `unit_type`, `unit_position` (field units), `unit_heading` (the last move, not normalised), `unit_hp`, `unit_max_hp`, `unit_state`, `unit_target` (a building id, 0 for none) | Units. `unit_state` is one of `BattleArmy.IDLE`, `WALKING`, `ATTACKING`, `DEAD`, `STUNNED`, `HELD`. |
-| `building_ids()`; per building id: `building_hp`, `building_max_hp`, `is_destroyed`, `is_revealed`, `shield_hp` | Buildings. |
+| `building_ids()`; per building id: `building_hp`, `building_max_hp`, `is_destroyed`, `is_revealed`, `shield_hp`, `building_disabled` (an EMP burst has it off now) | Buildings. |
 | `destruction_pct()`, `stars()`, `loot()` | Progress. |
-| `events` (`BattleEvents`) | The last tick's events, the first `count` of its arrays: `UNIT_HIT`, `SHOT`, `SHELL` (with its `land_tick`), `SHELL_LAND`, `HOLD`, `DETONATE`, `THROW`, `REVEAL`, `FALL`, `DEATH`, each with a source and target id and from and to points. |
+| `events` (`BattleEvents`) | The last tick's events, the first `count` of its arrays: `UNIT_HIT`, `SHOT`, `SHELL` (with its `land_tick`), `SHELL_LAND`, `HOLD`, `DETONATE`, `THROW`, `REVEAL`, `FALL`, `DEATH`, each with a source and target id and from and to points; and `ABILITY` (an ability used at `to`: a swarm's cloud until its `land_tick`, a burst's flash with the defences waking at it, a strike's incoming marker landing at it) and `STRIKE_LAND` (the blast at `to`), their source the ability's place in `catalog.ability_types()` plus one. A live ability command keeps its event for the tick it runs on: only an accepted ability command clears the last tick's events before adding its own (as the next tick does); a deploy or a refused command leaves the last tick's events in place. |
 | `state_hash()`, `result()` | Determinism and the end. |
 
 ## Determinism and performance
 
 The same setup gives the same `result()` text and the same `state_hash()` at every tick: ties go
 through id order or the heap's (cost, cell) order, the setup's dictionary order does not matter
-(the defender's buildings are taken in id order and the attacker's unit types in sorted order,
-so a setup sent as JSON, whose parse sorts its keys, replays to the same hash), and nothing reads
-a clock or draws a random number. A battle stepped tick by tick, fed
-its commands live, or replayed from its logged commands gives the same result
-(`test_battle_sim.gd`).
+(the defender's buildings are taken in id order and the attacker's unit types and abilities in
+sorted order, so a setup sent as JSON, whose parse sorts its keys, replays to the same hash), and
+nothing reads a clock or draws a random number. The hash covers the abilities' state too: what
+is left and used, every swarm (point, end, heal, radius, carry), every strike on its way (point,
+landing tick, damage, radius) and every building's disabled timer. A battle stepped tick by tick,
+fed its commands live, or replayed from its logged commands gives the same result
+(`test_battle_sim.gd`, and with abilities `test_battle_abilities.gd`).
 
 **Budget**: a full 180 s battle with 280 housing of units against a maxed layout simulates
 headless in well under 2 s on the development Mac, so the view can run it at real time with

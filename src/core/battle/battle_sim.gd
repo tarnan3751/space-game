@@ -8,24 +8,32 @@ extends RefCounted
 ##
 ## A battle is made from a setup, which is exactly its replay:
 ##   {"seed": int,
-##    "attacker": {"army": {unit: count}, "unit_levels": {unit: level}, "abilities": {}},
+##    "attacker": {"army": {unit: count}, "unit_levels": {unit: level},
+##                 "abilities": {ability: count}, "ability_levels": {ability: level}},
 ##    "defender": {"buildings": [{"id", "type", "level", "cell": [x, y]}, ...],
 ##                 "resources": {resource: int}},
 ##    "commands": [command, ...]}
 ## Commands, in tick order, are applied at the start of their tick; the view sends them live
 ## through command() instead:
 ##   {"op": "deploy", "tick": int, "unit": String, "cell": [x, y]}
-##   {"op": "ability", "tick": int, "ability": String, "cell": [x, y]}   (step 4b; refused now)
+##   {"op": "ability", "tick": int, "ability": String, "cell": [x, y]}
 ##   {"op": "surrender", "tick": int}
 ##
-## A tick: the commands due; the unit phase (BattleArmy): the units with a target act, their
+## A tick: the commands due; the ability phase (BattleAbilities: strikes landing, swarms healing)
+## and its falls passed on; the unit phase (BattleArmy): the units with a target act, their
 ## falls are passed on, then the units wanting a target get one and act, and their falls are
 ## passed on; the unit buckets; the defence phase (BattleCombat); the falls and reveals of that;
 ## then the clock, and the end:
-## the timer, 100% destruction, no unit standing and none left to deploy, or a surrender.
+## the timer, 100% destruction, no unit standing and none left to deploy, no ability left and no
+## strike on its way, or a surrender.
 
 const TICKS_PER_SECOND := 20
 const TICK_MS := 50
+## The most units and abilities a setup may bring, far above any legal army (280 housing) or
+## Foundry stock, so a setup from elsewhere (a server replaying a client's) cannot size the
+## battle's arrays at will.
+const MAX_UNITS := 2000
+const MAX_ABILITIES := 200
 
 const ERR_BAD_TICK := "bad_tick"
 const ERR_UNKNOWN_OP := "unknown_op"
@@ -45,6 +53,7 @@ var field: BattleField
 var pathing: BattlePathing
 var army: BattleArmy
 var combat: BattleCombat
+var abilities: BattleAbilities
 var events: BattleEvents = BattleEvents.new()
 ## Seeded from the setup and unused by today's rules.
 var rng: SeededRng
@@ -55,6 +64,10 @@ var _commands: Array = []
 var _next_command: int = 0
 var _log: Array[Dictionary] = []
 var _over: bool = false
+## Set after a tick: the events are the last tick's. The next tick clears them, and so does an
+## accepted ability command before it adds its own, so a live ability's event is kept for the tick
+## it runs on; a deploy or a refused command leaves the last tick's events in place.
+var _events_done: bool = false
 ## Falls and reveals passed on so far.
 var _falls_done: int = 0
 var _reveals_done: int = 0
@@ -96,7 +109,7 @@ func is_over() -> bool:
 func step() -> void:
 	if _over:
 		return
-	events.clear()
+	_fresh_events()
 	while _next_command < _commands.size():
 		var next: Dictionary = _commands[_next_command]
 		if int(next.get("tick", 0)) > tick:
@@ -105,6 +118,8 @@ func step() -> void:
 		command(next)
 	if _over:
 		return
+	abilities.tick(tick, events)
+	_pass_on()
 	army.act(tick, combat, events)
 	_pass_on()
 	army.aim_and_act(tick, combat, events)
@@ -112,9 +127,11 @@ func step() -> void:
 	army.rebuild_buckets()
 	combat.tick(tick, events)
 	_pass_on()
+	_events_done = true
 	tick += 1
 	if tick >= _total_ticks or (layout.counted > 0 and layout.counted_fallen == layout.counted) \
-			or (army.alive == 0 and army.left_total() == 0):
+			or (army.alive == 0 and army.left_total() == 0 and abilities.left_total() == 0
+				and abilities.strike_count == 0):
 		_over = true
 
 
@@ -142,7 +159,15 @@ func command(cmd: Dictionary) -> String:
 			army.deploy(army.type_index(unit), cell)
 			_log.append({"cell": [cell.x, cell.y], "op": "deploy", "tick": tick, "unit": unit})
 		"ability":
-			return ERR_UNKNOWN_ABILITY
+			var ability := str(cmd.get("ability", ""))
+			var ability_cell := BattleMath.cell_from(cmd.get("cell"))
+			var refused := check_ability(ability, ability_cell)
+			if refused != "":
+				return refused
+			_fresh_events()
+			abilities.use(abilities.type_index(ability), ability_cell, tick, events)
+			_log.append({"ability": ability, "cell": [ability_cell.x, ability_cell.y], "op": "ability",
+				"tick": tick})
 		"surrender":
 			_log.append({"op": "surrender", "tick": tick})
 			_over = true
@@ -162,6 +187,25 @@ func check_deploy(unit: String, cell: Vector2i) -> String:
 	if not field.is_deploy_cell(cell):
 		return ERR_BLOCKED
 	return ""
+
+
+## An ability may be used anywhere in the field, buildings included, while one of it is left.
+func check_ability(ability: String, cell: Vector2i) -> String:
+	if _over:
+		return ERR_OVER
+	if not catalog.has_ability(ability):
+		return ERR_UNKNOWN_ABILITY
+	var t := abilities.type_index(ability)
+	if t < 0 or abilities.left[t] <= 0:
+		return ERR_NONE_LEFT
+	if not field.in_bounds(cell):
+		return ERR_BLOCKED
+	return ""
+
+
+func left_to_use(ability: String) -> int:
+	var t := abilities.type_index(ability)
+	return abilities.left[t] if t >= 0 else 0
 
 
 ## In the field and outside every standing footprint grown by one cell (traps left out).
@@ -242,6 +286,11 @@ func is_revealed(id: int) -> bool:
 	return layout.revealed[layout.index_of(id)] != 0
 
 
+## Whether an EMP burst has the building disabled now.
+func building_disabled(id: int) -> bool:
+	return combat.is_disabled(layout.index_of(id), tick)
+
+
 ## A shield generator's pool; 0 for any other building and once it has fallen.
 func shield_hp(id: int) -> int:
 	return combat.shield_of(layout.index_of(id))
@@ -278,7 +327,7 @@ func loot() -> Dictionary[String, int]:
 
 
 ## The result, every key and sub-key in sorted order, so equal battles give equal text:
-##   {"abilities_used": {}, "commands": [accepted commands], "deployed": {unit: n},
+##   {"abilities_used": {ability: n}, "commands": [accepted commands], "deployed": {unit: n},
 ##    "destruction": int, "hash": int, "loot": {resource: n}, "stars": int, "ticks": int}
 func result() -> Dictionary:
 	var names := army.type_names.duplicate()
@@ -288,13 +337,20 @@ func result() -> Dictionary:
 		var n := army.deployed[army.type_index(name)]
 		if n > 0:
 			deployed[name] = n
+	var ability_names := abilities.type_names.duplicate()
+	ability_names.sort()
+	var used := {}
+	for name: String in ability_names:
+		var n := abilities.used[abilities.type_index(name)]
+		if n > 0:
+			used[name] = n
 	var resources := catalog.resources.duplicate()
 	resources.sort()
 	var taken := {}
 	for res: String in resources:
 		taken[res] = _loot[catalog.resources.find(res)]
 	return {
-		"abilities_used": {},
+		"abilities_used": used,
 		"commands": _log.duplicate(true),
 		"deployed": deployed,
 		"destruction": destruction_pct(),
@@ -308,8 +364,9 @@ func result() -> Dictionary:
 ## FNV-1a over everything that changes in a battle: the clock and the commands accepted (not
 ## where the scripted ones have got to, so a battle fed live hashes as its replay does), every
 ## unit's state, path and timers (BattleArmy.hash_into), every building's hull and flags, the
-## defences, shields and shells (BattleCombat.hash_into), the falls and reveals passed on, and the
-## loot. Equal battles hash equal at every tick. Built on request, so it may allocate.
+## defences, shields, shells and disabled timers (BattleCombat.hash_into), the abilities left,
+## swarms and strikes (BattleAbilities.hash_into), the falls and reveals passed on, and the loot.
+## Equal battles hash equal at every tick. Built on request, so it may allocate.
 func state_hash() -> int:
 	var h := 2166136261
 	for value: int in [tick, 1 if _over else 0, _falls_done, _reveals_done, _log.size(),
@@ -321,12 +378,20 @@ func state_hash() -> int:
 		h = BattleMath.mix(h, layout.revealed[b])
 	h = army.hash_into(h)
 	h = combat.hash_into(h)
+	h = abilities.hash_into(h)
 	for r: int in _loot.size():
 		h = BattleMath.mix(h, _loot[r])
 	return h
 
 
 # --- Internals -----------------------------------------------------------------
+
+## Clears the last tick's events before this tick adds any.
+func _fresh_events() -> void:
+	if _events_done:
+		events.clear()
+		_events_done = false
+
 
 func _setup(setup: Dictionary) -> String:
 	if catalog.battle_seconds <= 0:
@@ -346,11 +411,15 @@ func _setup(setup: Dictionary) -> String:
 	var defender_dict: Dictionary = defender
 	var army_data: Variant = attacker_dict.get("army", {})
 	var level_data: Variant = attacker_dict.get("unit_levels", {})
+	var ability_data: Variant = attacker_dict.get("abilities", {})
+	var ability_level_data: Variant = attacker_dict.get("ability_levels", {})
 	var buildings: Variant = defender_dict.get("buildings", [])
 	var stored: Variant = defender_dict.get("resources", {})
 	if typeof(army_data) != TYPE_DICTIONARY or typeof(level_data) != TYPE_DICTIONARY \
 			or typeof(buildings) != TYPE_ARRAY or typeof(stored) != TYPE_DICTIONARY:
 		return "the army, unit_levels and resources must be objects and buildings a list"
+	if typeof(ability_data) != TYPE_DICTIONARY or typeof(ability_level_data) != TYPE_DICTIONARY:
+		return "the abilities and ability_levels must be objects"
 	layout = BattleLayout.new()
 	var error := layout.build(catalog, buildings, catalog.grid_size)
 	if error != "":
@@ -363,6 +432,10 @@ func _setup(setup: Dictionary) -> String:
 	if error != "":
 		return error
 	combat = BattleCombat.new(layout, army)
+	abilities = BattleAbilities.new(layout, army, combat)
+	error = abilities.setup(catalog, ability_data, ability_level_data)
+	if error != "":
+		return error
 	error = _setup_loot(stored)
 	if error != "":
 		return error

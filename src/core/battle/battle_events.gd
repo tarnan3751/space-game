@@ -1,12 +1,13 @@
 class_name BattleEvents
 extends RefCounted
 ## What happened in the battle's last tick, for the view to draw (docs/reference/battle.md):
-## shots, shells, detonations, falls and deaths. Pure logic. The arrays are reused from tick to
+## shots, shells, detonations, falls, deaths and abilities. Pure logic. The arrays are reused from tick to
 ## tick, so only the first `count` entries are this tick's; they grow only when a tick has more
 ## events than any before it.
 ##
-## `source` and `target` are a building id or a unit id, as the kind says; (from_x, from_y) and
-## (to_x, to_y) are field units; `land_tick` is the tick a shell lands, else the tick itself.
+## `source` and `target` are a building id, a unit id or an ability's place, as the kind says;
+## (from_x, from_y) and (to_x, to_y) are field units; `land_tick` is the tick a shell lands or an
+## ability's effect ends or lands, else the tick itself.
 
 ## A unit hits a building: source unit, target building.
 const UNIT_HIT := 0
@@ -28,6 +29,12 @@ const REVEAL := 7
 const FALL := 8
 ## A unit dies: target unit.
 const DEATH := 9
+## An ability is used at to: source the ability's place in catalog.ability_types() plus one;
+## land_tick the tick its effect ends (a swarm), the defences wake (an EMP burst) or it lands (a
+## strike).
+const ABILITY := 10
+## An orbital strike lands at to: source as for ABILITY.
+const STRIKE_LAND := 11
 
 const START_CAPACITY := 256
 

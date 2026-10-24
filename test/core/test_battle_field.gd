@@ -179,6 +179,11 @@ func test_setup_refusals() -> void:
 		"bad count of melee": Fixtures.battle_setup([["command_center", 0, 0]], {"melee": -1}),
 		"ticks must be whole and in order": Fixtures.battle_setup([["command_center", 0, 0]], {"melee": 2},
 			[Fixtures.deploy(5, "melee", 9, 9), Fixtures.deploy(4, "melee", 9, 9)]),
+		"unknown ability 'ghost'": _with_abilities({"ghost": 1}),
+		"bad count of strike": _with_abilities({"strike": -1}),
+		"abilities and ability_levels must be objects": _with_abilities([]),
+		"more than 2000 units": Fixtures.battle_setup([["command_center", 0, 0]], {"melee": 1 << 40}),
+		"more than 200 in all": _with_abilities({"strike": 1 << 40}),
 	}
 	for reason: String in cases:
 		var sim := BattleSim.create(catalog, cases[reason])
@@ -194,6 +199,25 @@ func test_setup_refusals() -> void:
 		FileAccess.get_file_as_string(Fixtures.UNITS))
 	assert_eq(BattleSim.create(bare, Fixtures.battle_setup([], {})).setup_error, "the catalog has no battle rules")
 	assert_eq(BattleSim.run(bare, Fixtures.battle_setup([], {})), {})
+
+
+func test_setup_counts_are_capped_in_total() -> void:
+	var catalog := Fixtures.battle_catalog()
+	var army := Fixtures.battle_setup([["command_center", 0, 0]], {"melee": 1500, "drone": 501})
+	assert_eq(BattleSim.create(catalog, army).setup_error, "the attacker's army has more than 2000 units")
+	army["attacker"]["army"] = {"melee": 1500, "drone": 500}
+	assert_eq(BattleSim.create(catalog, army).setup_error, "", "the cap itself is allowed")
+	var abilities := _with_abilities({"strike": 150, "swarm": 51})
+	assert_eq(BattleSim.create(catalog, abilities).setup_error, "the attacker's abilities have more than 200 in all")
+	abilities["attacker"]["abilities"] = {"strike": 150, "swarm": 50}
+	assert_eq(BattleSim.create(catalog, abilities).setup_error, "")
+
+
+## A setup with the attacker's abilities set to `abilities`.
+static func _with_abilities(abilities: Variant) -> Dictionary:
+	var setup := Fixtures.battle_setup([["command_center", 0, 0]], {})
+	setup["attacker"]["abilities"] = abilities
+	return setup
 
 
 func _step_until(sim: BattleSim, done: Callable) -> void:
