@@ -4,8 +4,9 @@ extends Node
 ## ones (ghost + confirm, like Clash), and dragging the selected building to move it.
 ## Walls are painted instead: until Done, a tap places one, and a drag one on every free
 ## cell the finger crosses. The ground's cell grid shows only during these (_show_grid).
-## It also applies the army's commands the HUD's panels ask for: train, cancel_training and
-## research. This is the only game-layer code that calls BaseState.apply().
+## It also applies the army's commands the HUD's panels ask for: train, cancel_training,
+## research, and the Foundry's make, cancel_making and research_ability. This is the only
+## game-layer code that calls BaseState.apply().
 ##
 ## While the ghost, a building or the wall brush is dragged with the finger near the
 ## screen's edge, the camera scrolls toward that edge and the dragged thing keeps following
@@ -232,6 +233,22 @@ func cancel_training(id: int, unit: String) -> String:
 ## words `busy` its own way.
 func research(unit: String) -> String:
 	return state.apply({"op": "research", "unit": unit}, clock.call())
+
+
+## Queues one `ability` at Foundry `id`. Returns the error code, as train() does.
+func make(id: int, ability: String) -> String:
+	return state.apply({"op": "make", "id": id, "ability": ability, "count": 1}, clock.call())
+
+
+## Cancels the newest queued `ability` at Foundry `id`, refunding it. Returns the error code.
+func cancel_making(id: int, ability: String) -> String:
+	return state.apply({"op": "cancel_making", "id": id, "ability": ability}, clock.call())
+
+
+## Starts the research of `ability`'s next level, in the research slot units share. Returns the
+## error code.
+func research_ability(ability: String) -> String:
+	return state.apply({"op": "research", "ability": ability}, clock.call())
 
 
 # --- Gestures --------------------------------------------------------------------

@@ -183,10 +183,12 @@ and colours the footprint by `state.check_move`; on release, if the cell changed
 
 **The army's commands.** `train(id, unit)` applies `{"op": "train", "id", "unit", "count": 1}`,
 `cancel_training(id, unit)` `{"op": "cancel_training", "id", "unit"}` and `research(unit)`
-`{"op": "research", "unit"}`, each at `clock.call()`. Unlike the other commands they return the
+`{"op": "research", "unit"}`; the Foundry's, `make(id, ability)` `{"op": "make", "id", "ability",
+"count": 1}`, `cancel_making(id, ability)` `{"op": "cancel_making", "id", "ability"}` and
+`research_ability(ability)` `{"op": "research", "ability"}`; each at `clock.call()`. Unlike the other commands they return the
 error code (`""` on success) instead of emitting `command_failed`, so the caller words the
 result: `main.gd` connects the HUD's training and research panels to them and toasts the outcome
-(`hud.md`, **Training panel**, **Research panel**).
+(`hud.md`, **Training panel**, **Making panel**, **Research panel**).
 
 Pinches go to `camera.zoom_at`, two-finger pans and camera drags to `camera.pan`.
 
