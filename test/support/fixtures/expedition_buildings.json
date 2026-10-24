@@ -271,16 +271,16 @@
     "category": "walls",
     "max_count": [30, 40, 50, 60, 70, 80, 90, 100, 110, 120],
     "levels": [
-      {"cost": {"metal": 10}, "build_seconds": 0, "hp": 100},
-      {"cost": {"metal": 20}, "build_seconds": 0, "requires_cc": 2, "hp": 150},
-      {"cost": {"metal": 30}, "build_seconds": 0, "requires_cc": 3, "hp": 200},
-      {"cost": {"metal": 40}, "build_seconds": 0, "requires_cc": 4, "hp": 250},
-      {"cost": {"metal": 50}, "build_seconds": 0, "requires_cc": 5, "hp": 300},
-      {"cost": {"metal": 60}, "build_seconds": 0, "requires_cc": 6, "hp": 350},
-      {"cost": {"metal": 70}, "build_seconds": 0, "requires_cc": 7, "hp": 400},
-      {"cost": {"metal": 80}, "build_seconds": 0, "requires_cc": 8, "hp": 450},
-      {"cost": {"metal": 90}, "build_seconds": 0, "requires_cc": 9, "hp": 500},
-      {"cost": {"metal": 100}, "build_seconds": 0, "requires_cc": 10, "hp": 550}
+      {"cost": {"metal": 10}, "build_seconds": 0, "storage": {"antimatter": 5}, "hp": 100},
+      {"cost": {"metal": 20}, "build_seconds": 0, "requires_cc": 2, "storage": {"antimatter": 5}, "hp": 150},
+      {"cost": {"metal": 30}, "build_seconds": 0, "requires_cc": 3, "storage": {"antimatter": 5}, "hp": 200},
+      {"cost": {"metal": 40}, "build_seconds": 0, "requires_cc": 4, "storage": {"antimatter": 5}, "hp": 250},
+      {"cost": {"metal": 50}, "build_seconds": 0, "requires_cc": 5, "storage": {"antimatter": 5}, "hp": 300},
+      {"cost": {"metal": 60}, "build_seconds": 0, "requires_cc": 6, "storage": {"antimatter": 5}, "hp": 350},
+      {"cost": {"metal": 70}, "build_seconds": 0, "requires_cc": 7, "storage": {"antimatter": 5}, "hp": 400},
+      {"cost": {"metal": 80}, "build_seconds": 0, "requires_cc": 8, "storage": {"antimatter": 5}, "hp": 450},
+      {"cost": {"metal": 90}, "build_seconds": 0, "requires_cc": 9, "storage": {"antimatter": 5}, "hp": 500},
+      {"cost": {"metal": 100}, "build_seconds": 0, "requires_cc": 10, "storage": {"antimatter": 5}, "hp": 550}
     ]
   }
 }

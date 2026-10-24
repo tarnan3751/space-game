@@ -49,7 +49,8 @@ extends RefCounted
 ##   hangar 3x3   academy 2x2 (trains every unit)   lab 2x2 (from CC 2)
 ##   turret 2x2 ground, range 4   cannon 2x2 both, range 8 (from CC 2)   shield 2x2 (from CC 3)
 ##   sentry 1x1 hidden (from CC 4)   mine 1x1 trap (from CC 2)   mega_mine 2x2 trap (from CC 5)
-##   wall 1x1, 30 at CC 1 up to 120 at CC 10
+##   wall 1x1, 30 at CC 1 up to 120 at CC 10, storing 5 antimatter: walls hold no loot share,
+##     so none of it counts
 
 const RULES := "res://test/support/fixtures/rules.json"
 const BUILDINGS := "res://test/support/fixtures/buildings.json"
