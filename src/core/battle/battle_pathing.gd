@@ -14,6 +14,9 @@ extends RefCounted
 ## time a unit asks for it, and kept up to date as buildings fall or are revealed, about a
 ## hundred cells each. The maps live side by side in one array of this object's own, so updating
 ## one never copies it.
+##
+## The search and the maps run on the field grown by a border of closed cells, so a step needs
+## no bounds check; a cell keeps its order there, so ties break as they do on the field.
 
 const SET_ANY := 0
 const SET_DEFENSE := 1
@@ -39,10 +42,26 @@ var _field: BattleField
 var _layout: BattleLayout
 var _wall_cost: int
 var _cells: int
-## The reach maps, map m at [m * _cells, (m + 1) * _cells); their set and reach.
+## The search runs on the field grown by a border of closed cells, `_pw` wide, so a step needs no
+## bounds check: a cell (x, y) is (y + 1) * _pw + x + 1 there, in the same order as on the field,
+## so the heap breaks ties the same way. `_kind` is the field's kind in that grid, the border
+## BUILDING, kept up to date as buildings fall. The reach maps use the grid too.
+var _pw: int
+var _pcells: int
+var _kind: PackedByteArray = PackedByteArray()
+## The neighbour offsets in that grid, in DX/DY's order, and a diagonal's two side cells.
+var _step_to: PackedInt32Array = PackedInt32Array()
+var _side_x: PackedInt32Array = PackedInt32Array()
+var _side_y: PackedInt32Array = PackedInt32Array()
+## The reach maps, map m at [m * _pcells, (m + 1) * _pcells); their set and reach.
 var _reach: PackedInt32Array = PackedInt32Array()
 var _map_set: PackedInt32Array = PackedInt32Array()
 var _map_reach: PackedInt32Array = PackedInt32Array()
+## Each map's members, the buildings that are or may become its candidates (the unrevealed
+## ones too, for the sets a reveal joins), in index order: map m's at [_member_start[m],
+## _member_start[m + 1]) of _members.
+var _members: PackedInt32Array = PackedInt32Array()
+var _member_start: PackedInt32Array = PackedInt32Array([0])
 ## Search buffers, reused: a cell's cost and parent are valid when its stamp is the search's.
 var _cost: PackedInt32Array = PackedInt32Array()
 var _parent: PackedInt32Array = PackedInt32Array()
@@ -57,11 +76,24 @@ func _init(field: BattleField, layout: BattleLayout, wall_cost: int) -> void:
 	_layout = layout
 	_wall_cost = wall_cost
 	_cells = field.width * field.height
-	_cost.resize(_cells)
-	_parent.resize(_cells)
-	_seen.resize(_cells)
+	_pw = field.width + 2
+	_pcells = _pw * (field.height + 2)
+	_kind.resize(_pcells)
+	_kind.fill(BattleField.BUILDING)
+	for y: int in field.height:
+		for x: int in field.width:
+			_kind[(y + 1) * _pw + x + 1] = field.kind[y * field.width + x]
+	for d: int in 8:
+		var dx: int = DX[d]
+		var dy: int = DY[d]
+		_step_to.append(dy * _pw + dx)
+		_side_x.append(dx)
+		_side_y.append(dy * _pw)
+	_cost.resize(_pcells)
+	_parent.resize(_pcells)
+	_seen.resize(_pcells)
 	_seen.fill(0)
-	_done.resize(_cells)
+	_done.resize(_pcells)
 	_done.fill(0)
 	# A cell is pushed at most once per neighbour that improves it.
 	_heap.resize(_cells * 8 + 8)
@@ -101,12 +133,15 @@ func map_for(set_id: int, reach: int) -> int:
 	var m := _map_set.size()
 	_map_set.append(set_id)
 	_map_reach.append(reach)
-	_reach.resize((m + 1) * _cells)
-	for i: int in range(m * _cells, (m + 1) * _cells):
+	_reach.resize((m + 1) * _pcells)
+	for i: int in range(m * _pcells, (m + 1) * _pcells):
 		_reach[i] = 0
 	for b: int in _layout.count:
+		if _may_join(b, set_id):
+			_members.append(b)
 		if is_candidate(b, set_id):
 			_stamp(m, b, 1)
+	_member_start.append(_members.size())
 	return m
 
 
@@ -120,11 +155,16 @@ func map_count() -> int:
 
 ## How many candidates of map `m` are in reach of `cell`.
 func reach_count(m: int, cell: int) -> int:
-	return _reach[m * _cells + cell]
+	return _reach[m * _pcells + _grown(cell)]
 
 
-## Building `b` has fallen: it leaves every map it was in.
+## Building `b` has fallen: its cells take the field's kind again, and it leaves every map it
+## was in.
 func building_fell(b: int) -> void:
+	var width := _field.width
+	for y: int in range(_layout.cell_y[b], _layout.cell_y[b] + _layout.sizes[b]):
+		for x: int in range(_layout.cell_x[b], _layout.cell_x[b] + _layout.sizes[b]):
+			_kind[(y + 1) * _pw + x + 1] = _field.kind[y * width + x]
 	for m: int in _map_set.size():
 		if is_member(b, _map_set[m]):
 			_stamp(m, b, -1)
@@ -148,31 +188,35 @@ func building_revealed(b: int) -> void:
 func find(start: int, m: int) -> PackedInt32Array:
 	searches += 1
 	var stamp := searches
-	var kind := _field.kind
-	var width := _field.width
-	var height := _field.height
-	var offset := m * _cells
+	var kind := _kind
+	var reach := _reach
+	var step_to := _step_to
+	var side_x := _side_x
+	var side_y := _side_y
+	var pcells := _pcells
+	var offset := m * pcells
+	var first := _grown(start)
 	_heap_size = 0
-	_seen[start] = stamp
-	_cost[start] = 0
-	_parent[start] = -1
-	_push_key(start)
+	_seen[first] = stamp
+	_cost[first] = 0
+	_parent[first] = -1
+	_push_key(first)
 	var goal := -1
 	var goal_cost := -1
 	found = -1
 	while _heap_size > 0:
 		var key := _pop()
-		var cell := key % _cells
-		var cost := key / _cells
+		var cell := key % pcells
+		var cost := key / pcells
 		if goal >= 0 and cost > goal_cost:
 			break
 		if _done[cell] == stamp:
 			continue
 		_done[cell] = stamp
-		if _reach[offset + cell] > 0:
+		if reach[offset + cell] > 0:
 			# A map is current after every fall passed on; one this tick has not passed on yet
 			# leaves a count with nothing standing behind it, and the search goes on.
-			var pick := _pick_at(cell, m)
+			var pick := _pick_at(_shrunk(cell), m)
 			if pick >= 0:
 				if goal < 0 or pick < found:
 					goal = cell
@@ -181,22 +225,14 @@ func find(start: int, m: int) -> PackedInt32Array:
 				continue
 		if goal >= 0:
 			continue
-		var x := cell % width
-		var y := cell / width
 		for d: int in 8:
-			var dx: int = DX[d]
-			var dy: int = DY[d]
-			var nx := x + dx
-			var ny := y + dy
-			if nx < 0 or ny < 0 or nx >= width or ny >= height:
-				continue
-			var next := ny * width + nx
+			var next := cell + step_to[d]
 			var next_kind := kind[next]
 			if next_kind == BattleField.BUILDING or _done[next] == stamp:
 				continue
 			var step := STEP
 			if d >= 4:
-				if kind[y * width + nx] != BattleField.FREE or kind[ny * width + x] != BattleField.FREE:
+				if kind[cell + side_x[d]] != BattleField.FREE or kind[cell + side_y[d]] != BattleField.FREE:
 					continue
 				step = DIAGONAL
 			if next_kind == BattleField.WALL:
@@ -206,55 +242,116 @@ func find(start: int, m: int) -> PackedInt32Array:
 				_seen[next] = stamp
 				_cost[next] = next_cost
 				_parent[next] = cell
-				_push_key(next_cost * _cells + next)
+				_push_key(next_cost * pcells + next)
 	var path := PackedInt32Array()
 	if goal < 0:
 		return path
 	var at := goal
 	while at >= 0:
-		path.append(at)
+		path.append(_shrunk(at))
 		at = _parent[at]
 	path.reverse()
 	return path
 
 
-## The nearest candidate of map `m`'s set in reach of a cell's centre, then the lowest index.
+## A field cell's index in the grown grid, and back.
+func _grown(cell: int) -> int:
+	return (cell / _field.width + 1) * _pw + cell % _field.width + 1
+
+
+func _shrunk(cell: int) -> int:
+	return (cell / _pw - 1) * _field.width + cell % _pw - 1
+
+
+## Whether building `b` is a member of a set or becomes one when revealed: is_member with every
+## building taken as seen.
+func _may_join(b: int, set_id: int) -> bool:
+	var cls := _layout.classes[b]
+	if cls == BattleLayout.TRAP:
+		return false
+	match set_id:
+		SET_ANY, SET_ANY_HIDDEN:
+			return cls != BattleLayout.WALL
+		SET_DEFENSE:
+			return cls == BattleLayout.DEFENSE
+		SET_RESOURCE:
+			return cls == BattleLayout.RESOURCE
+		SET_HQ:
+			return cls == BattleLayout.HQ
+		SET_WALL:
+			return cls == BattleLayout.WALL
+	return false
+
+
+## The nearest candidate of map `m`'s set in reach of a cell's centre, then the lowest index:
+## is_candidate and the distance to each member's footprint, written out, since a search asks it
+## of every cell in reach it settles at its goal's cost.
 func _pick_at(cell: int, m: int) -> int:
 	var set_id := _map_set[m]
+	var seen_only := set_id == SET_ANY or set_id == SET_DEFENSE or set_id == SET_RESOURCE
 	var px := BattleMath.centre(cell % _field.width)
 	var py := BattleMath.centre(cell / _field.width)
 	var r2 := _map_reach[m] * _map_reach[m]
+	var destroyed := _layout.destroyed
+	var revealed := _layout.revealed
+	var x0 := _layout.x0
+	var y0 := _layout.y0
+	var x1 := _layout.x1
+	var y1 := _layout.y1
 	var best := -1
 	var best_d2 := 0
-	for b: int in _layout.count:
-		if not is_candidate(b, set_id):
+	for i: int in range(_member_start[m], _member_start[m + 1]):
+		var b := _members[i]
+		if destroyed[b] != 0 or (seen_only and revealed[b] == 0):
 			continue
-		var d2 := BattleMath.dist2_to_rect(px, py, _layout.x0[b], _layout.y0[b], _layout.x1[b],
-			_layout.y1[b])
+		var dx := 0
+		if px < x0[b]:
+			dx = x0[b] - px
+		elif px > x1[b]:
+			dx = px - x1[b]
+		var dy := 0
+		if py < y0[b]:
+			dy = y0[b] - py
+		elif py > y1[b]:
+			dy = py - y1[b]
+		var d2 := dx * dx + dy * dy
 		if d2 <= r2 and (best < 0 or d2 < best_d2):
 			best = b
 			best_d2 = d2
 	return best
 
 
+## Adds `delta` to map `m` on every cell whose centre is within its reach of building `b`'s
+## footprint: per row, the cells whose centres lie within the row's span, the integer square
+## root of what the reach leaves after the row's distance, so the test is exact.
 func _stamp(m: int, b: int, delta: int) -> void:
 	var r := _map_reach[m]
 	var r2 := r * r
 	var width := _field.width
-	var left := maxi(0, (_layout.x0[b] - r) / BattleMath.CELL)
-	var top := maxi(0, (_layout.y0[b] - r) / BattleMath.CELL)
-	var right := mini(width - 1, (_layout.x1[b] + r) / BattleMath.CELL)
-	var bottom := mini(_field.height - 1, (_layout.y1[b] + r) / BattleMath.CELL)
 	var bx0 := _layout.x0[b]
 	var by0 := _layout.y0[b]
 	var bx1 := _layout.x1[b]
 	var by1 := _layout.y1[b]
-	var offset := m * _cells
+	var top := maxi(0, (by0 - r) / BattleMath.CELL)
+	var bottom := mini(_field.height - 1, (by1 + r) / BattleMath.CELL)
+	var offset := m * _pcells + 1
 	for y: int in range(top, bottom + 1):
 		var py := BattleMath.centre(y)
+		var dy := 0
+		if py < by0:
+			dy = by0 - py
+		elif py > by1:
+			dy = py - by1
+		if dy > r:
+			continue
+		var span := BattleMath.isqrt(r2 - dy * dy)
+		# The cells x with bx0 - span <= centre(x) <= bx1 + span.
+		var low := bx0 - span - BattleMath.HALF
+		var left := 0 if low <= 0 else (low + BattleMath.CELL - 1) / BattleMath.CELL
+		var right := mini(width - 1, (bx1 + span - BattleMath.HALF) / BattleMath.CELL)
+		var row := offset + (y + 1) * _pw
 		for x: int in range(left, right + 1):
-			if BattleMath.dist2_to_rect(BattleMath.centre(x), py, bx0, by0, bx1, by1) <= r2:
-				_reach[offset + y * width + x] += delta
+			_reach[row + x] += delta
 
 
 ## A binary min-heap of cost * cells + cell.

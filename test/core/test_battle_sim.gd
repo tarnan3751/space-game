@@ -216,34 +216,28 @@ func test_stepped_live_and_replayed_battles_agree() -> void:
 
 
 func test_a_big_battle_runs_to_its_end() -> void:
-	# 150 buildings and 280 units on a 48x48 field.
-	var buildings := [["command_center", 22, 22]]
-	var types := ["turret", "tower", "mortar", "academy", "shield", "emp", "well", "sentry", "mine", "air_mine"]
-	var i := 0
-	for y: int in range(2, 46, 3):
-		for x: int in range(2, 46, 3):
-			if buildings.size() >= 121 or (x >= 20 and x <= 26 and y >= 20 and y <= 26):
-				continue
-			buildings.append([types[i % types.size()], x, y])
-			i += 1
-	for x: int in range(10, 40):
-		buildings.append(["wall", x, 1])
-	assert_eq(buildings.size(), 151)
-	var army := {"melee": 100, "gunner": 80, "drone": 60, "bomber": 20, "breaker": 20}
-	var commands := []
-	var n := 0
-	for unit: String in army:
-		for k: int in army[unit]:
-			commands.append(Fixtures.deploy(n / 10, unit, (n * 7) % 48, 47))
-			n += 1
-	var catalog := Fixtures.battle_catalog(Vector2i(48, 48))
-	var result := BattleSim.run(catalog, Fixtures.battle_setup(buildings, army, commands))
+	var setup := _big_setup()
+	assert_eq((setup["defender"]["buildings"] as Array).size(), 151)
+	var result := BattleSim.run(Fixtures.battle_catalog(Vector2i(48, 48)), setup)
 	assert_false(result.is_empty())
 	var deployed := 0
 	for unit: String in result["deployed"]:
 		deployed += int(result["deployed"][unit])
 	assert_eq(deployed, 280)
 	assert_true(int(result["destruction"]) > 0)
+
+
+func test_the_hash_at_every_tick_is_pinned() -> void:
+	# Pinned values: a change to the pathing's speed must not move them; only a change to what a
+	# battle does may, under a brief that says so.
+	var sim := BattleSim.create(Fixtures.battle_catalog(), _rich_setup())
+	var chain := 2166136261
+	while not sim.is_over():
+		sim.step()
+		chain = BattleMath.mix(chain, sim.state_hash())
+	assert_eq([sim.tick, sim.state_hash(), chain], [1200, 2555368207, 1486836163], "the rich battle")
+	var big := BattleSim.run(Fixtures.battle_catalog(Vector2i(48, 48)), _big_setup())
+	assert_eq([big["ticks"], big["hash"]], [1154, 296948820], "the big battle")
 
 
 ## A battle with every kind of unit and defence on the 20x20 fixture field.
@@ -260,3 +254,26 @@ func _rich_setup() -> Dictionary:
 		Fixtures.deploy(20, "bomber", 10, 19), Fixtures.deploy(40, "melee", 19, 3), Fixtures.deploy(60, "gunner", 3, 19),
 		Fixtures.deploy(80, "breaker", 0, 6)]
 	return Fixtures.battle_setup(buildings, army, commands, {"metal": 800, "crystal": 600, "antimatter": 0})
+
+
+## The big battle's setup: 151 buildings and 280 units on a 48x48 field.
+func _big_setup() -> Dictionary:
+	var buildings := [["command_center", 22, 22]]
+	var types := ["turret", "tower", "mortar", "academy", "shield", "emp", "well", "sentry", "mine", "air_mine"]
+	var i := 0
+	for y: int in range(2, 46, 3):
+		for x: int in range(2, 46, 3):
+			if buildings.size() >= 121 or (x >= 20 and x <= 26 and y >= 20 and y <= 26):
+				continue
+			buildings.append([types[i % types.size()], x, y])
+			i += 1
+	for x: int in range(10, 40):
+		buildings.append(["wall", x, 1])
+	var army := {"melee": 100, "gunner": 80, "drone": 60, "bomber": 20, "breaker": 20}
+	var commands := []
+	var n := 0
+	for unit: String in army:
+		for k: int in army[unit]:
+			commands.append(Fixtures.deploy(n / 10, unit, (n * 7) % 48, 47))
+			n += 1
+	return Fixtures.battle_setup(buildings, army, commands)
