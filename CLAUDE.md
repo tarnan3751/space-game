@@ -149,7 +149,7 @@ src/game/models/ parts (the model being built, shared helpers and surfaces), the
 test/core/       test_*.gd (one file per core area)
 test/support/    TestCase base class, fixtures and fixture JSON
 tools/           run_tests.sh, test_runner.gd, gates.sh, land_series.sh, dump_api.sh,
-                 gen_textures.gd, gen_outposts.gd
+                 gen_textures.gd, gen_outposts.gd, sim_battles.gd, sim_matrix.sh
 tools/harness/   driver.gd, scenario.gd, scenarios/, run.sh, README.md (output in out/, gitignored)
 .claude/agents/  scout, researcher, developer, reviewer
 assets/          textures/kit/ (the material kit, generated); textures/field.png and

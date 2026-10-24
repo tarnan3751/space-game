@@ -142,6 +142,19 @@ ticks, destruction, stars, loot per resource, units deployed, abilities used, wa
 `--out` or stdout, and a summary line (the stars and the mean destruction) to stderr. The gate
 does not run it.
 
+## The beatability matrix: `tools/sim_matrix.sh`
+
+```
+tools/sim_matrix.sh [--seeds=20] [--out=<dir>] [cc ...]
+```
+
+Runs `sim_battles.gd` against the expedition fields for each Command Center level given (3, 5, 7
+and 10 by default), each band (field 0 easy, 2 even, 4 hard) and each strategy (edge, two_edges,
+waves, then random), with a full army of that level (its Hangars' housing, written in the script)
+at its researched levels and no abilities, and prints the summary line of each run; the CSVs go to
+`--out` (`tools/harness/out/sim_matrix/` by default, gitignored). The acceptance rules it is read
+against are in `docs/plans/retune.md`. The gate does not run it.
+
 ## Outposts: `tools/gen_outposts.gd`
 
 ```
