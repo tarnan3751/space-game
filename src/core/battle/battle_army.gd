@@ -565,3 +565,26 @@ func _attack(u: int, tick: int, combat: BattleCombat, events: BattleEvents) -> v
 		hp[u] = 0
 		_kill(u)
 		events.add(BattleEvents.DEATH, 0, u + 1, x[u], y[u], x[u], y[u], tick)
+
+
+## Mixes everything of the army that changes in a battle into a state hash (BattleSim.state_hash).
+func hash_into(h: int) -> int:
+	h = BattleMath.mix(h, count)
+	h = BattleMath.mix(h, alive)
+	for t: int in left.size():
+		h = BattleMath.mix(h, left[t])
+		h = BattleMath.mix(h, deployed[t])
+	for b: int in _down.size():
+		h = BattleMath.mix(h, _down[b])
+	for s: int in _standing.size():
+		h = BattleMath.mix(h, _standing[s])
+	for u: int in count:
+		for value: int in [unit_type[u], x[u], y[u], heading_x[u], heading_y[u], hp[u], state[u],
+				target[u], cooldown[u], stun_until[u], hold_until[u], _carry[u], _wants[u], _stuck[u],
+				_path_pos[u]]:
+			h = BattleMath.mix(h, value)
+		var path := _paths[u]
+		h = BattleMath.mix(h, path.size())
+		for i: int in path.size():
+			h = BattleMath.mix(h, path[i])
+	return h

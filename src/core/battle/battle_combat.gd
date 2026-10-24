@@ -313,3 +313,18 @@ func _collect(cx: int, cy: int, reach: int, mask: int) -> void:
 			_found[j + 1] = _found[j]
 			j -= 1
 		_found[j + 1] = v
+
+
+## Mixes everything of the defences that changes in a battle into a state hash
+## (BattleSim.state_hash).
+func hash_into(h: int) -> int:
+	for b: int in _layout.count:
+		for value: int in [cooldown[b], aim[b], pool[b], _quiet[b], _regen_carry[b]]:
+			h = BattleMath.mix(h, value)
+	h = BattleMath.mix(h, shell_count)
+	for i: int in shell_count:
+		for value: int in [_shell_source[i], _shell_land[i], _shell_x[i], _shell_y[i]]:
+			h = BattleMath.mix(h, value)
+	h = BattleMath.mix(h, fallen_count)
+	h = BattleMath.mix(h, revealed_count)
+	return h

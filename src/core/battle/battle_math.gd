@@ -70,3 +70,10 @@ static func dist2_to_rect(px: int, py: int, x0: int, y0: int, x1: int, y1: int) 
 	elif py > y1:
 		dy = py - y1
 	return dx * dx + dy * dy
+
+
+## One step of FNV-1a (32 bits) over a 64-bit value, low half then high half: the battle's state
+## hash.
+static func mix(h: int, value: int) -> int:
+	h = ((h ^ (value & 0xFFFFFFFF)) * 16777619) & 0xFFFFFFFF
+	return ((h ^ ((value >> 32) & 0xFFFFFFFF)) * 16777619) & 0xFFFFFFFF

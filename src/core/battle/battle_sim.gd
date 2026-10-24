@@ -3,8 +3,8 @@ extends RefCounted
 ## A deterministic battle: the attacker's army against a defended layout (docs/reference/
 ## battle.md). Pure logic, like all of src/core: no clock (time is the tick count, 20 a second),
 ## integers only, ties broken by id, and no randomness: the setup's seed is kept in a SeededRng
-## for rules to come, and no rule draws from it yet. The same setup gives the same result on every
-## device and on the server.
+## for rules to come, and no rule draws from it yet. The same setup gives the same result, and the
+## same state_hash() at every tick, on every device and on the server.
 ##
 ## A battle is made from a setup, which is exactly its replay:
 ##   {"seed": int,
@@ -58,6 +58,9 @@ var _over: bool = false
 ## Falls and reveals passed on so far.
 var _falls_done: int = 0
 var _reveals_done: int = 0
+## Loot by resource (catalog order): taken so far, and each building's share.
+var _loot: PackedInt64Array = PackedInt64Array()
+var _loot_share: Array[PackedInt64Array] = []
 
 
 ## A battle from a setup; check setup_error before running it.
@@ -266,9 +269,17 @@ func stars() -> int:
 	return total
 
 
+## Loot released so far, per resource.
+func loot() -> Dictionary[String, int]:
+	var taken: Dictionary[String, int] = {}
+	for r: int in catalog.resources.size():
+		taken[catalog.resources[r]] = _loot[r]
+	return taken
+
+
 ## The result, every key and sub-key in sorted order, so equal battles give equal text:
 ##   {"abilities_used": {}, "commands": [accepted commands], "deployed": {unit: n},
-##    "destruction": int, "stars": int, "ticks": int}
+##    "destruction": int, "hash": int, "loot": {resource: n}, "stars": int, "ticks": int}
 func result() -> Dictionary:
 	var names := army.type_names.duplicate()
 	names.sort()
@@ -277,14 +288,42 @@ func result() -> Dictionary:
 		var n := army.deployed[army.type_index(name)]
 		if n > 0:
 			deployed[name] = n
+	var resources := catalog.resources.duplicate()
+	resources.sort()
+	var taken := {}
+	for res: String in resources:
+		taken[res] = _loot[catalog.resources.find(res)]
 	return {
 		"abilities_used": {},
 		"commands": _log.duplicate(true),
 		"deployed": deployed,
 		"destruction": destruction_pct(),
+		"hash": state_hash(),
+		"loot": taken,
 		"stars": stars(),
 		"ticks": tick,
 	}
+
+
+## FNV-1a over everything that changes in a battle: the clock and the commands accepted (not
+## where the scripted ones have got to, so a battle fed live hashes as its replay does), every
+## unit's state, path and timers (BattleArmy.hash_into), every building's hull and flags, the
+## defences, shields and shells (BattleCombat.hash_into), the falls and reveals passed on, and the
+## loot. Equal battles hash equal at every tick. Built on request, so it may allocate.
+func state_hash() -> int:
+	var h := 2166136261
+	for value: int in [tick, 1 if _over else 0, _falls_done, _reveals_done, _log.size(),
+			layout.counted_fallen]:
+		h = BattleMath.mix(h, value)
+	for b: int in layout.count:
+		h = BattleMath.mix(h, layout.hp[b])
+		h = BattleMath.mix(h, layout.destroyed[b])
+		h = BattleMath.mix(h, layout.revealed[b])
+	h = army.hash_into(h)
+	h = combat.hash_into(h)
+	for r: int in _loot.size():
+		h = BattleMath.mix(h, _loot[r])
+	return h
 
 
 # --- Internals -----------------------------------------------------------------
@@ -308,9 +347,10 @@ func _setup(setup: Dictionary) -> String:
 	var army_data: Variant = attacker_dict.get("army", {})
 	var level_data: Variant = attacker_dict.get("unit_levels", {})
 	var buildings: Variant = defender_dict.get("buildings", [])
+	var stored: Variant = defender_dict.get("resources", {})
 	if typeof(army_data) != TYPE_DICTIONARY or typeof(level_data) != TYPE_DICTIONARY \
-			or typeof(buildings) != TYPE_ARRAY:
-		return "the army and unit_levels must be objects and buildings a list"
+			or typeof(buildings) != TYPE_ARRAY or typeof(stored) != TYPE_DICTIONARY:
+		return "the army, unit_levels and resources must be objects and buildings a list"
 	layout = BattleLayout.new()
 	var error := layout.build(catalog, buildings, catalog.grid_size)
 	if error != "":
@@ -323,6 +363,9 @@ func _setup(setup: Dictionary) -> String:
 	if error != "":
 		return error
 	combat = BattleCombat.new(layout, army)
+	error = _setup_loot(stored)
+	if error != "":
+		return error
 	var last := 0
 	for entry: Variant in commands:
 		if typeof(entry) != TYPE_DICTIONARY:
@@ -335,7 +378,51 @@ func _setup(setup: Dictionary) -> String:
 	return ""
 
 
-## Passes the falls and reveals of the last phase to the field, the pathing and the army.
+## Each resource's loot (loot_pct of what the defender stores) spread over the buildings that
+## hold it, by their storage of it plus an hour of their production of it, rounded down, the
+## rest one by one to the lowest ids; a building's share is taken when it falls.
+func _setup_loot(stored: Dictionary) -> String:
+	_loot.resize(catalog.resources.size())
+	_loot.fill(0)
+	for r: int in catalog.resources.size():
+		var res := catalog.resources[r]
+		var amount := BattleMath.whole(stored.get(res, 0))
+		if amount < 0:
+			return "the defender's %s must be a whole number" % res
+		var share := PackedInt64Array()
+		share.resize(layout.count)
+		share.fill(0)
+		var weights := PackedInt64Array()
+		weights.resize(layout.count)
+		var total_weight := 0
+		for b: int in layout.count:
+			var cls := layout.classes[b]
+			var weight := 0
+			if cls != BattleLayout.WALL and cls != BattleLayout.TRAP:
+				var stats := catalog.level_stats(layout.types[b], layout.levels[b])
+				var storage: Dictionary = stats.get("storage", {})
+				var produces: Dictionary = stats.get("produces", {})
+				weight = int(storage.get(res, 0)) + int(produces.get(res, 0))
+			weights[b] = weight
+			total_weight += weight
+		var loot := amount * catalog.loot_pct(res) / 100
+		if total_weight > 0:
+			var left := loot
+			for b: int in layout.count:
+				share[b] = loot * weights[b] / total_weight
+				left -= share[b]
+			for b: int in layout.count:
+				if left <= 0:
+					break
+				if weights[b] > 0:
+					share[b] += 1
+					left -= 1
+		_loot_share.append(share)
+	return ""
+
+
+## Passes the falls and reveals of the last phase to the field, the pathing, the army and the
+## loot.
 func _pass_on() -> void:
 	while _falls_done < combat.fallen_count:
 		var b := combat.fallen[_falls_done]
@@ -345,6 +432,8 @@ func _pass_on() -> void:
 			continue
 		pathing.building_fell(b)
 		army.building_fell(b)
+		for r: int in _loot.size():
+			_loot[r] += _loot_share[r][b]
 		events.add(BattleEvents.FALL, layout.ids[b], 0, layout.cx[b], layout.cy[b], layout.cx[b],
 			layout.cy[b], tick)
 	while _reveals_done < combat.revealed_count:
