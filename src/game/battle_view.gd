@@ -15,7 +15,9 @@ extends Node3D
 ## fallen building is replaced by its rubble (BuildingModels.create_rubble) with its smoke, a
 ## fallen wall leaves the merged mesh for a low strip. A hidden sentry shows once revealed; traps
 ## never show, but a mine going off leaves a flash and a scorch mark. A shield generator's pool is
-## a faint dome while it is up. The camera is the base's IsoCamera, free over the field.
+## a faint dome while it is up. The camera is the base's IsoCamera, free over the field. An
+## expedition's battle (`rival`) draws the defender as a rival colony: its buildings and walls take
+## the faction tint (MaterialKit.rival), the units and the rubble never do.
 ##
 ## Input comes from a WorldInput of its own (main.gd takes the base's out of the tree for the
 ## battle): a pinch or a two-finger pan moves the camera. With a unit type selected (select_unit,
@@ -98,6 +100,9 @@ var speed: int = 1
 var deploy_unit: String = ""
 ## The ability selected to cast (select_ability); "" for none. One of this and deploy_unit at most.
 var cast_ability: String = ""
+## Set before setup: the defender is a rival colony (an expedition), its buildings and walls
+## tinted.
+var rival: bool = false
 var camera: IsoCamera
 ## The defender's field: ground, scenery, the merged walls.
 var field: BaseView
@@ -217,6 +222,8 @@ func setup(battle_catalog: Catalog, setup_data: Dictionary, iso_camera: IsoCamer
 				view.position = centre
 				root.add_child(view)
 				view.visible = sim.is_revealed(id)
+				if rival:
+					view.set_rival(true)
 				_views[id] = view
 				_muzzles[id] = maxf(0.6, view.site_height() * MUZZLE_SHARE)
 				var stats := catalog.level_stats(type, level)
@@ -225,6 +232,9 @@ func setup(battle_catalog: Catalog, setup_data: Dictionary, iso_camera: IsoCamer
 				if type == "arc_tower":
 					_arc_towers[id] = true
 	field.walls.rebuild_cells(catalog, _walls)
+	if rival:
+		# The override, not a surface's: the merged mesh is replaced each time a wall falls.
+		field.walls.body.material_override = MaterialKit.rival()
 
 	effects = BattleEffects.new()
 	effects.setup(walls, area)

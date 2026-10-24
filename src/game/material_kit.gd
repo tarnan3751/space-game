@@ -91,6 +91,9 @@ static var _ghost_valid: ShaderMaterial
 static var _ghost_invalid: ShaderMaterial
 static var _hit_flash: ShaderMaterial
 static var _disabled: ShaderMaterial
+static var _rival: ShaderMaterial
+static var _hit_flash_rival: ShaderMaterial
+static var _disabled_rival: ShaderMaterial
 static var _terrain: ShaderMaterial
 
 
@@ -165,6 +168,33 @@ static func disabled() -> ShaderMaterial:
 	if _disabled == null:
 		_disabled = _toon_material(Color(DISABLED_GREY, DISABLED_MIX))
 	return _disabled
+
+
+## The body of a rival colony's building or wall in an expedition battle: the faction tint, a green
+## faction (its orange teal, its gold verdigris, its violet emerald, its cream hull cooler;
+## toon.gdshader's `rival`).
+static func rival() -> ShaderMaterial:
+	if _rival == null:
+		_rival = _toon_material(Color(1, 1, 1, 0))
+		_rival.set_shader_parameter("rival", 1.0)
+	return _rival
+
+
+## A rival colony's building for the moment it is hit: the faction tint, whitened.
+static func hit_flash_rival() -> ShaderMaterial:
+	if _hit_flash_rival == null:
+		_hit_flash_rival = _toon_material(Color(Color.WHITE, HIT_FLASH_MIX))
+		_hit_flash_rival.set_shader_parameter("rival", 1.0)
+	return _hit_flash_rival
+
+
+## A rival colony's building while an EMP burst has it disabled: the faction tint, dimmed grey
+## over it, as disabled() dims the plain body (BuildingView.set_disabled).
+static func disabled_rival() -> ShaderMaterial:
+	if _disabled_rival == null:
+		_disabled_rival = _toon_material(Color(DISABLED_GREY, DISABLED_MIX))
+		_disabled_rival.set_shader_parameter("rival", 1.0)
+	return _disabled_rival
 
 
 ## The terrain ring's body: its vertex tint drawn over with the field texture's marks and the rock

@@ -11,7 +11,9 @@ extends Node3D
 ## placement ghost keeps plain ink outlines, lifted as it is, and its bodies take the valid or
 ## invalid ghost tint (set_ghost) for as long as it lives. In battle (BattleView) a hit whitens the
 ## bodies for a moment (set_flash, MaterialKit.hit_flash), and an EMP burst dims them grey while the
-## building is disabled (set_disabled, MaterialKit.disabled).
+## building is disabled (set_disabled, MaterialKit.disabled). A rival colony's building carries the
+## faction tint (set_rival, MaterialKit.rival), and its flash and its grey are the tinted ones
+## (hit_flash_rival, disabled_rival).
 ##
 ## While the building is busy a ConstructionDrone works over it, driven from _process; when the
 ## work ends the drone leaves, and if the view is freed first (a finished level replaces it)
@@ -56,6 +58,8 @@ var _ghost_tint: Material = null
 ## (set_disabled), which tints them grey while no flash is on.
 var _flashed: bool = false
 var _disabled: bool = false
+## Whether the bodies carry the faction tint (set_rival).
+var _rival: bool = false
 ## Whether the outlines carry the selected ink now.
 var _inked: bool = false
 ## The model's moving parts, each with its Motion and its rest position. They are posed at
@@ -213,12 +217,23 @@ func is_disabled() -> bool:
 	return _disabled
 
 
+## Gives the bodies a rival colony's faction tint (MaterialKit.rival), or takes it off; the
+## outlines stay plain ink. For a battle's defender (BattleView), never a ghost.
+func set_rival(on: bool) -> void:
+	if on == _rival or _ghost_tint != null:
+		return
+	_rival = on
+	_apply_tint()
+
+
+## The bodies' material for the flash, the grey and the faction tint: the flash over the grey over
+## the plain body, each in its rival version on a rival building, whose plain body is rival().
 func _apply_tint() -> void:
-	var material: Material = null
+	var material: Material = MaterialKit.rival() if _rival else null
 	if _flashed:
-		material = MaterialKit.hit_flash()
+		material = MaterialKit.hit_flash_rival() if _rival else MaterialKit.hit_flash()
 	elif _disabled:
-		material = MaterialKit.disabled()
+		material = MaterialKit.disabled_rival() if _rival else MaterialKit.disabled()
 	for body: MeshInstance3D in _bodies:
 		if body.mesh.surface_get_material(0) == MaterialKit.toon():
 			body.set_surface_override_material(0, material)
