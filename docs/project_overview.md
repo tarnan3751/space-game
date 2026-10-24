@@ -109,7 +109,7 @@ in one second at most (`Catalog.apply_dev_cheats`; `-- --no-cheats` for the real
 | 3 | Milestone 2, the offline game (`docs/vision.md` §7) — the figures and the army: the humanoid design study (a human in a spacesuit and a humanoid robot, in the comic style, rendered for the owner to approve), then the unit roster in data, training queues, Hangar housing, Research Lab upgrades and unit models | Built: the humanoid study is built (`Figures`, the `figures` harness scenario) and approved at 3.5 heads; the figures' thinner ink line is built (`Figures.FIGURE_INK`); the army is built in core (`docs/reference/core-economy.md`, **The army**): eleven unit types in `data/units.json`, a training queue per producer building, Hangar housing, Research Lab levels, save version 3; the training HUD is built (`docs/reference/hud.md`, **Army panel**: Train and Research from the info panel, unit cards with drawn glyphs, the queue strip, the army meter; the `train_units` harness scenario); the unit models are built (`UnitModels`, one per type, the tier as palette; the `unit_gallery` harness scenario; `docs/reference/art-style.md`, **Units**) |
 | 4 | The battle sim in `src/core/battle/`: fixed-point integer positions (1 cell = 1000 units), fixed tick, pathing round and through walls, targeting, defences, traps, status effects; replay = seed + layouts + deploy commands; byte-identical results tested headless; batch simulations for balance; the result applied to the base (`raid_result`) | Built (`docs/reference/battle.md`): 20 ticks a second, the deploy zone opening as buildings fall, every special and trap, loot by storage, save version 4 keeping the last five raids, the `battle` harness scenario and `tools/sim_battles.gd`; a full battle simulates in 0.15 to 1.6 s headless on the development Mac |
 | 4b | Abilities: `data/abilities.json` (a repair swarm, an EMP burst, an orbital strike), made in the Nanite Foundry as a timed queue with a stock, their effects in the battle sim, spent through `raid_result` | Core built (`docs/reference/core-economy.md`, **The Foundry**; `docs/reference/battle.md`, **Abilities**): three abilities of five levels, the Foundry's making queue and its stock capped by its `capacity`, ability levels researched in the lab's one slot, the swarm, the burst and the strike in the sim, the spend through `raid_result`, save version 6, a strike in the `battle` harness scenario and `--abilities` in `tools/sim_battles.gd`. The Foundry's HUD panel and the attack HUD's abilities bar are planned |
-| 5 | The battle view: units moving, projectiles, damage and destruction, the attack HUD; the phone target fixed, and the maxed base and a full battle measured on it | Planned |
+| 5 | The battle view: units moving, projectiles, damage and destruction, the attack HUD; the phone target fixed, and the maxed base and a full battle measured on it | Built (`docs/reference/battle-view.md`, `hud.md` **Battle HUD**): the sim driven at its tick with interpolation, units from one MultiMesh pair a type with a shader gait, flash and death, shots, shells, lightning, impacts, rubble, shields, the attack HUD with tap and smear deploys over the red zone, End and the result panel, the debug Practice raid; the phone target fixed (§3.1). On the development Mac, the maxed template base and a full army at the widest zoom: 974 draw calls (1,031 with the attack HUD), 2.0 million primitives, 1.6 to 1.8 ms render CPU, 154 to 174 fps; the sim's step 0.2 to 0.5 ms a tick on average. The phone measurement stays with the owner |
 | 6 | Expeditions: the sector map, the outpost generator (the player's roster with a faction tint, loot deposits, hazards), loot into `BaseState` through a new command, re-training; then the real-timer retune (6a). Milestone 2 complete: a game that plays end to end offline | Core built (`docs/reference/expeditions.md`): the sector of six fields (two easy, two even, two hard) derived from a seed, the `scan` command on a cooldown, the outpost generator (walled compound, defences, collectors, deposits and hazards outside the walls, traps; loot sized to the player's capacity), `raid_result` clearing a field with a star, save version 5, the `expedition` harness scenario and `tools/gen_outposts.gd`. The sector map screen and the faction tint are planned |
 | 7 | Milestone 3, the online game — the server: Nakama with accounts, base storage, migration of the local save and command validation; battles verified by replaying them in headless Godot running the same `src/core` | Planned |
 | 8 | Async PvP: matchmaking, attacking saved bases, a defence log with replays, shields, revenge, a league ladder | Planned |
@@ -127,10 +127,14 @@ in one second at most (`Catalog.apply_dev_cheats`; `-- --no-cheats` for the real
   version 1 to 4 bases with a sector seeded from their saved time, and version 1 to 5 bases with
   no abilities); the server will hold the base
   later and nothing below `main.gd` changes.
-- **Phones are unmeasured for the maxed base.** At the Command Center 10 counts the template
-  base is 1,140 draw calls and 1.7 million primitives a frame at the widest zoom on the
-  development Mac (`docs/reference/art-style.md`, **Cost**); no phone has run it, and that
-  measurement decides whether the Crown robots stay.
+- **Phones are unmeasured.** The phone target is fixed (§3.1) and the maxed base and a full battle
+  meet its Mac proxies (the template base 1,140 draw calls and 1.7 million primitives at the widest
+  zoom; a battle on it with a full army 974 and 2.0 million, `docs/reference/art-style.md`,
+  **Cost**), but no phone has run them: the measurement needs a device and stays with the owner
+  (`docs/reference/testing-tools.md`, **Measuring on a phone**), and it decides whether the Crown
+  robots stay and what the unit budgets are. The sim's slowest tick, 5 to 10 ms on the Mac, varying
+  by run, when a large group first searches, is over the 5 ms a tick proxy and parked for the next
+  core batch.
 - **Build times are on the development scale**: 27 to 40 minutes at the top levels (the walls
   and the Drone Bay instant), the Command Center's 75 to 150 minutes at levels 6 to 10
   (`docs/reference/data-format.md`); the retune is parked until the economy is tuned. The
@@ -141,22 +145,19 @@ in one second at most (`Catalog.apply_dev_cheats`; `-- --no-cheats` for the real
   has to weigh it.
 - **The template base fills 46 of the field's 48 rows** at the Command Center 10 counts, so more
   walls or another type at the top needs its layout reworked (`docs/reference/input-camera.md`).
-- **Battles have no view yet**: `hp`, `damage`, `range_cells`, `fire_ms`, `hidden`, `targets`
-  and the specials' fields in `data/buildings.json`, and a unit's battle fields in
-  `data/units.json`, drive the battle sim (`docs/reference/battle.md`), but no player action
-  starts a battle until the battle view (step 5) and expeditions (step 6). `capacity` drives the
-  army's housing on the Hangar and the ability stock's cap on the Nanite Foundry, and is
-  display-only on the Alliance Beacon.
+- **Only a practice battle can be fought**: the battle view (step 5) runs the sim, but the only
+  way into it is the debug build's Practice raid on the template base, whose result is not
+  applied; expeditions (step 6) bring the real one. `capacity` drives the army's housing on the
+  Hangar and the ability stock's cap on the Nanite Foundry, and is display-only on the Alliance
+  Beacon.
 - **Abilities have no HUD yet**: making, the stock and ability research are in core
   (`docs/reference/core-economy.md`, **The Foundry**) and the sim runs their effects, but no
   panel queues them, the lab's card shows no ability research, the HUD's error text has none of
   the Foundry's codes, and no attack carries them (an expedition's setup brings none) until the
   Foundry panel and the attack HUD's abilities bar.
-- **The army's models are not on screen yet**: the HUD trains, houses and researches it, and its
-  cards show drawn glyphs by crew; the unit models (`UnitModels`) are built but shown only by the
-  `unit_gallery` harness scenario, each in one static pose, until the cards render them and the
-  battle view (step 5) walks them. Their budgets are study values until step 5's phone
-  measurement.
+- **Units do not articulate**: the battle walks them with a shader hop, lean and sway, every
+  model in its one static pose; limb-articulated walk cycles are a later polish item. The unit
+  budgets are study values until the phone measurement.
 
 ## 3. Decisions
 
@@ -277,7 +278,13 @@ in one second at most (`Catalog.apply_dev_cheats`; `-- --no-cheats` for the real
   ability is left or a strike is on its way; `raid_result` spends `abilities_used`, which must
   match the battle's ability commands; save version 6; an expedition's setup brings no abilities
   until the HUD wiring; the numbers are development values.
-
+- **The phone target** (the coordinator under the owner's mandate, 2026-10-24): a 2021 mid-range
+  Android (Snapdragon 695 or Dimensity 700 class, 6 GB, 1080p) and an iPhone 11 as the floor; at
+  least 30 fps in battle at the widest zoom with a maxed outpost and a full 280-housing army on
+  screen, 60 fps the target in the base view. On the development Mac the proxies are the Cost
+  ceilings (1,600 draw calls, 2.1 million primitives, 6 ms of render CPU a frame) and the sim's
+  step under 5 ms a tick. The phone measurement needs a device and stays with the owner
+  (`docs/reference/testing-tools.md`, **Measuring on a phone**).
 - **Expeditions in core** (the coordinator under the owner's mandate, 2026-10-24; the step 6
   core plan; `docs/reference/expeditions.md`): the sector is renewable: six fields from
   `(sector seed, epoch, index)`, a field raided once an epoch (a star clears it, none leaves it
@@ -298,4 +305,3 @@ in one second at most (`Catalog.apply_dev_cheats`; `-- --no-cheats` for the real
 - **Economy validation on the server.** Either port the small economy rules to TypeScript,
   checked against shared golden test cases, or run headless Godot for that too. Decide in step 5.
 - **The name.** "Space Game" is a placeholder.
-- **The phone target** (device and frame rate), to fix before step 5 measures a battle.

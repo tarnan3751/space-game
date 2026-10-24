@@ -189,3 +189,41 @@ simulate touches and evaluate GDScript in the live tree. It runs the game normal
 save, which is why only the coordinator uses it. While it runs it injects a
 `McpInteractionServer` autoload (`mcp_interaction_server.gd`, gitignored) and removes it on
 stop; never commit it.
+
+## Measuring on a phone
+
+The phone target (`docs/project_overview.md` §3.1): a 2021 mid-range Android (Snapdragon 695 or
+Dimensity 700 class, 6 GB, 1080p) and an iPhone 11 as the floor; at least 30 fps in battle at
+the widest zoom with a maxed outpost and a full 280-housing army on screen, 60 fps in the base
+view. The Mac proxies (`battle_view` and `template_base`, rendered: the Cost ceilings and the
+sim's step) say whether a change is likely to hold it; only the device says whether it does. The
+measurement needs a device in hand and is the owner's:
+
+1. **Build and connect.** Run a debug build on the device with Godot's remote debugger attached,
+   since the Practice raid and the Template base are debug-only (its dev cheats leave the battle's
+   numbers alone and make training instant; a debug build runs somewhat slower than a release one,
+   so a pass on it is a pass). On Android (written from Godot's documentation, not yet tried on a
+   device): set up the Android export preset, plug the phone in with USB debugging on, and press the
+   editor's one-click deploy (Remote Deploy) with "Deploy with Remote Debug" checked in the Debug
+   menu. On iOS the same: one-click deploy with remote debug where the export allows it, or a
+   debug export built with remote debugging pointed at the development machine (the editor's
+   Debugger listening); Xcode's own debugger does not connect Godot's, so the numbers are read in
+   the editor either way.
+2. **Read.** The editor's Debugger shows the device's **Monitors**: `time/fps`, `time/process`,
+   `raster/total_draw_calls_in_frame`, `raster/total_primitives_in_frame`. Let the phone sit at
+   room temperature, on battery, the screen at its usual brightness, nothing else running.
+3. **The base.** Press Template base, zoom to the start zoom (24) and out to the widest (44), and
+   hold each for 30 s: read the lowest fps in that time. Target 60.
+4. **The battle.** Train a full army (the Hangars' 280 housing; the battle scenario's mix, 100
+   Rangers, 40 Brawlers, 20 Jet Troopers, 5 Hover Tanks and 2 Gunships, or 280 Rangers for the
+   most instances), press Practice raid, zoom to the widest, and deploy every unit within the
+   first five seconds by dragging along the open pockets (the smear), so the whole army is on
+   screen at once. Read the lowest fps over the first 30 s, while the army walks and fights, and
+   the slowest `time/process` (it holds the sim's steps: a spike there is the sim's first tick).
+   Target 30 fps.
+5. **Record** in `docs/project_overview.md` §2.3 the device, the build, both zooms' lowest fps,
+   the battle's lowest fps and slowest process time, draw calls and primitives, and whether the
+   phone throttled over a few minutes (repeat step 4 after five minutes of play). A miss names
+   the lever: the units' far version (`UnitModels.FAR_DETAIL`, `BattleUnits.FAR_ZOOM`), the
+   effects' buffer sizes (`BattleEffects.MAX_*`), the Crown robots, or the sim's levers
+   (`battle.md`, **Determinism and performance**).

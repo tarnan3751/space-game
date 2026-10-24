@@ -157,11 +157,16 @@ figures carry a thinner ink line than buildings so they stay readable at the gam
 
 ## 6. Platform
 
-Native iOS and Android on the GL Compatibility renderer, light enough for mid-range phones.
-The maxed base is unmeasured on a phone, and a battle with a full army at the top (the Hangars'
-280 housing) over a hundred buildings is the real test, so Milestone 2 fixes a target device and frame rate and
-measures on it when the battle view exists (step 5). That measurement decides whether the
-Crown robots stay and what the unit budgets are.
+Native iOS and Android on the GL Compatibility renderer, light enough for mid-range phones. **The
+phone target** (fixed 2026-10-24, `docs/project_overview.md` §3.1): a 2021 mid-range Android
+(Snapdragon 695 or Dimensity 700 class, 6 GB, 1080p) and an iPhone 11 as the floor; at least 30 fps
+in battle at the widest zoom with a maxed outpost and a full 280-housing army on screen, 60 fps the
+target in the base view. On the development Mac its proxies are the Cost ceilings (1,600 draw calls,
+2.1 million primitives, 6 ms of render CPU a frame, `docs/reference/art-style.md`) and the sim's
+step under 5 ms a tick; the battle view meets them with the maxed template base and a full army. The
+measurement on a phone needs a device in hand and stays with the owner
+(`docs/reference/testing-tools.md`, **Measuring on a phone**); it decides whether the Crown robots
+stay and what the unit budgets are.
 
 ## 7. Milestones
 
@@ -189,6 +194,5 @@ Not planned, so an agent that meets one of these stops and reports rather than b
 ## 9. Open
 
 - **The name.** "Space Game" is a placeholder.
-- **The phone target** (device and frame rate), to be fixed before step 5.
-- **The phone measurement** itself, which needs a device in hand; the target is fixed before
-  step 5 and the budgets are set against it on the development Mac until then.
+- **The phone measurement** itself, which needs a device in hand; the target is fixed (§6) and
+  the budgets are held to its Mac proxies until then.
