@@ -226,6 +226,19 @@ layer and flags and checks that every swatch's layer is within the kit, that eac
 move. Rendered, it frames the row and the pad at the closest zoom (camera size 10) and screenshots
 them, then again 0.3 and 1.0 seconds later, so FLOW, PULSE, the flickers and the orbits show.
 
+`scenarios/figures.gd` is the humanoid design study (`docs/reference/art-style.md`, **Figures**):
+on the field, the base's own views hidden, a row of figures (`Figures`), each on a small concrete
+pad and turned 25 degrees off the camera, the striding ones in profile, walking towards the
+screen's left, so the stride shows: the colonist at 3, 3.5 and 4.25 heads in the stance, the
+3.5-head colonist mid-stride, the automaton in the stance and mid-stride, and at the end of the
+row a level 1 Cadet Academy for scale. It logs each figure's body triangles, its top and its
+lowest point over its pad, and checks that every figure is within the study budget (1,500), that
+its lowest point is on its pad (within 0.005, so no foot sinks or floats) and that each stance
+figure stands its height (0.8 for the colonist, 0.9 for the automaton to its head with the antenna
+above). Rendered, it shoots the row at camera size 24 (the gameplay view) and 10, the primary
+colonist and the automaton at size 4 (set directly, under the camera's closest zoom), and the row
+at size 10 with every figure turned 180 degrees so the backs show.
+
 `scenarios/view_states.gd` checks the comic style's view states on a fresh base, each with a
 close-up screenshot: the selected Command Center's outlines in gold (and the override cleared on
 deselecting), the placement ghost's body tinted valid on a free spot and invalid on the Command
