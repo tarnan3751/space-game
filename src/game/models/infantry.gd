@@ -25,6 +25,11 @@ const JET_HOVER := 0.5
 
 ## The breacher's fuse lamp: blinking red, at every tier, since it says the pack is live.
 static var FUSE := Surf.make(MaterialKit.Layer.GLOW, MaterialKit.DEFENCE, 1.0, Surf.UNLIT | Surf.BLINK, true, false)
+## The breacher's hazard paint: a solid hazard yellow on the flat layer and one ink-black band
+## across each painted part, so its secondary colour reads yellow at the battle zoom (the hazard
+## layer's fine stripes blended to khaki there) and the band still reads as a stripe close up.
+static var HAZARD_YELLOW := Surf.make(MaterialKit.Layer.FLAT, MaterialKit.HAZARD)
+static var HAZARD_BAND := Surf.make(MaterialKit.Layer.FLAT, MaterialKit.INK)
 ## The jet trooper's stub wings: army-orange plate, flat.
 static var ORANGE := Parts.surf("orange")
 ## The army orange on the flat layer, for the infantry's small orange gear (none over 0.25 across),
@@ -53,11 +58,12 @@ static func build_ranger(p: Parts) -> void:
 	m.ink = ink
 
 
-## The breacher: the colonist in a bulkier suit, 0.85 tall: plated shoulders and belly, heavy boots
-## and a big charge pack on its back, hazard-striped, its fuse blinking.
+## The breacher: the colonist in a bulkier suit, 0.85 tall: plated shoulders and belly, heavy boots,
+## a hazard-banded charge held in both hands in front and a big charge pack on its back, its top
+## hazard-striped, its fuse blinking.
 static func build_breacher(p: Parts) -> void:
 	var m := p.body
-	var pose := Figures.stance()
+	var pose := _carry()
 	var k := BREACHER_SCALE
 	Figures.colonist(m, Vector3.ZERO, 0.0, pose, Figures.PRIMARY_HEADS, k)
 	var j := Figures.joints(Vector3.ZERO, 0.0, pose, Figures.PRIMARY_HEADS, k)
@@ -68,6 +74,7 @@ static func build_breacher(p: Parts) -> void:
 	for s: int in 2:
 		_pauldron(m, j.waist, j.shoulders[s].origin, k, Figures.SIDES[s], p.tier)
 		_heavy_boot(m, j.ankles[s], k)
+	_charge(m, _hand(j, 1, k), _hand(j, 0, k), j.waist, k)
 	_charge_pack(m, j.waist, top, k)
 	m.ink = ink
 
@@ -116,6 +123,15 @@ static func _low_ready() -> Figures.Pose:
 	pose.shoulder_swing = PackedFloat32Array([46.0, -10.0])
 	pose.shoulder_out = PackedFloat32Array([-26.0, -40.0])
 	pose.elbow = PackedFloat32Array([0.0, 70.0])
+	return pose
+
+
+## The stance with both hands forward at the belly, a little apart, holding the charge across.
+static func _carry() -> Figures.Pose:
+	var pose := Figures.stance()
+	pose.shoulder_swing = PackedFloat32Array([10.0, 0.0])
+	pose.shoulder_out = PackedFloat32Array([-10.0, 4.0])
+	pose.elbow = PackedFloat32Array([82.0, 92.0])
 	return pose
 
 
@@ -209,42 +225,72 @@ static func _ranger_pack(m: LowPolyMesh, xf: Transform3D, top: float, tier: int)
 
 # --- The breacher's ------------------------------------------------------------------------
 
-## The belly plate on the waist `xf` (the torso `top` high): a curved armour sector of the tier's
-## trim over the front of the suit between the belt and the chest plate.
+## The belly plate on the waist `xf` (the torso `top` high): a curved armour sector (_plate) over
+## the front of the suit between the belt and the chest plate.
 static func _belly_plate(m: LowPolyMesh, xf: Transform3D, top: float, k: float, tier: int) -> void:
 	m.lathe(PackedVector2Array([
 		Vector2(0.1 * k, top * 0.22), Vector2(0.104 * k, top * 0.36), Vector2(0.1 * k, top * 0.46),
 		Vector2(0.08 * k, top * 0.46), Vector2(0.084 * k, top * 0.36), Vector2(0.08 * k, top * 0.22),
-	]), 16, xf.origin, UnitModels.trim(tier, true), UnitModels.euler(xf), 50.0, 130.0)
+	]), 16, xf.origin, _plate(tier), UnitModels.euler(xf), 50.0, 130.0)
 
 
-## A pauldron over the shoulder joint `shoulder` on side `side`: a broad dome of the tier's trim
-## over the suit's orange pad, tilted out.
+## A pauldron over the shoulder joint `shoulder` on side `side`: a broad dome (_plate) over the
+## suit's orange pad, tilted out.
 static func _pauldron(m: LowPolyMesh, waist: Transform3D, shoulder: Vector3, k: float, side: float, tier: int) -> void:
 	m.dome(0.084 * k, 0.07 * k, 12, 2, shoulder + waist.basis * Vector3(side * 0.012, 0.014, 0) * k,
-		UnitModels.trim(tier, true), UnitModels.euler(waist, Vector3(0, 0, -side * 30.0)))
+		_plate(tier), UnitModels.euler(waist, Vector3(0, 0, -side * 30.0)))
 
 
-## A heavy boot over the boot on the ankle joint `xf`: a fatter dark shell round its shaft.
+## The breacher's armour plates: orange to Gold, the tier's trim from Chrome, so they stay bright
+## on the dark tiers.
+static func _plate(tier: int) -> Surf:
+	return Figures.ARMY_SMALL if tier < Parts.Tier.CHROME else UnitModels.trim(tier, true)
+
+
+## A heavy boot over the boot on the ankle joint `xf`: a fatter shell round its shaft, over the
+## boot's dark sole.
 static func _heavy_boot(m: LowPolyMesh, xf: Transform3D, k: float) -> void:
 	var ankle := 0.055 * k
-	m.lathe(PackedVector2Array([
-		Vector2(0.076 * k, -ankle), Vector2(0.078 * k, -ankle + 0.04 * k), Vector2(0.066 * k, -ankle + 0.07 * k),
-	]), 10, xf.origin, Parts.HULL_DARK_ROUND, UnitModels.euler(xf))
+	m.lathe(PackedVector2Array([Vector2(0.076 * k, -ankle + 0.02 * k), Vector2(0.07 * k, -ankle + 0.072 * k)]), 10,
+		xf.origin, Parts.HULL_MID_ROUND, UnitModels.euler(xf))
+
+
+## The charge held across between the hands `right` and `left`, in front of the waist `xf`: a fat
+## hazard-yellow cylinder with one black band round its middle and low gunmetal end cones under the
+## gloves.
+static func _charge(m: LowPolyMesh, right: Vector3, left: Vector3, xf: Transform3D, k: float) -> void:
+	var across := (left - right).normalized()
+	var centre := (left + right) * 0.5 + xf.basis * Vector3(0, 0, 0.012 * k)
+	var radius := 0.07 * k
+	var half := 0.1 * k
+	var turn := Parts.facing(across)
+	m.lathe(PackedVector2Array([Vector2(radius, 0), Vector2(radius, half * 2.0)]), 10, centre - across * half,
+		HAZARD_YELLOW, turn)
+	m.lathe(PackedVector2Array([Vector2(radius + 0.004 * k, 0), Vector2(radius + 0.004 * k, 0.04 * k)]), 10,
+		centre - across * 0.02 * k, HAZARD_BAND, turn)
+	for end: float in [-1.0, 1.0]:
+		m.lathe(PackedVector2Array([Vector2(radius + 0.006 * k, 0), Vector2(0, 0.03 * k)]), 8,
+			centre + across * end * (half - 0.004 * k), Parts.GUNMETAL, Parts.facing(across * end))
 
 
 ## The charge pack on the waist `xf`'s back: a big dark chamfered pack over the suit's backpack,
-## rising behind the helmet so it shapes the breacher's outline, a hazard-striped band round it, a
-## gunmetal detonator block on top and the fuse lamp on that.
+## rising behind the helmet so it shapes the breacher's outline, its top third a hazard-yellow cap
+## with a black band round it, a gunmetal detonator block on top and the fuse lamp on a short mast
+## on that.
 static func _charge_pack(m: LowPolyMesh, xf: Transform3D, top: float, k: float) -> void:
 	var pack := Vector3(0, top * 0.1, -0.175 * k)
 	var tall := 0.46 * k
-	m.box_chamfered(Vector3(0.28 * k, tall, 0.15 * k), 0.045 * k, xf * pack, Parts.HULL_DARK, UnitModels.euler(xf))
-	m.box_chamfered(Vector3(0.29, 0.08, 0.16) * k, 0.025 * k, xf * (pack + Vector3(0, tall * 0.42, 0)), Parts.HAZARD,
+	var cap := 0.16 * k
+	m.box_chamfered(Vector3(0.28 * k, tall - cap, 0.15 * k), 0.045 * k, xf * pack, Parts.HULL_DARK, UnitModels.euler(xf))
+	m.box_chamfered(Vector3(0.29 * k, cap, 0.16 * k), 0.045 * k, xf * (pack + Vector3(0, tall - cap, 0)), HAZARD_YELLOW,
 		UnitModels.euler(xf))
+	m.box(Vector3(0.296, 0.035, 0.166) * k, xf * (pack + Vector3(0, tall - cap * 0.62, 0)), HAZARD_BAND, UnitModels.euler(xf))
 	m.box_chamfered(Vector3(0.16, 0.05, 0.09) * k, 0.018 * k, xf * (pack + Vector3(0, tall - 0.01 * k, 0)), Parts.GUNMETAL,
 		UnitModels.euler(xf))
-	m.orb(0.026 * k, 8, 3, xf * (pack + Vector3(0.045 * k, tall + 0.065 * k, 0)), FUSE)
+	var mast := pack + Vector3(0.045 * k, tall + 0.035 * k, 0)
+	m.lathe(PackedVector2Array([Vector2(0.012 * k, 0), Vector2(0.01 * k, 0.05 * k)]), 6, xf * mast, Parts.ROD,
+		UnitModels.euler(xf))
+	m.orb(0.04 * k, 8, 3, xf * (mast + Vector3(0, 0.07 * k, 0)), FUSE)
 
 
 # --- The jet trooper's ------------------------------------------------------------------------
