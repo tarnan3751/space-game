@@ -239,6 +239,11 @@ func is_revealed(id: int) -> bool:
 	return layout.revealed[layout.index_of(id)] != 0
 
 
+## A shield generator's pool; 0 for any other building and once it has fallen.
+func shield_hp(id: int) -> int:
+	return combat.shield_of(layout.index_of(id))
+
+
 # --- Progress and the result ---------------------------------------------------
 
 ## Buildings destroyed, walls and traps left out, as a whole percent rounded down.

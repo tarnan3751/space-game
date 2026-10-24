@@ -6,7 +6,7 @@ extends RefCounted
 ## Units are indexed 0..count-1 in deploy order (a unit's id is its index + 1), so a tie broken
 ## by the lowest index is broken by the lowest id. The arrays are sized for the whole army at
 ## setup, so a tick allocates nothing but the paths it searches. Only this class writes them; the
-## combat phase goes through damage_unit, stun and hold.
+## combat phase goes through damage_unit, stun, hold and throw_unit.
 ##
 ## Each tick, in two halves (act, then aim_and_act, with the falls of the first passed on
 ## between them): a unit with a target walks or flies (a held unit does not) towards it and
@@ -296,6 +296,42 @@ func stun(u: int, until: int) -> void:
 
 func hold(u: int, until: int) -> void:
 	hold_until[u] = maxi(hold_until[u], until)
+
+
+## Throws a ground unit up to `cells` cells away from (from_x, from_y)'s side: opposite to its
+## heading, or away from that point when it has none, in one of the eight directions. It stops
+## on the last free cell before a building, a wall or the field's edge, or before a diagonal step
+## past one, lands on that cell's centre and looks for a target again.
+func throw_unit(u: int, from_x: int, from_y: int, cells: int) -> void:
+	var dx := -heading_x[u]
+	var dy := -heading_y[u]
+	if dx == 0 and dy == 0:
+		dx = x[u] - from_x
+		dy = y[u] - from_y
+	if dx == 0 and dy == 0:
+		dy = 1
+	var step_x := signi(dx)
+	var step_y := signi(dy)
+	if absi(dx) > 2 * absi(dy):
+		step_y = 0
+	elif absi(dy) > 2 * absi(dx):
+		step_x = 0
+	var cell := Vector2i(x[u] / BattleMath.CELL, y[u] / BattleMath.CELL)
+	for k: int in cells:
+		var next := cell + Vector2i(step_x, step_y)
+		if _field.kind_at(next) != BattleField.FREE:
+			break
+		# No corner cutting, as for walking: a diagonal step needs both cells beside it free.
+		if step_x != 0 and step_y != 0 and (_field.kind_at(Vector2i(next.x, cell.y)) != BattleField.FREE
+				or _field.kind_at(Vector2i(cell.x, next.y)) != BattleField.FREE):
+			break
+		cell = next
+	x[u] = BattleMath.centre(cell.x)
+	y[u] = BattleMath.centre(cell.y)
+	target[u] = -1
+	state[u] = IDLE
+	_wants[u] = 1
+	_stuck[u] = 0
 
 
 ## Rebuilds the unit buckets from the living units.

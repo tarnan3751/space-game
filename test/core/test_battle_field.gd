@@ -124,6 +124,14 @@ func test_check_deploy_codes() -> void:
 	assert_eq(sim.left_to_deploy("melee"), 0)
 
 
+func test_a_trap_cell_takes_a_deploy() -> void:
+	var sim := Fixtures.battle([["command_center", 5, 5], ["mine", 12, 12]], {"melee": 1})
+	assert_eq(sim.command(Fixtures.deploy(0, "melee", 12, 12)), "")
+	sim.step()
+	assert_true(sim.is_destroyed(2), "the mine goes off on the first tick")
+	assert_eq(sim.unit_hp(1), 50, "a melee of 100 takes the mine's 50")
+
+
 func test_a_deployed_unit_stands_at_its_cell_centre() -> void:
 	var sim := Fixtures.battle([["command_center", 10, 10]], {"melee": 2, "gunner": 1})
 	sim.command(Fixtures.deploy(0, "gunner", 2, 3))
