@@ -25,10 +25,12 @@ extends RefCounted
 ##
 ## This file dispatches and holds the tier palette and the shared helpers; each type's builder is
 ## a static build_<type>(p: Parts) in its file under src/game/models/: infantry (ranger, breacher,
-## jet_trooper, brawler) and vehicles (dune_runner, siege_walker, hover_tank, titan).
+## jet_trooper, brawler), vehicles (dune_runner, siege_walker, hover_tank, titan) and aircraft
+## (skimmer, gunship, bomber).
 
 const InfantryModels := preload("res://src/game/models/infantry.gd")
 const VehicleModels := preload("res://src/game/models/vehicles.gd")
+const AircraftModels := preload("res://src/game/models/aircraft.gd")
 
 ## Moving parts a unit model may have.
 const MAX_MOVING := 2
@@ -104,6 +106,12 @@ static func build(type: String, tier: int) -> Parts:
 			VehicleModels.build_hover_tank(p)
 		"titan":
 			VehicleModels.build_titan(p)
+		"skimmer":
+			AircraftModels.build_skimmer(p)
+		"gunship":
+			AircraftModels.build_gunship(p)
+		"bomber":
+			AircraftModels.build_bomber(p)
 		_:
 			if not _warned.has(type):
 				_warned[type] = true
