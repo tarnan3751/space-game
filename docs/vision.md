@@ -1,7 +1,8 @@
 # Space Game — vision
 
-Last updated: 2026-10-24. Written when the owner settled the six design calls that open
-Milestone 2, after the model feedback pass (main at 7be07cf).
+Last updated: 2026-10-25. Written when the owner settled the six design calls that open
+Milestone 2 (main at 7be07cf); the milestone table was updated when Milestone 2 was built
+(main at a607432).
 
 This file says what the game is meant to become, in enough detail to plan the steps that build
 it. `docs/project_overview.md` holds the status, the roadmap table and the list of decisions;
@@ -174,7 +175,7 @@ stay and what the unit budgets are.
 | Milestone | What it delivers | Steps |
 | --- | --- | --- |
 | 1. The offline base | Build and upgrade a base; save with offline progress | 1, 2, 2a, 2b (built) |
-| 2. The offline game | A complete loop with no server: army, battles, expeditions, real timers | 3 figures and army, 4 battle sim, 5 battle view, 6 expeditions, 6a retune |
+| 2. The offline game | A complete loop with no server: army, battles, expeditions, real timers | 3 figures and army, 4 battle sim, 4b abilities, 5 battle view, 6 expeditions, 6a retune (built) |
 | 3. The online game | Accounts, the base on the server, async PvP | 7 server, 8 PvP |
 | 4. The social game | Alliances; a distinct PvE faction; the store release | 9 alliances, then content |
 

@@ -1,7 +1,8 @@
 # Space Game — project overview
 
-Last updated: 2026-10-24. Snapshot taken after the model feedback pass, when the owner settled
-the design calls that open Milestone 2 (`docs/vision.md`).
+Last updated: 2026-10-25. Snapshot taken when Milestone 2, the offline game, was built (main at
+a607432): every step from the humanoid study to the retune landed between 2026-10-24 and
+2026-10-25 under the owner's mandate that the coordinator decide for the milestone.
 
 This file answers three questions: what the project is meant to become, how far along it is, and
 what has been decided. It is written for a human reader and for an AI agent picking up the
@@ -152,6 +153,11 @@ in one second at most (`Catalog.apply_dev_cheats`; `-- --no-cheats` for the real
   budgets are study values until the phone measurement.
 
 ## 3. Decisions
+
+The owner asked, on 2026-10-24, that the rest of Milestone 2 be built without questions. Every
+product call the coordinator made under that mandate is a bullet below marked "the coordinator
+under the owner's mandate"; those bullets are the owner's review list for the milestone, and
+any of them can be reversed as a data or model change.
 
 ### 3.1 Recorded
 
@@ -340,3 +346,5 @@ in one second at most (`Catalog.apply_dev_cheats`; `-- --no-cheats` for the real
 - **Economy validation on the server.** Either port the small economy rules to TypeScript,
   checked against shared golden test cases, or run headless Godot for that too. Decide in step 5.
 - **The name.** "Space Game" is a placeholder.
+- **The phone measurement** itself: the target and the procedure are recorded
+  (`docs/reference/testing-tools.md`, **Measuring on a phone**); it needs a device in hand.

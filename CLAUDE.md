@@ -22,8 +22,11 @@ ink outlines, a generated material kit) with every model rebuilt onto it, and th
 Command Center 10: ten levels, every one modelled, in five tiers, on the 48×48 field, with save
 version 2 (`docs/plans/upgrade-pass.md` is its record), and the model feedback pass after it
 (robots tailored per building, one slow lightning, rising smoke; `docs/plans/model-feedback.md`).
-**Milestone 2, the offline game, is in progress** (`docs/vision.md`): it opens with the humanoid
-design study, then the army, the battle sim, the battle view and expeditions, all offline.
+**Milestone 2, the offline game, is built** (`docs/vision.md` §7; 2026-10-25): the humanoid
+figures and the eleven unit models, the army trained and researched in the base, the
+deterministic battle sim with abilities, the battle view and attack HUD, expeditions from a
+sector map against generated rival colonies, and the retune to real timers. Everything after
+that (the server, PvP, alliances) is planned.
 `docs/project_overview.md` holds the roadmap (§2.2), the known limitations (§2.3) and the
 decisions (§3). The numbers in `data/` are the retune's real timers and economy
 (`docs/plans/retune.md`); a debug build's dev cheats make them free and one second at most.
