@@ -27,8 +27,9 @@ float 5.0 differ), `assert_true`, `assert_false`.
 
 Logic tests build their state from the fixture catalog, never `data/`: `const Fixtures :=
 preload("res://test/support/fixtures.gd")`, then `Fixtures.catalog()`,
-`Fixtures.catalog_with_grid(size)` (the same rules on another field) or
-`Fixtures.new_base(start_time)` (`data-format.md` describes the fixture base). The one
+`Fixtures.catalog_with_grid(size)` (the same rules on another field),
+`Fixtures.new_base(start_time)` or `Fixtures.army_base()` (the fixture base with a finished
+hangar and an academy, at time 30; `data-format.md` describes the fixture base). The one
 exception is `test_catalog.gd`, whose `test_shipped_*` tests load the real `data/` on purpose:
 the data is valid, the start layout fits, every level's price fits the storage a base can reach
 when that level unlocks, and no curve (cost, `build_seconds`, `hp`, `produces`, `storage`,
@@ -41,6 +42,7 @@ when that level unlocks, and no curve (cost, `build_seconds`, `hp`, `produces`, 
 | `test/core/test_catalog.gd` | The shipped data (validity, start layout, affordability, curves, final levels at the top Command Center, counts; for units, prices and housing within reach, curves, final levels at the top lab), int conversion, level, count, resource, category, display-field and unit lookups, one validation message per rule (units and `rules.army` included), the dev cheats (every level free and one second at most, nothing else changed; units free to train and research in one second at most; a base building what it could not afford). |
 | `test/core/test_production.gd` | Production starting at completion, carried remainders, tick-size independence, storage caps, caps rising when a silo finishes, busy buildings not producing, a third resource. |
 | `test/core/test_seeded_rng.gd` | The frozen sequences for seeds 1 and 12345, range bounds, the zero seed. **These expected values never change.** |
+| `test/core/test_training.gd` | Training: queue and pay, units finishing in order, all-or-nothing counts, every refusal through its check and `apply`, a huge count refused before it is multiplied, `queue_of` handing out a copy, no Hangar, a producer under construction, the queue limit, two producers side by side, a busy producer pausing and resuming, an army above the housing waiting for a Hangar (and a Hangar being upgraded keeping its housing), a finished unit housed while its producer upgrades, the lowest id that fits housed first, a unit and a Hangar finishing in the same second, cancel and its refund, refusals, production untouched, the same commands giving the same state, and one-second ticks equal to one big tick. |
 
 A core change ships with a test here. A new test file is `test/core/test_<area>.gd`.
 

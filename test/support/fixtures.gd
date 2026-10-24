@@ -43,3 +43,13 @@ static func catalog_with_grid(size: Vector2i) -> Catalog:
 
 static func new_base(start_time: int = 0) -> BaseState:
 	return BaseState.create_new(catalog(), start_time)
+
+
+## The fixture base with a finished hangar (id 3, 2x2 at (0, 3), housing 20) and an academy
+## (id 4, at (9, 9)), at time 30 with 390 metal and 500 crystal.
+static func army_base() -> BaseState:
+	var state := new_base(0)
+	state.apply({"op": "place", "type": "hangar", "cell": [0, 3]}, 0)
+	state.advance_to(30)
+	state.apply({"op": "place", "type": "academy", "cell": [9, 9]}, 30)
+	return state

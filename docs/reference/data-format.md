@@ -339,7 +339,8 @@ and `wall` (1×1, instant, up to 25). `rules.army` names the hangar and the lab.
 10 crystal; level 2 researched for 100 crystal in 60 s at lab 1), `flyer` (air, housing 2, 20 s,
 20 crystal; level 2 for 200 crystal in 120 s at lab 2) and `walker` (ground, housing 5, 30 s,
 50 crystal, needs academy level 2, one level).
-`test/support/fixtures.gd` loads it (`Fixtures.catalog()`, `Fixtures.new_base(start_time)`).
+`test/support/fixtures.gd` loads it (`Fixtures.catalog()`, `Fixtures.new_base(start_time)`,
+`Fixtures.army_base()`).
 Rebalancing `data/` never touches it.
 
 ## The save file
