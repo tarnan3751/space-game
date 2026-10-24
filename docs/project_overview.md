@@ -1,13 +1,14 @@
 # Space Game — project overview
 
-Last updated: 2026-10-16. Snapshot taken after the upgrade pass to Command Center 10, save format
-version 2.
+Last updated: 2026-10-24. Snapshot taken after the model feedback pass, when the owner settled
+the design calls that open Milestone 2 (`docs/vision.md`).
 
 This file answers three questions: what the project is meant to become, how far along it is, and
 what has been decided. It is written for a human reader and for an AI agent picking up the
 codebase.
 
-It is a summary, not the reference. The reference files under `docs/reference/` and the code's
+It is a summary, not the reference. The design the roadmap builds towards (the fantasy, the
+loops, the pillars, the milestones) is in `docs/vision.md`. The reference files under `docs/reference/` and the code's
 module header comments are the authority on how each mechanism works, and the map, `CLAUDE.md`,
 on the conventions to follow when changing code. Where they disagree, check the code.
 
@@ -35,13 +36,16 @@ Three loops, of which the first is built:
    drones (builders) as the limit on parallel work, a Command Center whose level gates what can
    be built, an integer economy with production rates and storage caps, and a local save with
    offline progress.
-2. **Expeditions (PvE)** — send expeditions into procedurally generated fields (asteroids,
-   deposits, hazards) generated from a seed, and bring loot back into the base.
-3. **Attacks (async PvP)** — attack other players' saved bases, which defend themselves with AI;
-   a deterministic battle simulation that the server can replay to verify the result.
+2. **Expeditions (PvE)** — fight the battle sim against rival outposts generated from a seed on
+   a sector map (buildings from the player's own roster, loot deposits, hazards), and bring the
+   loot back into the base. Offline, on the local save.
+3. **Attacks (async PvP)** — the same battle against other players' saved bases, which defend
+   themselves with AI, through a server that replays the deterministic sim to verify the result.
 
-Later: a server (accounts, base storage, command validation, replay verification), matchmaking,
-an attack log, revenge and shields.
+Between them sits the army: machines crewed by humans, with some autonomous machines, trained
+in the base. Later: a server (accounts, base storage, command validation, replay verification),
+matchmaking, an attack log, revenge and shields, then alliances. The design of each loop is in
+`docs/vision.md`.
 
 ### 1.2 Design philosophy
 
@@ -102,10 +106,13 @@ for the real numbers).
 | 2 | Base polish: the building roster, build-menu categories, a third resource (antimatter), low-poly models built in code, HUD category tabs, safe-area margins for notches, painting walls by dragging, edge auto-scroll while dragging | Built |
 | 2a | The upgrade pass (`docs/plans/upgrade-pass.md`): the Command Center and every type to Command Center 10 (ten levels for the staples), the five tiers, 138 new level models with Crown escorts, the 48×48 field with a version 2 save migration, the maxed base measured | Built |
 | 2b | The model feedback pass (`docs/plans/model-feedback.md`): the owner's review of every max-level model folded in: no robot above defence buildings, every robot tailored to its building (a security bot, an ore hauler, a collector, a marshaller, welders), one slow lightning crackle, rising smoke, the Command Center's broader base, the academy and fabricator reshaped, the mortar's plasma and the orbital cannon's spire | Built |
-| 3 | Seeded PvE expeditions: a field generated from a seed with `SeededRng` (asteroids, deposits, hazards); loot returns into `BaseState` through a new command | Planned |
-| 4 | Deterministic battle sim in `src/core/battle/`: fixed-point integer positions (1 cell = 1000 units), fixed tick; replay = seed + base layout + list of deploy commands; tested headless against AI-built bases; same inputs give byte-identical results | Planned |
-| 5 | Server: Nakama with accounts, base storage and command validation; battles verified by replaying them in headless Godot running the same `src/core` | Planned |
-| 6 | PvP matchmaking, attack log, revenge, shields | Planned |
+| 3 | Milestone 2, the offline game (`docs/vision.md` §7) — the figures and the army: the humanoid design study (a human in a spacesuit and a humanoid robot, in the comic style, rendered for the owner to approve), then the unit roster in data, training queues, Hangar housing, Research Lab upgrades and unit models | In progress: the humanoid study is briefed; the rest waits on its approval |
+| 4 | The battle sim in `src/core/battle/`: fixed-point integer positions (1 cell = 1000 units), fixed tick, pathing round and through walls, targeting, defences, traps, status effects, abilities; replay = seed + layouts + deploy commands; byte-identical results tested headless; batch simulations for balance | Planned |
+| 5 | The battle view: units moving, projectiles, damage and destruction, the attack HUD; the phone target fixed, and the maxed base and a full battle measured on it | Planned |
+| 6 | Expeditions: the sector map, the outpost generator (the player's roster with a faction tint, loot deposits, hazards), loot into `BaseState` through a new command, re-training; then the real-timer retune (6a). Milestone 2 complete: a game that plays end to end offline | Planned |
+| 7 | Milestone 3, the online game — the server: Nakama with accounts, base storage, migration of the local save and command validation; battles verified by replaying them in headless Godot running the same `src/core` | Planned |
+| 8 | Async PvP: matchmaking, attacking saved bases, a defence log with replays, shields, revenge, a league ladder | Planned |
+| 9 | Milestone 4, the social game — alliances through the Alliance Beacon: membership, donations, later wars; then a distinct PvE faction and the store release | Planned |
 
 ### 2.3 Known limitations
 
@@ -174,9 +181,23 @@ for the real numbers).
 - **A model's reach is measured per axis**: its extent in x and in z separately, a spinning
   part's as its pivot's offset plus its sweep in each axis, so a round off the centre along a
   diagonal is not over-counted (`docs/reference/art-style.md`, **Budget and checks**).
+- **The six calls that open Milestone 2** (the owner, 2026-10-24; `docs/vision.md`): the army
+  is mostly machines piloted by humanoids, with some autonomous machines, so humans and humanoid
+  robots are figures of the game and the humanoid design comes first; battles use Clash's
+  control model (deploy at the edge, units act on their own, a few abilities from the Nanite
+  Foundry); an expedition is a battle against a generated outpost, so the battle sim precedes
+  expeditions; the PvE enemy of Milestone 2 is rival colonies built from the player's roster
+  with a faction tint; offline first, with no PvP in Milestone 2; a premium currency slot in the
+  economy design, nothing sold until PvP exists.
+- **The earlier figure is rejected** (the owner, 2026-10-24): the all-box trooper and cadet read
+  as a blocky toy ("a Roblox character"); a figure has to read as a character in the comic
+  style, and the humanoid design study replaces them before any unit is modelled.
 
 ### 3.2 Open
 
 - **Economy validation on the server.** Either port the small economy rules to TypeScript,
   checked against shared golden test cases, or run headless Godot for that too. Decide in step 5.
 - **The name.** "Space Game" is a placeholder.
+- **The phone target** (device and frame rate), to fix before step 5 measures a battle.
+- **The unit roster, the housing rule, and whether deployed units are spent** (Clash's model)
+  or survive with repairs: the step 3 plan.
