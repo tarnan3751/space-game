@@ -258,6 +258,32 @@ func unit_train_seconds(type: String) -> int:
 	return int(_unit(type).get("train_seconds", 0))
 
 
+## Battle: field units a second.
+func unit_speed(type: String) -> int:
+	return int(_unit(type).get("speed", 0))
+
+
+## Battle: the building class it picks first; "any" when it has none.
+func unit_prefers(type: String) -> String:
+	return str(_unit(type).get("prefers", "any"))
+
+
+## Battle: splash radius in field units, 0 for one target.
+func unit_splash(type: String) -> int:
+	return int(_unit(type).get("splash_units", 0))
+
+
+## Battle: the percent of its damage it does to a building class; 100 unless damage_pct says.
+func unit_damage_pct(type: String, building_class: String) -> int:
+	var percents: Dictionary = _unit(type).get("damage_pct", _NONE)
+	return int(percents.get(building_class, 100))
+
+
+## Battle: whether its first attack spends it.
+func unit_self_destructs(type: String) -> bool:
+	return _unit(type).get("self_destruct", false) == true
+
+
 ## The number of levels; 0 when `levels` is missing or not a list (validation reports it).
 func unit_max_level(type: String) -> int:
 	var levels: Variant = _unit(type).get("levels", _NO_LIST)

@@ -1,5 +1,5 @@
 extends TestCase
-## The battle's layout and its deploy zone: what a layout accepts, what stands on each cell and
+## The battle's layout and its deploy zone: what a setup accepts, where units may be deployed and
 ## how the zone opens as buildings fall.
 
 const Fixtures := preload("res://test/support/fixtures.gd")
@@ -95,6 +95,104 @@ func test_the_deploy_zone_is_every_footprint_grown_by_one() -> void:
 	for cell: Vector2i in [Vector2i(3, 3), Vector2i(8, 8), Vector2i(8, 5), Vector2i(13, 13), Vector2i(12, 12)]:
 		assert_true(field.is_deploy_cell(cell), "%s is outside it" % cell)
 	assert_false(field.is_deploy_cell(Vector2i(20, 0)), "off the field")
+
+
+func test_a_battle_deploys_outside_the_zone() -> void:
+	var sim := Fixtures.battle([["command_center", 5, 5], ["wall", 15, 15], ["mine", 12, 12]], {"melee": 1})
+	assert_eq(sim.setup_error, "")
+	for cell: Vector2i in [Vector2i(4, 4), Vector2i(7, 7), Vector2i(5, 6), Vector2i(14, 14), Vector2i(16, 15)]:
+		assert_false(sim.is_deploy_cell(cell), "%s is in the zone" % cell)
+	for cell: Vector2i in [Vector2i(3, 3), Vector2i(8, 8), Vector2i(8, 5), Vector2i(13, 13)]:
+		assert_true(sim.is_deploy_cell(cell), "%s is outside it" % cell)
+	assert_true(sim.is_deploy_cell(Vector2i(12, 12)), "a trap is hidden, so it makes no zone")
+	assert_true(sim.is_deploy_cell(Vector2i(11, 11)))
+
+
+func test_check_deploy_codes() -> void:
+	var sim := Fixtures.battle([["command_center", 5, 5]], {"melee": 1, "gunner": 0})
+	assert_eq(sim.check_deploy("ghost", Vector2i(0, 0)), BattleSim.ERR_UNKNOWN_UNIT)
+	assert_eq(sim.check_deploy("drone", Vector2i(0, 0)), BattleSim.ERR_NONE_LEFT, "not in the army")
+	assert_eq(sim.check_deploy("gunner", Vector2i(0, 0)), BattleSim.ERR_NONE_LEFT)
+	assert_eq(sim.check_deploy("melee", Vector2i(-1, 0)), BattleSim.ERR_BLOCKED)
+	assert_eq(sim.check_deploy("melee", Vector2i(20, 0)), BattleSim.ERR_BLOCKED)
+	assert_eq(sim.check_deploy("melee", Vector2i(4, 5)), BattleSim.ERR_BLOCKED)
+	assert_eq(sim.check_deploy("melee", Vector2i(0, 0)), "")
+	assert_eq(sim.command(Fixtures.deploy(0, "melee", 4, 5)), BattleSim.ERR_BLOCKED, "the command agrees")
+	assert_eq(sim.unit_count(), 0, "a refused deploy places nothing")
+	assert_eq(sim.command(Fixtures.deploy(0, "melee", 0, 0)), "")
+	assert_eq(sim.check_deploy("melee", Vector2i(0, 1)), BattleSim.ERR_NONE_LEFT)
+	assert_eq(sim.left_to_deploy("melee"), 0)
+
+
+func test_a_deployed_unit_stands_at_its_cell_centre() -> void:
+	var sim := Fixtures.battle([["command_center", 10, 10]], {"melee": 2, "gunner": 1})
+	sim.command(Fixtures.deploy(0, "gunner", 2, 3))
+	sim.command(Fixtures.deploy(0, "melee", 0, 0))
+	assert_eq(sim.unit_count(), 2)
+	assert_eq(sim.unit_type(1), "gunner", "ids in deploy order")
+	assert_eq(sim.unit_type(2), "melee")
+	assert_eq(sim.unit_position(1), Vector2i(2500, 3500))
+	assert_eq(sim.unit_hp(2), 100)
+	assert_eq(sim.unit_max_hp(2), 100)
+
+
+func test_the_zone_opens_as_buildings_fall() -> void:
+	# Two walls a cell apart: the cell between is covered by both and opens only when both fall.
+	var sim := Fixtures.battle([["command_center", 0, 0], ["wall", 10, 10], ["wall", 12, 10]],
+		{"breaker": 2, "melee": 1})
+	var between := Vector2i(11, 10)
+	assert_eq(sim.check_deploy("melee", between), BattleSim.ERR_BLOCKED)
+	sim.command(Fixtures.deploy(0, "breaker", 6, 10))
+	_step_until(sim, func() -> bool: return sim.is_destroyed(2) or sim.is_destroyed(3))
+	assert_true(sim.is_destroyed(2) != sim.is_destroyed(3), "one wall down")
+	assert_eq(sim.check_deploy("melee", between), BattleSim.ERR_BLOCKED, "the other still covers it")
+	var open := Vector2i(9, 10) if sim.is_destroyed(2) else Vector2i(13, 10)
+	assert_eq(sim.check_deploy("melee", open), "", "the fallen wall's own side opens")
+	sim.command({"op": "deploy", "unit": "breaker", "cell": [16, 10]})
+	_step_until(sim, func() -> bool: return sim.is_destroyed(2) and sim.is_destroyed(3))
+	assert_eq(sim.check_deploy("melee", between), "", "both down: open")
+
+
+func test_level_zero_buildings_are_left_out() -> void:
+	var sim := Fixtures.battle([["command_center", 0, 0], ["academy", 10, 10, 0]], {"melee": 1})
+	assert_eq(sim.setup_error, "")
+	assert_eq(sim.building_ids(), PackedInt32Array([1]))
+	assert_true(sim.is_deploy_cell(Vector2i(10, 10)))
+
+
+func test_setup_refusals() -> void:
+	var catalog := Fixtures.battle_catalog()
+	var cases := {
+		"unknown type 'tower_of_babel'": Fixtures.battle_setup([["tower_of_babel", 0, 0]], {}),
+		"has no level 3": Fixtures.battle_setup([["command_center", 0, 0, 3]], {}),
+		"off the field or over another": Fixtures.battle_setup([["command_center", 0, 0], ["academy", 1, 1]], {}),
+		"is off the field": Fixtures.battle_setup([["command_center", 19, 0]], {}),
+		"unknown unit 'ghost'": Fixtures.battle_setup([["command_center", 0, 0]], {"ghost": 1}),
+		"bad count of melee": Fixtures.battle_setup([["command_center", 0, 0]], {"melee": -1}),
+		"ticks must be whole and in order": Fixtures.battle_setup([["command_center", 0, 0]], {"melee": 2},
+			[Fixtures.deploy(5, "melee", 9, 9), Fixtures.deploy(4, "melee", 9, 9)]),
+	}
+	for reason: String in cases:
+		var sim := BattleSim.create(catalog, cases[reason])
+		assert_true(sim.setup_error.contains(reason.replace("is off", "off")), "%s: %s" % [reason, sim.setup_error])
+	var twice := Fixtures.battle_setup([["command_center", 0, 0], ["academy", 5, 5]], {})
+	twice["defender"]["buildings"][1]["id"] = 1
+	assert_true(BattleSim.create(catalog, twice).setup_error.contains("not a new positive whole number"))
+	assert_true(BattleSim.create(Fixtures.catalog_with_grid(Vector2i(20, 20)),
+		Fixtures.battle_setup([], {})).setup_error == "", "the plain fixture rules have battle rules too")
+	var rules: Dictionary = JSON.parse_string(FileAccess.get_file_as_string(Fixtures.RULES))
+	rules.erase("battle")
+	var bare := Catalog.from_json(JSON.stringify(rules), FileAccess.get_file_as_string(Fixtures.BUILDINGS),
+		FileAccess.get_file_as_string(Fixtures.UNITS))
+	assert_eq(BattleSim.create(bare, Fixtures.battle_setup([], {})).setup_error, "the catalog has no battle rules")
+	assert_eq(BattleSim.run(bare, Fixtures.battle_setup([], {})), {})
+
+
+func _step_until(sim: BattleSim, done: Callable) -> void:
+	var guard := 0
+	while not done.call() and not sim.is_over() and guard < 5000:
+		sim.step()
+		guard += 1
 
 
 func _layout(buildings: Array) -> BattleLayout:

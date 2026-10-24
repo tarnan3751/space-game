@@ -105,3 +105,9 @@ static func battle_setup(buildings: Array, army: Dictionary, commands: Array = [
 ## A deploy command.
 static func deploy(tick: int, unit: String, x: int, y: int) -> Dictionary:
 	return {"op": "deploy", "tick": tick, "unit": unit, "cell": [x, y]}
+
+
+## A battle on the battle catalog (20x20) from battle_setup's arguments.
+static func battle(buildings: Array, army: Dictionary, commands: Array = [],
+		resources: Dictionary = {}, unit_levels: Dictionary = {}) -> BattleSim:
+	return BattleSim.create(battle_catalog(), battle_setup(buildings, army, commands, resources, unit_levels))
