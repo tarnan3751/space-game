@@ -76,6 +76,8 @@ func _ready() -> void:
 	hud.close_pressed.connect(func() -> void: placement.select(0))
 	hud.reset_pressed.connect(_reset_base)
 	hud.template_pressed.connect(_template_base)
+	hud.train_pressed.connect(_on_train_pressed)
+	hud.cancel_training_pressed.connect(_on_cancel_training_pressed)
 	placement.selection_changed.connect(_refresh_hud)
 	placement.placing_changed.connect(_on_placing_changed)
 	placement.command_failed.connect(hud.show_error)
@@ -132,6 +134,22 @@ func _refresh_hud() -> void:
 func _on_placing_changed() -> void:
 	hud.refresh_placing(state, placement.selected_id, placement.is_placing(), placement.ghost_is_valid(),
 		placement.is_painting())
+
+
+## A training card: one unit queued, or the reason it was not as a toast.
+func _on_train_pressed(id: int, unit: String) -> void:
+	var error := placement.train(id, unit)
+	if error != "":
+		hud.show_error(error)
+
+
+## A queue entry: the newest of its unit cancelled and refunded.
+func _on_cancel_training_pressed(id: int, unit: String) -> void:
+	var error := placement.cancel_training(id, unit)
+	if error == "":
+		hud.show_message("Refunded")
+	else:
+		hud.show_error(error)
 
 
 func _set_state(new_state: BaseState) -> void:

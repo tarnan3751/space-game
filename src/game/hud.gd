@@ -13,7 +13,9 @@ extends CanvasLayer
 ##
 ## Every part sits inside the device's safe area (clear of notches and the home
 ## indicator), refitted when the window resizes; apply_safe_area() sets it directly. The
-## build panel alone reaches the screen's edges, with its content inside the safe area.
+## build panel alone reaches the screen's edges, with its content inside the safe area, and so
+## does the army panel, which slides up in the same place: a producer's training (its unit
+## cards and its queue).
 
 signal build_pressed(type: String)
 signal confirm_pressed
@@ -22,6 +24,13 @@ signal upgrade_pressed
 signal close_pressed
 signal reset_pressed
 signal template_pressed
+## A training card: queue one `unit` at producer `id`.
+signal train_pressed(id: int, unit: String)
+## A queue entry: cancel the newest queued `unit` at producer `id`.
+signal cancel_training_pressed(id: int, unit: String)
+
+## What the army panel shows: nothing (closed or closing) or a producer's training.
+enum ArmyPage { NONE, TRAIN }
 
 const ERROR_TEXT := {
 	BaseState.ERR_BLOCKED: "That spot is taken",
@@ -31,6 +40,13 @@ const ERROR_TEXT := {
 	BaseState.ERR_FUNDS: "Not enough resources",
 	BaseState.ERR_BUSY: "Already under construction",
 	BaseState.ERR_MAX_LEVEL: "Already at max level",
+	BaseState.ERR_UNKNOWN_UNIT: "Unknown unit",
+	BaseState.ERR_NOT_PRODUCER: "This building does not train that",
+	BaseState.ERR_BAD_COUNT: "Bad count",
+	BaseState.ERR_PRODUCER_LEVEL: "Needs a higher building level",
+	BaseState.ERR_HOUSING: "Not enough room in the Hangars",
+	BaseState.ERR_NOT_QUEUED: "Nothing like that is queued",
+	BaseState.ERR_LAB_LEVEL: "Needs a higher Research Lab",
 }
 
 # The UI palette (docs/reference/hud.md, **Theme**).
@@ -113,6 +129,16 @@ const MENU_OPEN_SECONDS := 0.18
 const MENU_CLOSE_SECONDS := 0.14
 ## Pressing the selected tab again scrolls its strip back to the start over this long.
 const STRIP_RETURN_SECONDS := 0.2
+## A unit level with no train_cost, shared so a lookup builds none.
+const _NO_COST := {}
+## The info panel's Train button, beside Close.
+const ACTION_SIZE := Vector2(112, 44)
+## A unit card in the army panel, and its glyph (HudIcon) at the top.
+const TRAIN_CARD_SIZE := Vector2(200, 140)
+const GLYPH_SIZE := Vector2(48, 48)
+## An entry of the queue strip under the training cards, and its glyph.
+const QUEUE_ENTRY_SIZE := Vector2(180, 48)
+const QUEUE_GLYPH_SIZE := Vector2(32, 32)
 
 ## The dev cheats are on (main.gd): every meter shows, full, reading "∞" instead of amount / cap.
 var cheats: bool = false
@@ -174,12 +200,60 @@ var _toast_label: Label
 var _toast_tween: Tween
 var _reset_button: Button
 var _template_button: Button
+## The building selected at the last refresh, 0 for none.
+var _selected_id: int = 0
+## The info panel's Train button, shown for a finished producer.
+var _action_button: Button
+## The building types that train units (Catalog.units_of_producer is not empty).
+var _producers: Dictionary[String, bool] = {}
+## The army panel, outside the root like the build panel, and what it shows for which building.
+var _army: PanelContainer
+var _army_inset: MarginContainer
+var _army_page: ArmyPage = ArmyPage.NONE
+var _army_id: int = 0
+var _army_tween: Tween
+var _army_title: Label
+var _army_close: Button
+var _train_page: Control
+var _train_scroll: ScrollContainer
+## One card per unit type, in units.json order; the panel shows its producer's.
+var _train_cards: Dictionary[String, ArmyCard] = {}
+## The queue strip's entries, made as the queue first grows that long and reused after; the
+## units they show, oldest first.
+var _queue_strip: HBoxContainer
+var _queue_entries: Array[ArmyCard] = []
+var _queue_units: PackedStringArray = PackedStringArray()
+var _queue_empty: Label
+## What the head entry last showed: its status and its seconds left, so a tick that changes
+## neither sets no text.
+var _head_status: String = ""
+var _head_seconds: int = -1
+## The state whose `changed` rebuilds the army panel's content; a tick only counts down.
+var _watched: BaseState
+
+
+## A unit card or a queue entry: the button, what dims while it cannot be pressed, the glyph, the
+## name, the cost (a label per resource, "Free" when it has none) and the time, and the lines
+## under them.
+class ArmyCard:
+	var button: Button
+	var heading: Control
+	var glyph: HudIcon
+	var title: Label
+	var costs: Dictionary[String, Label] = {}
+	var free: Label
+	var time: Label
+	var info: Label
 
 
 func setup(catalog: Catalog) -> void:
 	_catalog = catalog
 	_theme = _make_theme()
+	for type: String in catalog.types():
+		if not catalog.units_of_producer(type).is_empty():
+			_producers[type] = true
 	_build_menu()
+	_build_army_panel()
 	_root = Control.new()
 	_root.set_anchors_preset(Control.PRESET_FULL_RECT)
 	_root.mouse_filter = Control.MOUSE_FILTER_IGNORE
@@ -202,6 +276,7 @@ func setup(catalog: Catalog) -> void:
 ## nothing to confirm, and Done ends the mode.
 func refresh(state: BaseState, selected_id: int, placing: bool, ghost_ok: bool, painting: bool) -> void:
 	_state = state
+	_watch(state)
 	# The safe area can move without a resize: turning a phone over moves the notch to the
 	# other side. Every refresh, the 1 s tick's included, checks it.
 	_fit_safe_area()
@@ -234,18 +309,26 @@ func refresh(state: BaseState, selected_id: int, placing: bool, ghost_ok: bool, 
 	_drone_ring.set_counts(state.builders_free(), state.builders_total())
 
 	var has_selection := selected_id != 0 and state.buildings.has(selected_id)
+	_selected_id = selected_id if has_selection else 0
 	# Placing, painting or selecting a building in the world closes the build panel.
 	if placing or has_selection:
 		_slide_menu(false)
+	# The army panel belongs to the building it opened on: placing, a deselection or another
+	# selection closes it.
+	if _army_page != ArmyPage.NONE and (placing or _selected_id != _army_id):
+		_close_army()
 	_build_button.visible = not placing
 	_place_bar.visible = placing
 	_place_button.text = "Done" if painting else "Place"
 	_place_button.disabled = not ghost_ok and not painting
-	_info_panel.visible = not placing and has_selection
+	_info_panel.visible = not placing and has_selection and _army_page == ArmyPage.NONE
 	if _menu_open:
 		_refresh_entries(state)
 	if _info_panel.visible:
 		_refresh_info(state, state.buildings[selected_id])
+	# Its content is rebuilt on a state change (_on_state_changed); the tick only counts down.
+	if _army_page != ArmyPage.NONE:
+		_tick_army(state)
 
 
 ## Placement began, ended or its ghost moved. A move changes only the Place button, so
@@ -269,16 +352,23 @@ func apply_safe_area(inset: Rect2) -> void:
 	_root.offset_bottom = inset.end.y - full.y
 	# The build panel spans the screen's width and reaches its bottom edge, with its content
 	# padded into the safe area.
-	_menu_inset.add_theme_constant_override("margin_left", roundi(inset.position.x))
-	_menu_inset.add_theme_constant_override("margin_right", roundi(full.x - inset.end.x))
-	_menu_inset.add_theme_constant_override("margin_bottom", roundi(full.y - inset.end.y))
+	# The army panel likewise.
+	for padding: MarginContainer in [_menu_inset, _army_inset]:
+		padding.add_theme_constant_override("margin_left", roundi(inset.position.x))
+		padding.add_theme_constant_override("margin_right", roundi(full.x - inset.end.x))
+		padding.add_theme_constant_override("margin_bottom", roundi(full.y - inset.end.y))
 	_menu.custom_minimum_size.y = minf(MENU_HEIGHT, full.y * MENU_MAX_SHARE)
+	_army.custom_minimum_size.y = _menu.custom_minimum_size.y
 	if _menu_open:
 		# Open, or opening: on the bottom edge at its own height, which the panel grows upward
 		# to. A slide under way was aimed at the old screen's bottom edge, so it stops here.
 		_menu_tween.kill()
 		_menu.offset_top = 0.0
 		_menu.offset_bottom = 0.0
+	if _army_page != ArmyPage.NONE:
+		_army_tween.kill()
+		_army.offset_top = 0.0
+		_army.offset_bottom = 0.0
 
 
 ## DisplayServer reports the safe area in screen pixels; on desktop it is the screen's
@@ -411,12 +501,61 @@ func template_button() -> Button:
 	return _template_button
 
 
+## The info panel's Train button; hidden unless a finished producer is selected.
+func action_button() -> Button:
+	return _action_button
+
+
+## The army panel itself; hidden while closed.
+func army_panel() -> Control:
+	return _army
+
+
+## Whether the army panel shows a producer's training (open or opening).
+func is_training_open() -> bool:
+	return _army_page == ArmyPage.TRAIN
+
+
+func army_close_button() -> Button:
+	return _army_close
+
+
+## The army panel's title: the building's name and level.
+func army_title() -> String:
+	return _army_title.text
+
+
+## A unit's training card.
+func train_card(unit: String) -> Button:
+	return _train_cards[unit].button
+
+
+## A training card's last line: the housing and the count housed, or why it is locked.
+func train_card_info(unit: String) -> String:
+	return _train_cards[unit].info.text
+
+
+## The units the queue strip shows, oldest first.
+func queue_shown() -> PackedStringArray:
+	return _queue_units
+
+
+## The queue strip's entry `index` (0 is the head); only the first queue_shown().size() show.
+func queue_entry(index: int) -> Button:
+	return _queue_entries[index].button
+
+
+## The head entry's state: the time left, "Waiting for room" or "Paused"; "" with no queue.
+func queue_head_status() -> String:
+	return _queue_entries[0].info.text if not _queue_units.is_empty() else ""
+
+
 # --- The build panel -------------------------------------------------------------
 
-## Build toggles the panel. Opening it closes a selected building's info panel first, as
-## its Close would: the two never show together.
+## Build toggles the panel. Opening it closes a selected building's info panel, or the army
+## panel, first, as the info panel's Close would: the two never show together.
 func _on_build_button() -> void:
-	if not _menu_open and _info_panel.visible:
+	if not _menu_open and (_info_panel.visible or _army_page != ArmyPage.NONE):
 		close_pressed.emit()
 	_slide_menu(not _menu_open)
 
@@ -460,6 +599,166 @@ func _slide(panel: Control, open: bool, under_way: Tween) -> Tween:
 	if not open:
 		tween.tween_callback(panel.hide)
 	return tween
+
+
+# --- The army panel --------------------------------------------------------------
+
+## The info panel's Train: the army panel slides up in its place, on the selected building.
+func _on_action_pressed() -> void:
+	if _selected_id == 0 or _state == null:
+		return
+	_open_army(_page_for(_state.buildings[_selected_id].type))
+
+
+## The army panel's page for a building type: a producer's training, or none.
+func _page_for(type: String) -> ArmyPage:
+	return ArmyPage.TRAIN if _producers.has(type) else ArmyPage.NONE
+
+
+func _open_army(page: ArmyPage) -> void:
+	if page == ArmyPage.NONE:
+		return
+	_army_page = page
+	_army_id = _selected_id
+	_train_page.visible = page == ArmyPage.TRAIN
+	_info_panel.visible = false
+	_train_scroll.scroll_horizontal = 0
+	_refresh_army(_state)
+	_army_tween = _slide(_army, true, _army_tween)
+
+
+## Slides the army panel down. The selection stays as it is: refresh() shows its info panel.
+func _close_army() -> void:
+	if _army_page == ArmyPage.NONE:
+		return
+	_army_page = ArmyPage.NONE
+	_army_tween = _slide(_army, false, _army_tween)
+
+
+## The panel's close button: back to the building's info panel, still selected.
+func _on_army_close() -> void:
+	_close_army()
+	if _state != null and _state.buildings.has(_selected_id):
+		_info_panel.visible = true
+		_refresh_info(_state, _state.buildings[_selected_id])
+
+
+## Rebuilds the army panel's content on `state.changed`, which the HUD connects to itself from
+## the state it is given (main.gd's handler, connected first, has refreshed by then).
+func _watch(state: BaseState) -> void:
+	if state == _watched:
+		return
+	if _watched != null and _watched.changed.is_connected(_on_state_changed):
+		_watched.changed.disconnect(_on_state_changed)
+	_watched = state
+	state.changed.connect(_on_state_changed)
+
+
+func _on_state_changed() -> void:
+	if _army_page != ArmyPage.NONE:
+		_refresh_army(_watched)
+
+
+## The one-second tick while the panel is open: only the countdown. It calls no query that
+## copies (queue_of does) and sets text only where the shown value changed.
+func _tick_army(state: BaseState) -> void:
+	if _army_page == ArmyPage.TRAIN:
+		_refresh_head(state)
+
+
+## Everything the army panel shows, on opening it and on each state change.
+func _refresh_army(state: BaseState) -> void:
+	var building: BuildingState = state.buildings[_army_id]
+	_army_title.text = "%s   Lv %d" % [_catalog.display_name(building.type), building.level]
+	if _army_page == ArmyPage.TRAIN:
+		_refresh_training(state, building)
+
+
+## The producer's unit cards, then its queue. A card is locked, disabled with its glyph, name
+## and cost dimmed, until the producer's finished level trains the unit.
+func _refresh_training(state: BaseState, building: BuildingState) -> void:
+	for unit: String in _train_cards:
+		var card := _train_cards[unit]
+		card.button.visible = _catalog.unit_producer(unit) == building.type
+		if not card.button.visible:
+			continue
+		var stats := _catalog.unit_level_stats(unit, state.unit_level(unit))
+		_set_card_cost(card, stats.get("train_cost", _NO_COST), _catalog.unit_train_seconds(unit))
+		var needed := _catalog.unit_producer_level(unit)
+		var locked := building.level < needed
+		card.button.disabled = locked
+		card.heading.modulate.a = DISABLED_ALPHA if locked else 1.0
+		card.info.theme_type_variation = &"CardReason" if locked else &"CardCount"
+		if locked:
+			card.info.text = "Needs %s %d" % [_catalog.display_name(building.type), needed]
+		else:
+			card.info.text = "Housing %d   Housed %d" % [_catalog.unit_housing(unit), state.army_count(unit)]
+	_refresh_queue(state)
+
+
+## The queue strip: an entry per queued unit, oldest first, the head's with its state. Entries
+## are made only as the queue first grows that long; after that a rebuild only sets text.
+func _refresh_queue(state: BaseState) -> void:
+	# A copy, built per call: taken here, on a state change, and kept for the ticks between.
+	_queue_units = state.queue_of(_army_id)
+	while _queue_entries.size() < _queue_units.size():
+		_queue_entries.append(_build_queue_entry(_queue_entries.size()))
+	for i: int in _queue_entries.size():
+		var entry := _queue_entries[i]
+		entry.button.visible = i < _queue_units.size()
+		if not entry.button.visible:
+			continue
+		var unit := _queue_units[i]
+		entry.glyph.show_icon(_catalog.unit_crew(unit), _catalog.unit_class(unit) == "air")
+		entry.title.text = _catalog.unit_name(unit)
+		entry.info.visible = i == 0
+	_head_seconds = -1
+	_refresh_head(state)
+	_queue_empty.visible = _queue_units.is_empty()
+
+
+## The head entry's state: its time left, "Waiting for room" or "Paused". The queries it reads
+## build nothing; the text is set only when the status or the seconds changed.
+func _refresh_head(state: BaseState) -> void:
+	if _queue_units.is_empty():
+		return
+	var status := state.training_status(_army_id)
+	var seconds := state.training_seconds_left(_army_id)
+	if status == _head_status and seconds == _head_seconds:
+		return
+	_head_status = status
+	_head_seconds = seconds
+	var head := _queue_entries[0].info
+	if status == BaseState.TRAINING_WAITING:
+		head.text = "Waiting for room"
+	elif status == BaseState.TRAINING_PAUSED:
+		head.text = "Paused"
+	else:
+		head.text = "%s left" % Format.duration(seconds)
+
+
+## A card's cost, each amount in its resource's colour, or "Free"; and its time.
+func _set_card_cost(card: ArmyCard, cost: Dictionary, seconds: int) -> void:
+	var free := true
+	for res: String in _catalog.resources:
+		var amount := int(cost.get(res, 0))
+		var label := card.costs[res]
+		label.visible = amount > 0
+		if amount > 0:
+			label.text = Format.amount(amount)
+			free = false
+	card.free.visible = free
+	card.time.text = Format.duration(seconds)
+
+
+func _on_train_card(unit: String) -> void:
+	train_pressed.emit(_army_id, unit)
+
+
+## An entry cancels the newest queued unit of its type, not necessarily itself.
+func _on_queue_entry(index: int) -> void:
+	if index < _queue_units.size():
+		cancel_training_pressed.emit(_army_id, _queue_units[index])
 
 
 # --- Refresh helpers -------------------------------------------------------------
@@ -590,6 +889,8 @@ func _refresh_info(state: BaseState, building: BuildingState) -> void:
 		var what := "Under construction" if building.level == 0 else "Upgrading to Lv %d" % building.target_level
 		lines.append("%s: %s left" % [what, Format.duration(state.seconds_left(building.id))])
 	_info_detail.text = "\n".join(lines)
+	# A finished producer trains.
+	_action_button.visible = _page_for(type) != ArmyPage.NONE and building.level >= 1
 
 	_upgrade_note.text = ""
 	if building.is_busy():
@@ -902,6 +1203,198 @@ func _build_entry(type: String) -> Button:
 	return button
 
 
+## The army panel: like the build panel, the screen's full width at its bottom edge, its content
+## padded into the safe area and a column kept clear for the Build button. A header of the
+## building's name and level and a close button, over the training page: a strip of unit cards
+## and, under it, the queue strip. Built hidden; _open_army shows a page.
+func _build_army_panel() -> void:
+	_army = PanelContainer.new()
+	_army.theme = _theme
+	_army.theme_type_variation = &"MenuPanel"
+	_army.mouse_filter = Control.MOUSE_FILTER_STOP
+	_army.visible = false
+	add_child(_army)
+	_army.set_anchors_preset(Control.PRESET_BOTTOM_WIDE)
+	_army.grow_vertical = Control.GROW_DIRECTION_BEGIN
+	_army.offset_left = 0.0
+	_army.offset_right = 0.0
+	_army.offset_top = 0.0
+	_army.offset_bottom = 0.0
+	_army_inset = MarginContainer.new()
+	_army_inset.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_army.add_child(_army_inset)
+	var column := VBoxContainer.new()
+	column.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	column.add_theme_constant_override("separation", 8)
+	_army_inset.add_child(column)
+
+	var header := HBoxContainer.new()
+	header.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	header.add_theme_constant_override("separation", 10)
+	column.add_child(header)
+	_army_title = Label.new()
+	_army_title.theme_type_variation = &"InfoTitle"
+	_army_title.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	header.add_child(_army_title)
+	_army_close = _button("X", CLOSE_SIZE, &"CloseButton")
+	_army_close.pressed.connect(_on_army_close)
+	header.add_child(_army_close)
+
+	var body := HBoxContainer.new()
+	body.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	body.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	body.add_theme_constant_override("separation", 0)
+	column.add_child(body)
+	var pages := VBoxContainer.new()
+	pages.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	pages.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	body.add_child(pages)
+	# The Build button stays over the open panel at the safe area's corner; nothing goes under it.
+	var clear := Control.new()
+	clear.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	clear.custom_minimum_size = Vector2(BUILD_SIZE.x + MARGIN, 0)
+	body.add_child(clear)
+
+	_train_page = VBoxContainer.new()
+	_train_page.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_train_page.add_theme_constant_override("separation", 6)
+	pages.add_child(_train_page)
+	var cards := _strip(_train_page, TRAIN_CARD_SIZE.y + 18)
+	_train_scroll = cards.get_parent().get_parent() as ScrollContainer
+	for unit: String in _catalog.unit_types():
+		var card := _build_army_card(unit, TRAIN_CARD_SIZE)
+		card.button.pressed.connect(_on_train_card.bind(unit))
+		cards.add_child(card.button)
+		_train_cards[unit] = card
+	_queue_strip = _strip(_train_page, QUEUE_ENTRY_SIZE.y + 12)
+	_queue_strip.add_theme_constant_override("separation", 8)
+	_queue_empty = _card_label(_queue_strip, "Nothing in training", &"CardCount")
+	_queue_empty.custom_minimum_size.y = QUEUE_ENTRY_SIZE.y
+	_queue_empty.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+
+
+## A horizontal ScrollContainer under `parent`, `height` high (its cards' with room for their
+## shadows and the scroll bar), holding the row it returns.
+func _strip(parent: Control, height: float) -> HBoxContainer:
+	var scroll := ScrollContainer.new()
+	scroll.vertical_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+	scroll.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	scroll.custom_minimum_size = Vector2(0, height)
+	parent.add_child(scroll)
+	# Room for the cards' shadows, which fall outside them, at the strip's end and bottom.
+	var room := MarginContainer.new()
+	room.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	room.add_theme_constant_override("margin_right", 6)
+	room.add_theme_constant_override("margin_bottom", 6)
+	scroll.add_child(room)
+	var row := HBoxContainer.new()
+	row.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	row.add_theme_constant_override("separation", 12)
+	room.add_child(row)
+	return row
+
+
+## A unit card, `card_size`: the army's stripe along its top, the unit's glyph, its name and a
+## row of its cost and time, then the line under them that the refresh fills. PASS, like a build
+## card, so a drag on it scrolls the strip; its content takes no touch.
+func _build_army_card(unit: String, card_size: Vector2) -> ArmyCard:
+	var card := ArmyCard.new()
+	card.button = _button("", card_size)
+	card.button.mouse_filter = Control.MOUSE_FILTER_PASS
+	var stripe := Panel.new()
+	stripe.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	stripe.theme_type_variation = &"CardStripe"
+	stripe.self_modulate = MaterialKit.ARMY
+	card.button.add_child(stripe)
+	stripe.set_anchors_preset(Control.PRESET_TOP_WIDE)
+	stripe.offset_left = BORDER
+	stripe.offset_right = -BORDER
+	stripe.offset_top = BORDER
+	stripe.offset_bottom = BORDER + STRIPE_HEIGHT
+	var content := VBoxContainer.new()
+	content.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	content.alignment = BoxContainer.ALIGNMENT_CENTER
+	content.add_theme_constant_override("separation", 0)
+	card.button.add_child(content)
+	content.set_anchors_preset(Control.PRESET_FULL_RECT)
+	content.offset_left = 10
+	content.offset_top = BORDER + STRIPE_HEIGHT + 2
+	content.offset_right = -10
+	content.offset_bottom = -BORDER - 2
+	var heading := VBoxContainer.new()
+	heading.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	heading.add_theme_constant_override("separation", 0)
+	content.add_child(heading)
+	card.heading = heading
+	card.glyph = _glyph(heading, unit, GLYPH_SIZE)
+	card.title = _card_label(heading, _catalog.unit_name(unit), &"CardName")
+	card.title.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
+	var cost_row := HBoxContainer.new()
+	cost_row.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	cost_row.alignment = BoxContainer.ALIGNMENT_CENTER
+	cost_row.add_theme_constant_override("separation", 10)
+	heading.add_child(cost_row)
+	for res: String in _catalog.resources:
+		var amount := _card_label(cost_row, "", &"CardCost")
+		amount.add_theme_color_override("font_color", _resource_color(res))
+		card.costs[res] = amount
+	card.free = _card_label(cost_row, "Free", &"CardCost")
+	card.time = _card_label(cost_row, "", &"CardCount")
+	card.info = _card_label(content, "", &"CardCount")
+	card.info.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
+	return card
+
+
+## A queue strip entry: a small glyph beside the unit's name and, on the head, its state. A press
+## cancels one of its unit (_on_queue_entry). PASS, so a drag on it scrolls the strip.
+func _build_queue_entry(index: int) -> ArmyCard:
+	var entry := ArmyCard.new()
+	entry.button = _button("", QUEUE_ENTRY_SIZE)
+	entry.button.mouse_filter = Control.MOUSE_FILTER_PASS
+	entry.button.pressed.connect(_on_queue_entry.bind(index))
+	var row := HBoxContainer.new()
+	row.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	row.add_theme_constant_override("separation", 8)
+	entry.button.add_child(row)
+	row.set_anchors_preset(Control.PRESET_FULL_RECT)
+	row.offset_left = 10
+	row.offset_top = BORDER
+	row.offset_right = -10
+	row.offset_bottom = -BORDER
+	entry.glyph = _glyph(row, "", QUEUE_GLYPH_SIZE)
+	entry.glyph.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	var lines := VBoxContainer.new()
+	lines.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	lines.alignment = BoxContainer.ALIGNMENT_CENTER
+	lines.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	lines.add_theme_constant_override("separation", -2)
+	row.add_child(lines)
+	entry.title = Label.new()
+	entry.title.theme_type_variation = &"QueueName"
+	entry.title.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
+	lines.add_child(entry.title)
+	entry.info = Label.new()
+	entry.info.theme_type_variation = &"CardReason"
+	entry.info.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
+	lines.add_child(entry.info)
+	_queue_strip.add_child(entry.button)
+	return entry
+
+
+## A unit's glyph (HudIcon, by its crew, winged for an air unit) in the army accent, `glyph_size`,
+## centred across `parent`; `unit` "" leaves it blank until show_icon.
+func _glyph(parent: Control, unit: String, glyph_size: Vector2) -> HudIcon:
+	var glyph := HudIcon.new()
+	glyph.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	glyph.custom_minimum_size = glyph_size
+	glyph.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
+	glyph.color = MaterialKit.ARMY
+	if unit != "":
+		glyph.show_icon(_catalog.unit_crew(unit), _catalog.unit_class(unit) == "air")
+	parent.add_child(glyph)
+	return glyph
+
+
 ## Cancel and Place on a panel at the bottom centre.
 func _build_place_bar() -> void:
 	var panel := PanelContainer.new()
@@ -935,6 +1428,9 @@ func _build_info_panel() -> void:
 	_info_title.theme_type_variation = &"InfoTitle"
 	_info_title.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	header.add_child(_info_title)
+	_action_button = _button("Train", ACTION_SIZE, &"ConfirmButton")
+	_action_button.pressed.connect(_on_action_pressed)
+	header.add_child(_action_button)
 	var close := _button("Close", Vector2(96, 44))
 	close.pressed.connect(func() -> void: close_pressed.emit())
 	header.add_child(close)
@@ -1114,6 +1610,7 @@ func _make_theme() -> Theme:
 	_label_variation(ui, &"CardCost", 18, TEXT, 0)
 	_label_variation(ui, &"CardCount", 16, TEXT_DIM, 0)
 	_label_variation(ui, &"CardReason", 15, TEXT_DIM, 0)
+	_label_variation(ui, &"QueueName", 16, TEXT, 0)
 	_label_variation(ui, &"MeterText", 18, TEXT, 2, _meter_font())
 	_label_variation(ui, &"InfoTitle", 24, TEXT, 0, DISPLAY_FONT)
 	_label_variation(ui, &"InfoDetail", 17, TEXT, 0)
