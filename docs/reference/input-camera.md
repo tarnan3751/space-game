@@ -19,26 +19,33 @@ material kit, `LowPolyMesh`, the shaders, the outlines, the view states, the wal
    linear tonemap) and one warm key light, a `DirectionalLight3D` with a soft single-split shadow
    (`art-style.md`, **Light and shading**).
 3. `BaseView` (ground, scenery, building views), `IsoCamera` (made current), `WorldInput`,
-   `Hud`, then `PlacementController`, which is given the view, the camera and the clock
+   `Hud`, the `SectorMap` (`sector_map`, hosted by the HUD through `hud.add_screen`, `hud.md`,
+   **Sector map**), then `PlacementController`, which is given the view, the camera and the clock
    (`placement.clock = _now`) and connected to the input signals.
 4. The HUD's signals are wired to the controller (`build_pressed` → `begin_place`,
    `confirm_pressed` → `confirm_place`, `cancel_pressed` → `cancel_place`, `upgrade_pressed` →
    `upgrade_selected`, `close_pressed` → `select(0)`, `reset_pressed` → `_reset_base`,
-   `template_pressed` → `_template_base`, `practice_pressed` → `_practice_raid`); the controller's `selection_changed` refreshes the
+   `template_pressed` → `_template_base`, `practice_pressed` → `_practice_raid`,
+   `expedition_pressed` → `open_sector_map`), and the map's: `scan_pressed` → `_on_scan_pressed`
+   (`placement.scan`, an error toasted), `attack_pressed` → `_on_attack_pressed` (the battle,
+   **A battle**), `closed` → `_on_sector_map_closed` (the `WorldInput` back in the tree); the
+   controller's `selection_changed` refreshes the
    HUD, `placing_changed` calls `hud.refresh_placing` (`_on_placing_changed`; a ghost move
    updates only the Place button), and `command_failed` shows a toast.
 5. The state is loaded or created (`_load_or_create`) and installed (`_set_state`: disconnects
    the old state's `changed`, connects the new one, hands it to the controller, cancels any
    placement and selection, clears and syncs the view).
 6. A 1 s `Timer` ticks: `state.advance_to(_now())`, `base_view.sync(state)`, the HUD refresh
-   (timer labels change every second), and a save every `SAVE_EVERY_TICKS` (10) ticks.
+   (timer labels change every second), `sector_map.tick(state)` while the map is open (Scan's
+   countdown), and a save every `SAVE_EVERY_TICKS` (10) ticks.
 
 Every frame, `_process` advances the animation clock (`Motion.tick()`) and sets the shaders'
 `anim_time` global to it (`art-style.md`, **Animation**, **One clock**).
 
 `_now()` is the device clock (`Time.get_unix_time_from_system()`); the server will own time
 later. `state.changed` → `_on_state_changed`: sync the view, `placement.refresh()` (re-checks
-the ghost), refresh the HUD. The save is written on `NOTIFICATION_WM_CLOSE_REQUEST` and
+the ghost), refresh the HUD, and `sector_map.refresh(state)` while the map is open (a scan, a
+raid). The save is written on `NOTIFICATION_WM_CLOSE_REQUEST` and
 `NOTIFICATION_APPLICATION_PAUSED` too.
 
 **The save path.** `save_path` is `user://base.json` unless a `--save-path=<file>` user
@@ -48,12 +55,19 @@ the owner's save. Loading parses the JSON, calls `BaseState.from_dict`, then `ad
 for offline progress; an unreadable file starts a new base with a warning. `_reset_base`
 (the debug row's Reset base) creates a new base and saves at once.
 
-**A battle.** `open_battle(setup, practice)` runs a `BattleView` in the base's place: the base's
-`BaseView` and `WorldInput` leave the tree, the HUD is hidden, the camera is bounded to the
-battle's field; on the view's `finished` they come back (`battle-view.md`, **Entering and
-leaving**). `battle` is the view while one runs, else null. The debug row's Practice raid
-(`_practice_raid`) opens `practice_setup()`, the template base raided by the Hangars' army, and
-applies nothing.
+**The sector map.** `open_sector_map()` (the HUD's Expedition button) cancels any placement and
+selection, takes the `WorldInput` out of the tree, so no touch reaches the base while the map is
+open, and opens the map; its `closed` puts the input back (`hud.md`, **Sector map**).
+
+**A battle.** `open_battle(setup, practice, expedition = {})` runs a `BattleView` in the base's
+place: the base's `BaseView` and `WorldInput` leave the tree, the HUD is hidden, the camera is
+bounded to the battle's field; on the view's `finished` they come back (`battle-view.md`,
+**Entering and leaving**). `battle` is the view while one runs, else null. The debug row's
+Practice raid (`_practice_raid`) opens `practice_setup()`, the template base raided by the
+Hangars' army, and applies nothing. An expedition's (`_on_attack_pressed`) passes its key
+`{"epoch", "index"}`: the view is made with `rival` set, so the defender is drawn as a rival
+colony, and on `finished` the result is applied with that key (`_apply_expedition`;
+`battle-view.md`, **Expeditions**).
 
 **The template base.** `_template_base` (the debug row's Template base, `hud.md`) installs a
 showcase base the same way and saves at once: `TemplateBase.build(catalog, grid, now)`
@@ -124,6 +138,11 @@ Once a second finger lands, the rest of that gesture can never become a tap or a
 passes over a HUD panel: `_input` (which runs before the HUD) catches `InputEventScreenDrag`
 for a finger it is already tracking and marks it handled.
 
+Out of the tree (main.gd takes it out for the sector map and for a battle) it hears no event, so
+a finger down when it left would never be released and the next touch would count as a second
+finger. It forgets every finger, and any drag or multi-touch state, on `_exit_tree` and
+`_enter_tree` (`_reset`), so the first touch after it comes back is a gesture of its own.
+
 ## PlacementController (`placement_controller.gd`)
 
 The only game-layer code that calls `BaseState.apply()`. It interprets the gestures above as
@@ -189,6 +208,13 @@ and colours the footprint by `state.check_move`; on release, if the cell changed
 error code (`""` on success) instead of emitting `command_failed`, so the caller words the
 result: `main.gd` connects the HUD's training and research panels to them and toasts the outcome
 (`hud.md`, **Training panel**, **Making panel**, **Research panel**).
+
+**The expedition's commands.** `scan()` applies `{"op": "scan"}` (the sector map's Scan) and
+`raid_result(setup, result, expedition)` an expedition battle's end: `{"op": "raid_result",
+"battle"`: the setup with the sim's accepted commands, `"result"`: the rest of `BattleSim.result()`,
+`"expedition"`: `{"epoch", "index"}`}, applied once rather than checked first, since the check lays
+the field out again (`expeditions.md`). Both at `clock.call()`, and both return the error code for
+`main.gd` to toast (`battle-view.md`, **Expeditions**).
 
 Pinches go to `camera.zoom_at`, two-finger pans and camera drags to `camera.pan`.
 

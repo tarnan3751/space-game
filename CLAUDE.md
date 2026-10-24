@@ -76,7 +76,7 @@ or `data/`.
 | Input and camera: the scene, camera, gestures, placement, views | `src/game/` (all but the HUD's, the art style's and the battle view's files) | `docs/reference/input-camera.md` |
 | Battle view: the battle scene, driving the sim, the field and its falls, the units' MultiMeshes, shots and impacts, deploying, the practice raid | `src/game/battle_view.gd`, `battle_units.gd`, `battle_effects.gd`, `src/game/models/rubble.gd` | `docs/reference/battle-view.md` |
 | Art style: the look, light, colours, the material kit, `LowPolyMesh`, outlines, models, unit models, animation, the construction drone, view states | `src/game/models/`, `unit_models.gd`, `construction_drone.gd`, `src/game/*.gdshader*`, `material_kit.gd`, `surf.gd`, `motion.gd`, `low_poly_mesh.gd`, `assets/textures/kit/`, `assets/textures/*.png`, `tools/gen_textures.gd` | `docs/reference/art-style.md` |
-| HUD: the theme and fonts, top bar (meters, drone ring), Build button and build panel, place bar, info panel, toasts, the cards' pictures, the attack HUD | `src/game/hud.gd`, `battle_hud.gd`, `hud_icon.gd`, `drone_ring.gd`, `model_preview.gd`, `meter.gdshader`, `format.gd`, `assets/fonts/` | `docs/reference/hud.md` |
+| HUD: the theme and fonts, top bar (meters, drone ring), Build button and build panel, place bar, info panel, toasts, the cards' pictures, the attack HUD, the Expedition button and the sector map | `src/game/hud.gd`, `battle_hud.gd`, `hud_icon.gd`, `drone_ring.gd`, `model_preview.gd`, `sector_map.gd`, `meter.gdshader`, `format.gd`, `assets/fonts/` | `docs/reference/hud.md` |
 | Testing and tools: runner, fixtures, gate, harness, landing, API dump | `test/`, `tools/` | `docs/reference/testing-tools.md`, `tools/harness/README.md` |
 
 ## Architecture rules
@@ -140,7 +140,7 @@ src/core/        catalog, base_state, building_state, training_queue, base_grid,
 src/game/        main, template_base, iso_camera, world_input, placement_controller, base_view,
                  building_view, construction_drone, building_models, unit_models, wall_mesh, low_poly_mesh, surf,
                  battle_view, battle_units, battle_effects, battle_hud,
-                 motion, material_kit, hud, hud_icon, drone_ring, format, model_preview, toon.gdshader,
+                 motion, material_kit, hud, hud_icon, drone_ring, sector_map, format, model_preview, toon.gdshader,
                  toon_common.gdshaderinc, effects.gdshaderinc, ink.gdshader, holo.gdshader,
                  ground.gdshader, terrain.gdshader, field_marks.gdshaderinc, meter.gdshader
 src/game/models/ parts (the model being built, shared helpers and surfaces), then one file of

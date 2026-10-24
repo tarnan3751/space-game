@@ -8,6 +8,8 @@ signals to `PlacementController` (`input-camera.md`). Two controls of its own dr
 `ModelPreview` (`model_preview.gd`), a node under it, renders the cards' pictures, the buildings'
 and the units'. The battle's attack HUD, `BattleHud` (`battle_hud.gd`), is a `CanvasLayer` of its
 own in the same theme (**Battle HUD**).
+`SectorMap` (`sector_map.gd`), the expeditions' screen, is a full panel the HUD hosts
+(**Sector map**).
 
 ## The touch rule
 
@@ -20,7 +22,8 @@ meant to block. The meters and the drone ring block too, like the panels: an opa
 HUD never lets a tap through to select or drag what lies under it. Each meter's root and the
 ring are `MOUSE_FILTER_STOP`, and a meter's own parts (trough, fill, amount, icon) are IGNORE,
 so the root is what a touch lands on. The toast is IGNORE, so it never blocks the world while it
-shows.
+shows. The Expedition button's badge is IGNORE, so a touch on it presses the button. The sector map
+is `STOP` over the whole safe area and its layout containers IGNORE (**Sector map**).
 
 The build cards are the one exception: they are `MOUSE_FILTER_PASS`, so a drag that starts on
 a card also reaches the `ScrollContainer` and scrolls the strip (with the default `STOP` it
@@ -59,8 +62,8 @@ the building view's timer label included, wider.
 | Card disabled `CARD_DISABLED` | `2E2B55` | a card or button that cannot be pressed now, a busy drone |
 | Text `TEXT` | `F4F2FF` | names, amounts |
 | Text dim `TEXT_DIM` | `9A95C4` | counts, reasons, the scroll bar's grabber |
-| Accent `ACCENT` | `58E8FF` | the selected tab, Place, Train and Research, free drones, the unit glyphs' visors, canopies and eyes |
-| Build gold `GOLD` | `FFC13B`, pressed `E0A52A` | the Build button, the upgrade button |
+| Accent `ACCENT` | `58E8FF` | the selected tab, Place, Train and Research, the Expedition button and Scan, free drones, the unit glyphs' visors, canopies and eyes |
+| Build gold `GOLD` | `FFC13B`, pressed `E0A52A` | the Build button, the upgrade button, Attack, the cleared stamp, storages on the minimap |
 | Trough `TROUGH` | `17162A` | the meters' troughs |
 | Warning `WARNING` | `FFB37A` | the info panel's note, a research card's lab level the lab lacks |
 | Resource colours | `rules.json`, `Catalog.resource_color` | costs, the meters' fills and icons |
@@ -87,6 +90,7 @@ so its parts — the Build button above all — draw over the panel.
 | --- | --- | --- |
 | Top bar | top, `MARGIN` (16) in, a column across the width | First row, from the left: a meter per resource in catalog order, the army meter, then the drone ring (**Top bar**). |
 | Build button | bottom right, `MARGIN` from the safe area's corner, 128×64 | "BUILD" on gold; toggles the build panel (**Build panel**). Hidden while placing or painting. |
+| Expedition button | bottom left, `MARGIN` from the safe area's corner, 176×64 | "EXPEDITION" in Bangers 30 on the accent cyan, ink text, with a badge on its top right corner: the open fields' count in `BadgeText` (Lilita One 17, 2 px of ink) on a defence-red circle (`Badge`, 30×30), hidden at none. Emits `expedition_pressed`. Shown with Build, and hidden while the build panel or the army panel is open across its corner (`_show_expedition`). |
 | Build panel | bottom, the screen's full width | Slides up over the bottom of the screen (**Build panel**). |
 | Place bar | bottom centre | A panel holding `Cancel` and `Place` (170×72); `Place` is disabled unless the ghost is valid. While walls are painted it reads `Done` and is always enabled: there is nothing to confirm. |
 | Info panel | bottom centre, 460 wide | Title `"Name   Lv N"` with Train, Make or Research (a finished producer, Foundry or research building only) and a `Close` button; detail lines (**Info panel**); the upgrade button; a note under it. |
@@ -95,7 +99,9 @@ so its parts — the Build button above all — draw over the panel.
 | Debug row | debug builds only (`OS.is_debug_build()`): the top bar's second row, right-aligned | Practice raid, which emits `practice_pressed`, Template base, which emits `template_pressed`, then Reset base, which emits `reset_pressed`, 16 apart. On a row of its own so a long top bar never runs under it. |
 
 The army panel is built after the build panel and before the root, outside it like the build
-panel, so the Build button draws over it too. The place bar and the info panel are anchored to the bottom edge and grow upward
+panel, so the Build button draws over it too. `add_screen(control)` adds a full screen (the sector
+map) under the root, so it sits on the safe area and takes the theme, and moves the toast after
+it, so a toast shows over it. The place bar and the info panel are anchored to the bottom edge and grow upward
 (`_anchor_bottom`).
 
 ## Top bar
@@ -202,7 +208,8 @@ drones are busy" toast and the cards' "No free drone" name the drones.
 `refresh(state, selected_id, placing, ghost_ok, painting)` is called by `main.gd` every tick,
 after every state change, and on every selection change; `painting` is
 `PlacementController.is_painting()`, which turns `Place` into `Done`. It refits the safe area if
-the device's changed (**Safe area**), updates the meters and the drone ring, then:
+the device's changed (**Safe area**), updates the meters, the drone ring and the Expedition
+button's badge (the field count less the sector's cleared fields), then:
 
 - **placing** (painting included) → the build panel closes, Build hides and the place bar shows;
 - **a building selected** (`selected_id` in `state.buildings`) → the build panel closes and the
@@ -420,6 +427,45 @@ level"; dimmed in the same cases. Tapping one emits `research_ability_pressed(ab
 The progress line names an ability's research too ("Researching Repair Swarm to Lv 2: …",
 `research_ability`); a unit's and an ability's share the one slot.
 
+## Sector map
+
+`SectorMap` (`sector_map.gd`), the expeditions' screen (`expeditions.md`, **The expedition flow**):
+a `PanelContainer` built in code, added by `main.gd` through `add_screen`, so it lies on the safe
+area, `MARGIN` in from its edges, styled by the theme's `ScreenPanel` (the panel's fill, opaque, as
+the info panel's shape). Hidden until the Expedition button opens it. It reads `BaseState` and
+`OutpostGenerator` and changes nothing: Scan, Attack and its close button are signals that
+`main.gd` applies through `PlacementController` (`battle-view.md`, **Expeditions**).
+
+| Part | Contents |
+| --- | --- |
+| Header | "SECTOR" (`InfoTitle`); **Scan** (`ConfirmButton`, 190×48): "SCAN" while a scan is allowed (the first always), else disabled and counting down, "SCAN  3h 00m" (`scan_seconds_left`, `Format.duration`), hidden while a field's detail shows; the close button "X" (`CloseButton`). |
+| Hint | "Scan to refresh: your Command Center has grown" (`InfoNote`) while the sector's snapshot is of a lower Command Center than the base's (`state.sector.cc < state.cc_level()`). |
+| Fields | A card per field of `state.sector_fields()` in a 3×2 grid (`GridContainer`, 16 apart), each filling its cell (360×200 at least): a stripe along its top in the band's colour; a 140×140 thumbnail of its outpost (the minimap's drawing, below, with the buildings as plain fills at that size); the band as a word in Bangers in that colour (easy `MaterialKit.ENERGY` cyan, even `ARMY` orange, hard `DEFENCE` red, any other the accent); "Rival colony · CC N", the outpost's Command Center level; the loot targets, each resource with a target above 0 as its `HudIcon` (28×28) and the amount in its colour ("No loot" when none has one). A cleared field's card is disabled (the disabled fill), its stripe and lines at 55 %, and stamped at its top right with a gold star (60×60, tilted, a lighter facet, ink outline and shadow, drawn as `HudIcon` draws). |
+| Detail | A field's card opens it (`show_field(index)`; a cleared field, or one that is not a field, opens nothing and returns false), with the field already laid out (below), or laid out then if it has not come yet. On the left the **minimap**, 480×480: the field (48×48 cells and one cell of margin) as a field-dark rounded square with an ink outline and a shadow, every building but the traps (hidden) a flat fill in its role's colour inset a little from its footprint, with an ink outline and a shadow: the Command Center violet (`ANTIMATTER`), defences red, storages (deposits among them) gold, other buildings cream (`HULL_LIGHT`), walls a plain grey fill (`HULL_MID`). Drawn with `HudIcon.Pen`, one triangle array, only when the field changes or the map resizes; under 6 px a cell (a card's thumbnail) the buildings are plain fills, which outlines would cover. On the right the field's band, outpost and loot again, what it holds ("N defences   N storages, N of them loot deposits outside the walls   N walls"; traps stay hidden), a legend of the five colours (each a swatch drawn the same way), and at the bottom **Back** (`BarButton`, 140×64), back to the fields, and **ATTACK** (`BuildButton`, 200×64), which emits `attack_pressed(index, field)`. |
+
+**Layouts.** The fields are laid out (`OutpostGenerator.generate`, up to 25 ms for a hard field,
+about 100 ms for the six at Command Center 10) one a frame in `_process` while the map is open,
+each card's thumbnail drawn as its field arrives, and kept for the sector's seed and epoch: a scan
+or another base (Reset, Template) lays them out again. Once all six are in, processing stops and
+nothing is laid out or drawn per frame.
+
+`open(state)` shows it on the fields; `refresh(state)` fills the cards and the hint (on
+`BaseState.changed` while it is open: a scan, a raid), and sends a detail whose field is no longer
+open (cleared, or the epoch moved on) back to the fields; `tick(state)` (the one-second tick) sets
+Scan's countdown, its text only when the seconds changed; `close()` hides it and emits `closed`.
+
+**Touch.** The panel is `MOUSE_FILTER_STOP` over the whole safe area and every layout container in
+it IGNORE; the cards and buttons keep `STOP`. `main.gd` also takes the base's `WorldInput` out of
+the tree while the map is open and puts it back on `closed`, so no touch reaches the base, a pinch
+included.
+
+**Queries for the harness** (on `main.sector_map`): `is_open()`, `is_detail_open()`,
+`detail_index()` (-1 for none) and `detail_field()` (the field laid out); `card(index)` and
+`card_cleared(index)`, whether the stamp shows; `card_lines(index)`, the band, the outpost and each
+loot shown; `scan_button()`, `close_button()`, `back_button()`, `attack_button()`; `hint_shown()`;
+`minimap()`, whose `drawn()` and `walls_drawn()` count what it draws; `card_thumbnail(index)`, a card's
+own (`Minimap` too); `layouts_done()`, whether all six fields are laid out.
+
 ## Safe area
 
 The root holds every part but the build panel and the army panel, so their anchors and margins are relative to the
@@ -488,6 +534,7 @@ the harness: `card(unit)`, `card_count(unit)`, `card_picture(unit)`, `timer_text
 | `make_pressed(id, ability)` | a making card | `main._on_make_pressed`: `placement.make`, an error toasted |
 | `cancel_making_pressed(id, ability)` | a making queue entry | `main._on_cancel_making_pressed`: `placement.cancel_making`, "Refunded" or the error toasted |
 | `research_ability_pressed(ability)` | an ability's research card | `main._on_research_ability_pressed`: `placement.research_ability`, an error toasted in `research_error_text` |
+| `expedition_pressed` | the Expedition button | `main.open_sector_map` (**Sector map**) |
 
 ## Queries for the harness
 
@@ -516,6 +563,8 @@ strip shows, `queue_entry(index)` an entry and `queue_head_status()` the head's 
 `research_card(unit)`, `research_card_lines(unit)` (its level line and its last line), the same for
 an ability (`research_ability_card(ability)`, `research_ability_card_lines(ability)`) and
 `research_line()` the research page's; `toast_text()` the toast's text while it shows.
+`expedition_button()` is the Expedition button and `expedition_badge()` its badge's count ("" while
+the badge is hidden). The sector map's own queries are under **Sector map**.
 `MENU_OPEN_SECONDS` and `MENU_CLOSE_SECONDS` say how long to wait for a slide.
 
 ## Messages
@@ -556,7 +605,10 @@ slot is taken, "Research already running"; any other code is `error_text(code)`.
 `PlacementController.command_failed` is connected to `show_error`; the army's commands return
 their error to `main.gd`, which toasts it (**Army panel**) and "Refunded" on a cancel;
 `_reset_base` shows "Base reset" and `_template_base` "Template base"; a Practice raid with no
-units "Train some units first", and its end "Practice: nothing applied" (`battle-view.md`).
+units "Train some units first", and its end "Practice: nothing applied" (`battle-view.md`); an
+expedition's Attack with no units the same "Train some units first", and its end "Field cleared: N
+star(s)" or "Field still open", with a second line of what came home, "+N metal, +M crystal", when
+anything did (`battle-view.md`, **Expeditions**).
 Amounts, costs and durations are formatted by `Format` (`input-camera.md`): a duration in seconds
 under a minute ("45s"), minutes and seconds under an hour ("1m 15s"), hours and minutes under a
 day ("18h 30m"), then days and hours ("2d 18h").

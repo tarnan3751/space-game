@@ -15,8 +15,8 @@ The attack HUD, `BattleHud`, is in `hud.md`, **Battle HUD**.
 
 ## Entering and leaving
 
-`main.gd` runs a battle in the base's place: `open_battle(setup, practice)` makes a `BattleView`
-from the setup (a refused setup returns `BattleSim.setup_error` and changes nothing), cancels any
+`main.gd` runs a battle in the base's place: `open_battle(setup, practice, expedition = {})` makes
+a `BattleView` from the setup (a refused setup returns `BattleSim.setup_error` and changes nothing), cancels any
 placement, takes the base's `BaseView` and `WorldInput` out of the tree, hides the HUD, adds the
 battle and its `BattleHud` (`main.battle`, `main.battle_hud`) and bounds the camera to its field.
 When the battle ends the view emits `ended(result)` and the HUD shows its result panel; its Return
@@ -24,7 +24,7 @@ calls `leave()`, which emits `finished(setup, result)` once, and the battle and 
 and the base's view, input and HUD come back. The base keeps running meanwhile:
 the game's tick advances it and saves it as ever.
 
-Until the sector map exists (step 6) the only battle is the debug build's **Practice raid** (the
+A battle is an expedition's (**Expeditions**, below) or the debug build's **Practice raid** (the
 HUD's debug row, `hud.md`): `practice_setup()` is the template base (`TemplateBase`, as the
 `battle` harness scenario builds it) defending with its resources, the Hangars' army at its
 researched levels attacking with the Foundry's stock (`attacker.abilities`, every ability above 0)
@@ -32,6 +32,63 @@ at its levels (`attacker.ability_levels`), and a seed from the clock, so each pr
 its own. With no units it is refused ("Train some units first"). Its result is never applied:
 `finished` returns to the base with the toast "Practice: nothing applied", and the save and the
 real base are untouched.
+
+## Expeditions
+
+The sector map's Attack (`hud.md`, **Sector map**) emits the field's index and its layout;
+`main._on_attack_pressed` takes the field the map laid out and builds the battle with
+`OutpostGenerator.battle_setup(field, army, state.unit_levels, abilities, state.ability_levels)`,
+the army being the Hangars' units with a count above 0 (none: refused with "Train some units
+first", the map left open) and the abilities the stock's entries above 0, for the abilities bar
+(`hud.md`, **Battle HUD**); it closes the map and opens the battle with
+`expedition` `{"epoch": state.sector.epoch, "index": index}`; a setup the sim refuses is toasted
+(`hud.show_error`) and the map opens again. The setup's seed is the field's, so
+the field stands in the landscape of its seed (`BaseView.setup(size, seed)`), and the view is made
+with `rival` set, which draws the defender as a rival colony (**The faction tint**). On `finished`
+the base comes back as after any battle, then `_apply_expedition` applies the result once through
+`PlacementController.raid_result(setup, result, expedition)` (the check lays the field out again,
+so it is not checked first: `expeditions.md`) and toasts the outcome: "Field cleared: N star(s)"
+or "Field still open", with a second line of what came home, each resource's rise up to storage,
+"+N metal, +M crystal", when anything did; a refusal toasts its error ("That expedition does not add up"
+for `bad_expedition`). Then the sector map opens again, the field stamped once cleared. A battle's
+`expedition` is kept from its start, so the result names the epoch it was fought in.
+
+## The faction tint
+
+Rival colonies are the player's roster with a faction tint (`docs/vision.md` §3.4). The toon
+shader's `rival` uniform (0 or 1), set, passes each vertex tint through `toon_common`'s
+`rival_tint` in `vertex()`, which makes a rival colony a green faction at every tier, Base to
+Crown. Each role is a window on the tint's hue, full within a first distance and gone by a second,
+over a saturation floor; the hues are of the tint as the shader reads it, the stored sRGB value:
+
+| Role | Its tint's hue (sRGB) | Window | Becomes |
+| --- | --- | --- | --- |
+| Army orange (`ARMY`, the orange plates and glows) | 0.078 | 0.012, gone by 0.025; saturation from 0.5 | teal: hue 0.47 at 0.8 of its value |
+| Core gold (`CORE_GOLD`: the Gold tier's trim, the Crown's filigree, the gold glows) | 0.110 | 0.010, gone by 0.020; saturation from 0.5 | verdigris green-gold: hue 0.24, 0.75 of its saturation and value |
+| The violets (`ANTIMATTER`, the veins, the antimatter core's `CORE_GLOW_TINT`, the bright cores) | 0.72 to 0.74 | round 0.728: 0.018, gone by 0.032; saturation from 0.22 | emerald: hue 0.40, 1.5 times its saturation (at most 0.9), 0.9 of its value; a glow stays unlit and bright |
+| The warm cream hull (`HULL_LIGHT`) | about 0.12, faintly coloured | warm, saturation 0.02 to 0.3, light | cooled a little, times `0.92, 0.97, 1.07` |
+
+What lies just outside the windows keeps its colour: hazard yellow (0.139, the traps' lights; the
+hazard stripes are a white-tinted layer), defence red (0.988), crystal (0.78), the cool greys and
+the energy cyan. So do three layers whatever their tint, glass, chrome and obsidian (which is
+violet-tinted, at 0.715), and the outlines (`ink.gdshader`), the holograms (`holo.gdshader`) and
+the ground, which have no such uniform. The `expedition_flow` scenario measures it: at Command
+Center 10, the share of the middle of the screen in the green band (hue 0.17 to 0.47, saturated)
+is about 0.24 over a tinted outpost against under 0.01 over the template base.
+
+`MaterialKit.rival()`, `hit_flash_rival()` and `disabled_rival()` are three shared materials made
+once, the toon's, the hit flash's and the EMP's grey's with `rival` 1: the grey and the white are
+mixed in after the tint, so a disabled or flashing rival building shows both. A `BattleView` given
+`rival` before `setup` calls `BuildingView.set_rival(true)` on every defender building;
+`BuildingView._apply_tint` then picks its toon bodies' surface 0 from the flash over the grey over
+the plain body, each in its rival version, `rival()` being the plain body's, so a flash or a wake
+never clears the tint. A third variant costs one more shared material and no per-building state;
+the alternative, the grey as a per-instance shader parameter, would need instance uniforms on
+every body for the few seconds an EMP lasts; the merged walls' body
+takes `rival()` as its material override (`GeometryInstance3D.material_override`), which, unlike a
+surface's, survives the mesh being rebuilt as walls fall. No material is made per building. The
+units, every outline, the rubble, the wall strips and the scenery are never tinted, and a practice
+battle leaves `rival` off.
 
 ## Driving the sim
 
@@ -67,7 +124,8 @@ The view stays on the field after the end, its last effects finishing, until `le
   in the base. A hit whitens its bodies for `FLASH_SECONDS` (`BuildingView.set_flash`, the shared
   `MaterialKit.hit_flash` material on surface 0, no material per building) and shakes it for
   `SHAKE_SECONDS`, `SHAKE` either way; its health bar shows for `BAR_SECONDS` after the last hit.
-  At zero hull it is freed and replaced by its **rubble** (`BuildingModels.create_rubble(size)`,
+  An expedition's buildings carry the faction tint and flash on `MaterialKit.hit_flash_rival`
+  (**The faction tint**). At zero hull it is freed and replaced by its **rubble** (`BuildingModels.create_rubble(size)`,
   `models/rubble.gd`): a scorched pad, a heap of chamfered dark chunks, three orange armour plates
   stuck in it, an ember or two and a column of dark smoke (RISE puffs on the hologram surface, two
   tiers of them), with a burst of dust. No tier: a heap reads the same whatever stood there.

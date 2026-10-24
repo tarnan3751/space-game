@@ -111,7 +111,7 @@ in one second at most (`Catalog.apply_dev_cheats`; `-- --no-cheats` for the real
 | 4 | The battle sim in `src/core/battle/`: fixed-point integer positions (1 cell = 1000 units), fixed tick, pathing round and through walls, targeting, defences, traps, status effects; replay = seed + layouts + deploy commands; byte-identical results tested headless; batch simulations for balance; the result applied to the base (`raid_result`) | Built (`docs/reference/battle.md`): 20 ticks a second, the deploy zone opening as buildings fall, every special and trap, loot by storage, save version 4 keeping the last five raids, the `battle` harness scenario and `tools/sim_battles.gd`; a full battle simulates in 0.15 to 1.6 s headless on the development Mac |
 | 4b | Abilities: `data/abilities.json` (a repair swarm, an EMP burst, an orbital strike), made in the Nanite Foundry as a timed queue with a stock, their effects in the battle sim, spent through `raid_result` | Built (`docs/reference/core-economy.md`, **The Foundry**; `docs/reference/battle.md`, **Abilities**): three abilities of five levels, the Foundry's making queue and its stock capped by its `capacity`, ability levels researched in the lab's one slot, the swarm, the burst and the strike in the sim, the spend through `raid_result`, save version 6, a strike in the `battle` harness scenario and `--abilities` in `tools/sim_battles.gd`. The Foundry's making page, the abilities' research cards, the attack HUD's abilities bar and the effects in the battle view (`hud.md`, `battle-view.md`), the `make_abilities` harness scenario and the abilities in `battle_view` |
 | 5 | The battle view: units moving, projectiles, damage and destruction, the attack HUD; the phone target fixed, and the maxed base and a full battle measured on it | Built (`docs/reference/battle-view.md`, `hud.md` **Battle HUD**): the sim driven at its tick with interpolation, units from one MultiMesh pair a type with a shader gait, flash and death, shots, shells, lightning, impacts, rubble, shields, the attack HUD with tap and smear deploys over the red zone, End and the result panel, the debug Practice raid; the phone target fixed (§3.1). On the development Mac, the maxed template base and a full army at the widest zoom: 974 draw calls (about 1,045 with the attack HUD and the abilities bar), 2.0 million primitives, 1.6 to 1.9 ms render CPU, 155 to 185 fps; the sim's step 0.2 to 0.5 ms a tick on average. The phone measurement stays with the owner |
-| 6 | Expeditions: the sector map, the outpost generator (the player's roster with a faction tint, loot deposits, hazards), loot into `BaseState` through a new command, re-training; then the real-timer retune (6a). Milestone 2 complete: a game that plays end to end offline | Retune built (6a, `docs/plans/retune.md`): real build, training, research and making times, prices and production tuned to the pace of `docs/vision.md` §5, a 3 h scan, the units' battle stats set so a full army beats its level's fields, measured with `tools/sim_matrix.sh`. Core built (`docs/reference/expeditions.md`): the sector of six fields (two easy, two even, two hard) derived from a seed, the `scan` command on a cooldown, the outpost generator (walled compound, defences, collectors, deposits and hazards outside the walls, traps; loot sized to the player's capacity), `raid_result` clearing a field with a star, save version 5, the `expedition` harness scenario and `tools/gen_outposts.gd`. The sector map screen and the faction tint are planned |
+| 6 | Expeditions: the sector map, the outpost generator (the player's roster with a faction tint, loot deposits, hazards), loot into `BaseState` through a new command, re-training; then the real-timer retune (6a). Milestone 2 complete: a game that plays end to end offline | Built. The retune (6a, `docs/plans/retune.md`): real build, training, research and making times, prices and production tuned to the pace of `docs/vision.md` §5, a 3 h scan, the units' battle stats set so a full army beats its level's fields, measured with `tools/sim_matrix.sh`. Core built (`docs/reference/expeditions.md`): the sector of six fields (two easy, two even, two hard) derived from a seed, the `scan` command on a cooldown, the outpost generator (walled compound, defences, collectors, deposits and hazards outside the walls, traps; loot sized to the player's capacity), `raid_result` clearing a field with a star, save version 5, the `expedition` harness scenario and `tools/gen_outposts.gd`. Built with the UI: the Expedition button and the sector map with its field cards, Scan and a field's detail with the outpost's minimap (`docs/reference/hud.md`, **Sector map**); the battle against the outpost drawn as a rival colony with the faction tint in its field's landscape, its result applied through the controller with toasts, the map reopened (`docs/reference/battle-view.md`, **Expeditions**, **The faction tint**); the `expedition_flow` harness scenario. |
 | 7 | Milestone 3, the online game — the server: Nakama with accounts, base storage, migration of the local save and command validation; battles verified by replaying them in headless Godot running the same `src/core` | Planned |
 | 8 | Async PvP: matchmaking, attacking saved bases, a defence log with replays, shields, revenge, a league ladder | Planned |
 | 9 | Milestone 4, the social game — alliances through the Alliance Beacon: membership, donations, later wars; then a distinct PvE faction and the store release | Planned |
@@ -145,11 +145,8 @@ in one second at most (`Catalog.apply_dev_cheats`; `-- --no-cheats` for the real
   weigh.
 - **The template base fills 46 of the field's 48 rows** at the Command Center 10 counts, so more
   walls or another type at the top needs its layout reworked (`docs/reference/input-camera.md`).
-- **Only a practice battle can be fought**: the battle view (step 5) runs the sim, but the only
-  way into it is the debug build's Practice raid on the template base, whose result is not
-  applied; expeditions (step 6) bring the real one. `capacity` drives the army's housing on the
-  Hangar and the ability stock's cap on the Nanite Foundry, and is display-only on the Alliance
-  Beacon.
+- **`capacity` is display-only on the Alliance Beacon**; on the Hangar it drives the army's
+  housing and on the Nanite Foundry the ability stock's cap.
 - **Units do not articulate**: the battle walks them with a shader hop, lean and sway, every
   model in its one static pose; limb-articulated walk cycles are a later polish item. The unit
   budgets are study values until the phone measurement.
@@ -318,6 +315,25 @@ in one second at most (`Catalog.apply_dev_cheats`; `-- --no-cheats` for the real
   `tools/sim_matrix.sh`, and the model assumes four raids a day at about 17% of the storage,
   builders busy 75% of the time. No expedition cost is added. The scripts that applied it stayed
   in the developer's scratch directory; the plan states every rule they used.
+
+- **The expedition flow and the faction tint** (the coordinator under the owner's mandate,
+  2026-10-24; `docs/reference/hud.md`, **Sector map**; `docs/reference/battle-view.md`,
+  **Expeditions**): an Expedition button at the bottom left of the base HUD, opposite Build, with
+  a badge of the open fields, opens the sector map, a full panel over the base: six field cards
+  (the band as a word and a colour, the outpost's Command Center, the loot targets; a cleared field
+  stamped and dimmed), Scan with its countdown, a hint to scan when the Command Center has grown,
+  each card with a thumbnail of its outpost (the six laid out one a frame when the map opens,
+  kept per epoch), and a field's detail with a minimap of its outpost and Attack (refused with no
+  units). The battle
+  takes the field's seed for its landscape and its result is applied once through
+  `PlacementController.raid_result` with the expedition key, with toasts, and the map opens again.
+  The tint makes a rival colony a green faction at every tier: a `rival` uniform on the toon
+  shader turns the army orange teal, the core gold a verdigris green-gold and the violet roles
+  (antimatter, the veins, the cores, glows included) emerald, and cools the cream hull, leaving
+  chrome, obsidian, glass, ink, the hazard stripes and the ground alone; hues tuned on the sRGB
+  vertex colour; through two shared materials (`MaterialKit.rival`, `hit_flash_rival`) on the
+  defender's buildings and walls only, never on the units, outlines, rubble or the base, and
+  never in a practice battle; no material per building.
 
 ### 3.2 Open
 

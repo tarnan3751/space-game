@@ -2,8 +2,9 @@
 
 How `src/core/expedition/` works: the sector of fields a base can raid, and the outpost generator
 that lays out a rival colony on each field for the battle sim (`battle.md`) to fight. This is
-`docs/vision.md` §3.4 in core; the sector map screen and the outpost's faction tint are the game
-layer's, later. The data is `rules.expedition` (`data-format.md`).
+`docs/vision.md` §3.4 in core; the sector map screen (`hud.md`, **Sector map**) and the outpost's
+faction tint (`battle-view.md`, **The faction tint**) are the game layer's. The data is
+`rules.expedition` (`data-format.md`).
 
 Everything here `extends RefCounted`, like the rest of `src/core`: no clock, integers only, ties
 broken by order, and every draw from one `SeededRng` per field.
@@ -61,6 +62,15 @@ queries. `OutpostGenerator.generate(catalog, state, index)` lays out a field of 
    as for any raid; with a star the field is cleared for the epoch. The raid is logged without
    its defender, with the field's inputs instead (`core-economy.md`, **Raids**).
 4. `{"op": "scan"}` starts the next epoch once the cooldown allows.
+
+In the game: the HUD's Expedition button opens the sector map over the base, its cards from
+`sector_fields()` and its Scan counting down `scan_seconds_left()`; a card opens the field's detail,
+which lays the field out once for its minimap; Attack builds the battle with `battle_setup` from
+that layout and the Hangars' army, and `BattleView` draws the outpost as a rival colony in the
+landscape of the field's seed; at its end `PlacementController.raid_result` applies it once, a toast
+says the field was cleared or is still open and what came home, and the map opens again with the
+field stamped (`hud.md`, **Sector map**; `battle-view.md`, **Expeditions**). The
+`expedition_flow` harness scenario drives it end to end.
 
 `check_raid_result` with the expedition key lays the field out again (10 to 25 ms for a hard
 Command Center 10 field on the development Mac), and `apply` runs the same check, so the game

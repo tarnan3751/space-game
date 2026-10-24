@@ -95,13 +95,14 @@ through the game layer as the player would, and read the state through `BaseStat
 
 | Through | What |
 |---|---|
-| `main.placement` | `begin_place(type)`, `confirm_place()`, `cancel_place()`, `select(id)`, `upgrade_selected()`, `train(id, unit)`, `cancel_training(id, unit)`, `research(unit)`, `make(id, ability)`, `cancel_making(id, ability)`, `research_ability(ability)`, `is_placing()`, `is_painting()`, `ghost_is_valid()`, `ghost_cell()`, `selected_id` |
+| `main.placement` | `begin_place(type)`, `confirm_place()`, `cancel_place()`, `select(id)`, `upgrade_selected()`, `train(id, unit)`, `cancel_training(id, unit)`, `research(unit)`, `make(id, ability)`, `cancel_making(id, ability)`, `research_ability(ability)`, `scan()`, `raid_result(setup, result, expedition)`, `is_placing()`, `is_painting()`, `ghost_is_valid()`, `ghost_cell()`, `selected_id` |
 | `main.world_input` signals | `tapped`, `drag_started`, `dragged`, `drag_ended`, `pinched`, `panned`; emit them to simulate a gesture (`tap_cell` below does) |
-| `main.hud` signals | `build_pressed`, `confirm_pressed`, `cancel_pressed`, `upgrade_pressed`, `close_pressed`, `reset_pressed`, `template_pressed`, `practice_pressed`, `train_pressed`, `cancel_training_pressed`, `research_pressed`, `make_pressed`, `cancel_making_pressed`, `research_ability_pressed`; emit them to press a button |
-| `main.hud` queries | `build_button()`, `is_menu_open()`, `build_panel()`, `close_button()`, `tab_button(category)`, `entry_button(type)`, `entry_status(type)`, `entry_preview(type)`, `previews_done()`, `entry_strip()`, `resource_panel(res)`, `resource_fill(res)`, `army_meter()`, `army_meter_text()`, `army_fill()`, `place_button()`, `drones_panel()` (the `DroneRing`: `free_count()`, `total_count()`), `reset_button()`, `template_button()`, `practice_button()`, `action_button()`, `army_panel()`, `is_training_open()`, `is_research_open()`, `army_close_button()`, `army_title()`, `train_card(unit)`, `train_card_info(unit)`, `queue_shown()`, `queue_entry(index)`, `queue_head_status()`, `research_card(unit)`, `research_card_lines(unit)`, `research_line()`, `is_making_open()`, `make_card(ability)`, `make_card_info(ability)`, `research_ability_card(ability)`, `research_ability_card_lines(ability)`, `info_detail()`, `toast_text()` (`docs/reference/hud.md`); `apply_safe_area(inset)` to try a notch-like inset |
+| `main.hud` signals | `build_pressed`, `confirm_pressed`, `cancel_pressed`, `upgrade_pressed`, `close_pressed`, `reset_pressed`, `template_pressed`, `practice_pressed`, `train_pressed`, `cancel_training_pressed`, `research_pressed`, `make_pressed`, `cancel_making_pressed`, `research_ability_pressed`, `expedition_pressed`; emit them to press a button |
+| `main.hud` queries | `build_button()`, `is_menu_open()`, `build_panel()`, `close_button()`, `tab_button(category)`, `entry_button(type)`, `entry_status(type)`, `entry_preview(type)`, `previews_done()`, `entry_strip()`, `resource_panel(res)`, `resource_fill(res)`, `army_meter()`, `army_meter_text()`, `army_fill()`, `place_button()`, `drones_panel()` (the `DroneRing`: `free_count()`, `total_count()`), `reset_button()`, `template_button()`, `practice_button()`, `action_button()`, `army_panel()`, `is_training_open()`, `is_research_open()`, `army_close_button()`, `army_title()`, `train_card(unit)`, `train_card_info(unit)`, `queue_shown()`, `queue_entry(index)`, `queue_head_status()`, `research_card(unit)`, `research_card_lines(unit)`, `research_line()`, `is_making_open()`, `make_card(ability)`, `make_card_info(ability)`, `research_ability_card(ability)`, `research_ability_card_lines(ability)`, `info_detail()`, `toast_text()`, `expedition_button()`, `expedition_badge()` (`docs/reference/hud.md`); `apply_safe_area(inset)` to try a notch-like inset |
 | `main.state` | the `BaseState`: `buildings`, `resources`, `capacity()`, `builders_free()`, `seconds_left(id)`, `check_*` |
 | `main.camera`, `main.base_view` | `IsoCamera` and `BaseView`, for cell and screen mapping |
-| `main.open_battle(setup, practice)`, `main.practice_setup()`, `main.battle`, `main.battle_hud` | a battle in the base's place and its `BattleView` while it runs: `sim` (read only), `script_commands(list)`, `deploy(unit, cell)`, `select_unit(unit)`, `surrender()`, `leave()`, `speed`, `deploy_unit`, `is_masked(cell)`, `input` (its own `WorldInput`), `field` (its `BaseView`, `deploy_strength()`), `units`, `step_ms()`, `slowest_tick()`, `clock()`, `finished` (`docs/reference/battle-view.md`); and its `BattleHud`'s queries (`docs/reference/hud.md`, **Battle HUD**) |
+| `main.sector_map` | the `SectorMap`: `open(state)`, `close()`, `show_field(index)`, `is_open()`, `is_detail_open()`, `detail_index()`, `detail_field()`, `card(index)`, `card_cleared(index)`, `card_lines(index)`, `scan_button()`, `close_button()`, `back_button()`, `attack_button()`, `hint_shown()`, `minimap()` (`drawn()`, `walls_drawn()`), `card_thumbnail(index)`, `layouts_done()`, its signals `scan_pressed`, `attack_pressed`, `closed`; `main.open_sector_map()` (`docs/reference/hud.md`, **Sector map**) |
+| `main.open_battle(setup, practice, expedition = {})`, `main.practice_setup()`, `main.battle`, `main.battle_hud` | a battle in the base's place and its `BattleView` while it runs: `sim` (read only), `script_commands(list)`, `deploy(unit, cell)`, `select_unit(unit)`, `surrender()`, `leave()`, `speed`, `deploy_unit`, `is_masked(cell)`, `input` (its own `WorldInput`), `field` (its `BaseView`, `deploy_strength()`), `units`, `step_ms()`, `slowest_tick()`, `clock()`, `finished` (`docs/reference/battle-view.md`); and its `BattleHud`'s queries (`docs/reference/hud.md`, **Battle HUD**) |
 
 Helpers on `HarnessScenario`:
 
@@ -178,6 +179,45 @@ Research Lab's research page with the abilities after the units, the Repair Swar
 researched from its card, paid for and on the progress line, a unit's research refused while it
 runs, and the level reached. Screenshots: the info panel, the making page, the stock, the research
 page scrolled to the abilities.
+
+`scenarios/expedition_flow.gd` drives the expedition flow in the game (`docs/reference/hud.md`,
+**Sector map**; `docs/reference/battle-view.md`, **Expeditions**) on the debug build's Template
+base, pressed through its button, its sector seed set to 20261024 so the run repeats. A second
+finger is held on the world as the Expedition button is pressed and lifted while the map is open.
+The Expedition button, its badge counting six open fields, opens
+the sector map with the world's input out of the tree; the first scan is free and starts epoch 1,
+Scan then counts down and a scan pressed while it recharges is refused with "The scanner is still cooling down", and once the harness clock has
+moved through the cooldown (`advance`) Scan reads "SCAN" again;
+each card shows its field's band and outpost, and, once the six fields are laid out, its outpost's
+thumbnail. The easy field's card opens its detail, whose field
+is the generator's layout and whose minimap draws every building but the walls (drawn apart) and the
+traps; Attack with the Hangars empty is refused with "Train some units first". Then `main.state` is
+given the battle scenario's army at its top levels, one of the first ability in stock and half of
+every storage (set directly, as the
+`expedition` scenario sets its copy's: training 167 units would take its real time), and Attack
+opens the battle: the map closed, the field's seed the landscape's, and every defender building's
+toon body and the merged walls on `MaterialKit.rival` (or, for the moment of a hit,
+`hit_flash_rival`) while nothing else in the battle carries it, checked at the start and at tick
+300, and the battle brings the army and the stock at their levels. The army is deployed in four
+waves from the middles of the field's edges through
+`script_commands` and run at 2x to its end, and the result panel's Return (`BattleHud`) leaves it.
+Back on the base it checks the raid applied and logged
+with the field's inputs, the field cleared exactly when a star was taken (which it gets is the
+development balance's), the deployed units spent, the loot banked up to storage, the toast (the
+stars and what came home), and the map open again with the card stamped and disabled; for a cleared
+field, that its detail does not open and that its result applied again is refused with "That
+expedition does not add up". Close gives the world its input back, the first real tap on the world after it is a
+tap (the finger held at Expedition forgotten), and the badge counts the fields still open. Then the
+green faction at Command Center 10: the even field's battle (Command Center 10, one EMP burst in
+stock) opened tinted, shot at its start paused and framed on its buildings' middle at camera size
+26; the EMP cast on a defence, every defender body checked still on a rival material while the
+disabled ones are grey (`disabled_rival`) and again once they wake; then ended; and the
+practice raid on the template opened with no tint anywhere and shot the same way. Rendered, the
+share of the shots' middles (800×400, clear of the HUD) in the green band (hue 0.17 to 0.47,
+saturation 0.35 and value 0.25 at least) must be at least twice the practice's and 0.03 above it;
+both are logged (about 0.24 against under 0.01). Screenshots: the map with its thumbnails, the
+detail with its minimap, the battle at tick 300 framed on the outpost's Command Center, the map
+after it, the even field tinted and the practice. About 100 s headless.
 
 `scenarios/battle_view.gd` drives the battle view and its attack HUD
 (`docs/reference/battle-view.md`, `docs/reference/hud.md`, **Battle HUD**) on the debug build's
