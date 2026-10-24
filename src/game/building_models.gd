@@ -158,6 +158,19 @@ static func instantiate(p: Parts) -> Node3D:
 	return root
 
 
+## The meshes built from `p`, uncached: for a caller that keeps its own cache (UnitModels).
+static func meshes_of(p: Parts) -> Meshes:
+	return _meshes(p)
+
+
+## A model's nodes for `meshes`, as create() assembles them: for a caller that keeps its own
+## cache (UnitModels).
+static func assemble(meshes: Meshes) -> Node3D:
+	var root := Node3D.new()
+	_add_parts(root, meshes)
+	return root
+
+
 ## Shown while a building is first being constructed.
 static func create_scaffold(size: int) -> Node3D:
 	var key := "scaffold/%d" % size
