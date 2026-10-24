@@ -43,18 +43,22 @@ const SIDES: Array[float] = [1.0, -1.0]
 ## streak are what light it.
 const VISOR_TINT := Color("1f2a4d")
 
-## The figures' own surfaces: the army-orange chest plates, shoulder pads and helmet stripe, smooth;
-## the visor and its highlight streak (too thin for an outline); and the small glows, under 0.06
-## across and so not inked: the colonist's chest lamp (its one emissive element), the automaton's
-## core in ENERGY and its antenna bulb in ARMY. The rest are Parts' surfaces, the security bot's
-## and the ore hauler's among them, used where they are needed rather than copied here, since
-## Parts calls into Figures while its own surfaces are still being made: the suit and the
-## automaton's armour Parts.HULL_LIGHT_ROUND, the suit's joints and the automaton's limbs
-## Parts.HULL_MID_ROUND, the belt, tank, automaton's joints and hands Parts.GUNMETAL, the gloves,
-## boots, backpack and power unit Parts.HULL_DARK_ROUND, the automaton's visor band and foot pads
+## The figures' own surfaces: the army orange, smooth: on the plate layer (ARMY_PLATE, which the
+## machines share), and flat (ARMY_SMALL) for the figures' small orange parts, all under 0.2 across
+## (the chest plate, the shoulder pads, the helmet stripe, the gloves, the kneepads, the tank's
+## caps), where the plate layer's panel seams would cut a part into quarters; the visor and its
+## highlight streak (too thin for an outline); and the small glows, under 0.06 across and so not
+## inked: the colonist's chest lamp (its one emissive element), the automaton's core in ENERGY and
+## its antenna bulb in ARMY. The rest are Parts' surfaces, the security bot's and the ore hauler's
+## among them, used where they are needed rather than copied here, since Parts calls into Figures
+## while its own surfaces are still being made: the suit and the automaton's armour
+## Parts.HULL_LIGHT_ROUND, the suit's elbows, boots and backpack and the automaton's limbs
+## Parts.HULL_MID_ROUND, the belt, tank, automaton's joints and hands Parts.GUNMETAL, the boots'
+## soles and the power unit Parts.HULL_DARK_ROUND, the automaton's visor band and foot pads
 ## Parts.HULL_DARK, its visor slit and fan Parts.ESCORT_EYE, its pistons Parts.ROD. Shared: never
 ## change one.
 static var ARMY_PLATE := Surf.make(MaterialKit.Layer.PLATE, MaterialKit.ARMY, 1.0, Surf.LIT, true)
+static var ARMY_SMALL := Surf.make(MaterialKit.Layer.FLAT, MaterialKit.ARMY, 1.0, Surf.LIT, true)
 static var VISOR := Surf.make(MaterialKit.Layer.GLASS, VISOR_TINT, 1.0, Surf.GLOSSY, true)
 static var VISOR_GLINT := Surf.make(MaterialKit.Layer.GLASS, MaterialKit.ENERGY, 1.0, Surf.GLOSSY, true, false)
 static var LAMP_SMALL := Surf.make(MaterialKit.Layer.GLOW, MaterialKit.ENERGY, 1.0, Surf.UNLIT, true, false)
@@ -212,7 +216,8 @@ static func seated() -> Pose:
 
 ## A colonist in a spacesuit, `heads` tall: a round helmet with a dark curved visor and an orange
 ## stripe on a ring collar, a broad suit tapering to a belt, orange shoulder pads and chest plate
-## with a glowing lamp, round-jointed tapered limbs, big gloves and boots, a backpack with a tank.
+## with a glowing lamp, round-jointed tapered limbs with calves and orange kneepads, big orange
+## gloves, chunky boots on dark soles, a backpack with a tank capped orange.
 ## Without `legs`, the thighs, shins and boots are left out (the legs still set where it sits): a
 ## pilot whose legs are hidden in its machine's hull. With `rigging` (walk_rig) its segments carry
 ## their rig stamps.
@@ -434,13 +439,13 @@ static func _helmet(m: LowPolyMesh, xf: Transform3D, b: Body) -> void:
 	_shell(m, xf, centre, r * 1.045, r * 0.02, 12.0, 19.0, 62.0, 98.0, VISOR_GLINT, 1)
 	# The stripe: a band round the helmet's X axis, from the nape over the crown to the visor's top.
 	var half := 0.024 * k
-	m.tube(r * 0.9, r * 1.025, half * 2.0, 12, xf * (centre + Vector3(half, 0, 0)), ARMY_PLATE,
+	m.tube(r * 0.9, r * 1.025, half * 2.0, 12, xf * (centre + Vector3(half, 0, 0)), ARMY_SMALL,
 		_rot(xf, Vector3(0, 0, 90)), -120.0, 46.0)
 
 
 ## The torso on the waist joint `xf`: the suit broad at the chest, in at the waist and out again
 ## at the hips, a gunmetal belt, the orange chest plate with a glowing lamp, orange shoulder pads
-## over the arm joints, and the backpack with its tank.
+## over the arm joints, and the backpack with its gunmetal tank, capped orange at both ends.
 static func _suit_torso(m: LowPolyMesh, xf: Transform3D, b: Body) -> void:
 	var k := b.k
 	var top := b.neck_y - 0.015 * k
@@ -456,64 +461,71 @@ static func _suit_torso(m: LowPolyMesh, xf: Transform3D, b: Body) -> void:
 	m.lathe(PackedVector2Array([
 		Vector2(0.094 * k, top * 0.42), Vector2(0.11 * k, top * 0.62), Vector2(0.103 * k, top * 0.86),
 		Vector2(0.083 * k, top * 0.86), Vector2(0.09 * k, top * 0.62), Vector2(0.074 * k, top * 0.42),
-	]), 16, xf.origin, ARMY_PLATE, _rot(xf), 45.0, 135.0)
+	]), 16, xf.origin, ARMY_SMALL, _rot(xf), 45.0, 135.0)
 	m.orb(0.024 * k, 8, 3, xf * Vector3(0.036 * k, top * 0.66, 0.104 * k), LAMP_SMALL, _rot(xf))
 	for side: float in SIDES:
-		m.dome(0.066 * k, 0.056 * k, 12, 2, xf * Vector3(side * b.shoulder_x, b.shoulder_y + 0.008 * k, 0), ARMY_PLATE,
+		m.dome(0.066 * k, 0.056 * k, 12, 2, xf * Vector3(side * b.shoulder_x, b.shoulder_y + 0.008 * k, 0), ARMY_SMALL,
 			_rot(xf, Vector3(0, 0, -side * 28.0)))
 	var pack := Vector3(0, top * 0.36, -0.1 * k)
-	m.box_chamfered(Vector3(0.17, 0.21, 0.09) * k, 0.035 * k, xf * pack, Parts.HULL_DARK_ROUND, _rot(xf))
-	# The tank: a capsule lying across the top of the pack.
+	m.box_chamfered(Vector3(0.17, 0.21, 0.09) * k, 0.035 * k, xf * pack, Parts.HULL_MID_ROUND, _rot(xf))
+	# The tank: a capsule lying across the top of the pack, its rounded ends orange caps.
 	var length := 0.18 * k
 	var tank_radius := 0.036 * k
-	m.lathe(PackedVector2Array([
-		Vector2(0, 0), Vector2(tank_radius, tank_radius * 0.7), Vector2(tank_radius, length - tank_radius * 0.7),
-		Vector2(0, length),
-	]), 10, xf * (pack + Vector3(length * 0.5, 0.21 * k + tank_radius * 0.6, -0.01 * k)), Parts.GUNMETAL,
-		_rot(xf, Vector3(0, 0, 90)))
+	var cap := tank_radius * 0.7
+	var tank := xf * (pack + Vector3(length * 0.5, 0.21 * k + tank_radius * 0.6, -0.01 * k))
+	var along := _rot(xf, Vector3(0, 0, 90))
+	m.lathe(PackedVector2Array([Vector2(0, 0), Vector2(tank_radius, cap)]), 10, tank, ARMY_SMALL, along)
+	m.lathe(PackedVector2Array([Vector2(tank_radius, cap), Vector2(tank_radius, length - cap)]), 10, tank, Parts.GUNMETAL,
+		along)
+	m.lathe(PackedVector2Array([Vector2(tank_radius, length - cap), Vector2(0, length)]), 10, tank, ARMY_SMALL, along)
 
 
 ## The upper arm from the shoulder joint `xf`: a puffy tapered sleeve, its top under the shoulder
 ## pad.
 static func _suit_upper_arm(m: LowPolyMesh, xf: Transform3D, b: Body) -> void:
-	_limb(m, xf, b.upper_arm, 0.044 * b.k, 0.038 * b.k, Parts.HULL_LIGHT_ROUND, 12)
+	_limb(m, xf, b.upper_arm, 0.052 * b.k, 0.046 * b.k, Parts.HULL_LIGHT_ROUND, 12)
 
 
-## The forearm from the elbow joint `xf`: the elbow's joint orb and a tapered sleeve.
+## The forearm from the elbow joint `xf`: the elbow's joint orb and a sleeve flaring into a cuff
+## over the glove.
 static func _suit_forearm(m: LowPolyMesh, xf: Transform3D, b: Body) -> void:
-	m.orb(0.042 * b.k, 8, 4, xf.origin, Parts.HULL_MID_ROUND)
-	_limb(m, xf, b.forearm, 0.04 * b.k, 0.034 * b.k, Parts.HULL_LIGHT_ROUND, 12)
+	m.orb(0.05 * b.k, 8, 3, xf.origin, Parts.HULL_MID_ROUND)
+	_limb(m, xf, b.forearm, 0.044 * b.k, 0.048 * b.k, Parts.HULL_LIGHT_ROUND, 12)
 
 
-## The glove from the wrist joint `xf`: a chunky rounded mitt, fatter than the sleeve.
+## The glove from the wrist joint `xf`: a chunky rounded orange mitt, fatter than the cuff.
 static func _glove(m: LowPolyMesh, xf: Transform3D, b: Body) -> void:
 	var k := b.k
 	_hang(m, xf, PackedVector2Array([
-		Vector2(0.04 * k, -0.012 * k), Vector2(0.056 * k, 0.03 * k), Vector2(0.04 * k, 0.074 * k), Vector2(0, 0.084 * k),
-	]), 10, Parts.HULL_DARK_ROUND)
+		Vector2(0.046 * k, -0.012 * k), Vector2(0.064 * k, 0.032 * k), Vector2(0.048 * k, 0.08 * k), Vector2(0, 0.092 * k),
+	]), 10, ARMY_SMALL)
 
 
 ## The thigh from the hip joint `xf`: a rounded hip and a puffy tapered leg.
 static func _suit_thigh(m: LowPolyMesh, xf: Transform3D, b: Body) -> void:
-	m.orb(0.056 * b.k, 8, 3, xf.origin, Parts.HULL_LIGHT_ROUND)
-	_limb(m, xf, b.thigh, 0.058 * b.k, 0.05 * b.k, Parts.HULL_LIGHT_ROUND, 12)
+	m.orb(0.066 * b.k, 8, 3, xf.origin, Parts.HULL_LIGHT_ROUND)
+	_limb(m, xf, b.thigh, 0.07 * b.k, 0.06 * b.k, Parts.HULL_LIGHT_ROUND, 12)
 
 
-## The shin from the knee joint `xf`: the knee's joint orb and a tapered leg.
+## The shin from the knee joint `xf`: an orange kneepad over the knee and a leg swelling to a calf
+## and in again to the boot.
 static func _suit_shin(m: LowPolyMesh, xf: Transform3D, b: Body) -> void:
-	m.orb(0.052 * b.k, 8, 4, xf.origin, Parts.HULL_MID_ROUND)
-	_limb(m, xf, b.shin, 0.05 * b.k, 0.047 * b.k, Parts.HULL_LIGHT_ROUND, 12)
+	m.orb(0.064 * b.k, 8, 3, xf.origin, ARMY_SMALL)
+	_hang(m, xf, PackedVector2Array([
+		Vector2(0.054 * b.k, 0), Vector2(0.06 * b.k, b.shin * 0.4), Vector2(0.048 * b.k, b.shin),
+	]), 12, Parts.HULL_LIGHT_ROUND)
 
 
-## The boot on the ankle joint `xf`: a chunky round shaft to the ground and a domed toe cap in
-## front of it.
+## The boot on the ankle joint `xf`: a chunky round shaft to the ground on a dark sole band, and a
+## domed toe cap in front of it.
 static func _boot(m: LowPolyMesh, xf: Transform3D, b: Body) -> void:
 	var k := b.k
-	m.lathe(PackedVector2Array([
-		Vector2(0.062 * k, -b.ankle), Vector2(0.064 * k, -b.ankle + 0.03 * k), Vector2(0.054 * k, 0.012 * k),
-		Vector2(0, 0.012 * k),
-	]), 10, xf.origin, Parts.HULL_DARK_ROUND, _rot(xf))
-	m.dome(0.056 * k, 0.052 * k, 10, 2, xf * Vector3(0, -b.ankle, 0.055 * k), Parts.HULL_DARK_ROUND, _rot(xf))
+	var sole := -b.ankle + 0.02 * k
+	m.lathe(PackedVector2Array([Vector2(0.062 * k, -b.ankle), Vector2(0.066 * k, sole)]), 10, xf.origin,
+		Parts.HULL_DARK_ROUND, _rot(xf))
+	m.lathe(PackedVector2Array([Vector2(0.066 * k, sole), Vector2(0.056 * k, 0.012 * k), Vector2(0, 0.012 * k)]), 10,
+		xf.origin, Parts.HULL_MID_ROUND, _rot(xf))
+	m.dome(0.068 * k, 0.058 * k, 10, 2, xf * Vector3(0, -b.ankle, 0.043 * k), Parts.HULL_MID_ROUND, _rot(xf))
 
 
 # --- The automaton's segments ------------------------------------------------------
