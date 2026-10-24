@@ -70,16 +70,19 @@ func _init() -> void:
 	quit(0)
 
 
-## A base of that level with every storage at its count and its top allowed level.
+## A base of that level (its Command Center at it) with every storage at its count and its top
+## allowed level.
 func _capacity(catalog: Catalog, cc: int) -> Dictionary[String, int]:
 	var capacity: Dictionary[String, int] = {}
 	for res: String in catalog.resources:
 		capacity[res] = 0
 	for type: String in catalog.types():
-		var best := 1
-		for level: int in range(1, catalog.max_level(type) + 1):
-			if int(catalog.level_stats(type, level).get("requires_cc", 1)) <= cc:
-				best = level
+		# The Command Center's level k requires k - 1, so a base of level cc has it at cc.
+		var best := cc if type == Catalog.HQ_TYPE else 1
+		if type != Catalog.HQ_TYPE:
+			for level: int in range(1, catalog.max_level(type) + 1):
+				if int(catalog.level_stats(type, level).get("requires_cc", 1)) <= cc:
+					best = level
 		var storage: Dictionary = catalog.level_stats(type, best).get("storage", {})
 		for res: Variant in storage:
 			capacity[str(res)] += int(storage[res]) * catalog.max_count(type, cc)

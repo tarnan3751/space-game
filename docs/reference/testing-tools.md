@@ -112,19 +112,35 @@ touches the static body counted for review.
 
 ```
 $GODOT --headless --path . -s res://tools/sim_battles.gd -- [--seeds=10] \
-    [--army=ranger:100,brawler:40] [--level=3] [--abilities=repair_swarm:2,emp_burst:1] \
-    [--layout=<save.json>] [--out=<file.csv>]
+    [--army=ranger:100,brawler:40] [--level=3] [--cc=5] [--outpost=2] [--strategy=random] \
+    [--abilities=repair_swarm:2,emp_burst:1] [--layout=<save.json>] [--out=<file.csv>]
 ```
 
 A headless `SceneTree` script, run after an import, for balance (`battle.md`): N seeds of a
-scripted attack on the shipped data against the template base (`TemplateBase`), or the layout
-and resources of a save file, which it only reads. Each seed draws one to four deploy points and
-each unit's deploy tick in the first three seconds from the tool's own `SeededRng`; then, for each
-ability `--abilities` names (none by default; at `--level`, clamped), a tick from 3 to 8 seconds
-and a cell: a swarm on one of the deploy points, a burst or a strike on a defence's cell. The
-abilities are drawn after the deploys, so an attack without them is the same as before. It writes
-one CSV row a seed (seed, ticks, destruction, stars, loot per resource, units deployed, abilities
-used, wall time in ms) to `--out` or stdout. The gate does not run it.
+scripted attack on the shipped data against the template base (`TemplateBase`), the layout and
+resources of a save file, which it only reads, or, with `--outpost=<index>`, that expedition field
+laid out for each seed (sector seed = the seed, epoch 0) by `OutpostGenerator` against a player of
+Command Center `--cc` (5 by default) holding the capacity of every storage at its count and top
+allowed level, as `gen_outposts.gd` does. `--cc` also sets every unit's and ability's level to the
+highest a base of that level can have researched (its best Research Lab's) unless `--level` gives
+one level for all (3 by default; clamped to each). `--strategy` picks the attack, every draw from
+the tool's own `SeededRng`:
+
+- `random` (the default, the tool's original draw): one to four deploy points among the deploy
+  cells;
+- `edge`: three points on one drawn side of the field;
+- `two_edges`: two points on each of two drawn sides, the army alternating between them;
+- `waves`: three points on one drawn side, the tanks (a unit whose hull at its level is 150 or
+  more) first, the rest five seconds later.
+
+A point on a side is the deploy cell nearest the base on a line in from the field's edge. Each
+unit deploys at a tick in the first three seconds of its wave; then, for each ability
+`--abilities` names (none by default), a tick from 3 to 8 seconds and a cell: a swarm on one of the
+deploy points, a burst or a strike on a defence's cell. The abilities are drawn after the
+deploys, so an attack without them is the same as before. It writes one CSV row a seed (seed,
+ticks, destruction, stars, loot per resource, units deployed, abilities used, wall time in ms) to
+`--out` or stdout, and a summary line (the stars and the mean destruction) to stderr. The gate
+does not run it.
 
 ## Outposts: `tools/gen_outposts.gd`
 

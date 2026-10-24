@@ -305,5 +305,6 @@ tick.
   Strike (called at tick 40 on the first defence, which must have lost hull when it lands) on the
   template base, logged (duration, destruction, stars, loot, wall time), run twice to check it
   repeats, and its result applied to a copy of the game's base, the units and the strike spent.
-- `tools/sim_battles.gd`: N seeds of a scripted attack against the template base or a save
-  file, with abilities when `--abilities` names them, one CSV row each (`testing-tools.md`).
+- `tools/sim_battles.gd`: N seeds of a scripted attack against the template base, a save file or
+  an expedition field, by one of four deploy strategies, with abilities when `--abilities` names
+  them, one CSV row each (`testing-tools.md`).
