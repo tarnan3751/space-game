@@ -30,8 +30,13 @@ static var FUSE := Surf.make(MaterialKit.Layer.GLOW, MaterialKit.DEFENCE, 1.0, S
 ## layer's fine stripes blended to khaki there) and the band still reads as a stripe close up.
 static var HAZARD_YELLOW := Surf.make(MaterialKit.Layer.FLAT, MaterialKit.HAZARD)
 static var HAZARD_BAND := Surf.make(MaterialKit.Layer.FLAT, MaterialKit.INK)
-## The jet trooper's stub wings: army-orange plate, flat.
+## The brawler's shoulder plates: army-orange plate, flat.
 static var ORANGE := Parts.surf("orange")
+## The jet trooper's flames, fire rather than the tier's glow, the same at every tier (the tier's
+## near-white glows above Chrome washed them out): a white-hot band at the nozzle's mouth and an
+## ENERGY cyan cone, unlit, pulsing, not inked.
+static var FLAME_CORE := Surf.make(MaterialKit.Layer.GLOW, Color.WHITE, 1.0, Surf.UNLIT | Surf.PULSE, true, false)
+static var FLAME := Surf.make(MaterialKit.Layer.GLOW, MaterialKit.ENERGY, 1.0, Surf.UNLIT | Surf.PULSE, true, false)
 ## The army orange on the flat layer, for the infantry's small orange gear (none over 0.25 across),
 ## where the plate layer's panel seams would cut a part into quarters.
 static var ORANGE_SMALL := Surf.make(MaterialKit.Layer.FLAT, MaterialKit.ARMY)
@@ -79,8 +84,9 @@ static func build_breacher(p: Parts) -> void:
 	m.ink = ink
 
 
-## The jet trooper: the colonist flying, legs trailing, 0.5 over the ground, a jetpack on its back
-## with two nozzles blowing flame cones and short stub wings; every part bobs together.
+## The jet trooper: the colonist flying, legs trailing, 0.5 over the ground, a carbine in its right
+## hand, a jetpack on its back with two nozzles blowing flame cones and stub wings; every part bobs
+## together.
 static func build_jet_trooper(p: Parts) -> void:
 	var m := p.body
 	var pose := _flying()
@@ -91,6 +97,7 @@ static func build_jet_trooper(p: Parts) -> void:
 	var ink := m.ink
 	m.ink = Figures.FIGURE_INK
 	_jetpack(m, j.waist, _torso_top(j, 1.0), p.tier)
+	_carbine(m, j.wrists[1], p.tier)
 	m.ink = ink
 	m.flags = 0
 
@@ -135,15 +142,16 @@ static func _carry() -> Figures.Pose:
 	return pose
 
 
-## Flying: leaning into the flight, head up, arms a little back and out, the legs trailing with the
+## Flying: leaning into the flight, head up, the left arm a little back and out, the right reaching
+## forward and in a little with the carbine pointed ahead, nearly level, the legs trailing with the
 ## knees bent and the toes pointed.
 static func _flying() -> Figures.Pose:
 	var pose := Figures.Pose.new()
 	pose.torso = Vector3(16, 4, 0)
 	pose.head = Vector3(-14, -6, 0)
-	pose.shoulder_swing = PackedFloat32Array([-12.0, -16.0])
-	pose.shoulder_out = PackedFloat32Array([26.0, 22.0])
-	pose.elbow = PackedFloat32Array([24.0, 30.0])
+	pose.shoulder_swing = PackedFloat32Array([-12.0, 45.0])
+	pose.shoulder_out = PackedFloat32Array([26.0, -10.0])
+	pose.elbow = PackedFloat32Array([24.0, 55.0])
 	pose.hip_swing = PackedFloat32Array([-14.0, -4.0])
 	pose.hip_out = PackedFloat32Array([5.0, 6.0])
 	pose.knee = PackedFloat32Array([38.0, 24.0])
@@ -295,33 +303,48 @@ static func _charge_pack(m: LowPolyMesh, xf: Transform3D, top: float, k: float) 
 
 # --- The jet trooper's ------------------------------------------------------------------------
 
-## The jetpack on the waist `xf`'s back: a pack over the suit's backpack (the tier's trim to Gold,
-## its hull from Chrome), two gunmetal nozzles under its outer corners blowing pulsing flame cones
-## of the tier's glow down past the legs, and two orange stub wings out of its sides.
+## The carbine in the hand on the wrist joint `wrist`, pointing along the hand: one-handed, two
+## thirds of the ranger's rifle, held over the glove: a fat gunmetal receiver, a short stock of the
+## tier's trim behind the hand, a fat barrel and a glowing muzzle of the tier, its `muzzle` socket.
+static func _carbine(m: LowPolyMesh, wrist: Transform3D, tier: int) -> void:
+	var along := -wrist.basis.y.normalized()
+	var grip := wrist * Vector3(0, -0.042, 0.05)
+	Parts.beam(m, grip - along * 0.04, grip + along * 0.08, 0.07, Parts.GUNMETAL, 0.018)
+	Parts.beam(m, grip - along * 0.1, grip - along * 0.035, 0.046, UnitModels.trim(tier), 0.012)
+	var muzzle := grip + along * 0.19
+	Parts.pipe(m, grip + along * 0.08, muzzle, 0.03, Parts.GUNMETAL, 10)
+	m.orb(0.036, 8, 3, muzzle, UnitModels.glow(tier, Surf.PULSE, false))
+	m.socket("muzzle", muzzle, along)
+
+
+## The jetpack on the waist `xf`'s back: a pack over the suit's backpack (orange to Gold, the tier's
+## hull from Chrome), two gunmetal nozzles under its outer corners blowing pulsing flames down past
+## the legs, and two orange stub wings out of its sides, swept back.
 static func _jetpack(m: LowPolyMesh, xf: Transform3D, top: float, tier: int) -> void:
 	var pack := Vector3(0, top * 0.22, -0.165)
-	m.box_chamfered(Vector3(0.24, 0.25, 0.11), 0.035, xf * pack,
-		UnitModels.trim(tier) if tier < Parts.Tier.CHROME else UnitModels.hull(tier), UnitModels.euler(xf))
+	m.box_chamfered(Vector3(0.24, 0.25, 0.11), 0.035, xf * pack, _gear(tier), UnitModels.euler(xf))
 	for side: float in Figures.SIDES:
 		_nozzle(m, xf * Transform3D(Basis.from_euler(Vector3(deg_to_rad(-20), 0, deg_to_rad(side * 14))),
-			pack + Vector3(side * 0.105, 0.01, -0.01)), tier)
+			pack + Vector3(side * 0.105, 0.01, -0.01)))
 		_stub_wing(m, xf * Transform3D(Basis.IDENTITY, pack + Vector3(side * 0.11, 0.17, 0)), side)
 
 
-## A nozzle hanging from `xf` along its -Y: a gunmetal bell and the long flame cone out of its
-## mouth, unlit, pulsing, not inked.
-static func _nozzle(m: LowPolyMesh, xf: Transform3D, tier: int) -> void:
-	m.lathe(PackedVector2Array([Vector2(0.032, 0.0), Vector2(0.04, 0.04), Vector2(0.056, 0.08)]), 10, xf.origin,
-		Parts.GUNMETAL, UnitModels.euler(xf, Vector3(180, 0, 0)))
-	m.cone(0.05, 0.38, 10, xf * Vector3(0, -0.075, 0), UnitModels.glow(tier, Surf.PULSE, false),
-		UnitModels.euler(xf, Vector3(180, 0, 0)))
+## A nozzle hanging from `xf` along its -Y: a gunmetal bell and a fat flame out of its mouth, 0.075
+## across at its base and 0.3 long, the same at every tier: its first third white-hot (FLAME_CORE),
+## the rest a cyan cone (FLAME).
+static func _nozzle(m: LowPolyMesh, xf: Transform3D) -> void:
+	var down := UnitModels.euler(xf, Vector3(180, 0, 0))
+	m.lathe(PackedVector2Array([Vector2(0.036, 0.0), Vector2(0.07, 0.08)]), 10, xf.origin, Parts.GUNMETAL, down)
+	m.lathe(PackedVector2Array([Vector2(0.075, 0.0), Vector2(0.062, 0.09)]), 10, xf * Vector3(0, -0.075, 0), FLAME_CORE,
+		down)
+	m.cone(0.062, 0.21, 10, xf * Vector3(0, -0.165, 0), FLAME, down)
 
 
-## A stub wing from `xf` out along its X to side `side`: a short orange plate swept back and
+## A stub wing from `xf` out along its X to side `side`: an orange plate swept back 25 degrees and
 ## tipped up a little.
 static func _stub_wing(m: LowPolyMesh, xf: Transform3D, side: float) -> void:
-	m.box_chamfered(Vector3(0.15, 0.026, 0.08), 0.01, xf * Vector3(side * 0.07, 0, 0), ORANGE,
-		UnitModels.euler(xf, Vector3(0, side * 18.0, side * 12.0)))
+	m.box_chamfered(Vector3(0.24, 0.03, 0.1), 0.012, xf * Vector3(side * 0.1, 0, 0), ORANGE_SMALL,
+		UnitModels.euler(xf, Vector3(0, side * 25.0, side * 12.0)))
 
 
 # --- The brawler's ------------------------------------------------------------------------
