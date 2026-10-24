@@ -19,9 +19,9 @@ extends RefCounted
 ## housing. The research building raises an ability's level from the same research slot.
 ##
 ## Raids: a battle (BattleSim, src/core/battle) is applied through raid_result: the units deployed
-## are spent and the loot comes home, up to storage. The base trusts the result and keeps the
-## battle's inputs with it in `raids`, the last RAID_LOG_SIZE of them, so a server can replay
-## them later. An expedition's raid names its field (`expedition`): the battle must be that
+## and the abilities used are spent and the loot comes home, up to storage. The base trusts the
+## result and keeps the battle's inputs with it in `raids`, the last RAID_LOG_SIZE of them, so a
+## server can replay them later. An expedition's raid names its field (`expedition`): the battle must be that
 ## field's, a star clears it, and the log keeps the field's inputs instead of its layout.
 ##
 ## Expeditions (src/core/expedition): the base keeps a sector of fields (Sector), laid out by
@@ -68,6 +68,7 @@ const ERR_BAD_EXPEDITION := "bad_expedition"
 const ERR_NOT_FOUNDRY := "not_a_foundry"
 const ERR_FOUNDRY_LEVEL := "needs_foundry_level"
 const ERR_STOCK_ROOM := "not_enough_stock_room"
+const ERR_NOT_ENOUGH_ABILITIES := "not_enough_abilities"
 
 ## training_status(): nothing queued; the head training; the head stopped with time left while
 ## the producer is busy (constructing or upgrading); the head finished and waiting for room in
@@ -350,9 +351,10 @@ func check_research_ability(ability: String) -> String:
 
 ## Everything about applying a battle's result (BattleSim.result(), less its `commands`, which
 ## the battle carries): the shapes, every deployed unit known and its count no more than the army
-## has, and `abilities_used` empty, zero counts included (abilities come in step 4b). `deployed` must count the battle's deploy
-## commands exactly. With `expedition`, the field must be one of this epoch's, not cleared, and
-## the battle's seed and defender must be what the field lays out (checked by laying it out).
+## has, every ability used known and its count no more than the stock holds. `deployed` must
+## count the battle's deploy commands exactly, and `abilities_used` its ability commands. With
+## `expedition`, the field must be one of this epoch's, not cleared, and the battle's seed and
+## defender must be what the field lays out (checked by laying it out).
 func check_raid_result(command: Dictionary) -> String:
 	var battle: Variant = command.get("battle")
 	var result: Variant = command.get("result")
@@ -378,19 +380,34 @@ func check_raid_result(command: Dictionary) -> String:
 		if not catalog.resources.has(str(res)) or BattleMath.whole(loot_dict[res]) < 0:
 			return ERR_BAD_RAID
 	var counted: Dictionary[String, int] = {}
+	var counted_used: Dictionary[String, int] = {}
 	for entry: Variant in commands:
 		if typeof(entry) != TYPE_DICTIONARY:
 			return ERR_BAD_RAID
 		var entry_dict: Dictionary = entry
-		if str(entry_dict.get("op", "")) == "deploy":
+		var op := str(entry_dict.get("op", ""))
+		if op == "deploy":
 			var unit := str(entry_dict.get("unit", ""))
 			counted[unit] = counted.get(unit, 0) + 1
+		elif op == "ability":
+			var ability := str(entry_dict.get("ability", ""))
+			counted_used[ability] = counted_used.get(ability, 0) + 1
 	var deployed_dict: Dictionary = deployed
 	for unit: Variant in deployed_dict:
 		if BattleMath.whole(deployed_dict[unit]) != counted.get(str(unit), 0):
 			return ERR_BAD_RAID
 	for unit: String in counted:
 		if not deployed_dict.has(unit):
+			return ERR_BAD_RAID
+	var used_dict: Dictionary = used
+	for ability: Variant in used_dict:
+		if not catalog.has_ability(str(ability)):
+			return ERR_UNKNOWN_ABILITY
+	for ability: Variant in used_dict:
+		if BattleMath.whole(used_dict[ability]) != counted_used.get(str(ability), 0):
+			return ERR_BAD_RAID
+	for ability: String in counted_used:
+		if not used_dict.has(ability):
 			return ERR_BAD_RAID
 	if command.has("expedition"):
 		var error := _check_expedition(command["expedition"], battle_dict)
@@ -402,9 +419,9 @@ func check_raid_result(command: Dictionary) -> String:
 	for unit: Variant in deployed_dict:
 		if BattleMath.whole(deployed_dict[unit]) > army[str(unit)]:
 			return ERR_NOT_ENOUGH_UNITS
-	var used_dict: Dictionary = used
-	if not used_dict.is_empty():
-		return ERR_UNKNOWN_ABILITY
+	for ability: Variant in used_dict:
+		if BattleMath.whole(used_dict[ability]) > ability_stock[str(ability)]:
+			return ERR_NOT_ENOUGH_ABILITIES
 	return ""
 
 
@@ -1092,8 +1109,8 @@ func _research_ability(ability: String) -> String:
 	return ""
 
 
-## Spends the units deployed, brings the loot home up to storage (never removing what is there),
-## and keeps the battle with its result.
+## Spends the units deployed and the abilities used, brings the loot home up to storage (never
+## removing what is there), and keeps the battle with its result.
 func _raid_result(command: Dictionary) -> String:
 	var error := check_raid_result(command)
 	if error != "":
@@ -1103,6 +1120,9 @@ func _raid_result(command: Dictionary) -> String:
 	var deployed: Dictionary = result["deployed"]
 	for unit: Variant in deployed:
 		army[str(unit)] -= BattleMath.whole(deployed[unit])
+	var used: Dictionary = result.get("abilities_used", _EMPTY)
+	for ability: Variant in used:
+		ability_stock[str(ability)] -= BattleMath.whole(used[ability])
 	var loot: Dictionary = result["loot"]
 	var amounts := {}
 	for res: Variant in loot:

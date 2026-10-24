@@ -100,7 +100,7 @@ emits `changed`. A failed command changes nothing and charges nothing. The ops, 
 | `{"op": "research", "ability": String}` | `check_research_ability(ability)` | The same for an ability's next level, in the same research slot. A command with an `ability` key is this form. |
 | `{"op": "make", "id": int, "ability": String, "count": int}` | `check_make(id, ability, count)` | Pays `count` times the ability's `make_cost` at its current level and queues `count` of it at Foundry `id`. `count` is optional (1); all or nothing. |
 | `{"op": "cancel_making", "id": int, "ability": String}` | `check_cancel_making(id, ability)` | Removes the newest queued `ability` from Foundry `id`'s queue and refunds its `make_cost` at the level it was paid for, up to storage. |
-| `{"op": "raid_result", "battle": {...}, "result": {...}, "expedition": {"epoch", "index"}}` | `check_raid_result(command)` | Spends the units deployed, adds the loot up to storage and keeps the raid (**Raids**). `expedition` is optional: with it, a raid with a star clears that field of the sector (**Expeditions**). |
+| `{"op": "raid_result", "battle": {...}, "result": {...}, "expedition": {"epoch", "index"}}` | `check_raid_result(command)` | Spends the units deployed and the abilities used, adds the loot up to storage and keeps the raid (**Raids**). `expedition` is optional: with it, a raid with a star clears that field of the sector (**Expeditions**). |
 | `{"op": "scan"}` | `check_scan()` | Starts the sector's next epoch: new fields, none cleared, the snapshot retaken (**Expeditions**). |
 
 `"cell"` may also be a `Vector2i`; anything else becomes `(-1, -1)` and fails as `blocked`.
@@ -146,10 +146,12 @@ Checks, in the order they are made:
   result's `deployed`, `loot` and `abilities_used` are objects and the battle's `commands` a
   list of objects, its `ticks` and `hash` whole, `destruction` 0–100 and `stars` 0–3, every
   loot entry a known resource and a whole amount, and `deployed` counts the battle's deploy
-  commands exactly (a unit for each, no other); `unknown_unit` for a deployed unit the catalog
-  does not have; `not_enough_units` when a count exceeds the army's; `unknown_ability` unless
-  `abilities_used` is empty, an entry at zero included (step 4b). With `expedition`, after the
-  shapes and before the units: `bad_expedition` unless it is an object whose `epoch` is the
+  commands exactly (a unit for each, no other); `unknown_ability` for an entry of
+  `abilities_used` the catalog does not have, an entry at zero included; `bad_raid` unless
+  `abilities_used` counts the battle's ability commands exactly (an ability for each, no other);
+  `unknown_unit` for a deployed unit the catalog does not have; `not_enough_units` when a count
+  exceeds the army's; `not_enough_abilities` when a used count exceeds the stock's. With
+  `expedition`, after the abilities' match and before the units: `bad_expedition` unless it is an object whose `epoch` is the
   sector's and whose `index` is a field (0 to the field count less one) not cleared this epoch,
   and the battle's `seed` and `defender` are the field's as `OutpostGenerator.generate` lays it
   out (the defender compared as JSON with sorted keys after `Catalog.ints`, so a command parsed
@@ -186,10 +188,11 @@ Checks, in the order they are made:
 | `ERR_NOT_FOUNDRY` | `not_a_foundry` |
 | `ERR_FOUNDRY_LEVEL` | `needs_foundry_level` |
 | `ERR_STOCK_ROOM` | `not_enough_stock_room` |
+| `ERR_NOT_ENOUGH_ABILITIES` | `not_enough_abilities` |
 
 `Hud.ERROR_TEXT` maps these to player-facing text (`hud.md`); a code it does not know shows as
-the raw code, as `not_a_foundry`, `needs_foundry_level` and `not_enough_stock_room` do until the
-Foundry's HUD maps them.
+the raw code, as `not_a_foundry`, `needs_foundry_level`, `not_enough_stock_room` and
+`not_enough_abilities` do until the Foundry's HUD maps them.
 
 ### Buildings, levels and builders
 
@@ -318,13 +321,14 @@ A battle (`battle.md`) is applied to the attacker's base by `raid_result`. `batt
 battle's setup with its accepted commands (the result's `commands`), `result` the rest of
 `BattleSim.result()`. The base trusts the result: deployed units are spent, alive or not (the
 owner's call), the rest stay housed; the loot is added up to `capacity(res)`, never removing
-what is there; abilities are refused until step 4b makes them. The raid is kept, `battle` and
+what is there; the abilities used are spent from the stock, the rest come home. The raid is kept, `battle` and
 `result` with the time it was applied, the oldest dropped beyond `RAID_LOG_SIZE`, so a server
 can replay the inputs later. An expedition's raid is kept without its `battle.defender`, which
 the field's inputs lay out again, and with `"expedition": {"seed", "epoch", "index", "cc",
 "capacity"}`, the sector's seed, epoch and snapshot and the field's index (a Command Center 10
 outpost is about 18 KB of compact JSON, 38 KB as the save prints it; its inputs about 150 bytes). `apply` runs `_resume_training()` after it, as after every
-command, so a trained unit waiting for room is housed in the room the raid freed.
+command, so a trained unit waiting for room is housed in the room the raid freed, and a made
+ability waiting for room in the stock is stocked.
 
 ### Expeditions
 

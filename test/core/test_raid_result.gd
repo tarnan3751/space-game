@@ -1,5 +1,6 @@
 extends TestCase
-## Applying a battle's result to the attacker's base: units spent, loot home, the battle kept.
+## Applying a battle's result to the attacker's base: units and abilities spent, loot home, the
+## battle kept.
 
 const Fixtures := preload("res://test/support/fixtures.gd")
 
@@ -51,6 +52,17 @@ func test_refusals_match_their_checks_and_change_nothing() -> void:
 			Fixtures.deploy(0, "grunt", 0, 0)]), BaseState.ERR_NOT_ENOUGH_UNITS],
 		"an ability": [_raid({}, {}, [], {"abilities_used": {"orbital_strike": 1}}), BaseState.ERR_UNKNOWN_ABILITY],
 		"an ability at zero": [_raid({}, {}, [], {"abilities_used": {"orbital_strike": 0}}), BaseState.ERR_UNKNOWN_ABILITY],
+		"an unknown ability used": [_raid({}, {}, [_use("ghost")], {"abilities_used": {"ghost": 1}}),
+			BaseState.ERR_UNKNOWN_ABILITY],
+		"used without commands": [_raid({}, {}, [], {"abilities_used": {"swarm": 1}}), BaseState.ERR_BAD_RAID],
+		"commands without used": [_raid({}, {}, [_use("swarm")]), BaseState.ERR_BAD_RAID],
+		"an unknown ability's command": [_raid({}, {}, [_use("ghost")]), BaseState.ERR_BAD_RAID],
+		"fewer used than commands": [_raid({}, {}, [_use("swarm"), _use("swarm")], {"abilities_used": {"swarm": 1}}),
+			BaseState.ERR_BAD_RAID],
+		"a used count not whole": [_raid({}, {}, [_use("swarm")], {"abilities_used": {"swarm": 1.5}}),
+			BaseState.ERR_BAD_RAID],
+		"more than the stock": [_raid({}, {}, [_use("swarm")], {"abilities_used": {"swarm": 1}}),
+			BaseState.ERR_NOT_ENOUGH_ABILITIES],
 	}
 	for name: String in cases:
 		var state := _base()
@@ -76,6 +88,39 @@ func test_a_waiting_unit_is_housed_in_the_room_a_raid_frees() -> void:
 	assert_eq(state.army_count("melee"), 15)
 	assert_eq(state.army_count("grunt"), 3, "housed at once")
 	assert_eq(state.training_status(4), BaseState.TRAINING_IDLE)
+
+
+func test_the_abilities_used_are_spent() -> void:
+	var state := _base()
+	state.ability_stock["strike"] = 2
+	state.ability_stock["swarm"] = 1
+	var setup := Fixtures.battle_setup([["command_center", 10, 10]], {"melee": 6}, [_use("strike")])
+	setup["attacker"]["abilities"] = {"strike": 2, "swarm": 1}
+	var result := BattleSim.run(state.catalog, setup)
+	assert_eq(result["abilities_used"], {"strike": 1})
+	var command := _command_from(setup, result)
+	assert_eq(state.check_raid_result(command), "")
+	assert_eq(state.apply(command, 40), "")
+	assert_eq(state.stock("strike"), 1, "the one used is spent")
+	assert_eq(state.stock("swarm"), 1, "the one not used comes home")
+	assert_eq(state.raids[0]["result"]["abilities_used"], {"strike": 1})
+	assert_eq(state.apply(command, 41), "", "one left for the same battle again")
+	assert_eq(state.check_raid_result(command), BaseState.ERR_NOT_ENOUGH_ABILITIES)
+
+
+func test_a_waiting_ability_is_stocked_in_the_room_a_raid_frees() -> void:
+	var state := _base()
+	state.apply({"op": "place", "type": "foundry", "cell": [12, 12]}, 30)
+	var foundry := state.last_added_id
+	state.ability_stock["swarm"] = 1
+	assert_eq(state.apply({"op": "make", "id": foundry, "ability": "burst"}, 30), "")
+	state.ability_stock["swarm"] = 2
+	state.advance_to(50)
+	assert_eq(state.making_status(foundry), BaseState.TRAINING_WAITING, "the stock is full")
+	assert_eq(state.apply(_raid({}, {}, [_use("swarm")], {"abilities_used": {"swarm": 1}}), 50), "")
+	assert_eq(state.stock("swarm"), 1)
+	assert_eq(state.stock("burst"), 1, "stocked at once")
+	assert_eq(state.making_status(foundry), BaseState.TRAINING_IDLE)
 
 
 func test_the_last_five_raids_are_kept() -> void:
@@ -128,6 +173,11 @@ func _raid(deployed: Dictionary, loot: Dictionary, commands: Array = [], overrid
 	result.merge(overrides, true)
 	var battle := Fixtures.battle_setup([["command_center", 10, 10]], {"melee": 6, "grunt": 2}, commands)
 	return {"op": "raid_result", "battle": battle, "result": result}
+
+
+## An ability command, as the battle logs it.
+static func _use(ability: String) -> Dictionary:
+	return {"ability": ability, "cell": [0, 0], "op": "ability", "tick": 0}
 
 
 func _command_from(setup: Dictionary, result: Dictionary) -> Dictionary:
