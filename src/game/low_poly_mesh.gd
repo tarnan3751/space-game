@@ -26,6 +26,12 @@ extends RefCounted
 ## `ink` times the full width, as `ink` was when the part was added: 1.0, the full line, but on
 ## the figures' parts (Figures.FIGURE_INK). It goes into the outline's UV as the line's thinning,
 ## 1 - ink, so a mesh without UV draws the full line.
+##
+## A part added while `spin` is set spins in the shaders (Surf.SPIN): about the vertical line
+## through spin's xyz, at spin.w radians a second on the animation clock, as Motion.spin turns a
+## moving part about +Y. The pivot and the rate go into a CUSTOM0 channel (four floats a vertex) on
+## the body and the outline, which a mesh with no spinning part leaves out, so the rotor is part
+## of the one mesh and costs no draw of its own.
 
 ## Faces of a smooth part that meet at a smaller angle than this share normals.
 const SMOOTH_ANGLE := 40.0
@@ -45,6 +51,9 @@ var _outlined := PackedByteArray()
 var _hard := PackedByteArray()
 ## Per triangle: `ink` when it was added.
 var _inks := PackedFloat32Array()
+## Per triangle: 0, or 1 + the index in _spin_list of the spin it was added with.
+var _spin_of := PackedByteArray()
+var _spin_list: Array[Vector4] = []
 
 ## The share of the full ink width the parts added from now on are outlined at: 1.0, the full
 ## line, but where a caller thins it for its own parts and puts it back after.
@@ -53,6 +62,9 @@ var ink: float = 1.0
 ## caller sets Surf.BOB for a hovering unit's whole build, its figures' parts included, and puts
 ## it back after.
 var flags: int = 0
+## The spin given to the parts added from now on, as `ink` is kept: (pivot x, y, z, radians a
+## second) about the mesh's +Y; a zero rate, the default, spins nothing.
+var spin: Vector4 = Vector4.ZERO
 
 
 ## Triangles in the body mesh, both surfaces.
@@ -67,16 +79,16 @@ func to_mesh() -> ArrayMesh:
 	var mesh := ArrayMesh.new()
 	var opaque := to_arrays()
 	if not (opaque[Mesh.ARRAY_VERTEX] as PackedVector3Array).is_empty():
-		mesh.add_surface_from_arrays(Mesh.PRIMITIVE_TRIANGLES, opaque)
+		mesh.add_surface_from_arrays(Mesh.PRIMITIVE_TRIANGLES, opaque, [], {}, format())
 		mesh.surface_set_material(mesh.get_surface_count() - 1, MaterialKit.toon())
 	if _has_holo():
-		mesh.add_surface_from_arrays(Mesh.PRIMITIVE_TRIANGLES, _select(true))
+		mesh.add_surface_from_arrays(Mesh.PRIMITIVE_TRIANGLES, _select(true), [], {}, format())
 		mesh.surface_set_material(mesh.get_surface_count() - 1, MaterialKit.holo())
 	return mesh
 
 
-## The opaque body's surface arrays (vertex, normal, UV, UV2, colour), for a caller that merges
-## meshes itself (WallMesh); HOLO parts are left out.
+## The opaque body's surface arrays (vertex, normal, UV, UV2, colour, and the spins' CUSTOM0 when
+## a part spins), for a caller that merges meshes itself (WallMesh); HOLO parts are left out.
 func to_arrays() -> Array:
 	if _has_holo():
 		return _select(false)
@@ -87,7 +99,20 @@ func to_arrays() -> Array:
 	arrays[Mesh.ARRAY_TEX_UV] = _uvs
 	arrays[Mesh.ARRAY_TEX_UV2] = _uv2s
 	arrays[Mesh.ARRAY_COLOR] = _colors
+	if not _spin_list.is_empty():
+		var triangles := PackedInt32Array()
+		for i: int in _vertices.size():
+			triangles.append(i / 3)
+		arrays[Mesh.ARRAY_CUSTOM0] = _spins_of(triangles)
 	return arrays
+
+
+## The format flags add_surface_from_arrays takes for these arrays: CUSTOM0 as four floats a
+## vertex when a part spins, else none.
+func format() -> int:
+	if _spin_list.is_empty():
+		return 0
+	return Mesh.ARRAY_CUSTOM_RGBA_FLOAT << Mesh.ARRAY_FORMAT_CUSTOM0_SHIFT
 
 
 ## The ink outline, with the ink material; null when no part is outlined.
@@ -96,19 +121,21 @@ func to_outline_mesh() -> ArrayMesh:
 	if arrays.is_empty():
 		return null
 	var mesh := ArrayMesh.new()
-	mesh.add_surface_from_arrays(Mesh.PRIMITIVE_TRIANGLES, arrays)
+	mesh.add_surface_from_arrays(Mesh.PRIMITIVE_TRIANGLES, arrays, [], {}, format())
 	mesh.surface_set_material(0, MaterialKit.ink())
 	return mesh
 
 
 ## The outline's surface arrays (vertex, normal, each part's UV2 and colour, which carry the flags
-## and the phase, so the ink shader moves the outline with a bobbing or jittering part, and its
-## UV, which carries its line's thinning, (1 - ink, 0)); empty when no part is outlined.
+## and the phase, so the ink shader moves the outline with a bobbing or jittering part, its
+## UV, which carries its line's thinning, (1 - ink, 0), and the spins' CUSTOM0 when a part
+## spins); empty when no part is outlined.
 func to_outline_arrays() -> Array:
 	var vertices := PackedVector3Array()
 	var uvs := PackedVector2Array()
 	var uv2s := PackedVector2Array()
 	var colors := PackedColorArray()
+	var triangles := PackedInt32Array()
 	var sums: Dictionary[Vector3i, Vector3] = {}
 	for t: int in _outlined.size():
 		if _outlined[t] == 0:
@@ -119,6 +146,7 @@ func to_outline_arrays() -> Array:
 			uvs.append(thinning)
 			uv2s.append(_uv2s[i])
 			colors.append(_colors[i])
+			triangles.append(t)
 			var key := _weld(_vertices[i])
 			var sum: Vector3 = sums.get(key, Vector3.ZERO)
 			sums[key] = sum + _face_normals[t] * _corner_angle(i)
@@ -134,7 +162,24 @@ func to_outline_arrays() -> Array:
 	arrays[Mesh.ARRAY_TEX_UV] = uvs
 	arrays[Mesh.ARRAY_TEX_UV2] = uv2s
 	arrays[Mesh.ARRAY_COLOR] = colors
+	if not _spin_list.is_empty():
+		arrays[Mesh.ARRAY_CUSTOM0] = _spins_of(triangles)
 	return arrays
+
+
+## The CUSTOM0 channel for vertices of the triangles `triangles` (one entry a vertex): each
+## triangle's spin, pivot and rate, zeros where it does not spin.
+func _spins_of(triangles: PackedInt32Array) -> PackedFloat32Array:
+	var spins := PackedFloat32Array()
+	spins.resize(triangles.size() * 4)
+	for i: int in triangles.size():
+		var t := triangles[i]
+		var at := _spin_list[_spin_of[t] - 1] if _spin_of[t] > 0 else Vector4.ZERO
+		spins[i * 4] = at.x
+		spins[i * 4 + 1] = at.y
+		spins[i * 4 + 2] = at.z
+		spins[i * 4 + 3] = at.w
+	return spins
 
 
 ## Whether any part is a hologram.
@@ -152,6 +197,7 @@ func _select(holo: bool) -> Array:
 	var uvs := PackedVector2Array()
 	var uv2s := PackedVector2Array()
 	var colors := PackedColorArray()
+	var triangles := PackedInt32Array()
 	for i: int in _vertices.size():
 		if ((roundi(_uv2s[i].y) & Surf.HOLO) != 0) == holo:
 			vertices.append(_vertices[i])
@@ -159,6 +205,7 @@ func _select(holo: bool) -> Array:
 			uvs.append(_uvs[i])
 			uv2s.append(_uv2s[i])
 			colors.append(_colors[i])
+			triangles.append(i / 3)
 	var arrays := []
 	arrays.resize(Mesh.ARRAY_MAX)
 	arrays[Mesh.ARRAY_VERTEX] = vertices
@@ -166,6 +213,8 @@ func _select(holo: bool) -> Array:
 	arrays[Mesh.ARRAY_TEX_UV] = uvs
 	arrays[Mesh.ARRAY_TEX_UV2] = uv2s
 	arrays[Mesh.ARRAY_COLOR] = colors
+	if not _spin_list.is_empty():
+		arrays[Mesh.ARRAY_CUSTOM0] = _spins_of(triangles)
 	return arrays
 
 
@@ -556,7 +605,8 @@ func _emit(a: Vector3, b: Vector3, c: Vector3, uv_a: Vector2, uv_b: Vector2, uv_
 	_normals.append(normal)
 	_normals.append(normal)
 	_normals.append(normal)
-	var uv2 := Vector2(surf.layer, surf.flags | flags)
+	var spinning := spin.w != 0.0
+	var uv2 := Vector2(surf.layer, surf.flags | flags | (Surf.SPIN if spinning else 0))
 	_uv2s.append(uv2)
 	_uv2s.append(uv2)
 	_uv2s.append(uv2)
@@ -570,6 +620,15 @@ func _emit(a: Vector3, b: Vector3, c: Vector3, uv_a: Vector2, uv_b: Vector2, uv_
 	_outlined.append(1 if surf.outline and ((surf.flags | flags) & Surf.NO_OUTLINE) == 0 else 0)
 	_hard.append(1 if hard else 0)
 	_inks.append(ink)
+	if spinning:
+		var index := _spin_list.find(spin)
+		if index < 0:
+			assert(_spin_list.size() < 255, "a mesh has at most 255 spins")
+			_spin_list.append(spin)
+			index = _spin_list.size() - 1
+		_spin_of.append(index + 1)
+	else:
+		_spin_of.append(0)
 
 
 ## Ends a part begun at vertex `start`: a smooth one gets its shared normals.

@@ -61,8 +61,8 @@ static func _eye(m: LowPolyMesh, xf: Transform3D, tier: int) -> void:
 
 ## The gunship: a rotor-pod aircraft. A tier-hull chamfered fuselage and nose, a colonist pilot behind
 ## the glass windscreen on the nose, a chin gun, stub wings carrying a nacelle at each tip with a
-## band of the tier's glow, the two rotors spinning on them (the moving parts), and a tail boom
-## with orange fins; hovering and bobbing.
+## band of the tier's glow, the two rotors spinning on them (parts of the body tagged with
+## LowPolyMesh.spin, which the shaders turn), and a tail boom with orange fins; hovering and bobbing.
 static func build_gunship(p: Parts) -> void:
 	var m := p.body
 	var tier := p.tier
@@ -80,10 +80,10 @@ static func build_gunship(p: Parts) -> void:
 	for side: float in [1.0, -1.0]:
 		var hub := Vector3(side * 0.48, bottom + 0.06, -0.02)
 		_nacelle(m, UnitModels.pivot(hub), tier)
-		var rotor := p.moving(hub + Vector3(0, 0.34, 0), Motion.spin(Vector3.UP, side * ROTOR_RATE))
-		rotor.flags = Surf.BOB
-		_rotor(rotor, Transform3D.IDENTITY)
-		rotor.flags = 0
+		var pivot := hub + Vector3(0, 0.34, 0)
+		m.spin = Vector4(pivot.x, pivot.y, pivot.z, side * ROTOR_RATE)
+		_rotor(m, UnitModels.pivot(pivot))
+		m.spin = Vector4.ZERO
 	m.flags = 0
 
 
@@ -108,8 +108,8 @@ static func _nacelle(m: LowPolyMesh, xf: Transform3D, tier: int) -> void:
 	m.ring(0.04, 0.074, 0.03, 12, xf * Vector3(0, 0.275, 0), UnitModels.trim(tier, true), rot)
 
 
-## A rotor in its own space, the pivot at its origin on its nacelle's top: a gunmetal hub sunk in
-## the nacelle, the blur disc of ROTOR_RADIUS just above it and three dark blades over the blur.
+## A rotor on the pivot `xf` on its nacelle's top: a gunmetal hub sunk in the nacelle, the blur disc
+## of ROTOR_RADIUS just above it and three dark blades over the blur.
 static func _rotor(m: LowPolyMesh, xf: Transform3D) -> void:
 	Parts.drum(m, 0.045, 0.07, 0.02, 12, xf * Vector3(0, -0.05, 0), Parts.GUNMETAL, UnitModels.euler(xf))
 	m.disc(ROTOR_RADIUS, 16, xf * Vector3(0, 0.006, 0), ROTOR_BLUR, UnitModels.euler(xf))

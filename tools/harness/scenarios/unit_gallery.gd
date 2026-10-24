@@ -3,15 +3,16 @@ extends HarnessScenario
 ## order (UnitModels), each on a concrete pad, in five rows, one per tier, Base nearest the screen's
 ## bottom and each higher tier a row further back, a level 1 Cadet Academy (a Base-tier 3x3) at the
 ## end of each row for scale. The base's own views are hidden; the units are turned a little off the
-## camera so their depth shows. The scenario turns the moving parts (the gunship's rotors) itself,
-## each frame, with Motion.transform_at at Motion.clock(), as BuildingView turns a building's.
+## camera so their depth shows. A unit has no moving part (UnitModels.MAX_MOVING); the gunship's
+## rotors are tagged with LowPolyMesh.spin and spun by the shaders. Any moving part a model did have
+## the scenario would turn itself, each frame, as BuildingView turns a building's.
 ##
 ## Checks every type at every tier: the triangles (the body and the moving parts) within its
 ## budget (BUDGETS); at most UnitModels.MAX_MOVING moving parts and one body instance, each with its
 ## outline beside it on the ink material casting no shadow; every vertex's kit layer within the kit;
 ## its extent within SIZE_SLACK of the size table (SIZES: height, width across x, length along z, a
-## spinning part's whole round included); a flying unit's lowest point within SIZE_SLACK of its
-## hover height; and that no point, with BOB's lift taken off where it bobs, dips below its pad.
+## spinning part's whole round included, about its pivot); a flying unit's lowest point within
+## SIZE_SLACK of its hover height; and that no point, with BOB's lift taken off where it bobs, dips below its pad.
 ## Each unit's line says its triangles, instances and extent. It also logs a seated colonist's
 ## triangles with and without its legs (UnitModels.pilot leaves them out).
 ## Rendered, the screenshots, each a different frame, each checked in both modes to have every unit
@@ -282,14 +283,21 @@ func _check_unit(type: String, tier: int) -> AABB:
 			var arrays := instance.mesh.surface_get_arrays(surface)
 			var vertices: PackedVector3Array = arrays[Mesh.ARRAY_VERTEX]
 			var uv2s: PackedVector2Array = arrays[Mesh.ARRAY_TEX_UV2]
+			var custom: Variant = arrays[Mesh.ARRAY_CUSTOM0]
+			var spins: PackedFloat32Array = custom if typeof(custom) == TYPE_PACKED_FLOAT32_ARRAY else PackedFloat32Array()
 			for i: int in vertices.size():
 				var v := vertices[i]
 				top_layer = maxi(top_layer, roundi(uv2s[i].x))
 				var bob := BOB_HEIGHT if (roundi(uv2s[i].y) & Surf.BOB) != 0 else 0.0
 				var y := pivot.y + v.y
-				# A spinning part about +Y sweeps each point round a circle of its distance from the axis.
+				# A spinning part about +Y sweeps each point round a circle of its distance from the axis:
+				# a moving part's about its node, a part tagged with LowPolyMesh.spin about its pivot.
 				var reach := Vector2(v.x, v.z).length() if motion != null and motion.kind == Motion.Kind.SPIN else 0.0
 				var at := pivot + v if reach == 0.0 else pivot + Vector3(0, v.y, 0)
+				if (roundi(uv2s[i].y) & Surf.SPIN) != 0 and not spins.is_empty():
+					var axis := Vector3(spins[i * 4], 0.0, spins[i * 4 + 2])
+					reach = Vector2(v.x - axis.x, v.z - axis.z).length()
+					at = axis + Vector3(0, v.y, 0)
 				lo = lo.min(Vector3(at.x - reach, y, at.z - reach))
 				hi = hi.max(Vector3(at.x + reach, y, at.z + reach))
 				lowest_dip = minf(lowest_dip, y - bob)

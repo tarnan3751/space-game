@@ -38,6 +38,9 @@ const LIGHTNING := 1024
 ## RISE_DRIFT sideways, then starts again; on the hologram surface it fades out as it climbs, so
 ## smoke puffs rise from a stack's mouth (on an opaque surface the restart shows).
 const RISE := 2048
+## The part spins about the vertical line through a pivot at a rate, both carried per vertex in
+## CUSTOM0: set through LowPolyMesh.spin, never by a Surf, since the pivot is the part's.
+const SPIN := 4096
 ## The flags whose parts are never outlined, whatever `outline` says.
 const NO_OUTLINE := FLICKER | JITTER | HOLO
 

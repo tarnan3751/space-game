@@ -28,7 +28,8 @@ uniform sampler2DArray kit : source_color, filter_linear_mipmap, repeat_enable;
 varying float world_y;
 
 void vertex() {
-	VERTEX = effect_vertex(VERTEX, surf_flags(UV2), surf_phase(COLOR), MODEL_MATRIX);
+	int flags = surf_flags(UV2);
+	VERTEX = effect_vertex(effect_spin(VERTEX, flags, CUSTOM0), flags, surf_phase(COLOR), MODEL_MATRIX);
 	world_y = (MODEL_MATRIX * vec4(VERTEX, 1.0)).y;
 }
 

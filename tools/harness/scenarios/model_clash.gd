@@ -11,6 +11,9 @@ extends HarnessScenario
 ## (Geometry3D.segment_intersects_triangle), tested only inside the overlap of their posed bounds
 ## and through a spatial hash of CELL-sized cells.
 ##
+## A part of the body tagged with LowPolyMesh.spin (the gunship's rotors) is read back as a moving
+## part of its own, spinning about +Y through its pivot at its rate, as the shaders spin it.
+##
 ## - Every pair of moving parts is posed together on the clock, as BuildingView poses them
 ##   (Motion.transform_at): sampled every pair step (the smaller part's step: a SPIN's
 ##   SPIN_STEP degrees, a SWING's period over SWING_SAMPLES, a SLIDE's over SLIDE_SAMPLES) over the
@@ -87,9 +90,10 @@ func _check_model(label: String, model: Node3D) -> void:
 	var lift := BOB_HEIGHT / model.scale.y
 	var body := Shape.new()
 	var parts: Array[Shape] = []
+	var spins := {}
 	for child: Node in model.get_children():
 		if child is MeshInstance3D and not child.has_meta(BuildingModels.OUTLINE_META):
-			_read((child as MeshInstance3D).mesh, body)
+			_read((child as MeshInstance3D).mesh, body, spins)
 		elif child.has_meta(BuildingModels.MOVE_META):
 			var part := Shape.new()
 			part.motion = child.get_meta(BuildingModels.MOVE_META)
@@ -98,6 +102,8 @@ func _check_model(label: String, model: Node3D) -> void:
 				if grandchild is MeshInstance3D and not grandchild.has_meta(BuildingModels.OUTLINE_META):
 					_read((grandchild as MeshInstance3D).mesh, part)
 			parts.append(part)
+	for entry: Array in spins.values():
+		parts.append(entry[0])
 	model.free()
 	_models += 1
 	if parts.is_empty():
@@ -126,31 +132,65 @@ func _check_model(label: String, model: Node3D) -> void:
 
 
 ## Adds a mesh's triangles, every surface, to `shape`, with its distinct edges and its BOB corners.
-func _read(mesh: Mesh, shape: Shape) -> void:
+## With `spins`, a triangle tagged with LowPolyMesh.spin (Surf.SPIN, its pivot and rate in CUSTOM0)
+## goes instead to the part of its pivot in `spins` (made on first use, keyed by the spin), in that
+## part's own space: a spinning part of the body is checked as a moving part spinning about +Y.
+func _read(mesh: Mesh, shape: Shape, spins: Dictionary = {}) -> void:
 	var seen := {}
 	for surface: int in mesh.get_surface_count():
 		var arrays := mesh.surface_get_arrays(surface)
 		var vertices: PackedVector3Array = arrays[Mesh.ARRAY_VERTEX]
 		var uv2s: PackedVector2Array = arrays[Mesh.ARRAY_TEX_UV2]
 		var colours: PackedColorArray = arrays[Mesh.ARRAY_COLOR]
-		var base := shape.points.size()
-		shape.points.append_array(vertices)
-		for k: int in vertices.size():
-			if (roundi(uv2s[k].y) & Surf.BOB) != 0:
-				shape.bob.append(base + k)
-				shape.phases.append(roundf(colours[k].a * 255.0) / 254.0)
+		var custom: Variant = arrays[Mesh.ARRAY_CUSTOM0]
+		var spin_data: PackedFloat32Array = custom if typeof(custom) == TYPE_PACKED_FLOAT32_ARRAY else PackedFloat32Array()
 		for k: int in range(0, vertices.size(), 3):
-			# A bobbing triangle's edges stay apart from a still one's along the same corners.
-			var bobs := (roundi(uv2s[k].y) & Surf.BOB) != 0
-			for side: int in 3:
-				var a := base + k + side
-				var b := base + k + (side + 1) % 3
-				var key := [shape.points[a], shape.points[b], bobs] if _before(shape.points[a], shape.points[b]) \
-					else [shape.points[b], shape.points[a], bobs]
-				if not seen.has(key):
-					seen[key] = true
-					shape.edges.append(a)
-					shape.edges.append(b)
+			var into := shape
+			var origin := Vector3.ZERO
+			if (roundi(uv2s[k].y) & Surf.SPIN) != 0 and not spin_data.is_empty():
+				var spin := Vector4(spin_data[k * 4], spin_data[k * 4 + 1], spin_data[k * 4 + 2], spin_data[k * 4 + 3])
+				if not spins.has(spin):
+					var part := Shape.new()
+					part.pivot = Vector3(spin.x, spin.y, spin.z)
+					part.motion = Motion.spin(Vector3.UP, spin.w)
+					spins[spin] = [part, {}]
+				var entry: Array = spins[spin]
+				into = entry[0]
+				origin = into.pivot
+				_add_triangle(into, entry[1], vertices, uv2s, colours, k, origin)
+				continue
+			_add_triangle(into, seen, vertices, uv2s, colours, k, origin)
+	_bound(shape)
+	for entry: Array in spins.values():
+		_bound(entry[0])
+
+
+## Adds the triangle at corner `k` to `shape`, moved by -`origin`, with its edges not yet `seen`
+## and its BOB corners.
+func _add_triangle(shape: Shape, seen: Dictionary, vertices: PackedVector3Array, uv2s: PackedVector2Array,
+		colours: PackedColorArray, k: int, origin: Vector3) -> void:
+	var base := shape.points.size()
+	# A bobbing triangle's edges stay apart from a still one's along the same corners.
+	var bobs := (roundi(uv2s[k].y) & Surf.BOB) != 0
+	for corner: int in 3:
+		shape.points.append(vertices[k + corner] - origin)
+		if bobs:
+			shape.bob.append(base + corner)
+			shape.phases.append(roundf(colours[k + corner].a * 255.0) / 254.0)
+	for side: int in 3:
+		var a := base + side
+		var b := base + (side + 1) % 3
+		var key := [shape.points[a], shape.points[b], bobs] if _before(shape.points[a], shape.points[b]) \
+			else [shape.points[b], shape.points[a], bobs]
+		if not seen.has(key):
+			seen[key] = true
+			shape.edges.append(a)
+			shape.edges.append(b)
+
+
+func _bound(shape: Shape) -> void:
+	if shape.points.is_empty():
+		return
 	shape.box = AABB(shape.points[0], Vector3.ZERO)
 	for point: Vector3 in shape.points:
 		shape.box = shape.box.expand(point)

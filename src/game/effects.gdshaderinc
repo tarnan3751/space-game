@@ -23,6 +23,7 @@ const int FLAG_JITTER = 256;
 const int FLAG_HOLO = 512;
 const int FLAG_LIGHTNING = 1024;
 const int FLAG_RISE = 2048;
+const int FLAG_SPIN = 4096;
 
 // PULSE: the colour swells between PULSE_LOW and 1 on a sine of PULSE_PERIOD seconds.
 const float PULSE_PERIOD = 1.6;
@@ -74,6 +75,21 @@ float effect_hash(vec3 p) {
 	p = fract(p * vec3(0.1031, 0.1030, 0.0973));
 	p += dot(p, p.yzx + 33.33);
 	return fract((p.x + p.y) * p.z);
+}
+
+// SPIN (LowPolyMesh.spin): a vertex turned about the vertical line through spin.xyz by spin.w
+// radians a second on the clock, as Motion.spin turns a moving part about +Y (Basis(UP, angle));
+// a normal is turned the same way with a zero pivot. The pivot and the rate are in CUSTOM0, which a
+// mesh with no spinning part does not carry, so it is read only under the flag.
+vec3 effect_spin(vec3 vertex, int flags, vec4 spin) {
+	if (!has_flag(flags, FLAG_SPIN)) {
+		return vertex;
+	}
+	float angle = spin.w * anim_time;
+	float c = cos(angle);
+	float s = sin(angle);
+	vec3 off = vertex - spin.xyz;
+	return spin.xyz + vec3(off.x * c + off.z * s, off.y, -off.x * s + off.z * c);
 }
 
 // How far through its climb a RISE part is now, 0 to 1.

@@ -9,7 +9,7 @@ render_mode ambient_light_disabled;
 // material leaves it at 0.
 //
 // The surface flags in UV2.y animate a part from anim_time, offset by its phase in COLOR.a
-// (effects.gdshaderinc): the vertex moves (BOB, JITTER, FLICKER), the texture scrolls (FLOW,
+// (effects.gdshaderinc): the vertex moves (SPIN, BOB, JITTER, FLICKER), the texture scrolls (FLOW,
 // FLOW_U) and the colour, emission included, brightens and dims (PULSE, BLINK).
 
 #include "res://src/game/toon_common.gdshaderinc"
@@ -18,7 +18,10 @@ uniform sampler2DArray kit : source_color, filter_linear_mipmap, repeat_enable;
 uniform vec4 ghost_tint : source_color = vec4(1.0, 1.0, 1.0, 0.0);
 
 void vertex() {
-	VERTEX = effect_vertex(VERTEX, surf_flags(UV2), surf_phase(COLOR), MODEL_MATRIX);
+	int flags = surf_flags(UV2);
+	VERTEX = effect_spin(VERTEX, flags, CUSTOM0);
+	NORMAL = effect_spin(NORMAL, flags, vec4(vec3(0.0), CUSTOM0.w));
+	VERTEX = effect_vertex(VERTEX, flags, surf_phase(COLOR), MODEL_MATRIX);
 }
 
 void fragment() {

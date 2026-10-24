@@ -328,7 +328,12 @@ scale it. Round parts are lathes, a profile of (radius, height) points spun arou
 faces are left out of boxes and lathes, since the camera always looks down. `flags`, like `ink`,
 is a member a caller sets for the parts it adds next and puts back after: flags added to every
 part's own (`Surf.flags`), none by default; a hovering unit sets `Surf.BOB` for its whole build,
-its figures' parts included (**Units**).
+its figures' parts included (**Units**). `spin`, kept the same way, is a part tag: while it is
+(pivot x, y, z, radians a second) with a non-zero rate, the parts added get the `SPIN` flag and the
+spin in a `CUSTOM0` channel (four floats a vertex, on the body and the outline; `format()` gives the
+flags `add_surface_from_arrays` takes for it), and the shaders turn them about the vertical line
+through the pivot on the clock (**Surface effects**), so a rotor is part of its model's one mesh
+(the gunship's, **Units**). A mesh with no spinning part carries no `CUSTOM0`.
 
 | Builder | What |
 | --- | --- |
@@ -360,7 +365,8 @@ when nothing is outlined), for a caller that merges meshes itself, as `WallMesh`
   dominant axis of its normal, times `uv_scale`. Round parts take U from the angle around their
   axis, a whole number of repeats around (about one per world unit at their widest radius), so
   bands wrap without a seam, and V from the distance along the profile; caps and discs are polar
-  (V the radius). UV2 is (layer, flags); the vertex colour is the tint, its alpha the phase.
+  (V the radius). UV2 is (layer, flags); the vertex colour is the tint, its alpha the phase;
+  CUSTOM0, when a part spins, the spin.
 - **Smoothing**: a smooth part's faces that meet at under 40° share normals, averaged by position
   within the part and weighted by corner angle; caps, discs and sharper edges (chamfers, 45°;
   box corners, 90°) stay hard. A 16- to 24-sided cylinder shades as a curve; an 8-sided one
@@ -679,15 +685,14 @@ even proportions with no neck, no joints, no taper and no hands or feet.
 The army's eleven unit types (`data/units.json`, `docs/reference/data-format.md`), one model each,
 built by `UnitModels` (`src/game/unit_models.gd`) on the figures above: `create(type, tier)`
 returns a model as `BuildingModels.create` does (a `Node3D` of the body's instance and its
-outline's, and a node per moving part at its pivot carrying `MOVE_META`), its meshes built once
-per type and tier and cached; `build(type, tier)` returns the uncached `Parts`, `instantiate(parts)`
+outline's), its meshes built once per type and tier and cached; `build(type, tier)` returns the uncached `Parts`, `instantiate(parts)`
 a model of parts a caller built. Each type's builder is a static `build_<type>(p: Parts)` in
 `src/game/models/infantry.gd` (ranger, breacher, jet trooper, brawler), `vehicles.gd` (dune
 runner, siege walker, hover tank, titan) or `aircraft.gd` (skimmer, gunship, bomber). The
 contract: origin on the ground under the unit's middle, +Y up, facing +Z; a hovering or flying
-unit is built at its height over that point. One cell is one unit. Nothing moves a unit's moving
-parts yet (the gallery does, as `BuildingView` does a building's); the walk cycle and the battle's
-movement are step 5's.
+unit is built at its height over that point. One cell is one unit. A unit has no moving part
+(`MAX_MOVING` is 0), so the battle can draw every unit of a type from one MultiMesh of its body and
+one of its outline; what turns is a part tagged with `LowPolyMesh.spin`, which the shaders spin.
 
 - **Tiers.** One shape per type; the tier repaints a machine's hull, panels, trim and glows, as
   the buildings' tiers do (**Tiers**), so a Crown unit reads black and gold with violet as a Crown
@@ -743,13 +748,13 @@ movement are step 5's.
   drone's arms are; the spin and the blur round them make them read. The gunship's rotor
   blur is the escort drone's screen-layer disc but still and on phase 0, since a phase is shared
   by every effect of a part and FLOW_U's speed would put it out of step with the body's BOB; the
-  spin turns it.
+  spin turns it. The rotors are parts of the body tagged with `LowPolyMesh.spin` (each its hub's
+  pivot and ±9 radians a second), not moving parts.
 - **Budget** (a study value; step 5 fixes the real one after the phone measurement): the body
   and moving parts' triangles at most 1,800 for the infantry, 2,200 for the dune runner, the
   skimmer and the hover tank, 3,000 for the siege walker, 2,600 for the gunship and the bomber and
-  4,500 for the titan. At most `MAX_MOVING` (two) moving parts, the gunship's rotors: at most six
-  instances, the body, the rotors and their outlines. No `_process`, no allocation after the
-  build.
+  4,500 for the titan. No moving part (`MAX_MOVING`, 0): two instances, the body and its outline.
+  No `_process`, no allocation after the build.
 
 | Type | Model | Size (world units) | Triangles |
 | --- | --- | --- | --- |
@@ -762,7 +767,7 @@ movement are step 5's.
 | `siege_walker` | a cream chamfered hull on two digitigrade legs (gunmetal hip joints under orange caps, hull-mid thighs, knee joints with caps of the tier's trim, cream shins with pistons, broad dark feet), two gun arms (a cream pod with an orange top plate, twin gunmetal barrels, muzzles in the tier's glow), the colonist pilot on top behind a glass windscreen, a mast with a lamp of the tier's glow blinking | 1.50 tall, 0.93 wide | 2,820 |
 | `hover_tank` | a low cream hull on orange chamfered skirts, the skirts' lower edges and the underside glowing in the tier's glow (PULSE), two rear thrusters; a turret on a ring of the tier's trim with a gunmetal mantlet, one fat barrel, a muzzle collar of the tier's trim and a glowing bore, and a hatch with the pilot's helmet and shoulders over a small windscreen; it bobs | 1.25 long, 0.90 wide, 0.70 tall | 1,992 |
 | `titan` | a giant biped: hull-mid thighs and cream shins under orange plates, gunmetal knee joints with caps of the tier's trim, big dark feet with toe caps of the tier's trim; a cream bridge with an orange rear block capped in the tier's trim, two colonists seated behind a wide glass windscreen, two huge cannon arms (cream housings with orange top plates, fat gunmetal barrels, collars of the tier's trim, glowing bores) and an antenna mast with a lamp of the tier's glow blinking | 2.46 tall, 1.82 wide | 4,286 |
-| `gunship` | a cream chamfered fuselage and nose, the pilot behind a glass windscreen on the nose, a gunmetal chin gun with a glowing muzzle, hull-mid stub wings carrying a cream nacelle at each tip with a band of the tier's glow and a cap of the tier's trim, a tail boom with orange fins; two counter-rotating rotors (`Motion.spin`, 9 radians a second), each a sunk gunmetal hub, the blur disc and three dark blades; its lowest point 1.23 up, bobbing | 1.60 across the rotors, 1.28 long | 2,044 (each rotor 106) |
+| `gunship` | a cream chamfered fuselage and nose, the pilot behind a glass windscreen on the nose, a gunmetal chin gun with a glowing muzzle, hull-mid stub wings carrying a cream nacelle at each tip with a band of the tier's glow and a cap of the tier's trim, a tail boom with orange fins; two counter-rotating rotors (`LowPolyMesh.spin`, 9 radians a second), each a sunk gunmetal hub, the blur disc and three dark blades; its lowest point 1.23 up, bobbing | 1.60 across the rotors, 1.28 long | 2,044 (each rotor 106) |
 | `bomber` | a cream centre body, two wings swept 34° (`veined`) with leading edges of the tier's trim and orange winglets, two cream engines on the wing roots with dark intakes and exhausts and flame cones in the tier's glow, a gunmetal rack across the body and the wing roots with a row of four orange bombs under it, the pilot behind a small windscreen; its lowest point 1.61 up, bobbing | 1.83 span, 0.93 long | 1,958 |
 
 "Cream" in the table is the tier's hull (`hull()`), "hull mid" its panels (`panel()`). The counts
@@ -771,7 +776,7 @@ renders every type at every tier, a row a tier, and checks each against the budg
 instances, the kit's layers, the size table above within 20%, the hover heights and the ground,
 and every shot for units under the HUD's buttons (`tools/harness/README.md`); its size-24 shot is
 the silhouette test and the tiers side by side, its size-4 shots the detail. `model_clash` checks the gunship's
-rotors at both tiers: no pair crossing, and each rotor touching the body at every pose only at its
+rotors at both tiers, read back from the body's spin tags as two spinning parts: no pair crossing, and each rotor touching the body at every pose only at its
 hub, sunk in its nacelle (a mount).
 
 ## Animation
@@ -826,6 +831,7 @@ of a mesh animates alike.
 | `JITTER` | 256 | each vertex jumps up to 0.04 in a pseudo-random direction (a hash of its position and the time step), 20 times a second; corners shared by faces move together. With UNLIT and FLICKER, a crackling arc: build it of short segments so there are corners to shake |
 | `HOLO` | 512 | a hologram (below) |
 | `LIGHTNING` | 1024 | with FLICKER and JITTER, a lightning arc's slow crackle, one speed on every arc: on or off 7 times a second (`LIGHTNING_FLICKER_RATE`), on about 60 % of the time (`LIGHTNING_ON`), and a new shake 5 times a second (`LIGHTNING_JITTER_RATE`) instead of a spark's 24 and 20. `Parts.spark()` carries it, so every arc built on it crackles alike; point sparks (welding, cutting, flares, grids, the construction drone's) are made without it and keep the fast rates |
+| `SPIN` | 4096 | the part turns about the vertical line (model +Y) through its pivot at its rate, radians a second on the clock, both per vertex in `CUSTOM0` (`LowPolyMesh.spin`), as `Motion.spin` turns a moving part; its normals turn with it. A part of the model's one mesh, so it costs no draw: the gunship's rotors |
 | `RISE` | 2048 | the part climbs 0.7 along world Y (`RISE_HEIGHT`) over 3 s (`RISE_PERIOD`) from its phase, drifting (0.12, 0, 0.08) world units sideways by the top (`RISE_DRIFT`), then starts again. A hologram-surface effect: on HOLO, `holo.gdshader` fades the part in over the first 12 % of the climb and out over its top half, so the restart never shows; the toon shader has no transparency, so on an opaque part the snap back shows. Rising smoke (`Parts.puffs`) |
 
 Effects compose: UNLIT + PULSE, UNLIT + FLICKER + JITTER, FLOW + PULSE. `anim_time` wraps every

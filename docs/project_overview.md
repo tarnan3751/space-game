@@ -236,7 +236,7 @@ in one second at most (`Catalog.apply_dev_cheats`; `-- --no-cheats` for the real
   the glows with them; a level's tier the band of the Command Center level its Research Lab level
   requires);
   humans in machines are the colonist seated, under the figures' thin ink; hovering and flames are
-  surface flags, with at most two moving parts (the gunship's rotors); budgets are study values
+  surface flags, with no moving part (the gunship's rotors are spun by the shaders, step 5); budgets are study values
   until step 5. The glass stays opaque, so a pilot shows over a low windscreen rather than through
   a see-through canopy, which would cost a draw a unit (the developer's call, for review).
 

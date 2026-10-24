@@ -6,11 +6,11 @@ extends RefCounted
 ## middle, +Y up, facing +Z; a hovering or flying unit is built at its height over that point.
 ##
 ## A model is what BuildingModels.create makes: a Node3D holding the body's MeshInstance3D and its
-## ink outline's, and up to MAX_MOVING moving parts (the gunship's two rotors), each a Node3D at its
-## pivot carrying BuildingModels.MOVE_META with its mesh and outline under it; nothing here moves
-## them (the gallery does, as BuildingView does a building's). Hovering, bobbing, flames and lamps
-## are surface flags (Surf.BOB, PULSE, BLINK), never moving parts. The meshes are built once per
-## type and tier and shared.
+## ink outline's, and no moving part (MAX_MOVING): the battle draws every unit of a type from one
+## MultiMesh (BattleView), so a unit is one mesh and its outline. What turns is a part tagged with
+## LowPolyMesh.spin (the gunship's rotors), which the shaders spin; hovering, bobbing, flames and
+## lamps are surface flags (Surf.BOB, PULSE, BLINK). The meshes are built once per type and tier
+## and shared.
 ##
 ## One shape per type: a unit's tier (Parts.Tier) repaints its machine's hull (hull()), panels
 ## (panel()), trim (trim()) and glows (glow()) only, as the buildings' tiers do. tier_of() takes it from the data: a level researched at a
@@ -32,8 +32,9 @@ const InfantryModels := preload("res://src/game/models/infantry.gd")
 const VehicleModels := preload("res://src/game/models/vehicles.gd")
 const AircraftModels := preload("res://src/game/models/aircraft.gd")
 
-## Moving parts a unit model may have.
-const MAX_MOVING := 2
+## Moving parts a unit model may have: none, since a unit is drawn from a MultiMesh of its one
+## mesh; a rotor spins through LowPolyMesh.spin instead.
+const MAX_MOVING := 0
 
 ## The glows' tint per tier: the kit's energy cyan to Chrome, then near-white violets, a pale one
 ## at Obsidian and a whiter one at Crown. A unit's glows are small and pulse down to 0.55, so the
