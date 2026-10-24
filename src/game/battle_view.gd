@@ -11,7 +11,12 @@ extends Node3D
 ## The scene: the defender's field in the landscape of the battle's seed (a BaseView of its own,
 ## the grid off), its walls in the field's merged WallMesh, every other building a BuildingView at
 ## its level and tier, the units (BattleUnits, a MultiMesh pair a type) and the effects
-## (BattleEffects, each kind one MultiMesh). A hit whitens a building for a moment and shakes it; a
+## (BattleEffects, each kind one MultiMesh). A defence whose head carries a muzzle socket (the laser
+## turret) turns it towards its target (BattleSim.building_target) at its AIM_TURN rate, holds it
+## while disabled, and goes back to its idle swing a while after its target is gone
+## (BuildingView.aim_at, idle_aim); its shots leave its muzzle sockets in turn (MUZZLES) with a
+## muzzle flash, each held (the sim's hit is instant; the bolt is the view's) until the head faces
+## its target within AIM_READY, AIM_HOLD at most, so a bolt never leaves a barrel turned away. Any other defence's shots leave its centre, MUZZLE_SHARE of its height up. A hit whitens a building for a moment and shakes it; a
 ## fallen building is replaced by its rubble (BuildingModels.create_rubble) with its smoke, a
 ## fallen wall leaves the merged mesh for a low strip. A hidden sentry shows once revealed; traps
 ## never show, but a mine going off leaves a flash and a scorch mark. A shield generator's pool is
@@ -68,6 +73,19 @@ const BAR_OVER := 0.4
 ## Where a shot leaves a defence and hits a building: a share of the model's height.
 const MUZZLE_SHARE := 0.75
 const HIT_HEIGHT := 0.6
+## The muzzle sockets a defence's shots leave in turn, as many as its model has, and the flash at
+## each shot's.
+const MUZZLES: Array[String] = ["muzzle", "muzzle_2", "muzzle_3", "muzzle_4"]
+const DEFENCE_FLASH := 0.24
+## How fast an aiming head turns towards its target (the share of the way a second, as an
+## exponential rate) per type, and for any other type; how fast it goes back to its idle swing.
+const AIM_TURN := {"laser_turret": 10.0}
+const AIM_TURN_DEFAULT := 4.0
+const AIM_RETURN := 3.0
+## How close (radians) an aiming head must face its target before its held shot leaves, and the
+## longest a shot is held (seconds of battle).
+const AIM_READY := 0.12
+const AIM_HOLD := 0.4
 ## A unit's reach (field units) up to which its hits are drawn as a blow (an impact at the
 ## target), not a bolt.
 const MELEE_REACH := 1000
@@ -123,6 +141,13 @@ var _centres: Dictionary[int, Vector2] = {}
 ## The drawn buildings (not walls, not traps) and where each shot leaves it (its muzzle's height).
 var _views: Dictionary[int, BuildingView] = {}
 var _muzzles: Dictionary[int, float] = {}
+## The drawn defences with an aiming head, and per defence with muzzle sockets the next one a shot
+## leaves.
+var _aimers := PackedInt32Array()
+var _next_muzzle: Dictionary[int, int] = {}
+## Per aiming defence with a shot held until its head faces its target: the unit, and when it fired.
+var _held_shots: Dictionary[int, int] = {}
+var _held_since: Dictionary[int, float] = {}
 ## The standing walls' levels by cell, rebuilt into the merged mesh at the end of a frame they fell in.
 var _walls: Dictionary[Vector2i, int] = {}
 var _walls_changed: bool = false
@@ -226,6 +251,8 @@ func setup(battle_catalog: Catalog, setup_data: Dictionary, iso_camera: IsoCamer
 					view.set_rival(true)
 				_views[id] = view
 				_muzzles[id] = maxf(0.6, view.site_height() * MUZZLE_SHARE)
+				if view.can_aim():
+					_aimers.append(id)
 				var stats := catalog.level_stats(type, level)
 				if int(stats.get("shield_hp", 0)) > 0:
 					_shields.append(id)
@@ -340,6 +367,7 @@ func _process(delta: float) -> void:
 	var alpha := clampf(_accumulator / TICK_SECONDS, 0.0, 1.0)
 	effects.begin_bars()
 	units.draw(alpha, _clock, shown, effects, camera.size >= BattleUnits.FAR_ZOOM)
+	_aim_defences(shown)
 	_draw_buildings(shown)
 	effects.end_bars()
 	effects.draw(_clock)
@@ -443,14 +471,19 @@ func _read_events() -> void:
 			BattleEvents.UNIT_HIT:
 				_unit_hit(source, target, events.from_x[i], events.from_y[i])
 			BattleEvents.SHOT:
-				var from := _muzzle(source)
 				var to := units.aim_point(target)
 				if _arc_towers.has(source):
+					var from := _muzzle(source)
 					effects.lightning(from, to, _clock)
 					effects.impact(to, 0.3, MaterialKit.ARC_BLUE, _clock)
 					units.hit(target, _clock)
+				elif _aimers.has(source):
+					if _held_shots.has(source):
+						_release_shot(source)
+					_held_shots[source] = target
+					_held_since[source] = _clock
 				else:
-					effects.bolt(from, to, DEFENCE_SHOT, _clock, 0.0, 0.3, 0, target)
+					effects.bolt(_muzzle(source), to, DEFENCE_SHOT, _clock, 0.0, 0.3, 0, target)
 			BattleEvents.SHELL:
 				var lands := _point(events.to_x[i], events.to_y[i])
 				var seconds := (events.land_tick[i] - (sim.tick - 1)) * TICK_SECONDS
@@ -543,7 +576,7 @@ func _unit_hit(unit: int, building: int, x: int, y: int) -> void:
 		effects.impact(Vector3(side.x, HIT_HEIGHT * 0.6, side.y), maxf(0.3, splash), UNIT_SHOT, _clock)
 		_on_arrived(building, 0)
 		return
-	effects.bolt(units.aim_point(unit), hit_at, UNIT_SHOT, _clock, 0.0, maxf(0.3, splash), building, 0)
+	units.shoot(unit, hit_at, building, maxf(0.3, splash), UNIT_SHOT, _clock)
 
 
 ## A bolt reached `building` or `unit` (0 for none): it flashes, a building shakes and shows its bar.
@@ -574,6 +607,8 @@ func _fall(id: int) -> void:
 			return
 		Catalog.CLASS_TRAP:
 			return
+	if _held_shots.has(id):
+		_release_shot(id)
 	if _views.has(id):
 		_views[id].queue_free()
 		_views.erase(id)
@@ -587,6 +622,32 @@ func _fall(id: int) -> void:
 	effects.impact(at + Vector3(0, 0.3, 0), size * 0.7, FALL_DUST, _clock)
 	if _shields.has(id):
 		effects.set_shield(id, 0, _clock)
+
+
+## Turns each aiming head towards its defence's target, `shown` seconds of battle after the last
+## frame: held while the defence is disabled, back to its idle swing a while after it has none.
+func _aim_defences(shown: float) -> void:
+	for id: int in _aimers:
+		if not _views.has(id):
+			continue
+		var view := _views[id]
+		if not sim.building_disabled(id):
+			var target := sim.building_target(id)
+			if target != 0 and sim.unit_state(target) != BattleArmy.DEAD:
+				view.aim_at(units.aim_point(target), shown, float(AIM_TURN.get(_types[id], AIM_TURN_DEFAULT)))
+			else:
+				view.idle_aim(shown, AIM_RETURN)
+		if _held_shots.has(id) and (view.aim_error(units.aim_point(_held_shots[id])) <= AIM_READY
+				or _clock - _held_since[id] >= AIM_HOLD or sim.building_disabled(id)):
+			_release_shot(id)
+
+
+## Fires defence `id`'s held shot: a bolt from its next muzzle socket, wherever its head is now, at
+## the unit it hit. A defence that falls or is disabled while it holds one fires it at once.
+func _release_shot(id: int) -> void:
+	var target: int = _held_shots[id]
+	_held_shots.erase(id)
+	effects.bolt(_muzzle(id), units.aim_point(target), DEFENCE_SHOT, _clock, 0.0, 0.3, 0, target)
 
 
 ## The flashes, shakes and bars of the buildings hit lately; `shown` seconds of battle after the
@@ -754,8 +815,18 @@ func units_brought() -> PackedStringArray:
 	return names
 
 
-## Where a shot leaves building `id`.
+## Where a shot leaves building `id`: its next muzzle socket (MUZZLES), with a muzzle flash, or its
+## centre MUZZLE_SHARE of its height up when it has none.
 func _muzzle(id: int) -> Vector3:
+	var view: BuildingView = _views.get(id)
+	if view != null and view.has_socket(MUZZLES[0]):
+		var k: int = _next_muzzle.get(id, 0)
+		if k >= MUZZLES.size() or not view.has_socket(MUZZLES[k]):
+			k = 0
+		_next_muzzle[id] = k + 1
+		var at := view.socket_point(MUZZLES[k])
+		effects.flash(at, DEFENCE_FLASH, DEFENCE_SHOT, _clock)
+		return at
 	var centre: Vector2 = _centres.get(id, Vector2.ZERO)
 	return Vector3(centre.x, _muzzles.get(id, 1.0), centre.y)
 

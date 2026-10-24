@@ -2,7 +2,8 @@ class_name BattleEffects
 extends Node3D
 ## The battle's effects (docs/reference/battle-view.md), each kind batched into one MultiMesh so a
 ## battle's worth of them costs a fixed handful of draws: the bolts in flight (defences' red,
-## units' cyan, shells on an arc), the impacts (expanding hologram discs that fade), the arc
+## units' cyan, shells on an arc), the muzzle flashes (a comic star facing the camera at a
+## muzzle socket, shrinking away in FLASH_SECONDS), the impacts (expanding hologram discs that fade), the arc
 ## tower's lightning (the LIGHTNING surface on a kinked strip), the scorch marks mines leave, the
 ## strips fallen walls leave, the health bars, and the abilities' (a repair swarm's dome, an
 ## orbital strike's crosshair until it lands and its smoke after; each a Timed list). A shield generator's pool draws as a faint
@@ -24,6 +25,9 @@ const MAX_SCORCH := 64
 const MAX_BARS := 768
 ## The abilities' effects at once: swarm domes, strike markers, strike smoke.
 const MAX_ABILITY_EFFECTS := 32
+## Muzzle flashes at once, and how long one lasts.
+const MAX_FLASHES := 128
+const FLASH_SECONDS := 0.06
 ## A swarm dome's height for its radius; a strike's: how long its smoke rises from the landing
 ## and fades, how long its bolt falls from the sky before it lands (ten ticks), its width, and how
 ## far over the target's top its crosshair hovers and how big it is.
@@ -59,6 +63,11 @@ const SHIELD_FLICKER_RATE := 20.0
 
 ## Called with (building id, unit id) when a bolt aimed at either arrives.
 var arrived: Callable
+## Harness hooks, read by no game code: bolts started so far, and where the last one started and its
+## colour (the rig scenario's checks).
+var bolts_fired: int = 0
+var last_bolt_from := Vector3.ZERO
+var last_bolt_color := Color.WHITE
 
 
 ## Effects that each last from a start for some seconds at a point with a radius and a colour,
@@ -70,8 +79,9 @@ class Timed:
 	## SKY onto its point over its life (FALLING: the mesh one unit tall, its radius the
 	## column's width), or rising and swelling from its point (RISING).
 	## POP: swells to its radius and back to nothing over its life (an opaque flash, which
-	## cannot fade).
-	enum Mode { GROUND, FACING, FALLING, RISING, POP }
+	## cannot fade). FLASH: faces the camera as FACING does, at its radius at once, shrinking to
+	## nothing over its life (a muzzle flash, which shows on the frame it is fired).
+	enum Mode { GROUND, FACING, FALLING, RISING, POP, FLASH }
 	var mode: Mode = Mode.GROUND
 	## The camera's plane, for FACING: its right, its up, towards it.
 	var facing := Basis()
@@ -138,6 +148,9 @@ class Timed:
 					# The mesh's up to the view's towards, its z to the view's down: a turn, not a mirror,
 					# so the faces keep their winding.
 					basis = Basis(facing.x * r, facing.z * r, -facing.y * r)
+				Mode.FLASH:
+					var left := r * (1.0 - clampf(t, 0.0, 1.0))
+					basis = Basis(facing.x * left, facing.z * left, -facing.y * left)
 				Mode.FALLING:
 					var fallen := clampf(t, 0.0, 1.0)
 					var length := SKY * fallen
@@ -263,6 +276,7 @@ var _markers: Timed
 var _hover_markers: Timed
 var _sky_bolts: Timed
 var _fireballs: Timed
+var _flashes: Timed
 var _smoke: Timed
 
 var _shields: Dictionary[int, MeshInstance3D] = {}
@@ -378,6 +392,15 @@ func setup(walls: int, area: AABB) -> void:
 		smoke.orb(0.22 + 0.04 * k, 8, 3, Parts.around(0.25 * (k % 3), 72.0 * k, 0.1 + 0.15 * k), STRIKE_SMOKE)
 	_smoke = Timed.new(_multimesh(smoke.to_mesh(), MAX_ABILITY_EFFECTS, area, false), MAX_ABILITY_EFFECTS,
 		Timed.Mode.RISING)
+	# A muzzle flash: an eight-pointed star of unit radius, flat, its face up (FLASH turns it to the
+	# camera).
+	var star := LowPolyMesh.new()
+	for k: int in 8:
+		var a := Parts.around(1.0 if k % 2 == 0 else 0.42, 45.0 * k, 0.0)
+		var b := Parts.around(1.0 if k % 2 == 1 else 0.42, 45.0 * (k + 1), 0.0)
+		star.triangle(Vector3.ZERO, b, a, BOLT)
+	_flashes = Timed.new(_multimesh(star.to_mesh(), MAX_FLASHES, area, false), MAX_FLASHES, Timed.Mode.FLASH)
+	_flashes.facing = view
 
 
 # --- Adding ----------------------------------------------------------------------
@@ -391,6 +414,9 @@ func bolt(from: Vector3, to: Vector3, color: Color, now: float, seconds: float =
 		return
 	var i := _bolt_count
 	_bolt_count += 1
+	bolts_fired += 1
+	last_bolt_from = from
+	last_bolt_color = color
 	_bolt_from[i] = from
 	_bolt_to[i] = to
 	_bolt_start[i] = now
@@ -402,6 +428,11 @@ func bolt(from: Vector3, to: Vector3, color: Color, now: float, seconds: float =
 	_bolt_color[i] = color
 	_bolt_building[i] = building
 	_bolt_unit[i] = unit
+
+
+## A muzzle flash at `at`, `radius` across, in `color`, from `now`, for FLASH_SECONDS.
+func flash(at: Vector3, radius: float, color: Color, now: float) -> void:
+	_flashes.add(at, radius, now, FLASH_SECONDS, color)
 
 
 ## An impact at `at`, growing to `radius` and fading, in `color`, from `now`.
@@ -521,6 +552,7 @@ func draw(now: float) -> void:
 	_hover_markers.draw(now, 1.0, 0.0)
 	_sky_bolts.draw(now, 1.0, 0.0)
 	_fireballs.draw(now, 1.0, 0.0)
+	_flashes.draw(now, 1.0, 0.0)
 	_smoke.draw(now, 1.0, 2.0)
 	for id: int in _shields:
 		var since := now - _shield_flicker[id]
