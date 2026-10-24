@@ -1,0 +1,47 @@
+{
+  "grunt": {
+    "name": "Grunt",
+    "producer": "academy",
+    "producer_level": 1,
+    "class": "ground",
+    "crew": "human",
+    "housing": 1,
+    "train_seconds": 10,
+    "speed": 1000,
+    "prefers": "any",
+    "levels": [
+      { "train_cost": { "crystal": 10 }, "hp": 50, "damage": 10, "fire_ms": 1000, "range_units": 1000 },
+      { "train_cost": { "crystal": 20 }, "research_cost": { "crystal": 100 }, "research_seconds": 60,
+        "requires_lab": 1, "hp": 60, "damage": 12, "fire_ms": 1000, "range_units": 1000 }
+    ]
+  },
+  "flyer": {
+    "name": "Flyer",
+    "producer": "academy",
+    "producer_level": 1,
+    "class": "air",
+    "crew": "autonomous",
+    "housing": 2,
+    "train_seconds": 20,
+    "levels": [
+      { "train_cost": { "crystal": 20 }, "hp": 40 },
+      { "train_cost": { "crystal": 30 }, "research_cost": { "crystal": 200 }, "research_seconds": 120,
+        "requires_lab": 2, "hp": 50 }
+    ]
+  },
+  "walker": {
+    "name": "Walker",
+    "producer": "academy",
+    "producer_level": 2,
+    "class": "ground",
+    "crew": "piloted",
+    "housing": 5,
+    "train_seconds": 30,
+    "prefers": "defense",
+    "damage_pct": { "wall": 200 },
+    "self_destruct": false,
+    "levels": [
+      { "train_cost": { "crystal": 50 }, "hp": 300 }
+    ]
+  }
+}

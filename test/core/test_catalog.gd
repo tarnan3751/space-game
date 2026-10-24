@@ -158,6 +158,134 @@ func test_dev_cheats_let_a_base_build_what_it_cannot_afford() -> void:
 	assert_eq(extractor.level, 1)
 
 
+func test_unit_lookups() -> void:
+	var catalog := Fixtures.catalog()
+	assert_eq(catalog.unit_types(), PackedStringArray(["grunt", "flyer", "walker"]), "units.json order")
+	assert_eq(catalog.housing_type, "hangar")
+	assert_eq(catalog.research_type, "lab")
+	assert_true(catalog.has_unit("grunt"))
+	assert_false(catalog.has_unit("extractor"))
+	assert_eq(catalog.unit_name("walker"), "Walker")
+	assert_eq(catalog.unit_name("ghost"), "ghost", "falls back to the id")
+	assert_eq(catalog.unit_producer("grunt"), "academy")
+	assert_eq(catalog.unit_producer_level("walker"), 2)
+	assert_eq(catalog.unit_class("flyer"), "air")
+	assert_eq(catalog.unit_crew("walker"), "piloted")
+	assert_eq(catalog.unit_housing("walker"), 5)
+	assert_eq(catalog.unit_train_seconds("grunt"), 10)
+	assert_eq(catalog.unit_max_level("grunt"), 2)
+	assert_eq(catalog.unit_max_level("ghost"), 0)
+	assert_eq(catalog.unit_level_stats("grunt", 2)["requires_lab"], 1)
+	assert_eq(catalog.unit_level_stats("grunt", 2)["research_seconds"], 60)
+	assert_eq(catalog.unit_level_stats("grunt", 3), {})
+	assert_eq(catalog.units_of_producer("academy"), PackedStringArray(["grunt", "flyer", "walker"]))
+	assert_eq(catalog.units_of_producer("hangar"), PackedStringArray())
+
+
+func test_missing_units_file_reports_an_error() -> void:
+	var catalog := Catalog.from_json(FileAccess.get_file_as_string(Fixtures.RULES),
+		FileAccess.get_file_as_string(Fixtures.BUILDINGS), "")
+	assert_true(catalog.load_error.contains("units JSON is missing"), catalog.load_error)
+
+
+func test_validation_reports_bad_army_rules() -> void:
+	var cases := {
+		"rules.army must be an object": func(rules: Dictionary, _units: Dictionary) -> void:
+			rules["army"] = "hangar",
+		"rules.army.housing names unknown type 'barn'": func(rules: Dictionary, _units: Dictionary) -> void:
+			rules["army"]["housing"] = "barn",
+		"rules.army needs a research type": func(rules: Dictionary, _units: Dictionary) -> void:
+			rules["army"].erase("research"),
+	}
+	for message: String in cases:
+		var error := _unit_error_after(cases[message])
+		assert_true(error.contains(message), "%s: %s" % [message, error])
+
+
+func test_validation_reports_bad_units() -> void:
+	var cases := {
+		"unit grunt must be an object": func(_rules: Dictionary, units: Dictionary) -> void:
+			units["grunt"] = "small",
+		"unit grunt.producer must be a building type": func(_rules: Dictionary, units: Dictionary) -> void:
+			units["grunt"]["producer"] = "barracks",
+		"unit walker.producer_level must be 1-2": func(_rules: Dictionary, units: Dictionary) -> void:
+			units["walker"]["producer_level"] = 3,
+		"unit grunt.class must be ground or air": func(_rules: Dictionary, units: Dictionary) -> void:
+			units["grunt"]["class"] = "space",
+		"unit grunt.crew must be human, piloted or autonomous": func(_rules: Dictionary, units: Dictionary) -> void:
+			units["grunt"].erase("crew"),
+		"unit grunt.housing must be a whole number of at least 1": func(_rules: Dictionary, units: Dictionary) -> void:
+			units["grunt"]["housing"] = 0,
+		"unit grunt.train_seconds must be a whole number of at least 1": func(_rules: Dictionary, units: Dictionary) -> void:
+			units["grunt"]["train_seconds"] = 0,
+		"unit grunt.speed must be whole and non-negative": func(_rules: Dictionary, units: Dictionary) -> void:
+			units["grunt"]["speed"] = 1.5,
+		"unit grunt.prefers must be one of any, defense, resource, wall, hq": func(_rules: Dictionary, units: Dictionary) -> void:
+			units["grunt"]["prefers"] = "gold",
+		"unit walker.self_destruct must be true or false": func(_rules: Dictionary, units: Dictionary) -> void:
+			units["walker"]["self_destruct"] = 1,
+		"unit walker.damage_pct must be an object": func(_rules: Dictionary, units: Dictionary) -> void:
+			units["walker"]["damage_pct"] = 200,
+		"unit walker.damage_pct.tree must be a target class and a whole percent": func(_rules: Dictionary, units: Dictionary) -> void:
+			units["walker"]["damage_pct"]["tree"] = 100,
+		"unit walker.levels must be a list": func(_rules: Dictionary, units: Dictionary) -> void:
+			units["walker"]["levels"] = {},
+		"unit walker has no levels": func(_rules: Dictionary, units: Dictionary) -> void:
+			units["walker"]["levels"] = [],
+		"unit walker level 1 must be an object": func(_rules: Dictionary, units: Dictionary) -> void:
+			units["walker"]["levels"][0] = 5,
+		"unit walker level 1.train_cost uses unknown resource 'gold'": func(_rules: Dictionary, units: Dictionary) -> void:
+			units["walker"]["levels"][0]["train_cost"] = {"gold": 5},
+		"unit walker level 1.train_cost.crystal must be a whole number": func(_rules: Dictionary, units: Dictionary) -> void:
+			units["walker"]["levels"][0]["train_cost"] = {"crystal": 5.5},
+		"unit walker level 1.hp must be whole and non-negative": func(_rules: Dictionary, units: Dictionary) -> void:
+			units["walker"]["levels"][0]["hp"] = -1,
+		"unit walker level 1 must not have requires_lab: level 1 needs no research": func(_rules: Dictionary, units: Dictionary) -> void:
+			units["walker"]["levels"][0]["requires_lab"] = 1,
+		"unit grunt level 2.research_cost must be an object": func(_rules: Dictionary, units: Dictionary) -> void:
+			units["grunt"]["levels"][1]["research_cost"] = 100,
+		"unit grunt level 2.research_seconds must be a whole number of at least 1": func(_rules: Dictionary, units: Dictionary) -> void:
+			units["grunt"]["levels"][1].erase("research_seconds"),
+		"unit grunt level 2.requires_lab must be 1-2": func(_rules: Dictionary, units: Dictionary) -> void:
+			units["grunt"]["levels"][1]["requires_lab"] = 3,
+	}
+	for message: String in cases:
+		var error := _unit_error_after(cases[message])
+		assert_true(error.contains(message), "%s: %s" % [message, error])
+	for field: String in Catalog.UNIT_LEVEL_WHOLE_FIELDS:
+		var field_error := _unit_error_after(func(_rules: Dictionary, units: Dictionary) -> void:
+			units["grunt"]["levels"][0][field] = -1)
+		assert_true(field_error.contains("unit grunt level 1.%s must be whole and non-negative" % field),
+			field_error)
+
+
+func test_dev_cheats_make_units_free_and_one_second_at_most() -> void:
+	var catalog := Fixtures.catalog()
+	var before := Fixtures.catalog()
+	catalog.apply_dev_cheats()
+	for type: String in catalog.unit_types():
+		assert_eq(catalog.unit_train_seconds(type), mini(before.unit_train_seconds(type), 1), type)
+		assert_eq(catalog.unit_producer_level(type), before.unit_producer_level(type), type)
+		assert_eq(catalog.unit_housing(type), before.unit_housing(type), type)
+		for level: int in range(1, catalog.unit_max_level(type) + 1):
+			var stats := catalog.unit_level_stats(type, level)
+			var original := before.unit_level_stats(type, level)
+			var where := "%s level %d" % [type, level]
+			assert_eq(stats["train_cost"], {}, where)
+			var changed := ["train_cost"]
+			if level > 1:
+				assert_eq(stats["research_cost"], {}, where)
+				assert_eq(stats["research_seconds"], mini(int(original["research_seconds"]), 1), where)
+				changed.append_array(["research_cost", "research_seconds"])
+			# Every other field (requires_lab, hp, damage...) is untouched.
+			var rest := stats.duplicate()
+			var original_rest := original.duplicate()
+			for field: String in changed:
+				rest.erase(field)
+				original_rest.erase(field)
+			assert_eq(rest, original_rest, "%s apart from its costs and times" % where)
+
+
 func test_validation_reports_unknown_resources() -> void:
 	var rules := FileAccess.get_file_as_string(Fixtures.RULES)
 	var buildings := '{"command_center": {"size": 2, "max_count": [1], "levels": [' \
@@ -378,4 +506,14 @@ func _error_after(change: Callable) -> String:
 	var rules: Dictionary = JSON.parse_string(FileAccess.get_file_as_string(Fixtures.RULES))
 	var buildings: Dictionary = JSON.parse_string(FileAccess.get_file_as_string(Fixtures.BUILDINGS))
 	change.call(rules, buildings)
-	return Catalog.from_json(JSON.stringify(rules), JSON.stringify(buildings)).load_error
+	return Catalog.from_json(JSON.stringify(rules), JSON.stringify(buildings),
+		FileAccess.get_file_as_string(Fixtures.UNITS)).load_error
+
+
+## The same with one change made to the fixture rules and units; returns the load error.
+func _unit_error_after(change: Callable) -> String:
+	var rules: Dictionary = JSON.parse_string(FileAccess.get_file_as_string(Fixtures.RULES))
+	var units: Dictionary = JSON.parse_string(FileAccess.get_file_as_string(Fixtures.UNITS))
+	change.call(rules, units)
+	return Catalog.from_json(JSON.stringify(rules), FileAccess.get_file_as_string(Fixtures.BUILDINGS),
+		JSON.stringify(units)).load_error

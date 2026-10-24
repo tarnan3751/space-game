@@ -9,9 +9,10 @@ Everything here `extends RefCounted`, never reads a clock, holds integers only, 
 
 ## Catalog (`catalog.gd`)
 
-Read-only game data, loaded from `data/rules.json` and `data/buildings.json` by
-`Catalog.load_default()`, or from two JSON strings by `Catalog.from_json(rules, buildings)`
-(the tests' fixtures use this). JSON numbers that are whole are converted to `int` on load,
+Read-only game data, loaded from `data/rules.json`, `data/buildings.json` and `data/units.json`
+by `Catalog.load_default()`, or from JSON strings by `Catalog.from_json(rules, buildings,
+units = "{}")` (the tests' fixtures use this; left out, `units` is no unit types, and an empty
+string, a missing file, is a load error). JSON numbers that are whole are converted to `int` on load,
 recursively (`_ints`); everything the catalog hands out is `int`. The one exception to
 read-only is `apply_dev_cheats()`, below.
 
@@ -33,7 +34,12 @@ read-only is `apply_dev_cheats()`, below.
 | `level_stats(type, level)` | The stats dictionary for a 1-based level, or a shared, read-only empty dictionary when the type or level does not exist (callers only read it). |
 | `max_count(type, cc_level)` | `max_count[cc_level - 1]`, with `cc_level` clamped into the list; `0` when the list is empty. |
 | `max_cc_level()` | The Command Center's level count, which is the length of every `max_count` list. |
-| `apply_dev_cheats()` | The dev cheats, which `main.gd` applies once after loading in a debug build unless `--no-cheats` is given (`input-camera.md`): rewrites every level of every type in place to `cost` `{}` and `build_seconds` `min(build_seconds, 1)`: a level that takes time takes one second, and an instant one (walls, the drone bay) stays instant, so it still needs no builder. Nothing else changes (`requires_cc`, `max_count`, `storage`, `produces`, `builders`), so levels still unlock in order. `BaseState` never knows, so a save made under the cheats is an ordinary save. |
+| `housing_type`, `research_type` | `rules.army`: the building type whose `capacity` houses the army (`hangar`) and the one that researches unit levels (`research_lab`). `""` when the rules have none. |
+| `unit_order`, `unit_types()` | The unit type ids in `units.json` order, the training menu's order. |
+| `has_unit`, `unit_name` (the id when it has none), `unit_producer`, `unit_producer_level`, `unit_class`, `unit_crew`, `unit_housing`, `unit_train_seconds` | Per-unit lookups. `unit_class` is `ground` or `air`; `unit_crew` is `human`, `piloted` or `autonomous`, display and models only. |
+| `units_of_producer(building_type)` | The unit types a building type trains, in `units.json` order. It builds a new array, so it is for the HUD, not for a per-frame check. |
+| `unit_max_level(type)`, `unit_level_stats(type, level)` | A unit's level count, and the stats of a 1-based level, the same shared read-only empty dictionary as `level_stats` when the type or level does not exist. |
+| `apply_dev_cheats()` | The dev cheats, which `main.gd` applies once after loading in a debug build unless `--no-cheats` is given (`input-camera.md`): rewrites every level of every type in place to `cost` `{}` and `build_seconds` `min(build_seconds, 1)`: a level that takes time takes one second, and an instant one (walls, the drone bay) stays instant, so it still needs no builder. Every unit's `train_seconds` becomes `min(train_seconds, 1)`, every level's `train_cost` and `research_cost` `{}`, and every `research_seconds` `min(research_seconds, 1)`. Nothing else changes (`requires_cc`, `max_count`, `storage`, `produces`, `builders`, `producer_level`, `requires_lab`, `housing`), so levels and units still unlock in order. `BaseState` never knows, so a save made under the cheats is an ordinary save. |
 
 Validation (`_read`, `_validate_building`) is listed in `data-format.md`.
 

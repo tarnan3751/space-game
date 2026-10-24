@@ -11,7 +11,8 @@
     { "id": "walls", "name": "Walls" }
   ],
   "grid": { "width": 10, "height": 10 },
-  "menu_order": ["extractor", "harvester", "silo", "drone_bay", "siphon", "hangar", "lab", "mine", "wall"],
+  "army": { "housing": "hangar", "research": "lab" },
+  "menu_order": ["extractor", "harvester", "silo", "drone_bay", "siphon", "hangar", "academy", "lab", "mine", "wall"],
   "start": {
     "resources": { "metal": 500, "crystal": 500, "antimatter": 0 },
     "buildings": [

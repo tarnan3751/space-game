@@ -23,6 +23,7 @@ A non-whole number stays a float and fails validation wherever an int is require
     { "id": "traps", "name": "Traps" }
   ],
   "grid": { "width": 48, "height": 48 },
+  "army": { "housing": "hangar", "research": "research_lab" },
   "menu_order": ["drone_bay", "metal_extractor", "crystal_harvester", "antimatter_siphon",
                  "metal_silo", "crystal_silo", "antimatter_vault", "hangar", "cadet_academy",
                  "...", "mega_mine", "barrier_wall"],
@@ -43,6 +44,7 @@ A non-whole number stays a float and fails validation wherever an int is require
 | `resources` | The resources, in the order production is paid out and the HUD shows them. Each is `{ "id", "name", "color" }`: the id that costs, rates and saves use; the display name (defaults to the id); and the HUD colour as a hex string without `#` (optional; the HUD falls back to its text colour). Must not be empty. |
 | `categories` | The build-menu categories in tab order, each `{ "id", "name" }` (the name defaults to the id). Every type but the Command Center belongs to one. `core`, the Command Center's category, is never listed. |
 | `grid` | `width` and `height` in cells, both positive. |
+| `army` | `housing`: the building type whose `capacity` houses the army; `research`: the building type that researches unit levels. Each names a type in `buildings.json`; both are required once `units.json` lists a unit. |
 | `menu_order` | The build menu's types in order: every type except `command_center`, exactly once. Within a category, this is the order the HUD lists them. |
 | `start.resources` | Starting amounts; each is capped at the starting base's capacity. A resource left out starts at 0. |
 | `start.buildings` | Placed finished at `level` (default 1, and one of the type's levels) when a new base is created. `cell` is the footprint's top-left. An entry of an unknown type is a load error; one that does not fit the grid is skipped. |
@@ -101,6 +103,62 @@ when present.
 The type `command_center` must exist: its level is `cc_level()`. One type's `size` applies to
 every level; a building cannot change footprint when it upgrades.
 
+## `data/units.json`
+
+An object keyed by unit type; its order is the training menu's order. Each type:
+
+```json
+"breacher": {
+  "name": "Breacher",
+  "producer": "cadet_academy",
+  "producer_level": 2,
+  "class": "ground",
+  "crew": "human",
+  "housing": 2,
+  "train_seconds": 10,
+  "speed": 2200,
+  "prefers": "wall",
+  "splash_units": 1500,
+  "damage_pct": { "wall": 1000 },
+  "self_destruct": true,
+  "levels": [
+    { "train_cost": { "crystal": 60 }, "hp": 40, "damage": 30, "fire_ms": 1000, "range_units": 500 },
+    { "train_cost": { "crystal": 81 }, "research_cost": { "crystal": 2800 }, "research_seconds": 60,
+      "requires_lab": 2, "hp": 45, "damage": 34, "fire_ms": 1000, "range_units": 500 }
+  ]
+}
+```
+
+| Field | Used by | What |
+| --- | --- | --- |
+| `name` | HUD | Display name. Defaults to the type key. |
+| `producer` | core | Required. The building type that trains it. |
+| `producer_level` | core | The level a producer building needs to train it, 1 to the producer's level count. Default 1. |
+| `class` | battle | Required. `ground` or `air`: walls stop ground units, and a defence's `targets` says which it can hit. |
+| `crew` | models | Required. `human` (a colonist on foot), `piloted` (a machine with a colonist at the controls) or `autonomous` (a robot or drone). Display and models only. |
+| `housing` | core | Required, at least 1. Housing units one takes in the Hangars. |
+| `train_seconds` | core | Required, at least 1. Seconds one takes to train, at every level. |
+| `speed` | battle | Field units per second (1000 = one cell). |
+| `prefers` | battle | The building class it picks first: `any`, `defense`, `resource`, `wall` or `hq`. |
+| `splash_units` | battle | Splash radius in field units; 0 or absent hits one target. |
+| `damage_pct` | battle | Optional `{class: percent}` against one of the target classes; 100 when absent. |
+| `self_destruct` | battle | Optional, default `false`: the unit is spent by its first attack. |
+| `levels` | core | One entry per level, level 1 first. Must not be empty; its length is the unit's max level. |
+
+Per level:
+
+| Field | Used by | What |
+| --- | --- | --- |
+| `train_cost` | core | `{resource: int}` paid when one is queued at this level. |
+| `research_cost` | core | Levels 2 and up only. `{resource: int}` paid when research to this level starts. |
+| `research_seconds` | core | Levels 2 and up only; required there, at least 1. |
+| `requires_lab` | core | Levels 2 and up only; required there. The research building's finished level needed to research this level, 1 to its level count. |
+| `hp`, `damage`, `fire_ms`, `range_units` | battle | Hull, damage a hit, milliseconds between attacks, and reach in field units (sub-cell, so melee can reach 800). |
+
+The "battle" fields are validated now and read by the battle sim (step 4), which maps buildings
+to the target classes: `hq` the Command Center, `wall` the Barrier Wall, `defense` a type with
+`targets`, `resource` the resources category. Unknown fields are ignored, as for buildings.
+
 ### Validation
 
 `Catalog.load_error` collects every problem; the game refuses to start on any:
@@ -125,6 +183,18 @@ every level; a building cannot change footprint when it upgrades.
   Command Center's level count; `builders`, `capacity`, `hp`, `damage`, `range_cells` or
   `fire_ms` negative or not whole; a `cost`, `produces` or `storage` entry naming an unknown
   resource or holding a non-whole number.
+- `units.json` missing or not an object; `rules.army` not an object, naming an unknown type, or
+  without `housing` and `research` while there are units.
+- Per unit: not an object; `producer` not a building type; `producer_level` outside 1 to the
+  producer's level count; `class`, `crew` or `prefers` not one of its values; `housing` or
+  `train_seconds` below 1 or not whole; `speed` or `splash_units` negative or not whole;
+  `self_destruct` not a bool; `damage_pct` not an object of target classes and whole
+  percentages; `levels` not a list or empty.
+- Per unit level: not an object; `train_cost` or `research_cost` not an object, naming an
+  unknown resource or holding a non-whole number; `hp`, `damage`, `fire_ms` or `range_units`
+  negative or not whole; level 1 carrying a research field; a later level without a
+  `research_seconds` of at least 1 or with `requires_lab` outside 1 to the research building's
+  level count.
 
 `test_catalog.gd` checks that the shipped files load cleanly, that the start layout fits, that
 every level's price fits the storage a base can reach when that level unlocks, that no curve
@@ -223,15 +293,20 @@ sitting. The retune to production time scales is a later change to `data/` alone
 
 ## The fixture catalog (`test/support/fixtures/`)
 
-The same two files in miniature for logic tests: three resources (metal, crystal, antimatter),
+The same three files in miniature for logic tests: three resources (metal, crystal, antimatter),
 four categories (resources, army, traps, walls), a 10×10 grid, 500/500/0 to start, a 2×2
 Command Center at (0, 0) with two levels (storage 1000/1000 and no antimatter; level 2 costs 400
 metal and takes 100 s), a 1×1 drone bay at (3, 0) with one builder, and types chosen for round
 numbers: `extractor` (2×2, 100 crystal, 60 s, 3600 metal/h = 1 per second), `harvester` (1×1,
 50 metal, instant, 1800 crystal/h = 1 per 2 s, max 1), `silo` (2×2, 100 metal, 30 s, +1000
 metal storage), `siphon` (1×1, 50 crystal, instant, 3600 antimatter/h, stores 100 antimatter),
-`hangar` (2×2, `capacity` 20 then 30), `lab` (2×2, locked until Command Center 2), `mine` (1×1,
-hidden, targets ground) and `wall` (1×1, instant, up to 25).
+`hangar` (2×2, `capacity` 20 then 30), `academy` (1×1, instant at level 1, 10 s to level 2, up to
+two), `lab` (2×2, locked until Command Center 2, two levels), `mine` (1×1, hidden, targets ground)
+and `wall` (1×1, instant, up to 25). `rules.army` names the hangar and the lab. Its
+`units.json` has three units, all trained by the academy: `grunt` (ground, housing 1, 10 s,
+10 crystal; level 2 researched for 100 crystal in 60 s at lab 1), `flyer` (air, housing 2, 20 s,
+20 crystal; level 2 for 200 crystal in 120 s at lab 2) and `walker` (ground, housing 5, 30 s,
+50 crystal, needs academy level 2, one level).
 `test/support/fixtures.gd` loads it (`Fixtures.catalog()`, `Fixtures.new_base(start_time)`).
 Rebalancing `data/` never touches it.
 

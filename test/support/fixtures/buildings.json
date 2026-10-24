@@ -66,13 +66,24 @@
       { "cost": { "metal": 200 }, "build_seconds": 60, "requires_cc": 2, "capacity": 30 }
     ]
   },
+  "academy": {
+    "name": "Academy",
+    "size": 1,
+    "category": "army",
+    "max_count": [2, 2],
+    "levels": [
+      { "cost": { "metal": 10 }, "build_seconds": 0 },
+      { "cost": { "metal": 20 }, "build_seconds": 10 }
+    ]
+  },
   "lab": {
     "name": "Lab",
     "size": 2,
     "category": "army",
     "max_count": [0, 1],
     "levels": [
-      { "cost": { "metal": 100 }, "build_seconds": 30, "requires_cc": 2 }
+      { "cost": { "metal": 100 }, "build_seconds": 30, "requires_cc": 2 },
+      { "cost": { "metal": 200 }, "build_seconds": 60, "requires_cc": 2 }
     ]
   },
   "mine": {
