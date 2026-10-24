@@ -23,6 +23,7 @@ camera and the views' wiring are in `input-camera.md`.
 | `src/game/building_models.gd`, `src/game/models/` | the dispatcher and one model file per category, `Parts` in `models/parts.gd` |
 | `src/game/construction_drone.gd`, `src/game/models/drone.gd` | the builder drone over a busy site, its flight and its laser (**Construction drone**) |
 | `src/game/models/figures.gd` | `Figures`: the colonist and the automaton, posed (**Figures**) |
+| `src/game/unit_models.gd`, `src/game/models/infantry.gd`, `vehicles.gd`, `aircraft.gd` | `UnitModels`: the army's unit models, their dispatcher, tier palette and shared helpers, and their builders (**Units**) |
 | `assets/textures/kit/` | the twenty layers, committed PNGs |
 | `assets/textures/field.png` | the field texture, a committed PNG |
 | `assets/textures/terrain_rock.png` | the terrain's rock texture, a committed PNG |
@@ -324,7 +325,10 @@ on the glow layer in their accent colour, hazard on the hazard layer); new model
 `LowPolyMesh` builds a model's meshes out of parts. A part is placed by `pos`, the centre of its
 base (an orb's centre), and `rot`, Euler degrees applied Z, then X, then Y; its size arguments
 scale it. Round parts are lathes, a profile of (radius, height) points spun around +Y. Bottom
-faces are left out of boxes and lathes, since the camera always looks down.
+faces are left out of boxes and lathes, since the camera always looks down. `flags`, like `ink`,
+is a member a caller sets for the parts it adds next and puts back after: flags added to every
+part's own (`Surf.flags`), none by default; a hovering unit sets `Surf.BOB` for its whole build,
+its figures' parts included (**Units**).
 
 | Builder | What |
 | --- | --- |
@@ -377,7 +381,8 @@ outline under it. That is at most **eight** `MeshInstance3D`, ten at Crown: the 
 moving parts, each with an outline (`OUTLINE_META`, no shadow); a moving part made only of
 parts that are never outlined has no outline instance. Meshes are built once per type, level
 and tier and cached; `BuildingModels.instantiate(parts)` assembles an uncached model from parts a caller
-built itself (the `effects` rig). The contract any model keeps, built or imported:
+built itself (the `effects` rig), and `meshes_of(parts)` and `assemble(meshes)` split that in two
+for a caller that keeps its own cache (`UnitModels`, **Units**). The contract any model keeps, built or imported:
 origin at the footprint centre on the ground, +Y up, fitting inside `size × size` cells.
 
 The `model_gallery` harness scenario lays out every type and level and checks each, built for
@@ -628,11 +633,17 @@ even proportions with no neck, no joints, no taper and no hands or feet.
   forearm, hand, thigh, shin and foot) is a function of its own taking its joint's transform,
   hanging along the joint's -Y, so posing is only changing angles and a unit pipeline can later
   move segments as step 5 decides. A figure is one `LowPolyMesh`, the caller's; nothing in it is a
-  moving part and it uses no `Motion`. Two poses: `stance()` (feet about shoulder width apart,
+  moving part and it uses no `Motion`. Three poses: `stance()` (feet about shoulder width apart,
   knees a little bent, the torso a few degrees forward and twisted, the elbows bent and the arms a
-  little out, the sides unalike) and `stride()` (walking upright: the left leg reaching forward
+  little out, the sides unalike), `stride()` (walking upright: the left leg reaching forward
   with its knee bent and its heel coming down, the right nearly straight behind pushing off its
-  toe, the arms counter-swung, the torso only a little forward and the head level).
+  toe, the arms counter-swung, the torso only a little forward and the head level) and `seated()`
+  (at the controls: the thighs level forward, the shins straight down to flat feet, the torso
+  upright and a touch back, both forearms reaching forward at chest height). A caller may build
+  a `Pose` of its own (the units' port arms, flight and guard). `joints(foot, yaw, pose, heads,
+  scale, robot)` hands a caller the posed skeleton, to add to a figure (a rifle between its hands)
+  or seat it (the pelvis is where its seat goes); `colonist(..., legs = false)` leaves the
+  thighs, shins and boots out, for a pilot whose legs are hidden in its machine.
 - **The colonist**: a round helmet on a ring collar (its neck); a dark glossy visor band curving
   across the helmet's front (glass layer, `1F2A4D`) with an `ENERGY` glint streak; an `ARMY`
   stripe over the crown, nape to visor; a suit lathe broad at the chest, in at the waist and out
@@ -660,7 +671,108 @@ even proportions with no neck, no joints, no taper and no hands or feet.
   that mesh keeps the full line.
 - **Budget**: a study value, not the unit budget, which step 5 fixes after the phone measurement:
   at most 1,500 body triangles a figure. The colonist is 1,456 at every proportion and pose (the
-  proportion changes lengths, not parts), the automaton 1,484.
+  proportion changes lengths, not parts), the automaton 1,484; without its legs the colonist is
+  1,040 (seated, as `unit_gallery` logs it).
+
+### Units
+
+The army's eleven unit types (`data/units.json`, `docs/reference/data-format.md`), one model each,
+built by `UnitModels` (`src/game/unit_models.gd`) on the figures above: `create(type, tier)`
+returns a model as `BuildingModels.create` does (a `Node3D` of the body's instance and its
+outline's, and a node per moving part at its pivot carrying `MOVE_META`), its meshes built once
+per type and tier and cached; `build(type, tier)` returns the uncached `Parts`, `instantiate(parts)`
+a model of parts a caller built. Each type's builder is a static `build_<type>(p: Parts)` in
+`src/game/models/infantry.gd` (ranger, breacher, jet trooper, brawler), `vehicles.gd` (dune
+runner, siege walker, hover tank, titan) or `aircraft.gd` (skimmer, gunship, bomber). The
+contract: origin on the ground under the unit's middle, +Y up, facing +Z; a hovering or flying
+unit is built at its height over that point. One cell is one unit. Nothing moves a unit's moving
+parts yet (the gallery does, as `BuildingView` does a building's); the walk cycle and the battle's
+movement are step 5's.
+
+- **Tiers.** One shape per type; the tier repaints a machine's hull, panels, trim and glows, as
+  the buildings' tiers do (**Tiers**), so a Crown unit reads black and gold with violet as a Crown
+  building does. `UnitModels.tier_of(catalog, type, level)`: level 1 is Base; a level above it
+  takes the band (`BuildingModels.tier_for_cc`) of the Command Center level that the Research Lab
+  level it requires (`requires_lab`) requires. The palette, each with a smooth version:
+
+  | Tier | `hull(tier)`: plates, chassis, fuselage, armour | `panel(tier)`: thighs, wings, a dash | `trim(tier)`: rims, caps, collars, edges | `glow(tier)` |
+  | --- | --- | --- | --- | --- |
+  | Base | `HULL_LIGHT` (cream) | `HULL_MID` | `HULL_MID` | `ENERGY` cyan |
+  | Gold | cream | `HULL_MID` | `GOLD_TRIM` | cyan |
+  | Chrome | `CHROME` | `HULL_MID` | `CYAN_STRIP` (glowing, PULSE) | cyan, PULSE |
+  | Obsidian | `OBSIDIAN` | violet veins | `CHROME` | `DCC4FF`, PULSE |
+  | Crown | `OBSIDIAN` | violet veins | gold filigree (`CROWN_TRIM`) | `EAD6FF`, PULSE |
+
+  The veins (`UnitModels.VEINS`) are the buildings' veins layer in the cores' bright violet
+  (`C9A2FF`), unlit and still at phase 0 (a FLOW phase would put a bobbing unit's veins out of
+  step), so they read as glowing panels on a unit's small faces. `veined(tier)` is the hull to
+  Chrome and the veins from Obsidian, for the large surfaces that would leave a dark tier too dark
+  (the skimmer's saucer, the bomber's wings). `CROWN_TRIM` is gold filigree on the bands layer at
+  five repeats a unit, finer than the buildings' so a small plate still shows a band. The glows
+  are near-white violets above Chrome: a unit's glows are small and PULSE dims them to 0.55, so
+  the buildings' violets (`ANTIMATTER`, the cores' `C9A2FF`) sank into the violet field and a
+  muzzle's bore or a flame read as a hole; `DCC4FF` and `EAD6FF` stay glows against the field and
+  the obsidian. A flame adds PULSE, a lamp BLINK. The paint every tier keeps: hull dark,
+  `GUNMETAL` weapons and joints, `GLASS` windscreens, the army-orange `ARMY` accent on one or two
+  surfaces (`Parts.surf("orange")`, `Figures.ARMY_PLATE`), and the crews' paint: the colonists'
+  suits stay cream, and the brawler takes the tier's hull on its armour (its girdle; its shoulder
+  plates orange to Gold, the hull above) only. On the dark tiers the trim, the orange, the
+  glows, the veins and the crews keep at least a third of what shows bright, as the buildings'
+  rule asks.
+- **Structure.** Every limb, wheel, turret, rotor, canopy, nozzle and gun arm is a function of its
+  own taking its pivot's transform, as `Figures` builds a figure's segments, so the battle view can
+  later tag or move segments without rebuilding a model; what an infantry unit wears or carries is
+  built on its figure's joints (`Figures.joints`). The walking units (the brawler, the siege
+  walker, the titan and the colonists) stand in one pose each; the machines' legs are posed by
+  their joints' positions in the hip pivot's frame.
+- **Crews.** A human in a machine is the colonist (`Figures.colonist`) scaled and seated
+  (`UnitModels.pilot(m, seat, yaw, scale, legs = false)`: `Figures.seated()` with the pelvis on
+  `seat`, its legs left out where the hull hides them, returning its joints for the controls in
+  its hands), never another human design. The glass is opaque, so a windscreen
+  (`UnitModels.canopy(m, xf, radius, depth, rise, from_deg, to_deg, tier, sides)`: a curved glass
+  shell round the pivot's front on a trim lip, open above and behind) stands lower than the
+  pilot's shoulders and the head and shoulders show over it; a see-through hologram canopy would
+  cost a draw a unit.
+- **Ink.** Every figure, pilot included, carries the figures' thinner line (`FIGURE_INK`), and
+  so does what an infantry unit wears and carries; a machine carries the full line.
+- **Hovering.** A hovering unit (the jet trooper, the skimmer, the hover tank, the gunship and the
+  bomber) sets `LowPolyMesh.flags` to `Surf.BOB` for its whole build, figures and rotors included,
+  every part on phase 0 (the figures' surfaces are), so nothing comes apart as it bobs. Flames,
+  lamps and hover glows are surface flags (PULSE, BLINK), never moving parts. The gunship's rotor
+  blades are plain boxes too thin to outline (0.012 tall, 0.045 wide, `outline` off), as the escort
+  drone's arms are; the spin and the blur round them make them read. The gunship's rotor
+  blur is the escort drone's screen-layer disc but still and on phase 0, since a phase is shared
+  by every effect of a part and FLOW_U's speed would put it out of step with the body's BOB; the
+  spin turns it.
+- **Budget** (a study value; step 5 fixes the real one after the phone measurement): the body
+  and moving parts' triangles at most 1,800 for the infantry, 2,200 for the dune runner, the
+  skimmer and the hover tank, 3,000 for the siege walker, 2,600 for the gunship and the bomber and
+  4,500 for the titan. At most `MAX_MOVING` (two) moving parts, the gunship's rotors: at most six
+  instances, the body, the rotors and their outlines. No `_process`, no allocation after the
+  build.
+
+| Type | Model | Size (world units) | Triangles |
+| --- | --- | --- | --- |
+| `ranger` | the colonist at ease (`stance` with the arms brought in to port arms), a short rifle across the chest (a gunmetal receiver, a stock of the tier's trim, a magazine, a thin barrel and a muzzle in the tier's glow), a pistol in a holster on the right thigh | 0.80 tall | 1,662 |
+| `breacher` | the colonist at 0.85 tall in a bulkier suit: a belly plate and pauldrons of the tier's trim, heavy dark boot shells, a big dark charge pack on its back rising behind the helmet, hazard-banded, a gunmetal detonator block and a red fuse lamp blinking (red at every tier: the pack is live) | 0.90 tall | 1,778 |
+| `jet_trooper` | the colonist flying, leaning in with the legs trailing and the toes pointed, its lower sole 0.5 up; a jetpack (the tier's trim to Gold, its hull above) with two gunmetal nozzles blowing long flame cones of the tier's glow (unlit, PULSE, not inked) and short orange stub wings; every part bobs | 0.86 tall, flames to 0.46 up | 1,646 |
+| `brawler` | the automaton at 1.08 scale crouched with its guard up: big gunmetal fists with knuckle bands of the tier's trim, broad shoulder plates (orange to Gold, the tier's hull above), a thick girdle of the tier's hull round its middle | 1.06 tall | 1,732 |
+| `dune_runner` | an open buggy: a cream chamfered hull, an orange bonnet, a bumper of the tier's trim, a gunmetal engine block, four chunky dark tyres with hub caps of the tier's trim, the colonist driver seated behind the dash at a steering wheel, an orange roll cage with a lamp bar of two lamps in the tier's glow | 0.86 long, 0.65 wide, 0.67 tall | 2,192 |
+| `skimmer` | a lens-shaped saucer (`veined`: cream, chrome, then violet veins) with a rim of the tier's trim, a glass sensor dome, an orange dive fin, one glowing eye in a gunmetal socket and a glowing ring under it (PULSE), its lowest point 0.62 up, bobbing | 0.61 across | 598 |
+| `siege_walker` | a cream chamfered hull on two digitigrade legs (gunmetal hip joints under orange caps, hull-mid thighs, knee joints with caps of the tier's trim, cream shins with pistons, broad dark feet), two gun arms (a cream pod with an orange top plate, twin gunmetal barrels, muzzles in the tier's glow), the colonist pilot on top behind a glass windscreen, a mast with a lamp of the tier's glow blinking | 1.50 tall, 0.93 wide | 2,820 |
+| `hover_tank` | a low cream hull on orange chamfered skirts, the skirts' lower edges and the underside glowing in the tier's glow (PULSE), two rear thrusters; a turret on a ring of the tier's trim with a gunmetal mantlet, one fat barrel, a muzzle collar of the tier's trim and a glowing bore, and a hatch with the pilot's helmet and shoulders over a small windscreen; it bobs | 1.25 long, 0.90 wide, 0.70 tall | 1,992 |
+| `titan` | a giant biped: hull-mid thighs and cream shins under orange plates, gunmetal knee joints with caps of the tier's trim, big dark feet with toe caps of the tier's trim; a cream bridge with an orange rear block capped in the tier's trim, two colonists seated behind a wide glass windscreen, two huge cannon arms (cream housings with orange top plates, fat gunmetal barrels, collars of the tier's trim, glowing bores) and an antenna mast with a lamp of the tier's glow blinking | 2.46 tall, 1.82 wide | 4,286 |
+| `gunship` | a cream chamfered fuselage and nose, the pilot behind a glass windscreen on the nose, a gunmetal chin gun with a glowing muzzle, hull-mid stub wings carrying a cream nacelle at each tip with a band of the tier's glow and a cap of the tier's trim, a tail boom with orange fins; two counter-rotating rotors (`Motion.spin`, 9 radians a second), each a sunk gunmetal hub, the blur disc and three dark blades; its lowest point 1.23 up, bobbing | 1.60 across the rotors, 1.28 long | 2,044 (each rotor 106) |
+| `bomber` | a cream centre body, two wings swept 34° (`veined`) with leading edges of the tier's trim and orange winglets, two cream engines on the wing roots with dark intakes and exhausts and flame cones in the tier's glow, a gunmetal rack across the body and the wing roots with a row of four orange bombs under it, the pilot behind a small windscreen; its lowest point 1.61 up, bobbing | 1.83 span, 0.93 long | 1,958 |
+
+"Cream" in the table is the tier's hull (`hull()`), "hull mid" its panels (`panel()`). The counts
+are the same at every tier, since a tier only swaps surfaces. The `unit_gallery` harness scenario
+renders every type at every tier, a row a tier, and checks each against the budget, the
+instances, the kit's layers, the size table above within 20%, the hover heights and the ground,
+and every shot for units under the HUD's buttons (`tools/harness/README.md`); its size-24 shot is
+the silhouette test and the tiers side by side, its size-4 shots the detail. `model_clash` checks the gunship's
+rotors at both tiers: no pair crossing, and each rotor touching the body at every pose only at its
+hub, sunk in its nacelle (a mount).
 
 ## Animation
 

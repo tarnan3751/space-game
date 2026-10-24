@@ -106,7 +106,7 @@ in one second at most (`Catalog.apply_dev_cheats`; `-- --no-cheats` for the real
 | 2 | Base polish: the building roster, build-menu categories, a third resource (antimatter), low-poly models built in code, HUD category tabs, safe-area margins for notches, painting walls by dragging, edge auto-scroll while dragging | Built |
 | 2a | The upgrade pass (`docs/plans/upgrade-pass.md`): the Command Center and every type to Command Center 10 (ten levels for the staples), the five tiers, 138 new level models with Crown escorts, the 48×48 field with a version 2 save migration, the maxed base measured | Built |
 | 2b | The model feedback pass (`docs/plans/model-feedback.md`): the owner's review of every max-level model folded in: no robot above defence buildings, every robot tailored to its building (a security bot, an ore hauler, a collector, a marshaller, welders), one slow lightning crackle, rising smoke, the Command Center's broader base, the academy and fabricator reshaped, the mortar's plasma and the orbital cannon's spire | Built |
-| 3 | Milestone 2, the offline game (`docs/vision.md` §7) — the figures and the army: the humanoid design study (a human in a spacesuit and a humanoid robot, in the comic style, rendered for the owner to approve), then the unit roster in data, training queues, Hangar housing, Research Lab upgrades and unit models | In progress: the humanoid study is built (`Figures`, the `figures` harness scenario) and approved at 3.5 heads; the figures' thinner ink line is built (`Figures.FIGURE_INK`); the army is built in core (`docs/reference/core-economy.md`, **The army**): eleven unit types in `data/units.json`, a training queue per producer building, Hangar housing, Research Lab levels, save version 3; the training HUD is built (`docs/reference/hud.md`, **Army panel**: Train and Research from the info panel, unit cards with drawn glyphs, the queue strip, the army meter; the `train_units` harness scenario); next the unit models |
+| 3 | Milestone 2, the offline game (`docs/vision.md` §7) — the figures and the army: the humanoid design study (a human in a spacesuit and a humanoid robot, in the comic style, rendered for the owner to approve), then the unit roster in data, training queues, Hangar housing, Research Lab upgrades and unit models | Built: the humanoid study is built (`Figures`, the `figures` harness scenario) and approved at 3.5 heads; the figures' thinner ink line is built (`Figures.FIGURE_INK`); the army is built in core (`docs/reference/core-economy.md`, **The army**): eleven unit types in `data/units.json`, a training queue per producer building, Hangar housing, Research Lab levels, save version 3; the training HUD is built (`docs/reference/hud.md`, **Army panel**: Train and Research from the info panel, unit cards with drawn glyphs, the queue strip, the army meter; the `train_units` harness scenario); the unit models are built (`UnitModels`, one per type, the tier as palette; the `unit_gallery` harness scenario; `docs/reference/art-style.md`, **Units**) |
 | 4 | The battle sim in `src/core/battle/`: fixed-point integer positions (1 cell = 1000 units), fixed tick, pathing round and through walls, targeting, defences, traps, status effects, abilities; replay = seed + layouts + deploy commands; byte-identical results tested headless; batch simulations for balance | Planned |
 | 5 | The battle view: units moving, projectiles, damage and destruction, the attack HUD; the phone target fixed, and the maxed base and a full battle measured on it | Planned |
 | 6 | Expeditions: the sector map, the outpost generator (the player's roster with a faction tint, loot deposits, hazards), loot into `BaseState` through a new command, re-training; then the real-timer retune (6a). Milestone 2 complete: a game that plays end to end offline | Planned |
@@ -139,8 +139,11 @@ in one second at most (`Catalog.apply_dev_cheats`; `-- --no-cheats` for the real
   `prefers`, `splash_units`, `damage_pct`, `self_destruct`, `hp`, `damage`, `fire_ms`,
   `range_units`). `capacity` drives the army's housing on the Hangar and is display-only on the
   Alliance Beacon.
-- **The army has no models yet**: the HUD trains, houses and researches it, and its cards show
-  drawn glyphs by crew until the unit models (step 3's follow-up) can be rendered in their place.
+- **The army's models are not on screen yet**: the HUD trains, houses and researches it, and its
+  cards show drawn glyphs by crew; the unit models (`UnitModels`) are built but shown only by the
+  `unit_gallery` harness scenario, each in one static pose, until the cards render them and the
+  battle view (step 5) walks them. Their budgets are study values until step 5's phone
+  measurement.
 
 ## 3. Decisions
 
@@ -221,6 +224,15 @@ in one second at most (`Catalog.apply_dev_cheats`; `-- --no-cheats` for the real
   correct art style and common sense." Product calls that would otherwise go to the owner are
   made by the coordinator, recorded here with that note, and the owner reviews them after the
   milestone.
+- **The unit models** (the coordinator, 2026-10-24, under the delegation above): one model per
+  unit type in the comic style on the approved figures, its tier changing only its machine's
+  paint as the buildings' tiers do (cream, chrome, then obsidian with violet veins; the trim and
+  the glows with them; a level's tier the band of the Command Center level its Research Lab level
+  requires);
+  humans in machines are the colonist seated, under the figures' thin ink; hovering and flames are
+  surface flags, with at most two moving parts (the gunship's rotors); budgets are study values
+  until step 5. The glass stays opaque, so a pilot shows over a low windscreen rather than through
+  a see-through canopy, which would cost a draw a unit (the developer's call, for review).
 
 ### 3.2 Open
 
