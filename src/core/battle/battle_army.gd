@@ -157,6 +157,12 @@ func setup(catalog: Catalog, army: Dictionary, unit_levels: Dictionary) -> Strin
 	_path_pos.resize(total)
 	_paths.resize(total)
 	bucket_next.resize(total)
+	# Every reach map a ground unit can ask for (_set_for: its set, then the two fallbacks, at
+	# its reach), built now so that no tick pays for one.
+	for t: int in type_names.size():
+		if _t_class[t] == BattleLayout.GROUND and left[t] > 0:
+			for set_id: int in [_t_set[t], BattlePathing.SET_ANY, BattlePathing.SET_ANY_HIDDEN]:
+				_pathing.map_for(set_id, _t_reach[t])
 	return ""
 
 

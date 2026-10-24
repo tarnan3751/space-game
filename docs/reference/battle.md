@@ -140,10 +140,13 @@ unit's cell.
 - A unit that finds nothing waits, IDLE, and searches again after the next fall.
 
 **Reach maps.** "A candidate in reach" is read from a map per (candidate set, reach): per cell,
-the number of standing candidates within that reach of the cell's centre. A map is built the
-first time a unit asks for it and kept up to date: a fall removes the building's stamp, a reveal
-adds it, about a hundred cells each. The maps live side by side in one array of the pathing's
-own.
+the number of standing candidates within that reach of the cell's centre. Every map the army can
+ask for is built at setup: for each ground type brought, its own set and the two fallbacks
+(**Targeting**: `any`, then `any` with the unrevealed) at its reach, so no tick builds one. A map
+is kept up to date: a fall removes the building's stamp, a reveal adds it, about a hundred cells
+each, a row's span in reach found by an integer square root. The maps live side by side in one
+array of the pathing's own. The search runs on the field grown by a border of closed cells, so a
+step needs no bounds check; a cell keeps its order there, so ties break as on the field.
 
 **Budget.** At most `BattleArmy.PATHS_PER_TICK` = 4 searches run a tick; units waiting are
 served in id order. Units asking the same map from the same cell in a tick share one search, so
@@ -259,7 +262,11 @@ nothing reads a clock or draws a random number. The hash covers the abilities' s
 is left and used, every swarm (point, end, heal, radius, carry), every strike on its way (point,
 landing tick, damage, radius) and every building's disabled timer. A battle stepped tick by tick,
 fed its commands live, or replayed from its logged commands gives the same result
-(`test_battle_sim.gd`, and with abilities `test_battle_abilities.gd`).
+(`test_battle_sim.gd`, and with abilities `test_battle_abilities.gd`). Until the reach maps were
+built at setup, a map first built in a pass where a unit had just felled a building counted every
+cell in that building's reach one low (the fall was left out, then taken off again), so a replay
+recorded before then whose first build of a map fell in that window does not reproduce; none
+exists outside a base's local raid log.
 
 **Budget**: a full 180 s battle with 280 housing of units against a maxed layout simulates
 headless in well under 2 s on the development Mac, so the view can run it at real time with
@@ -275,11 +282,21 @@ counted, 250 walls, 21 traps), with the machine shared with other runs (load ave
 - The worst case found, 280 Rangers given a thousand times their hull so all of them walk and
   fight for the whole 180 s: 1.1 to 1.6 s.
 
-Most of the worst case is the unit phase (walking, attack cooldowns and about 530 path searches
-of about 0.6 ms each), then the defences' nearest-unit searches. Two levers are not built yet,
-for when the phone measurement (step 5) asks for them: idle defences sleeping while the unit
-buckets their range touches are empty, and per-segment walking state, so a walking unit does
-not recompute its segment every tick.
+Most of the worst case is the unit phase (walking, attack cooldowns and about 530 path searches),
+then the defences' nearest-unit searches.
+
+**A tick's cost** is flat but for the searches. The reach maps are built at setup, about 0.5 to
+1.3 ms each on the template base, so a six-map army (the `battle` scenario's) adds about 5.5 ms
+to a setup of about 5.4 ms; the first tick, which used to build them, costs 1.5 to 1.7 ms. A
+search costs about 15 µs and about 1.6 µs a cell it settles, 0.5 to 0.75 ms for a group deployed
+far from the buildings, so a tick's ceiling is `PATHS_PER_TICK` full searches: 2.3 to 3.3 ms on
+the Mac (the `battle` scenario checks its slowest tick under 3.5 ms), about 8 to 16 ms on a phone
+three to five times slower. Measured headless, the faster of two runs per tick, load average 5 to
+9. If the phone measurement needs it, the next lever is the search budget, lowered or counted in
+settled cells instead of searches: a rule change, since it moves when units start walking. Two
+other levers are not built yet: idle defences sleeping while the unit buckets their range touches
+are empty, and per-segment walking state, so a walking unit does not recompute its segment every
+tick.
 
 ## Tools
 

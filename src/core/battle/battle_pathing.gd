@@ -11,8 +11,9 @@ extends RefCounted
 ##
 ## "In reach" comes from a reach map: per cell, how many standing candidates of a set (SET_*)
 ## lie within a reach of that cell's centre. One map per (set, reach) pair is built the first
-## time a unit asks for it, and kept up to date as buildings fall or are revealed, about a
-## hundred cells each. The maps live side by side in one array of this object's own, so updating
+## time it is asked for (BattleArmy asks for every one its ground units can need at setup, so no
+## tick builds one), and kept up to date as buildings fall or are revealed, about a hundred cells
+## each. The maps live side by side in one array of this object's own, so updating
 ## one never copies it.
 ##
 ## The search and the maps run on the field grown by a border of closed cells, so a step needs

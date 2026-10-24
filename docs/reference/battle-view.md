@@ -163,15 +163,14 @@ widest zoom (camera size 44), the battle paused once the whole scripted army (th
 attack HUD over it), 2.00 million primitives and 1.6 ms of render CPU a frame, 174 fps, against the maxed base's ceilings
 (`art-style.md`, **Cost**: 1,600, 2.1 million, 6 ms). The units in their near versions would have
 been 2.40 million primitives (2.12 million without their shadows). The sim's step averages about
-0.2 ms a tick over the battle; the longest, 7.5 to 10 ms, falls on the first tick or on the one
-after the last group lands, when tens of units first ask for targets (their reach maps built, their
-paths searched: `battle.md`, **Pathing**). The frame's process time at its slowest is about 10 ms.
+0.2 to 0.4 ms a tick over the battle; the longest is a tick of four full path searches
+(`battle.md`, **Determinism and performance**), the reach maps being built at setup so the first
+tick no longer pays for them: 2.3 to 3.3 ms in the `battle` scenario (the faster of two runs per
+tick), about 2.6 to 4.8 ms in this scenario's single run, depending on the machine's load. The frame's process time at its slowest is about 10 ms.
 Each unit type is three draws (its body, its outline and the body's shadow), each effect kind one;
 the buildings cost what they cost in the base, less the traps and the walls' own views.
 
 Two costs are measured fine on the Mac and unmeasured on a phone: every effect MultiMesh uploads
 its whole buffer each frame whatever its visible count (the bars 768 instances of 20 floats, the
 bolts 384, the impacts 256), and each unit type's buffer is uploaded twice, once for its body's
-MultiMesh and once for its outline's. And the sim's first-tick spike (7.0 to 9.6 ms on the Mac,
-on the first tick or when a large group first searches) is a core item parked for the next core
-batch (`battle.md`, **Determinism and performance**, its levers).
+MultiMesh and once for its outline's.

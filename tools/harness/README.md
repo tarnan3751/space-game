@@ -146,8 +146,10 @@ one Orbital Strike at its top level called at tick 40 on the template's first de
 to its landing in a second copy, which must show the defence's hull lowered), run
 to the end and logged (battle seconds and ticks,
 destruction, stars, loot, and the wall time of the run, which the scenario reads as the
-performance budget's measure, never the sim); the same setup run again must repeat its result
-and hash, and the result applied with `raid_result` to a copy of the game's base given the
+performance budget's measure, never the sim); each tick's step is timed in both runs and the
+faster kept, and the slowest tick must be under 3.5 ms (`TICK_BUDGET_MS`, four full path searches
+with room to spare), logged rather than failed while the average tick says the machine is loaded
+(over 0.4 ms); the same setup run again must repeat its result and hash, and the result applied with `raid_result` to a copy of the game's base given the
 army and the strike must spend the units deployed and the strike and bring the loot home up to
 storage. `main.state` itself
 is untouched, since no player action leads to a raid yet. Headless; no screenshots.

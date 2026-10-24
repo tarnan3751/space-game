@@ -52,6 +52,55 @@ func test_reach_maps_follow_falls_and_reveals() -> void:
 	assert_eq(pathing.map_count(), 1)
 
 
+func test_the_reach_maps_are_built_at_setup() -> void:
+	# melee (any, 500), breaker (wall, 500), hunter (defense, 800), drone (air: none); each ground
+	# type its set and the two fallbacks at its reach.
+	var commands := [Fixtures.deploy(0, "melee", 0, 0), Fixtures.deploy(0, "breaker", 19, 0),
+		Fixtures.deploy(0, "hunter", 0, 19), Fixtures.deploy(0, "drone", 19, 19)]
+	var sim := Fixtures.battle([["command_center", 9, 9], ["turret", 4, 4], ["wall", 14, 14]],
+		{"melee": 1, "breaker": 1, "hunter": 1, "drone": 1, "gunner": 0}, commands)
+	assert_eq(sim.pathing.map_count(), 6, "the gunner brought none: no map for its reach")
+	for set_id: int in [BattlePathing.SET_ANY, BattlePathing.SET_WALL, BattlePathing.SET_ANY_HIDDEN]:
+		assert_true(sim.pathing.map_for(set_id, 500) < 6, "set %d at 500 is there" % set_id)
+	for set_id: int in [BattlePathing.SET_ANY, BattlePathing.SET_DEFENSE, BattlePathing.SET_ANY_HIDDEN]:
+		assert_true(sim.pathing.map_for(set_id, 800) < 6, "set %d at 800 is there" % set_id)
+	assert_eq(sim.pathing.map_count(), 6, "asking for them built none")
+	while not sim.is_over():
+		sim.step()
+	assert_eq(sim.pathing.map_count(), 6, "no tick built one")
+
+
+func test_a_map_is_right_when_a_building_falls_in_the_tick_it_would_be_built() -> void:
+	# Built lazily, a map first asked for in the pass where a unit had just felled a building left
+	# that building out, and passing the fall on then took its stamp off again: every cell in its
+	# reach ended one count low. Built at setup, every map counts the standing candidates.
+	var commands := [Fixtures.deploy(0, "gunner", 12, 10), Fixtures.deploy(180, "gunner", 12, 10),
+		Fixtures.deploy(180, "hunter", 0, 11), Fixtures.deploy(200, "hunter", 0, 11),
+		Fixtures.deploy(220, "hunter", 0, 12)]
+	var sim := Fixtures.battle([["academy", 10, 10], ["command_center", 10, 12]], {"gunner": 2, "hunter": 3},
+		commands)
+	while not sim.is_over():
+		sim.step()
+	assert_eq(sim.state_hash(), 2032000496, "the battle as it plays with every map right")
+	var pathing := sim.pathing
+	var layout := sim.layout
+	var wrong := 0
+	for m: int in pathing.map_count():
+		var set_id := pathing.map_set(m)
+		var reach: int = pathing._map_reach[m]
+		for cell: int in sim.field.width * sim.field.height:
+			var px := BattleMath.centre(cell % sim.field.width)
+			var py := BattleMath.centre(cell / sim.field.width)
+			var n := 0
+			for b: int in layout.count:
+				if pathing.is_candidate(b, set_id) and BattleMath.dist2_to_rect(px, py, layout.x0[b], layout.y0[b],
+						layout.x1[b], layout.y1[b]) <= reach * reach:
+					n += 1
+			if pathing.reach_count(m, cell) != n:
+				wrong += 1
+	assert_eq(wrong, 0, "every map's count at every cell is the standing candidates in reach")
+
+
 func test_a_straight_walk_to_an_open_target() -> void:
 	var sim := Fixtures.battle([["command_center", 10, 10]], {"melee": 1}, [Fixtures.deploy(0, "melee", 2, 10)])
 	sim.step()

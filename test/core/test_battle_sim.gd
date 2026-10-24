@@ -229,7 +229,9 @@ func test_a_big_battle_runs_to_its_end() -> void:
 
 func test_the_hash_at_every_tick_is_pinned() -> void:
 	# Pinned values: a change to the pathing's speed must not move them; only a change to what a
-	# battle does may, under a brief that says so.
+	# battle does may, under a brief that says so. Building the reach maps at setup left them as
+	# they were: no map of these battles was first built in the window that miscounted one
+	# (test_battle_pathing's test_a_map_is_right_when_a_building_falls_in_the_tick_it_would_be_built).
 	var sim := BattleSim.create(Fixtures.battle_catalog(), _rich_setup())
 	var chain := 2166136261
 	while not sim.is_over():

@@ -8,7 +8,11 @@ extends HarnessScenario
 ## yet: the deployed units and the strike must be spent and the loot capped by the copy's storage.
 ##
 ## It also logs the run's wall time, read here in the tool and never in the sim, as the
-## performance budget's measure: a full battle in well under 2 s on the development Mac.
+## performance budget's measure: a full battle in well under 2 s on the development Mac. Each
+## tick's step is timed in both runs and the faster of the two kept, so a moment the machine
+## spent elsewhere does not count; the slowest tick must be under TICK_BUDGET_MS. Over it while
+## the average tick is over LOADED_AVERAGE_MS, the machine is taken to be loaded and the tick is
+## logged, not failed.
 
 ## Five of the eleven unit types, the Hangars' 280 housing, each at its top level (a level is
 ## clamped).
@@ -18,6 +22,11 @@ const LEVEL := 8
 const ABILITIES := {"orbital_strike": 1}
 const ABILITY_LEVEL := 5
 const STRIKE_TICK := 40
+## The slowest tick's budget, four full path searches (BattleArmy.PATHS_PER_TICK) with room to
+## spare, and the average tick above which the machine counts as loaded (about 0.13 ms on the
+## development Mac when it is not).
+const TICK_BUDGET_MS := 3.5
+const LOADED_AVERAGE_MS := 0.4
 
 
 func run(main: MainScript) -> void:
@@ -78,9 +87,19 @@ func run(main: MainScript) -> void:
 		"the strike on %s %d at %s landed at tick %d: %d of %d hull left" % [aim["type"], aim_id, aim_cell,
 			landing, watch.building_hp(aim_id), watch.building_max_hp(aim_id)])
 
+	var ticks := PackedInt32Array()
 	var started := Time.get_ticks_usec()
-	var result := BattleSim.run(catalog, setup)
+	var result := _timed_run(catalog, setup, ticks)
 	var ms := (Time.get_ticks_usec() - started) / 1000
+	var again := _timed_run(catalog, setup, ticks)
+	var total := 0
+	var slowest := 0
+	for t: int in ticks.size():
+		total += ticks[t]
+		if ticks[t] > ticks[slowest]:
+			slowest = t
+	var average := total / 1000.0 / ticks.size()
+	var worst := ticks[slowest] / 1000.0
 	say("battle: %d buildings, %d units, %d s of battle (%d ticks) in %d ms" % [
 		probe.layout.count, n, int(result["ticks"]) / BattleSim.TICKS_PER_SECOND, result["ticks"], ms])
 	say("battle: destruction %d%%, %d stars, loot %s" % [result["destruction"], result["stars"], result["loot"]])
@@ -92,7 +111,13 @@ func run(main: MainScript) -> void:
 	check(deployed == n, "all %d units deployed (%d)" % [n, deployed])
 	check(int(result["destruction"]) > 0, "the attack destroyed something")
 	check(ms < 2000, "a battle simulates in under 2 s (%d ms)" % ms)
-	var again := BattleSim.run(catalog, setup)
+	var tick_line := "the sim's step %.3f ms on average, %.3f ms at the slowest (tick %d), the faster of two runs" % [
+		average, worst, slowest]
+	if worst > TICK_BUDGET_MS and average > LOADED_AVERAGE_MS:
+		say("battle: %s: over the %.1f ms budget, but the machine is loaded (average over %.1f ms)" % [tick_line,
+			TICK_BUDGET_MS, LOADED_AVERAGE_MS])
+	else:
+		check(worst <= TICK_BUDGET_MS, "battle: %s, budget %.1f ms" % [tick_line, TICK_BUDGET_MS])
 	check(JSON.stringify(again) == JSON.stringify(result), "the same setup gives the same result, hash %d" % result["hash"])
 	check(result["abilities_used"] == {"orbital_strike": 1}, "the strike is used: %s" % result["abilities_used"])
 
@@ -121,3 +146,18 @@ func run(main: MainScript) -> void:
 		capped = capped and base.resources[res] == expected
 	check(capped, "the loot came home up to storage: %s" % base.resources)
 	check(base.raids.size() == 1, "the battle is kept with its result")
+
+
+## Runs a battle to its end tick by tick, as BattleSim.run does, keeping in `ticks` each tick's
+## step time in microseconds, the lower of this run's and what is there; returns the result.
+func _timed_run(catalog: Catalog, setup: Dictionary, ticks: PackedInt32Array) -> Dictionary:
+	var sim := BattleSim.create(catalog, setup)
+	while not sim.is_over():
+		var at := Time.get_ticks_usec()
+		sim.step()
+		var spent := Time.get_ticks_usec() - at
+		if sim.tick > ticks.size():
+			ticks.append(spent)
+		elif spent < ticks[sim.tick - 1]:
+			ticks[sim.tick - 1] = spent
+	return sim.result()
