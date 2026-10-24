@@ -211,6 +211,17 @@ in one second at most (`Catalog.apply_dev_cheats`; `-- --no-cheats` for the real
   units, and a piloted machine needs no trained colonist. The roster's names and numbers are
   provisional until the owner has seen them.
 
+- **Deployed units are spent** (the owner, 2026-10-24): every unit deployed in a battle is
+  gone afterwards and the rest come home, Clash's model, so training is the steady drain that
+  expeditions pay for. The step 4 battle sim and its result command apply it.
+- **The roster stands** (the owner, 2026-10-24): the eleven unit types of `data/units.json` keep
+  their names and roles; numbers stay development-scale until the retune.
+- **The coordinator decides for the rest of Milestone 2** (the owner, 2026-10-24): "work
+  independently and stop asking me questions for the duration of Milestone 2 ... stick with the
+  correct art style and common sense." Product calls that would otherwise go to the owner are
+  made by the coordinator, recorded here with that note, and the owner reviews them after the
+  milestone.
+
 ### 3.2 Open
 
 - **Economy validation on the server.** Either port the small economy rules to TypeScript,
