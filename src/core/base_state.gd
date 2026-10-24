@@ -12,6 +12,11 @@ extends RefCounted
 ## waits for room in the Hangars (`housing_capacity`). The research building
 ## (rules.army.research) raises one unit type a level at a time, and keeps researching while
 ## it upgrades.
+##
+## Raids: a battle (BattleSim, src/core/battle) is applied through raid_result: the units deployed
+## are spent and the loot comes home, up to storage. The base trusts the result and keeps the
+## battle's inputs with it in `raids`, the last RAID_LOG_SIZE of them, so a server can replay
+## them later.
 
 ## Emitted after anything visible changes: resources, buildings, levels, timers, the army.
 signal changed
@@ -19,8 +24,11 @@ signal changed
 const SECONDS_PER_HOUR := 3600
 ## The save's shape (to_dict). Version 2 records the field it was laid out on; every version 1
 ## save was laid out on V1_FIELD, and from_dict centres it on a field that has grown since.
-## Version 3 adds the army; an older save loads with none.
-const SAVE_VERSION := 3
+## Version 3 adds the army; an older save loads with none. Version 4 adds the raids; an older
+## save loads with none.
+const SAVE_VERSION := 4
+## The raids kept, newest last.
+const RAID_LOG_SIZE := 5
 const V1_FIELD := Vector2i(40, 40)
 
 const ERR_UNKNOWN_OP := "unknown_op"
@@ -40,6 +48,9 @@ const ERR_PRODUCER_LEVEL := "needs_producer_level"
 const ERR_HOUSING := "not_enough_housing"
 const ERR_NOT_QUEUED := "not_queued"
 const ERR_LAB_LEVEL := "needs_lab_level"
+const ERR_BAD_RAID := "bad_raid"
+const ERR_NOT_ENOUGH_UNITS := "not_enough_units"
+const ERR_UNKNOWN_ABILITY := "unknown_ability"
 
 ## training_status(): nothing queued; the head training; the head stopped with time left while
 ## the producer is busy (constructing or upgrading); the head finished and waiting for room in
@@ -69,6 +80,9 @@ var training: Dictionary[int, TrainingQueue] = {}
 ## The unit type being researched to its next level, "" when none; and when it completes.
 var research_unit: String = ""
 var research_done_at: int = 0
+## The last raids applied, newest last: {"at": unix seconds, "battle": the battle's setup,
+## "result": its result}, as raid_result carried them.
+var raids: Array[Dictionary] = []
 
 ## Production not yet paid out, per resource, in "resource-seconds" (amount * 3600).
 ## Keeping the remainder means ticking every second or once a day gives the same total.
@@ -116,6 +130,7 @@ static func create_new(base_catalog: Catalog, start_time: int) -> BaseState:
 ##   {"op": "train",   "id": int,      "unit": String, "count": int}   (count optional, 1)
 ##   {"op": "cancel_training", "id": int, "unit": String}
 ##   {"op": "research", "unit": String}
+##   {"op": "raid_result", "battle": {seed, attacker, defender, commands}, "result": {...}}
 func apply(command: Dictionary, at_time: int) -> String:
 	advance_to(at_time)
 	var result := ""
@@ -133,6 +148,8 @@ func apply(command: Dictionary, at_time: int) -> String:
 			result = _cancel_training(int(command.get("id", 0)), str(command.get("unit", "")))
 		"research":
 			result = _research(str(command.get("unit", "")))
+		"raid_result":
+			result = _raid_result(command)
 		_:
 			result = ERR_UNKNOWN_OP
 	if result == "":
@@ -232,6 +249,61 @@ func check_research(unit: String) -> String:
 		return ERR_BUSY
 	if not can_afford(stats.get("research_cost", _EMPTY)):
 		return ERR_FUNDS
+	return ""
+
+
+## Everything about applying a battle's result (BattleSim.result(), less its `commands`, which
+## the battle carries): the shapes, every deployed unit known and its count no more than the army
+## has, and `abilities_used` empty, zero counts included (abilities come in step 4b). `deployed` must count the battle's deploy
+## commands exactly.
+func check_raid_result(command: Dictionary) -> String:
+	var battle: Variant = command.get("battle")
+	var result: Variant = command.get("result")
+	if typeof(battle) != TYPE_DICTIONARY or typeof(result) != TYPE_DICTIONARY:
+		return ERR_BAD_RAID
+	var result_dict: Dictionary = result
+	var battle_dict: Dictionary = battle
+	var deployed: Variant = result_dict.get("deployed")
+	var loot: Variant = result_dict.get("loot")
+	var used: Variant = result_dict.get("abilities_used", {})
+	var commands: Variant = battle_dict.get("commands")
+	if typeof(deployed) != TYPE_DICTIONARY or typeof(loot) != TYPE_DICTIONARY \
+			or typeof(used) != TYPE_DICTIONARY or typeof(commands) != TYPE_ARRAY:
+		return ERR_BAD_RAID
+	if BattleMath.whole(result_dict.get("ticks")) < 0 or BattleMath.whole(result_dict.get("hash")) < 0:
+		return ERR_BAD_RAID
+	var destruction := BattleMath.whole(result_dict.get("destruction"))
+	var stars := BattleMath.whole(result_dict.get("stars"))
+	if destruction < 0 or destruction > 100 or stars < 0 or stars > 3:
+		return ERR_BAD_RAID
+	var loot_dict: Dictionary = loot
+	for res: Variant in loot_dict:
+		if not catalog.resources.has(str(res)) or BattleMath.whole(loot_dict[res]) < 0:
+			return ERR_BAD_RAID
+	var counted: Dictionary[String, int] = {}
+	for entry: Variant in commands:
+		if typeof(entry) != TYPE_DICTIONARY:
+			return ERR_BAD_RAID
+		var entry_dict: Dictionary = entry
+		if str(entry_dict.get("op", "")) == "deploy":
+			var unit := str(entry_dict.get("unit", ""))
+			counted[unit] = counted.get(unit, 0) + 1
+	var deployed_dict: Dictionary = deployed
+	for unit: Variant in deployed_dict:
+		if BattleMath.whole(deployed_dict[unit]) != counted.get(str(unit), 0):
+			return ERR_BAD_RAID
+	for unit: String in counted:
+		if not deployed_dict.has(unit):
+			return ERR_BAD_RAID
+	for unit: Variant in deployed_dict:
+		if not catalog.has_unit(str(unit)):
+			return ERR_UNKNOWN_UNIT
+	for unit: Variant in deployed_dict:
+		if BattleMath.whole(deployed_dict[unit]) > army[str(unit)]:
+			return ERR_NOT_ENOUGH_UNITS
+	var used_dict: Dictionary = used
+	if not used_dict.is_empty():
+		return ERR_UNKNOWN_ABILITY
 	return ""
 
 
@@ -494,6 +566,9 @@ func to_dict() -> Dictionary:
 	for id: int in _sorted_ids():
 		if training.has(id) and not training[id].is_empty():
 			training_list.append(training[id].to_dict())
+	var raid_list := []
+	for raid: Dictionary in raids:
+		raid_list.append(raid.duplicate(true))
 	return {
 		"version": SAVE_VERSION,
 		"grid": {"width": catalog.grid_size.x, "height": catalog.grid_size.y},
@@ -506,13 +581,15 @@ func to_dict() -> Dictionary:
 		"unit_levels": level_data,
 		"research": research_data,
 		"training": training_list,
+		"raids": raid_list,
 	}
 
 
 ## Rebuilds a base from to_dict() output (works on JSON-parsed data, floats included). A version
 ## 1 save (or one with no version) was laid out on V1_FIELD: its buildings move by half the
 ## field's growth since, so the base stays centred; a field that did not grow moves nothing. A
-## save from before version 3 has no army, so it loads with none, every unit at level 1.
+## save from before version 3 has no army, so it loads with none, every unit at level 1; one
+## from before version 4 has no raids.
 static func from_dict(base_catalog: Catalog, data: Dictionary) -> BaseState:
 	var state := BaseState.new(base_catalog)
 	var shift := Vector2i.ZERO
@@ -538,6 +615,15 @@ static func from_dict(base_catalog: Catalog, data: Dictionary) -> BaseState:
 		state.grid.occupy(building.id, building.cell, base_catalog.size_of(building.type))
 		state._next_id = maxi(state._next_id, building.id + 1)
 	state._load_army(data)
+	# The raids are kept as they were saved, numbers made ints again, never checked: nothing in
+	# the base reads them.
+	var raid_data: Variant = data.get("raids", [])
+	if typeof(raid_data) == TYPE_ARRAY:
+		for raid: Variant in raid_data:
+			if typeof(raid) == TYPE_DICTIONARY:
+				state.raids.append(Catalog.ints(raid))
+		while state.raids.size() > RAID_LOG_SIZE:
+			state.raids.remove_at(0)
 	return state
 
 
@@ -664,6 +750,28 @@ func _research(unit: String) -> String:
 	_pay(stats.get("research_cost", _EMPTY))
 	research_unit = unit
 	research_done_at = now + int(stats.get("research_seconds", 0))
+	return ""
+
+
+## Spends the units deployed, brings the loot home up to storage (never removing what is there),
+## and keeps the battle with its result.
+func _raid_result(command: Dictionary) -> String:
+	var error := check_raid_result(command)
+	if error != "":
+		return error
+	var battle: Dictionary = command["battle"]
+	var result: Dictionary = command["result"]
+	var deployed: Dictionary = result["deployed"]
+	for unit: Variant in deployed:
+		army[str(unit)] -= BattleMath.whole(deployed[unit])
+	var loot: Dictionary = result["loot"]
+	var amounts := {}
+	for res: Variant in loot:
+		amounts[str(res)] = BattleMath.whole(loot[res])
+	_refund(amounts)
+	raids.append({"at": now, "battle": Catalog.ints(battle), "result": Catalog.ints(result)})
+	while raids.size() > RAID_LOG_SIZE:
+		raids.remove_at(0)
 	return ""
 
 

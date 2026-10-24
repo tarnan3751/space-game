@@ -41,6 +41,7 @@ read-only is `apply_dev_cheats()`, below.
 | `has_unit`, `unit_name` (the id when it has none), `unit_producer`, `unit_producer_level`, `unit_class`, `unit_crew`, `unit_housing`, `unit_train_seconds` | Per-unit lookups. `unit_class` is `ground` or `air`; `unit_crew` is `human`, `piloted` or `autonomous`, display and models only. |
 | `units_of_producer(building_type)` | The unit types a building type trains, in `units.json` order. It builds a new array, so it is for the HUD, not for a per-frame check. |
 | `unit_speed`, `unit_prefers` (`any` when it has none), `unit_splash`, `unit_damage_pct(type, class)` (100 unless `damage_pct` says), `unit_self_destructs` | A unit's battle fields. |
+| `ints(value)` | Static: a copy of a parsed JSON value with its whole numbers made ints, as the catalog loads its files; `BaseState` uses it on a loaded save's raids. |
 | `unit_max_level(type)`, `unit_level_stats(type, level)` | A unit's level count, and the stats of a 1-based level, the same shared read-only empty dictionary as `level_stats` when the type or level does not exist. |
 | `apply_dev_cheats()` | The dev cheats, which `main.gd` applies once after loading in a debug build unless `--no-cheats` is given (`input-camera.md`): rewrites every level of every type in place to `cost` `{}` and `build_seconds` `min(build_seconds, 1)`: a level that takes time takes one second, and an instant one (walls, the drone bay) stays instant, so it still needs no builder. Every unit's `train_seconds` becomes `min(train_seconds, 1)`, every level's `train_cost` and `research_cost` `{}`, and every `research_seconds` `min(research_seconds, 1)`. Nothing else changes (`requires_cc`, `max_count`, `storage`, `produces`, `builders`, `producer_level`, `requires_lab`, `housing`), so levels and units still unlock in order. `BaseState` never knows, so a save made under the cheats is an ordinary save. One quirk follows, in development builds only: a unit queued under the cheats (paid `{}`) and cancelled in a later `--no-cheats` run refunds the catalog's `train_cost` at its paid level, not the nothing it was charged. |
 
@@ -63,6 +64,7 @@ The authoritative model of one player's base. One per player; `main.gd` holds on
 | `unit_levels: Dictionary[String, int]` | Each unit type's level, for the whole type; every catalog unit has an entry, 1 by default. |
 | `training: Dictionary[int, TrainingQueue]` | Training queues by producer building id (**The army**). A queue stays when it empties. |
 | `research_unit: String`, `research_done_at: int` | The unit type being researched to its next level (`""` when none) and the unix second it completes. |
+| `raids: Array[Dictionary]` | The last `RAID_LOG_SIZE` (5) raids applied, newest last: `{"at": unix seconds, "battle", "result"}` as `raid_result` carried them (**Raids**). |
 | `signal changed` | Emitted after anything visible changed: by `apply` on success, by `advance_to` when a timer completed or a resource amount changed. |
 
 `BaseState.create_new(catalog, start_time)` lays out `catalog.start`: each listed building is
@@ -84,6 +86,7 @@ emits `changed`. A failed command changes nothing and charges nothing. The ops, 
 | `{"op": "train", "id": int, "unit": String, "count": int}` | `check_train(id, unit, count)` | Pays `count` times the unit's `train_cost` at its current level and queues `count` of it at producer `id`. `count` is optional (1); all or nothing. |
 | `{"op": "cancel_training", "id": int, "unit": String}` | `check_cancel_training(id, unit)` | Removes the newest queued `unit` from producer `id`'s queue and refunds its `train_cost` at the level it was paid for, up to storage. |
 | `{"op": "research", "unit": String}` | `check_research(unit)` | Pays the unit's next level's `research_cost` and starts its research, `research_seconds` long. |
+| `{"op": "raid_result", "battle": {...}, "result": {...}}` | `check_raid_result(command)` | Spends the units deployed, adds the loot up to storage and keeps the raid (**Raids**). |
 
 `"cell"` may also be a `Vector2i`; anything else becomes `(-1, -1)` and fails as `blocked`.
 
@@ -113,6 +116,13 @@ Checks, in the order they are made:
   `needs_producer_level` unless `is_unit_unlocked(unit)`; `needs_lab_level` while
   `lab_level()` is below the next level's `requires_lab`; `busy` while a research runs;
   `insufficient_resources`.
+- `check_raid_result(command)`: `bad_raid` unless `battle` and `result` are objects, the
+  result's `deployed`, `loot` and `abilities_used` are objects and the battle's `commands` a
+  list of objects, its `ticks` and `hash` whole, `destruction` 0–100 and `stars` 0–3, every
+  loot entry a known resource and a whole amount, and `deployed` counts the battle's deploy
+  commands exactly (a unit for each, no other); `unknown_unit` for a deployed unit the catalog
+  does not have; `not_enough_units` when a count exceeds the army's; `unknown_ability` unless
+  `abilities_used` is empty, an entry at zero included (step 4b).
 - Level requirements (`_check_level_requirements(stats)`): `needs_command_center_level` when
   `requires_cc` (default 1) exceeds `cc_level()`; `no_free_builder` when `build_seconds > 0`
   and `builders_free() <= 0`; `insufficient_resources` unless `can_afford(cost)`.
@@ -136,6 +146,9 @@ Checks, in the order they are made:
 | `ERR_HOUSING` | `not_enough_housing` |
 | `ERR_NOT_QUEUED` | `not_queued` |
 | `ERR_LAB_LEVEL` | `needs_lab_level` |
+| `ERR_BAD_RAID` | `bad_raid` |
+| `ERR_NOT_ENOUGH_UNITS` | `not_enough_units` |
+| `ERR_UNKNOWN_ABILITY` | `unknown_ability` |
 
 `Hud.ERROR_TEXT` maps these to player-facing text (`hud.md`).
 
@@ -225,6 +238,17 @@ needs no builder, and the research building's own upgrade neither stops it nor c
 completes. When it completes, `unit_levels[unit]` rises by one and the slot empties. There is
 no cancel. `research_seconds_left()` is the time left, 0 when none runs.
 
+### Raids
+
+A battle (`battle.md`) is applied to the attacker's base by `raid_result`. `battle` is the
+battle's setup with its accepted commands (the result's `commands`), `result` the rest of
+`BattleSim.result()`. The base trusts the result: deployed units are spent, alive or not (the
+owner's call), the rest stay housed; the loot is added up to `capacity(res)`, never removing
+what is there; abilities are refused until step 4b makes them. The raid is kept, `battle` and
+`result` with the time it was applied, the oldest dropped beyond `RAID_LOG_SIZE`, so a server
+can replay the inputs later. `apply` runs `_resume_training()` after it, as after every
+command, so a trained unit waiting for room is housed in the room the raid freed.
+
 ### Time and production
 
 `advance_to(time)` moves the base forward. Earlier or equal times are ignored, so a clock that
@@ -262,15 +286,16 @@ upgrade. `seconds_left(id)` is `finish_at - now`, floored at 0.
 
 ### Save and load
 
-`to_dict()` returns the save, version 3 (`SAVE_VERSION`), with the field it was laid out on and
-the army:
+`to_dict()` returns the save, version 4 (`SAVE_VERSION`), with the field it was laid out on, the
+army and the raids:
 
 ```
-{"version": 3, "grid": {"width": int, "height": int}, "now": int, "next_id": int,
+{"version": 4, "grid": {"width": int, "height": int}, "now": int, "next_id": int,
  "resources": {res: int}, "remainders": {res: int},
  "buildings": [{"id", "type", "cell": [x, y], "level", "target_level", "finish_at"}, ...],
  "army": {unit: int}, "unit_levels": {unit: int}, "research": {"unit", "done_at"} or {},
- "training": [{"building", "units": [unit, ...], "paid_levels": [int, ...], "done_at", "left"}, ...]}
+ "training": [{"building", "units": [unit, ...], "paid_levels": [int, ...], "done_at", "left"}, ...],
+ "raids": [{"at", "battle", "result"}, ...]}
 ```
 
 Buildings and training queues are listed in id order, and `army` and `unit_levels` in sorted
@@ -289,7 +314,10 @@ moves by half the field's growth since, `(grid_size - V1_FIELD) / 2` floored at 
 (4, 4) on 48×48, so the base stays centred; a field that did not grow (the fixture's 10×10) moves
 nothing. A version 2 save loads where it was; its `grid` is recorded for later migrations, not
 read. A version 1 or 2 save has no army keys, so it loads with no army, every unit at level 1,
-no queues and no research; the next save is version 3.
+no queues and no research; a version 1, 2 or 3 save has no raids. The next save is version 4.
+Saved raids are loaded as they were, their whole numbers made ints again (`Catalog.ints`) so
+the save stays canonical, the newest `RAID_LOG_SIZE` kept; nothing checks them, since nothing
+in the base reads them.
 
 The army loads after the buildings (`_load_army`), and what a data change has made wrong is
 dropped or clamped: an army count or level of a unit the catalog no longer has is dropped, a

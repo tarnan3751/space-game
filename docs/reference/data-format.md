@@ -389,7 +389,7 @@ line) replaces it, which is how the gate and the harness keep off the real save.
 
 ```json
 {
-  "version": 3,
+  "version": 4,
   "grid": { "width": 48, "height": 48 },
   "now": 1760400000,
   "next_id": 4,
@@ -403,6 +403,11 @@ line) replaces it, which is how the gate and the harness keep off the real save.
   "research": { "unit": "brawler", "done_at": 1760400300 },
   "training": [
     { "building": 9, "units": ["ranger", "ranger"], "paid_levels": [2, 2], "done_at": 1760400010, "left": 0 }
+  ],
+  "raids": [
+    { "at": 1760400200, "battle": { "seed": 7, "attacker": {...}, "defender": {...}, "commands": [...] },
+      "result": { "abilities_used": {}, "deployed": { "ranger": 8 }, "destruction": 63, "hash": 1234567,
+                  "loot": { "antimatter": 0, "crystal": 1600, "metal": 1800 }, "stars": 2, "ticks": 2412 } }
   ]
 }
 ```
@@ -424,5 +429,9 @@ units oldest first, the level each was paid for, and the head's `done_at` while 
 `left`, its seconds to go, while it is stopped) are from version 3; a version 1 or 2 save has
 none and loads with no army, every unit at level 1. Units the catalog no longer has, levels
 above a unit's top and queues on a building that is gone or no longer trains the unit are
-dropped or clamped on load (`core-economy.md`). The next save is version 3. A change to this shape keeps old saves loading or bumps `version` with a migration
+dropped or clamped on load (`core-economy.md`).
+
+`raids` (from version 4) holds the last five raids applied, newest last: when, the battle's
+setup with its accepted commands, and its result (`battle.md`, `core-economy.md`, **Raids**). A
+version 1, 2 or 3 save has none. The next save is version 4. A change to this shape keeps old saves loading or bumps `version` with a migration
 (`CLAUDE.md`, **Agent workflow**, tier A).

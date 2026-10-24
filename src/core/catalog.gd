@@ -705,11 +705,12 @@ static func _parse(text: String) -> Variant:
 	var json := JSON.new()
 	if json.parse(text) != OK:
 		return null
-	return _ints(json.data)
+	return ints(json.data)
 
 
-## Recursively turns whole-number floats into ints.
-static func _ints(value: Variant) -> Variant:
+## Recursively turns whole-number floats into ints, in a copy. Public for BaseState, which
+## makes a loaded save's raids ints again.
+static func ints(value: Variant) -> Variant:
 	match typeof(value):
 		TYPE_FLOAT:
 			var number: float = value
@@ -720,12 +721,12 @@ static func _ints(value: Variant) -> Variant:
 			var source: Dictionary = value
 			var converted_dict := {}
 			for key: Variant in source:
-				converted_dict[key] = _ints(source[key])
+				converted_dict[key] = ints(source[key])
 			return converted_dict
 		TYPE_ARRAY:
 			var source_array: Array = value
 			var converted_array := []
 			for item: Variant in source_array:
-				converted_array.append(_ints(item))
+				converted_array.append(ints(item))
 			return converted_array
 	return value
