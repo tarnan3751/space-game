@@ -1,8 +1,8 @@
 class_name HudIcon
 extends Control
 ## A HUD badge drawn in code, vector, from no asset file: the icon at the left end of each
-## resource meter, and the drone at the centre of the drone ring (`DroneRing`)
-## (docs/reference/hud.md, **Top bar**). Each part of a silhouette is a flat fill in the
+## meter, the drone at the centre of the drone ring (`DroneRing`), and the unit glyphs of the
+## training and research panels (docs/reference/hud.md, **Top bar**, **Unit glyphs**). Each part of a silhouette is a flat fill in the
 ## icon's colour, with a lighter highlight facet and a 2.5 px ink outline, over a 2 px ink
 ## offset shadow under the whole icon. The shapes are laid out in a 40-unit box, scaled to
 ## the rect they are painted into. A control draws only when it is built or resized, and the
@@ -15,19 +15,32 @@ const OUTLINE := 2.5
 const EDGE := 2.0
 const SHADOW_OFFSET := Vector2(2, 2)
 
-## "metal", "crystal", "antimatter" or "drones"; anything else draws a plain gem.
+## "metal", "crystal", "antimatter", "drones", "army" (the army meter's figure), or a unit's
+## crew, "human", "piloted" or "autonomous"; anything else draws a plain gem.
 var kind: String = ""
 var color: Color = Color.WHITE
+## A wing mark at the lower right: an air unit.
+var winged: bool = false
 
 
 func _draw() -> void:
 	var pen := Pen.new()
-	paint(pen, kind, Rect2(Vector2.ZERO, size), color)
+	paint(pen, kind, Rect2(Vector2.ZERO, size), color, winged)
 	pen.draw(self)
 
 
-## Adds the `icon`, fitted to `rect`, to `pen`: every part's shadow, then the parts.
-static func paint(pen: Pen, icon: String, rect: Rect2, tint: Color) -> void:
+## Shows another icon; it redraws only when something changed.
+func show_icon(new_kind: String, new_winged: bool) -> void:
+	if new_kind == kind and new_winged == winged:
+		return
+	kind = new_kind
+	winged = new_winged
+	queue_redraw()
+
+
+## Adds the `icon`, fitted to `rect`, to `pen`: every part's shadow, then the parts, the wing
+## mark last when `wing`.
+static func paint(pen: Pen, icon: String, rect: Rect2, tint: Color, wing: bool = false) -> void:
 	pen.fit(rect)
 	for shadow: bool in [true, false]:
 		pen.shadow = shadow
@@ -40,8 +53,18 @@ static func paint(pen: Pen, icon: String, rect: Rect2, tint: Color) -> void:
 				_orb(pen, tint)
 			"drones":
 				_drone(pen, tint)
+			"army":
+				_figure(pen, tint)
+			"human":
+				_helmet(pen, tint)
+			"piloted":
+				_tracked(pen, tint)
+			"autonomous":
+				_sensor_head(pen, tint)
 			_:
 				_gem(pen, tint)
+		if wing:
+			_wing(pen)
 	pen.shadow = false
 
 
@@ -109,6 +132,81 @@ static func _drone(pen: Pen, tint: Color) -> void:
 	pen.facet(_ellipse(Vector2(17.2, 16.8), Vector2(2.2, 1.4), 0.0, TAU, 10, -0.7), tint.lightened(0.6))
 	pen.outline(body)
 	pen.facet(_ellipse(Vector2(20, 21), Vector2(2.6, 2.6), 0.0, TAU, 12), Hud.INK)
+
+
+## The army meter's figure: a head over a pair of rounded shoulders, each with a lighter facet.
+static func _figure(pen: Pen, tint: Color) -> void:
+	var shoulders := _ellipse(Vector2(20, 30), Vector2(13, 9), PI, TAU, 12)
+	shoulders.append_array(PackedVector2Array([Vector2(33, 37), Vector2(7, 37)]))
+	pen.shape(shoulders, tint)
+	pen.facet(_ellipse(Vector2(13, 27), Vector2(3.5, 2), 0.0, TAU, 10, -0.7), tint.lightened(0.5))
+	pen.outline(shoulders)
+	var head := _ellipse(Vector2(20, 12), Vector2(7, 7), 0.0, TAU, 16)
+	pen.shape(head, tint)
+	pen.facet(_ellipse(Vector2(17, 9), Vector2(2.6, 1.8), 0.0, TAU, 10, -0.6), tint.lightened(0.55))
+	pen.outline(head)
+
+
+## A human unit: a space helmet from the front, a dome over two cheek guards, with a cyan visor
+## across it and a glint on the dome and the visor.
+static func _helmet(pen: Pen, tint: Color) -> void:
+	var helmet := _ellipse(Vector2(20, 21), Vector2(14, 14), PI, TAU, 16)
+	helmet.append_array(PackedVector2Array([Vector2(33, 30), Vector2(28, 34), Vector2(12, 34), Vector2(7, 30)]))
+	pen.shape(helmet, tint)
+	pen.facet(_ellipse(Vector2(14, 12), Vector2(4, 2.4), 0.0, TAU, 10, -0.6), tint.lightened(0.55))
+	pen.outline(helmet)
+	var visor := PackedVector2Array([Vector2(9, 18), Vector2(31, 18), Vector2(29, 27), Vector2(11, 27)])
+	pen.facet(visor, Hud.ACCENT)
+	pen.facet(PackedVector2Array([Vector2(12, 19.5), Vector2(17, 19.5), Vector2(15, 25), Vector2(13, 25)]),
+		Color(1, 1, 1, 0.7))
+	pen.outline(visor)
+
+
+## A piloted unit: a cyan cockpit canopy on a hull over a track with three wheels.
+static func _tracked(pen: Pen, tint: Color) -> void:
+	var track := _ellipse(Vector2(9, 32), Vector2(5, 5), PI / 2.0, PI * 1.5, 6)
+	track.append_array(_ellipse(Vector2(31, 32), Vector2(5, 5), -PI / 2.0, PI / 2.0, 6))
+	pen.shape(track, tint.darkened(0.35))
+	for x: float in [10.0, 20.0, 30.0]:
+		pen.facet(_ellipse(Vector2(x, 32), Vector2(3, 3), 0.0, TAU, 10), tint.lightened(0.25))
+		pen.facet(_ellipse(Vector2(x, 32), Vector2(1.2, 1.2), 0.0, TAU, 8), Hud.INK)
+	pen.outline(track)
+	var hull := PackedVector2Array([Vector2(6, 27), Vector2(34, 27), Vector2(30, 19), Vector2(10, 19)])
+	pen.shape(hull, tint)
+	pen.facet(PackedVector2Array([Vector2(10, 19), Vector2(14, 19), Vector2(11, 27), Vector2(6, 27)]),
+		tint.lightened(0.45))
+	pen.outline(hull)
+	var canopy := _ellipse(Vector2(20, 19), Vector2(8, 9), PI, TAU, 12)
+	pen.shape(canopy, Hud.ACCENT)
+	pen.facet(_ellipse(Vector2(17, 14), Vector2(2.4, 1.5), 0.0, TAU, 10, -0.7), Color(1, 1, 1, 0.8))
+	pen.outline(canopy)
+
+
+## An autonomous unit: a block head with a sensor slit and a cyan eye, an antenna on top, on a
+## neck and a shoulder bar.
+static func _sensor_head(pen: Pen, tint: Color) -> void:
+	var shoulders := PackedVector2Array([Vector2(7, 38), Vector2(33, 38), Vector2(30, 32), Vector2(10, 32)])
+	pen.shape(shoulders, tint.darkened(0.3))
+	pen.outline(shoulders)
+	pen.band(PackedVector2Array([Vector2(20, 8), Vector2(20, 3.5)]), tint.lightened(0.3))
+	var bulb := _ellipse(Vector2(20, 3.5), Vector2(2.4, 2.4), 0.0, TAU, 10)
+	pen.shape(bulb, Hud.ACCENT)
+	pen.outline(bulb)
+	var head := _rounded_square(Vector2(20, 19), 12.0, 4.0)
+	pen.shape(head, tint)
+	pen.facet(_ellipse(Vector2(13, 11), Vector2(3, 1.8), 0.0, TAU, 10, -0.6), tint.lightened(0.55))
+	pen.outline(head)
+	var slit := PackedVector2Array([Vector2(11, 16), Vector2(29, 16), Vector2(29, 22), Vector2(11, 22)])
+	pen.facet(slit, Hud.INK)
+	pen.facet(_ellipse(Vector2(20, 19), Vector2(3.6, 2.2), 0.0, TAU, 12), Hud.ACCENT)
+	pen.facet(_ellipse(Vector2(19, 18.3), Vector2(1.2, 0.8), 0.0, TAU, 8), Color.WHITE)
+
+
+## The air mark: a swept wing, white with its ink outline, at the box's lower right.
+static func _wing(pen: Pen) -> void:
+	var wing := PackedVector2Array([Vector2(24, 31), Vector2(39, 24), Vector2(36, 31), Vector2(28, 38)])
+	pen.shape(wing, Hud.TEXT)
+	pen.outline(wing)
 
 
 ## A square `half` across each way of `centre`, its corners rounded to `radius`.

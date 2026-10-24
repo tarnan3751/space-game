@@ -104,6 +104,8 @@ const FLASH_RISE_TICKS := 1.5
 ## The seconds since the last refresh weighed against a rise are capped here: a stalled tick or
 ## two still never flashes, while a longer gap's catch-up (the app resumed) does.
 const FLASH_MAX_SECONDS := 5
+## The army meter's key among the meters: no resource id begins with "@".
+const ARMY_METER := "@army"
 ## The build panel's height, never past a share of the screen's.
 const MENU_HEIGHT := 300.0
 const MENU_MAX_SHARE := 0.4
@@ -122,7 +124,8 @@ var _root: Control
 var _fitted_area: Rect2 = Rect2()
 ## The top bar's rows: the meters and the drone ring, then the debug buttons in debug builds.
 var _top: VBoxContainer
-## Each resource's meter, the fill that grows across it, and its amount.
+## Each resource's meter, and the army's under ARMY_METER, the fill that grows across it, and its
+## amount.
 var _meters: Dictionary[String, Control] = {}
 var _meter_fills: Dictionary[String, Control] = {}
 var _meter_labels: Dictionary[String, Label] = {}
@@ -204,7 +207,7 @@ func refresh(state: BaseState, selected_id: int, placing: bool, ghost_ok: bool, 
 	_fit_safe_area()
 	var elapsed := clampi(state.now - _meters_now, 1, FLASH_MAX_SECONDS)
 	_meters_now = state.now
-	for res: String in _meters:
+	for res: String in _catalog.resources:
 		# A resource the base has no storage for yet (antimatter, early on) is hidden, unless
 		# the cheats make every resource infinite.
 		var capacity := state.capacity(res)
@@ -213,10 +216,7 @@ func refresh(state: BaseState, selected_id: int, placing: bool, ghost_ok: bool, 
 		var fraction := clampf(float(amount) / capacity, 0.0, 1.0) if capacity > 0 else 0.0
 		if cheats:
 			fraction = 1.0
-		var width := roundf(METER_TRACK.x * fraction)
-		if _meter_fills[res].size.x != width:
-			_meter_fills[res].size = Vector2(width, METER_TRACK.y)
-			_meter_shaders[res].set_shader_parameter(&"fill_width", width)
+		_set_fill(res, fraction)
 		# A drop (a purchase) or a rise past FLASH_RISE_TICKS ticks' production (a payout, an
 		# offline catch-up) flashes the fill; the per-tick trickle does not. Under the cheats the
 		# meter reads "∞" whatever it holds.
@@ -224,6 +224,13 @@ func refresh(state: BaseState, selected_id: int, placing: bool, ghost_ok: bool, 
 			_meter_shaders[res].set_shader_parameter(&"flash_time", Motion.clock())
 		_meter_amounts[res] = amount
 		_meter_labels[res].text = "∞" if cheats else "%s / %s" % [Format.short(amount), Format.short(capacity)]
+	# The army's housing shows once a Hangar is built; the cheats leave it as it is.
+	var housing := state.housing_capacity()
+	_meters[ARMY_METER].visible = housing > 0
+	if housing > 0:
+		var used := state.housing_used()
+		_set_fill(ARMY_METER, clampf(float(used) / housing, 0.0, 1.0))
+		_meter_labels[ARMY_METER].text = "%s / %s" % [Format.short(used), Format.short(housing)]
 	_drone_ring.set_counts(state.builders_free(), state.builders_total())
 
 	var has_selection := selected_id != 0 and state.buildings.has(selected_id)
@@ -364,6 +371,21 @@ func entry_strip() -> ScrollContainer:
 ## The top bar's meter for one resource; hidden while the base cannot store it.
 func resource_panel(res: String) -> Control:
 	return _meters[res]
+
+
+## The top bar's army meter; hidden while the base houses no army.
+func army_meter() -> Control:
+	return _meters[ARMY_METER]
+
+
+## The army meter's text: housing used / capacity.
+func army_meter_text() -> String:
+	return _meter_labels[ARMY_METER].text
+
+
+## The army meter's fill; its parent is the track it grows across.
+func army_fill() -> Control:
+	return _meter_fills[ARMY_METER]
 
 
 ## A meter's fill; its parent is the track it grows across.
@@ -546,6 +568,8 @@ func _refresh_info(state: BaseState, building: BuildingState) -> void:
 		lines.append("Houses %s drone" % _level_stat(stats, next, "builders"))
 	if stats.has("capacity"):
 		lines.append("Capacity %s" % _level_stat(stats, next, "capacity"))
+	if type == _catalog.housing_type:
+		lines.append("Army housed %s / %s" % [Format.amount(state.housing_used()), Format.amount(state.housing_capacity())])
 	var combat := PackedStringArray()
 	if stats.has("damage"):
 		combat.append("Damage %s" % _level_stat(stats, next, "damage"))
@@ -604,7 +628,7 @@ static func _seconds(ms: int) -> String:
 
 # --- Construction ----------------------------------------------------------------
 
-## The top-left row: a meter per resource, then the drone ring.
+## The top-left row: a meter per resource, the army's, then the drone ring.
 func _build_top_bar() -> void:
 	_top = VBoxContainer.new()
 	_top.mouse_filter = Control.MOUSE_FILTER_IGNORE
@@ -621,18 +645,21 @@ func _build_top_bar() -> void:
 	_top.add_child(bar)
 	var stripe := _make_stripe()
 	for i: int in _catalog.resources.size():
-		_build_meter(bar, _catalog.resources[i], stripe, fmod(i * GLINT_STAGGER, 1.0))
+		var res := _catalog.resources[i]
+		_build_meter(bar, res, res, _resource_color(res), stripe, fmod(i * GLINT_STAGGER, 1.0))
+	_build_meter(bar, ARMY_METER, "army", MaterialKit.ARMY, stripe,
+		fmod(_catalog.resources.size() * GLINT_STAGGER, 1.0))
 	_drone_ring = DroneRing.new()
 	bar.add_child(_drone_ring)
 
 
-## One resource's meter: a trough that the fill, textured with `stripe`, grows across by
-## amount over storage, the amount on it, and the resource's icon over its left end. The stripes
-## drift and glint (meter.gdshader), the glint at `phase` of its period. The meter stops a touch
-## on it, as any opaque part does, so it never selects or drags what lies under it; its parts
-## take none.
-func _build_meter(parent: Control, res: String, stripe: Texture2D, phase: float) -> void:
-	var color := _resource_color(res)
+## One meter, under `key` (a resource's id, or ARMY_METER): a trough that the fill, textured with
+## `stripe` and tinted `color`, grows across by amount over storage, the amount on it, and the
+## HudIcon `icon_kind` over its left end. The stripes drift and glint (meter.gdshader), the glint
+## at `phase` of its period. The meter stops a touch on it, as any opaque part does, so it never
+## selects or drags what lies under it; its parts take none.
+func _build_meter(parent: Control, key: String, icon_kind: String, color: Color, stripe: Texture2D,
+		phase: float) -> void:
 	var meter := Control.new()
 	meter.mouse_filter = Control.MOUSE_FILTER_STOP
 	meter.custom_minimum_size = METER_SIZE
@@ -690,15 +717,23 @@ func _build_meter(parent: Control, res: String, stripe: Texture2D, phase: float)
 	label.offset_left = METER_ICON.x - METER_TROUGH_LEFT
 	var icon := HudIcon.new()
 	icon.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	icon.kind = res
+	icon.kind = icon_kind
 	icon.color = color
 	icon.position = Vector2(0, (METER_SIZE.y - METER_ICON.y) / 2.0)
 	icon.size = METER_ICON
 	meter.add_child(icon)
-	_meters[res] = meter
-	_meter_fills[res] = fill
-	_meter_labels[res] = label
-	_meter_shaders[res] = shader
+	_meters[key] = meter
+	_meter_fills[key] = fill
+	_meter_labels[key] = label
+	_meter_shaders[key] = shader
+
+
+## Sizes a meter's fill to `fraction` of its track, to the pixel; untouched when that is its width.
+func _set_fill(key: String, fraction: float) -> void:
+	var width := roundf(METER_TRACK.x * fraction)
+	if _meter_fills[key].size.x != width:
+		_meter_fills[key].size = Vector2(width, METER_TRACK.y)
+		_meter_shaders[key].set_shader_parameter(&"fill_width", width)
 
 
 ## Whether a change of `change` in a resource's amount over `elapsed` seconds flashes its meter:
