@@ -11,7 +11,7 @@
     { "id": "traps", "name": "Traps" }
   ],
   "grid": { "width": 48, "height": 48 },
-  "army": { "housing": "hangar", "research": "research_lab" },
+  "army": { "housing": "hangar", "research": "research_lab", "foundry": "nanite_foundry" },
   "battle": {
     "seconds": 180,
     "loot_pct": { "metal": 20, "crystal": 20, "antimatter": 5 },

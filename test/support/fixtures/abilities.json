@@ -1,0 +1,36 @@
+{
+  "swarm": {
+    "name": "Swarm",
+    "effect": "swarm",
+    "make_seconds": 10,
+    "requires_foundry": 1,
+    "radius_units": 2000,
+    "levels": [
+      { "make_cost": { "crystal": 10 }, "heal_per_second": 40, "duration_ms": 1000 },
+      { "make_cost": { "crystal": 20 }, "research_cost": { "crystal": 100 }, "research_seconds": 60,
+        "requires_lab": 1, "heal_per_second": 80, "duration_ms": 1000 }
+    ]
+  },
+  "burst": {
+    "name": "Burst",
+    "effect": "emp",
+    "make_seconds": 20,
+    "requires_foundry": 1,
+    "radius_units": 2000,
+    "levels": [
+      { "make_cost": { "crystal": 20 }, "stun_ms": 1000 }
+    ]
+  },
+  "strike": {
+    "name": "Strike",
+    "effect": "strike",
+    "make_seconds": 30,
+    "requires_foundry": 2,
+    "radius_units": 1000,
+    "levels": [
+      { "make_cost": { "crystal": 30 }, "damage": 100, "delay_ms": 500 },
+      { "make_cost": { "crystal": 40 }, "research_cost": { "crystal": 200 }, "research_seconds": 120,
+        "requires_lab": 2, "damage": 150, "delay_ms": 500 }
+    ]
+  }
+}

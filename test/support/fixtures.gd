@@ -11,6 +11,8 @@ extends RefCounted
 ##   siphon    1x1: 50 crystal, instant, makes 3600 antimatter/h, stores 100 antimatter, max 1
 ##   hangar    2x2: 100 metal, 30 s, capacity 20 (L2 30, needs CC 2); houses the army
 ##   academy   1x1: 10 metal, instant, trains every unit (L2 20 metal, 10 s), max 2
+##   foundry   1x1: 10 metal, instant, makes the abilities, capacity 2 (L2 20 metal, 10 s,
+##             capacity 3), max 1
 ##   lab       2x2: 100 metal, 30 s, needs CC 2 (max_count 0 at CC 1); researches (L2 200 metal, 60 s)
 ##   mine      1x1: 20 metal, instant, hidden, targets ground, max 2
 ##   wall      1x1: 10 metal, instant, max 25
@@ -39,6 +41,14 @@ extends RefCounted
 ##   flyer  air, housing 2, 20 s, 20 crystal (L2: research 200 crystal, 120 s, lab 2; trains for 30)
 ##   walker ground, housing 5, 30 s, 50 crystal, needs academy level 2, one level
 ##
+## Fixture abilities (abilities.json, all made by the foundry; catalog(), catalog_with_grid and
+## battle_catalog load them, expedition_catalog does not):
+##   swarm   swarm, 10 s, foundry 1, radius 2000, 10 crystal, heals 40/s for 1000 ms
+##           (L2: research 100 crystal, 60 s, lab 1; makes for 20; heals 80/s for 1000 ms)
+##   burst   emp, 20 s, foundry 1, radius 2000, 20 crystal, disables for 1000 ms, one level
+##   strike  strike, 30 s, foundry 2, radius 1000, 30 crystal, 100 damage after 500 ms
+##           (L2: research 200 crystal, 120 s, lab 2; makes for 40; 150 damage)
+##
 ## The expedition catalog (Fixtures.expedition_catalog; docs/reference/expeditions.md): its own
 ## rules and buildings, on a 40x40 field, with ten Command Center levels so an outpost can be laid
 ## out at every level, and the units and battle units above. rules.expedition is the shipped
@@ -55,6 +65,7 @@ extends RefCounted
 const RULES := "res://test/support/fixtures/rules.json"
 const BUILDINGS := "res://test/support/fixtures/buildings.json"
 const UNITS := "res://test/support/fixtures/units.json"
+const ABILITIES := "res://test/support/fixtures/abilities.json"
 const BATTLE_UNITS := "res://test/support/fixtures/battle_units.json"
 const EXPEDITION_RULES := "res://test/support/fixtures/expedition_rules.json"
 const EXPEDITION_BUILDINGS := "res://test/support/fixtures/expedition_buildings.json"
@@ -64,7 +75,8 @@ static func catalog() -> Catalog:
 	return Catalog.from_json(
 		FileAccess.get_file_as_string(RULES),
 		FileAccess.get_file_as_string(BUILDINGS),
-		FileAccess.get_file_as_string(UNITS)
+		FileAccess.get_file_as_string(UNITS),
+		FileAccess.get_file_as_string(ABILITIES)
 	)
 
 
@@ -73,7 +85,7 @@ static func catalog_with_grid(size: Vector2i) -> Catalog:
 	var rules: Dictionary = JSON.parse_string(FileAccess.get_file_as_string(RULES))
 	rules["grid"] = {"width": size.x, "height": size.y}
 	return Catalog.from_json(JSON.stringify(rules), FileAccess.get_file_as_string(BUILDINGS),
-		FileAccess.get_file_as_string(UNITS))
+		FileAccess.get_file_as_string(UNITS), FileAccess.get_file_as_string(ABILITIES))
 
 
 ## The fixture catalog with the battle units merged in, on a field of `size` (20x20 by default).
@@ -83,7 +95,7 @@ static func battle_catalog(size: Vector2i = Vector2i(20, 20)) -> Catalog:
 	var units: Dictionary = JSON.parse_string(FileAccess.get_file_as_string(UNITS))
 	units.merge(JSON.parse_string(FileAccess.get_file_as_string(BATTLE_UNITS)))
 	return Catalog.from_json(JSON.stringify(rules), FileAccess.get_file_as_string(BUILDINGS),
-		JSON.stringify(units))
+		JSON.stringify(units), FileAccess.get_file_as_string(ABILITIES))
 
 
 ## The expedition catalog: its rules and buildings, with the battle units merged in as

@@ -1,0 +1,56 @@
+{
+  "repair_swarm": {
+    "name": "Repair Swarm",
+    "effect": "swarm",
+    "make_seconds": 60,
+    "requires_foundry": 1,
+    "radius_units": 3500,
+    "levels": [
+      { "make_cost": { "crystal": 1500 }, "heal_per_second": 30, "duration_ms": 6000 },
+      { "make_cost": { "crystal": 2000 }, "research_cost": { "crystal": 40000 }, "research_seconds": 300,
+        "requires_lab": 4, "heal_per_second": 40, "duration_ms": 6000 },
+      { "make_cost": { "crystal": 2800 }, "research_cost": { "crystal": 150000, "antimatter": 200 },
+        "research_seconds": 600, "requires_lab": 6, "heal_per_second": 50, "duration_ms": 6000 },
+      { "make_cost": { "crystal": 3800, "antimatter": 10 }, "research_cost": { "crystal": 500000, "antimatter": 800 },
+        "research_seconds": 1200, "requires_lab": 8, "heal_per_second": 62, "duration_ms": 6000 },
+      { "make_cost": { "crystal": 5000, "antimatter": 20 }, "research_cost": { "crystal": 1200000, "antimatter": 2100 },
+        "research_seconds": 1800, "requires_lab": 10, "heal_per_second": 75, "duration_ms": 6000 }
+    ]
+  },
+  "emp_burst": {
+    "name": "EMP Burst",
+    "effect": "emp",
+    "make_seconds": 90,
+    "requires_foundry": 3,
+    "radius_units": 3000,
+    "levels": [
+      { "make_cost": { "crystal": 2500 }, "stun_ms": 3000 },
+      { "make_cost": { "crystal": 3300 }, "research_cost": { "crystal": 72000, "antimatter": 90 },
+        "research_seconds": 600, "requires_lab": 6, "stun_ms": 3500 },
+      { "make_cost": { "crystal": 4300, "antimatter": 10 }, "research_cost": { "crystal": 290000, "antimatter": 440 },
+        "research_seconds": 1200, "requires_lab": 8, "stun_ms": 4000 },
+      { "make_cost": { "crystal": 5500, "antimatter": 20 }, "research_cost": { "crystal": 600000, "antimatter": 970 },
+        "research_seconds": 1500, "requires_lab": 9, "stun_ms": 4500 },
+      { "make_cost": { "crystal": 7000, "antimatter": 35 }, "research_cost": { "crystal": 1200000, "antimatter": 2100 },
+        "research_seconds": 1800, "requires_lab": 10, "stun_ms": 5000 }
+    ]
+  },
+  "orbital_strike": {
+    "name": "Orbital Strike",
+    "effect": "strike",
+    "make_seconds": 120,
+    "requires_foundry": 5,
+    "radius_units": 2000,
+    "levels": [
+      { "make_cost": { "crystal": 4000, "antimatter": 20 }, "damage": 600, "delay_ms": 1500 },
+      { "make_cost": { "crystal": 5200, "antimatter": 30 }, "research_cost": { "crystal": 290000, "antimatter": 440 },
+        "research_seconds": 1200, "requires_lab": 8, "damage": 750, "delay_ms": 1500 },
+      { "make_cost": { "crystal": 6800, "antimatter": 45 }, "research_cost": { "crystal": 450000, "antimatter": 700 },
+        "research_seconds": 1500, "requires_lab": 9, "damage": 900, "delay_ms": 1500 },
+      { "make_cost": { "crystal": 8800, "antimatter": 65 }, "research_cost": { "crystal": 800000, "antimatter": 1400 },
+        "research_seconds": 1500, "requires_lab": 9, "damage": 1100, "delay_ms": 1500 },
+      { "make_cost": { "crystal": 11000, "antimatter": 90 }, "research_cost": { "crystal": 1200000, "antimatter": 2100 },
+        "research_seconds": 1800, "requires_lab": 10, "damage": 1300, "delay_ms": 1500 }
+    ]
+  }
+}

@@ -23,7 +23,7 @@ A non-whole number stays a float and fails validation wherever an int is require
     { "id": "traps", "name": "Traps" }
   ],
   "grid": { "width": 48, "height": 48 },
-  "army": { "housing": "hangar", "research": "research_lab" },
+  "army": { "housing": "hangar", "research": "research_lab", "foundry": "nanite_foundry" },
   "battle": {
     "seconds": 180,
     "loot_pct": { "metal": 20, "crystal": 20, "antimatter": 5 },
@@ -60,7 +60,7 @@ A non-whole number stays a float and fails validation wherever an int is require
 | `resources` | The resources, in the order production is paid out and the HUD shows them. Each is `{ "id", "name", "color" }`: the id that costs, rates and saves use; the display name (defaults to the id); and the HUD colour as a hex string without `#` (optional; the HUD falls back to its text colour). Must not be empty. |
 | `categories` | The build-menu categories in tab order, each `{ "id", "name" }` (the name defaults to the id). Every type but the Command Center belongs to one. `core`, the Command Center's category, is never listed. |
 | `grid` | `width` and `height` in cells, both positive. |
-| `army` | `housing`: the building type whose `capacity` houses the army; `research`: the building type that researches unit levels. Each names a type in `buildings.json`; both are required once `units.json` lists a unit. |
+| `army` | `housing`: the building type whose `capacity` houses the army; `research`: the building type that researches unit and ability levels; `foundry`: the building type that makes the abilities, whose `capacity` caps their stock. Each names a type in `buildings.json`; `housing` and `research` are required once `units.json` lists a unit, `foundry` once `abilities.json` lists an ability. |
 | `battle` | Optional; the battle sim's rules (`battle.md`). `seconds`: the battle's length, at least 1. `loot_pct`: `{resource: percent}`, 0–100, of the defender's stored amount a raid can take (a resource left out gives none). `wall`: the wall type, the `wall` class. `trap_category`: the category whose types are traps, the `trap` class. `wall_cost_units`: the extra path cost, in field units, of walking into a wall cell, which decides when a ground unit breaks through a wall rather than walk round it. Without the section the catalog has no battle rules and a battle refuses to set up. |
 | `expedition` | Optional; the sector and the outpost generator (`expeditions.md`). `scan_seconds` (whole): the cooldown from one scan to the next. `margin` (at least 1, and less than half the grid): the free cells between every outpost footprint and the field's edge. `jitter`: how far the outpost's centre may move on each axis. `spacing`: the free cells kept between footprints outside the compound. `wall_gap_cells` (at least 1): one gap's width in a wall ring. `slack_pct` (at least 100): the compound's and the middle band's area as a percent of what their buildings take. `bands`, in field order, each `{ "id", "fields", "cc_offset", "level_offset", "density_pct", "loot_pct", "wall_gaps", "deposits", "hazards" }`: `fields` (at least 1) of the sector's fields are in the band, so the field count is their sum; the outpost's Command Center is the player's plus `cc_offset` (any whole number, clamped to the levels); its levels are the highest its Command Center allows plus `level_offset` (0 or less); `density_pct` of each type's `max_count`, rounded half up; `loot_pct` of the player's storage capacity as the loot target; `wall_gaps` openings in each wall ring; `deposits` storages outside the walls, with `hazards` defences each. The shipped bands are easy (Command Center −1, levels −1, 60%, 15% loot, two gaps, two deposits, no hazards), even (+0, 80%, 25%, one gap, one deposit, one hazard) and hard (+1, 85%, 40%, closed, one deposit, two hazards), two fields each. Without the section the catalog has no fields. A block with any error is reported and not kept. |
 | `menu_order` | The build menu's types in order: every type except `command_center`, exactly once. Within a category, this is the order the HUD lists them. |
@@ -110,7 +110,7 @@ Per level:
 | `produces` | core | `{resource: int}` per hour while the building is at this level and idle. |
 | `storage` | core | `{resource: int}` added to the base's capacity while the building is at this level, busy or not. |
 | `builders` | core | Builders (drones) this level supplies. |
-| `capacity` | HUD | Army capacity (the Hangar, the Alliance Beacon), shown as "Capacity". Unrelated to `BaseState.capacity(res)`, which is storage. Reserved for the army. |
+| `capacity` | core | The army's housing on the Hangar (`rules.army.housing`), the ability stock's cap on the Nanite Foundry (`rules.army.foundry`), display-only on the Alliance Beacon; the HUD shows it as "Capacity". Unrelated to `BaseState.capacity(res)`, which is storage. Reserved for the army. |
 | `hp` | HUD, battle | Shown as "Hull". The building's hull in battle; every type but the traps has it at every level. |
 | `damage`, `range_cells` | HUD, battle | Shown as "Damage N   Range N", each part when the level has it. `range_cells` is the reach in cells from the building's centre, a trap's trigger and blast radius, or the Shield Generator's bubble radius. |
 | `fire_ms` | HUD, battle | Milliseconds between shots, shown as "Fires every N s". |
@@ -189,6 +189,50 @@ Per level:
 The "battle" fields are read by the battle sim (`battle.md`), against the buildings' battle
 classes (above). Unknown fields are ignored, as for buildings.
 
+## `data/abilities.json`
+
+An object keyed by ability id; its order is the making menu's order. The abilities are what the
+attacker uses in battle besides deploying (`battle.md`, **Abilities**), made in the Nanite
+Foundry (`core-economy.md`, **The Foundry**). Each:
+
+```json
+"repair_swarm": {
+  "name": "Repair Swarm",
+  "effect": "swarm",
+  "make_seconds": 60,
+  "requires_foundry": 1,
+  "radius_units": 3500,
+  "levels": [
+    { "make_cost": { "crystal": 1500 }, "heal_per_second": 30, "duration_ms": 6000 },
+    { "make_cost": { "crystal": 2000 }, "research_cost": { "crystal": 40000 }, "research_seconds": 300,
+      "requires_lab": 4, "heal_per_second": 40, "duration_ms": 6000 }
+  ]
+}
+```
+
+| Field | Used by | What |
+| --- | --- | --- |
+| `name` | HUD | Display name. Defaults to the id. |
+| `effect` | battle | Required. `swarm`, `emp` or `strike`: the rule the battle sim runs, so the sim never keys on an id. |
+| `make_seconds` | core | Required, at least 1. Seconds one takes to make, at every level. |
+| `requires_foundry` | core | The Foundry's finished level that unlocks it, 1 to the Foundry's level count. Default 1. |
+| `radius_units` | battle | Required, whole. The effect's radius in field units round the cell's centre. |
+| `levels` | core | One entry per level, level 1 first. Must not be empty. |
+
+Per level:
+
+| Field | Used by | What |
+| --- | --- | --- |
+| `make_cost` | core | `{resource: int}` paid when one is queued at this level. |
+| `heal_per_second`, `duration_ms` | battle | `swarm` only, required there: hull healed a second to each unit in the radius, and for how long. |
+| `stun_ms` | battle | `emp` only, required there: how long each defence in the radius is disabled. |
+| `damage`, `delay_ms` | battle | `strike` only, required there: the damage to everything in the radius, and the delay from the use to the landing. |
+| `research_cost`, `research_seconds`, `requires_lab` | core | Levels 2 and up only, as in `units.json`: the price, the time, and the research building's level needed. |
+
+An ability's level belongs to the whole type, as a unit's does: the stock carries no level, and a
+battle uses the attacker's levels when it starts. The ms fields are floored to the battle's 50 ms
+ticks.
+
 ### Validation
 
 `Catalog.load_error` collects every problem; the game refuses to start on any:
@@ -229,6 +273,16 @@ classes (above). Unknown fields are ignored, as for buildings.
   negative or not whole; level 1 carrying a research field; a later level without a
   `research_seconds` of at least 1 or with `requires_lab` outside 1 to the research building's
   level count.
+- `abilities.json` not an object; `rules.army.foundry` naming an unknown type, or missing while
+  there are abilities.
+- Per ability: not an object; its id also a unit's (they share the research slot and the
+  `research` op); `effect` not one of its values; `make_seconds` below 1 or not whole;
+  `requires_foundry` outside 1 to the foundry's level count; `radius_units` negative or not
+  whole; `levels` not a list or empty.
+- Per ability level: not an object; `make_cost` or `research_cost` not an object, naming an
+  unknown resource or holding a non-whole number; one of its effect's fields missing, negative
+  or not whole; level 1 carrying a research field; a later level without a `research_seconds` of
+  at least 1 or with `requires_lab` outside 1 to the research building's level count.
 
 `test_catalog.gd` checks that the shipped files load cleanly, that the start layout fits, that
 every level's price fits the storage a base can reach when that level unlocks, that no curve
@@ -257,7 +311,7 @@ slowly, spent only on top-tier levels). A 48×48 grid, the Command Center with t
 | army | `fabricator` | Fabricator | 3 | 2 | 10 | 0,1,2,2,2,2,3,3,3,3 | |
 | army | `heavy_fabricator` | Heavy Fabricator | 3 | 4 | 8 | 0,0,0,1,2,2,2,2,2,2 | |
 | army | `research_lab` | Research Lab | 3 | 2 | 10 | 0,1,1,1,1,1,1,1,1,1 | |
-| army | `nanite_foundry` | Nanite Foundry | 3 | 3 | 8 | 0,0,1,1,1,1,1,1,1,1 | |
+| army | `nanite_foundry` | Nanite Foundry | 3 | 3 | 8 | 0,0,1,1,1,1,1,1,1,1 | makes the abilities; capacity 2–6 |
 | army | `drydock` | Drydock | 4 | 5 | 7 | 0,0,0,0,1,1,1,1,1,1 | |
 | army | `alliance_beacon` | Alliance Beacon | 3 | 3 | 7 | 0,0,1,1,1,1,1,1,1,1 | capacity 10–40 |
 | defense | `laser_turret` | Laser Turret | 3 | 1 | 10 | 1,2,3,4,5,5,6,6,6,6 | ground, range 7 |
@@ -361,12 +415,30 @@ pilots and two autonomous ones. The ids are provisional until the owner has seen
   reach when it unlocks, that one unit of each type fits the Hangars then, that no unit curve
   goes down, and that every final level requires the top lab level.
 
+### The abilities
+
+Three abilities, made in the Nanite Foundry, whose `capacity` caps the stock: 2, 2, 3, 3, 4, 4, 5
+and 6 at its levels 1 to 8. Each has five levels, the last needing lab 10.
+
+| Ability | Name | Effect | Unlock: Foundry (CC) | Make (s) | Radius | Level 1 → 5 | Make cost, level 1 → 5 |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| `repair_swarm` | Repair Swarm | swarm | 1 (3) | 60 | 3.5 cells | 30 → 75 hp a second for 6 s | 1,500 → 5,000 crystal, 20 antimatter at 5 |
+| `emp_burst` | EMP Burst | emp | 3 (4) | 90 | 3 cells | defences off 3 → 5 s | 2,500 → 7,000 crystal, 35 antimatter at 5 |
+| `orbital_strike` | Orbital Strike | strike | 5 (6) | 120 | 2 cells | 600 → 1,300 damage after 1.5 s | 4,000 → 11,000 crystal, 20 → 90 antimatter |
+
+- **Research** of each level sits on the units' price at the same lab level (40,000 crystal at
+  lab 4 up to 1,200,000 crystal and 2,100 antimatter at lab 10), labs 4, 6, 8, 10 for the swarm,
+  6, 8, 9, 10 for the burst and 8, 9, 9, 10 for the strike.
+- `test_catalog.gd` checks that every making and research price fits the storage a base can reach
+  when it unlocks, that no ability curve goes down, and that every final level requires the top
+  lab level.
+
 **These are development values**, timed in seconds and minutes so a change can be seen in one
 sitting. The retune to production time scales is a later change to `data/` alone.
 
 ## The fixture catalog (`test/support/fixtures/`)
 
-The same three files in miniature for logic tests: three resources (metal, crystal, antimatter),
+The same four files in miniature for logic tests: three resources (metal, crystal, antimatter),
 four categories (resources, army, traps, walls), a 10×10 grid, 500/500/0 to start, a 2×2
 Command Center at (0, 0) with two levels (storage 1000/1000 and no antimatter; level 2 costs 400
 metal and takes 100 s), a 1×1 drone bay at (3, 0) with one builder, and types chosen for round
@@ -374,16 +446,22 @@ numbers: `extractor` (2×2, 100 crystal, 60 s, 3600 metal/h = 1 per second), `ha
 50 metal, instant, 1800 crystal/h = 1 per 2 s, max 1), `silo` (2×2, 100 metal, 30 s, +1000
 metal storage), `siphon` (1×1, 50 crystal, instant, 3600 antimatter/h, stores 100 antimatter),
 `hangar` (2×2, `capacity` 20 then 30), `academy` (1×1, instant at level 1, 10 s to level 2, up to
-two), `lab` (2×2, locked until Command Center 2, two levels), `mine` (1×1, hidden, targets ground)
+two), `foundry` (1×1, instant at level 1, `capacity` 2 then 3, 10 s to level 2, one), `lab` (2×2, locked until Command Center 2, two levels), `mine` (1×1, hidden, targets ground)
 and `wall` (1×1, instant, up to 25). Every type but the traps has an `hp`, and nine more 1×1
 types serve the battle tests: seven defences (`turret`, `tower`, `mortar`, `shield`, `well`,
 `emp`, `sentry`, in the army category) and two traps (`air_mine`, `throw_trap`); their numbers
-are listed in `fixtures.gd`. `rules.army` names the hangar and the lab; `rules.battle` is 60 s,
+are listed in `fixtures.gd`. `rules.army` names the hangar, the lab and the foundry; `rules.battle` is 60 s,
 50% loot of each resource, `wall` the wall, the traps category, a wall cost of 8,000. Its
 `units.json` has three units, all trained by the academy: `grunt` (ground, housing 1, 10 s,
 10 crystal; level 2 researched for 100 crystal in 60 s at lab 1), `flyer` (air, housing 2, 20 s,
 20 crystal; level 2 for 200 crystal in 120 s at lab 2) and `walker` (ground, housing 5, 30 s,
-50 crystal, needs academy level 2, one level).
+50 crystal, needs academy level 2, one level). Its `abilities.json` has three abilities, all made
+by the foundry: `swarm` (swarm, 10 s, 10 crystal, radius 2,000, 40 hp a second for 1,000 ms; level
+2 researched for 100 crystal in 60 s at lab 1, 80 a second), `burst` (emp, 20 s, 20 crystal,
+radius 2,000, 1,000 ms, one level) and `strike` (strike, needs foundry level 2, 30 s, 30 crystal,
+radius 1,000, 100 damage after 500 ms; level 2 for 200 crystal in 120 s at lab 2, 150 damage).
+`Fixtures.catalog()`, `catalog_with_grid` and `battle_catalog` load them; the expedition catalog
+does not.
 `battle_units.json` holds seven more units for the battle tests (`melee`, `gunner`, `breaker`,
 `raider`, `hunter`, `drone`, `bomber`), merged in only by `Fixtures.battle_catalog(size)` (20×20 by
 default), so the plain catalog keeps its three.

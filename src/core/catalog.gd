@@ -1,7 +1,7 @@
 class_name Catalog
 extends RefCounted
 ## Read-only game data from data/*.json: resources, build-menu categories, grid size,
-## starting base, building definitions and unit types. Pure logic (see CLAUDE.md): no Nodes, no
+## starting base, building definitions, unit types and abilities. Pure logic (see CLAUDE.md): no Nodes, no
 ## engine state.
 ##
 ## JSON numbers parse as floats in Godot, so every whole number is converted to
@@ -9,11 +9,12 @@ extends RefCounted
 ##
 ## The one exception to read-only is apply_dev_cheats(), which a debug build of the game
 ## calls once after loading (main.gd): every level becomes free and builds in one second at
-## most, and so does every unit's training and research. BaseState never knows, so a save made under the cheats is an ordinary save.
+## most, and so does every unit's training and research and every ability's making and research. BaseState never knows, so a save made under the cheats is an ordinary save.
 
 const RULES_PATH := "res://data/rules.json"
 const BUILDINGS_PATH := "res://data/buildings.json"
 const UNITS_PATH := "res://data/units.json"
+const ABILITIES_PATH := "res://data/abilities.json"
 const HQ_TYPE := "command_center"
 ## The Command Center's category. It is never a build-menu category.
 const CORE_CATEGORY := "core"
@@ -43,6 +44,16 @@ const UNIT_WHOLE_FIELDS := ["speed", "splash_units"]
 const UNIT_LEVEL_WHOLE_FIELDS := ["hp", "damage", "fire_ms", "range_units"]
 ## The fields only a researched level (2 and up) carries.
 const RESEARCH_FIELDS := ["research_cost", "research_seconds", "requires_lab"]
+## An ability's effect in battle (docs/reference/battle.md, **Abilities**), and the per-level
+## fields each one needs, whole and non-negative.
+const EFFECT_SWARM := "swarm"
+const EFFECT_EMP := "emp"
+const EFFECT_STRIKE := "strike"
+const EFFECT_FIELDS := {
+	"swarm": ["heal_per_second", "duration_ms"],
+	"emp": ["stun_ms"],
+	"strike": ["damage", "delay_ms"],
+}
 ## Shared, read-only defaults for lookups, so a lookup builds no new {} or [] per call
 ## (BaseState's checks run every frame while a ghost is dragged).
 const _NONE := {}
@@ -58,11 +69,15 @@ var grid_size: Vector2i = Vector2i.ZERO
 var menu_order: PackedStringArray = PackedStringArray()
 ## {"resources": {name: int}, "buildings": [{"type", "cell": [x, y], "level"}]}
 var start: Dictionary = {}
-## rules.army: the building type whose capacity houses the army, and the one that researches.
+## rules.army: the building type whose capacity houses the army, the one that researches, and
+## the one that makes the abilities ("" when the rules name none).
 var housing_type: String = ""
 var research_type: String = ""
+var foundry_type: String = ""
 ## Unit type ids in units.json order, the training menu's order.
 var unit_order: PackedStringArray = PackedStringArray()
+## Ability ids in abilities.json order, the making menu's order.
+var ability_order: PackedStringArray = PackedStringArray()
 ## rules.battle (all 0 or "" when the rules have none): the battle's length in seconds, the wall
 ## type, the build-menu category whose types are traps, and the extra path cost of entering a
 ## wall cell, in field units.
@@ -78,6 +93,7 @@ var scan_seconds: int = 0
 
 var _buildings: Dictionary = {}
 var _units: Dictionary = {}
+var _abilities: Dictionary = {}
 ## rules.battle.loot_pct: resource -> the percent of the defender's stored amount a raid can take.
 var _loot_pct: Dictionary = {}
 ## id -> its rules entry ({"id", "name", "color"}), in rules order.
@@ -89,21 +105,28 @@ static func load_default() -> Catalog:
 	return from_json(
 		FileAccess.get_file_as_string(RULES_PATH),
 		FileAccess.get_file_as_string(BUILDINGS_PATH),
-		FileAccess.get_file_as_string(UNITS_PATH)
+		FileAccess.get_file_as_string(UNITS_PATH),
+		FileAccess.get_file_as_string(ABILITIES_PATH)
 	)
 
 
-## `units_text` defaults to no unit types; an empty string (a missing file) is an error.
-static func from_json(rules_text: String, buildings_text: String, units_text: String = "{}") -> Catalog:
+## `units_text` and `abilities_text` default to none; an empty string (a missing file) is an
+## error.
+static func from_json(rules_text: String, buildings_text: String, units_text: String = "{}",
+		abilities_text: String = "{}") -> Catalog:
 	var catalog := Catalog.new()
 	var rules: Variant = _parse(rules_text)
 	var buildings: Variant = _parse(buildings_text)
 	var units: Variant = _parse(units_text)
+	var abilities: Variant = _parse(abilities_text)
 	if typeof(rules) != TYPE_DICTIONARY or typeof(buildings) != TYPE_DICTIONARY \
 			or typeof(units) != TYPE_DICTIONARY:
 		catalog.load_error = "rules, buildings or units JSON is missing or not an object"
 		return catalog
-	catalog._read(rules, buildings, units)
+	if typeof(abilities) != TYPE_DICTIONARY:
+		catalog.load_error = "abilities JSON is missing or not an object"
+		return catalog
+	catalog._read(rules, buildings, units, abilities)
 	return catalog
 
 
@@ -328,9 +351,61 @@ func unit_level_stats(type: String, level: int) -> Dictionary:
 	return levels[level - 1]
 
 
+func has_ability(id: String) -> bool:
+	return _abilities.has(id)
+
+
+## Ability ids in abilities.json order.
+func ability_types() -> PackedStringArray:
+	return ability_order
+
+
+func ability_name(id: String) -> String:
+	return str(_ability(id).get("name", id))
+
+
+## One of the EFFECT_* constants: the rule the battle sim runs for it.
+func ability_effect(id: String) -> String:
+	return str(_ability(id).get("effect", ""))
+
+
+## Seconds one takes to make, at every level.
+func ability_make_seconds(id: String) -> int:
+	return int(_ability(id).get("make_seconds", 0))
+
+
+## The Foundry's finished level that unlocks it.
+func ability_requires_foundry(id: String) -> int:
+	return int(_ability(id).get("requires_foundry", 1))
+
+
+## Battle: the radius of its effect in field units.
+func ability_radius(id: String) -> int:
+	return int(_ability(id).get("radius_units", 0))
+
+
+## The number of levels; 0 when `levels` is missing or not a list (validation reports it).
+func ability_max_level(id: String) -> int:
+	var levels: Variant = _ability(id).get("levels", _NO_LIST)
+	if typeof(levels) != TYPE_ARRAY:
+		return 0
+	var level_list: Array = levels
+	return level_list.size()
+
+
+## Stats for one ability level (1-based): make_cost, the effect's fields, and from level 2
+## research_cost, research_seconds and requires_lab. Shared and read-only, like level_stats.
+func ability_level_stats(id: String, level: int) -> Dictionary:
+	var levels: Array = _ability(id).get("levels", _NO_LIST)
+	if level < 1 or level > levels.size():
+		return _NONE
+	return levels[level - 1]
+
+
 ## Debug builds only: every level of every type costs nothing, and one that takes time
 ## builds in one second. An instant level stays instant, so walls still need no builder and
-## paint as fast as the finger moves. Units train and research free in one second. Nothing
+## paint as fast as the finger moves. Units train and research free in one second, and so are
+## abilities made and researched. Nothing
 ## else changes, so the Command Center still gates levels and counts, and the producers and
 ## the lab still gate units. Call it once, on a catalog that loaded cleanly.
 func apply_dev_cheats() -> void:
@@ -349,6 +424,16 @@ func apply_dev_cheats() -> void:
 			if i > 0:
 				stats["research_cost"] = {}
 				stats["research_seconds"] = mini(int(stats["research_seconds"]), 1)
+	for id: String in _abilities:
+		var ability: Dictionary = _abilities[id]
+		ability["make_seconds"] = mini(int(ability["make_seconds"]), 1)
+		var ability_levels: Array = ability["levels"]
+		for i: int in ability_levels.size():
+			var stats: Dictionary = ability_levels[i]
+			stats["make_cost"] = {}
+			if i > 0:
+				stats["research_cost"] = {}
+				stats["research_seconds"] = mini(int(stats["research_seconds"]), 1)
 
 
 func _def(type: String) -> Dictionary:
@@ -359,7 +444,11 @@ func _unit(type: String) -> Dictionary:
 	return _units.get(type, _NONE)
 
 
-func _read(rules: Dictionary, buildings: Dictionary, units: Dictionary) -> void:
+func _ability(id: String) -> Dictionary:
+	return _abilities.get(id, _NONE)
+
+
+func _read(rules: Dictionary, buildings: Dictionary, units: Dictionary, abilities: Dictionary) -> void:
 	var problems := PackedStringArray()
 
 	problems.append_array(_read_entries(rules.get("resources", []), "rules.resources", _resource_defs))
@@ -425,6 +514,7 @@ func _read(rules: Dictionary, buildings: Dictionary, units: Dictionary) -> void:
 
 	problems.append_array(_validate_start())
 	problems.append_array(_read_army(rules.get("army", {}), units))
+	problems.append_array(_read_abilities(abilities))
 	problems.append_array(_read_battle(rules.get("battle", {})))
 	problems.append_array(_read_expedition(rules.get("expedition", {})))
 	load_error = "; ".join(problems)
@@ -529,6 +619,9 @@ func _read_army(army: Variant, units: Dictionary) -> PackedStringArray:
 		var army_dict: Dictionary = army
 		housing_type = str(army_dict.get("housing", ""))
 		research_type = str(army_dict.get("research", ""))
+		foundry_type = str(army_dict.get("foundry", ""))
+		if army_dict.has("foundry") and not _buildings.has(foundry_type):
+			problems.append("rules.army.foundry names unknown type '%s'" % foundry_type)
 		for field: String in ["housing", "research"]:
 			if army_dict.has(field) and not _buildings.has(str(army_dict[field])):
 				problems.append("rules.army.%s names unknown type '%s'" % [field, army_dict[field]])
@@ -599,6 +692,72 @@ func _validate_unit(type: String, def: Dictionary) -> PackedStringArray:
 		problems.append_array(_validate_amounts(stats, "train_cost", level_where))
 		for field: String in UNIT_LEVEL_WHOLE_FIELDS:
 			if stats.has(field) and not _is_whole(stats[field]):
+				problems.append("%s.%s must be whole and non-negative" % [level_where, field])
+		if i == 0:
+			for field: String in RESEARCH_FIELDS:
+				if stats.has(field):
+					problems.append("%s must not have %s: level 1 needs no research" % [level_where, field])
+			continue
+		problems.append_array(_validate_amounts(stats, "research_cost", level_where))
+		if not _is_whole(stats.get("research_seconds")) or int(stats["research_seconds"]) < 1:
+			problems.append("%s.research_seconds must be a whole number of at least 1" % level_where)
+		var lab: Variant = stats.get("requires_lab")
+		if typeof(lab) != TYPE_INT or int(lab) < 1 or int(lab) > lab_levels:
+			problems.append("%s.requires_lab must be 1-%d" % [level_where, lab_levels])
+	return problems
+
+
+## abilities.json, after the army: every ability is stored, then validated against the
+## buildings (the foundry and the lab) and the units (no id may be both).
+func _read_abilities(abilities: Dictionary) -> PackedStringArray:
+	var problems := PackedStringArray()
+	if not abilities.is_empty() and not _buildings.has(foundry_type):
+		problems.append("rules.army needs a foundry type when there are abilities")
+	for id: Variant in abilities:
+		if typeof(abilities[id]) != TYPE_DICTIONARY:
+			problems.append("ability %s must be an object" % id)
+			continue
+		_abilities[str(id)] = abilities[id]
+		ability_order.append(str(id))
+	for id: String in ability_order:
+		problems.append_array(_validate_ability(id, _abilities[id]))
+	return problems
+
+
+func _validate_ability(id: String, def: Dictionary) -> PackedStringArray:
+	var problems := PackedStringArray()
+	var where := "ability " + id
+	if _units.has(id):
+		problems.append("%s shares its id with a unit" % where)
+	var effect := str(def.get("effect", ""))
+	if not EFFECT_FIELDS.has(effect):
+		problems.append("%s.effect must be swarm, emp or strike" % where)
+	if not _is_whole(def.get("make_seconds")) or int(def["make_seconds"]) < 1:
+		problems.append("%s.make_seconds must be a whole number of at least 1" % where)
+	var foundry_levels := max_level(foundry_type)
+	var foundry: Variant = def.get("requires_foundry", 1)
+	if typeof(foundry) != TYPE_INT or int(foundry) < 1 or int(foundry) > foundry_levels:
+		problems.append("%s.requires_foundry must be 1-%d" % [where, foundry_levels])
+	if not _is_whole(def.get("radius_units")):
+		problems.append("%s.radius_units must be whole and non-negative" % where)
+	var levels_data: Variant = def.get("levels", [])
+	if typeof(levels_data) != TYPE_ARRAY:
+		problems.append("%s.levels must be a list" % where)
+		return problems
+	var levels: Array = levels_data
+	if levels.is_empty():
+		problems.append("%s has no levels" % where)
+	var lab_levels := max_level(research_type)
+	var needed: Array = EFFECT_FIELDS.get(effect, [])
+	for i: int in levels.size():
+		var level_where := "%s level %d" % [where, i + 1]
+		if typeof(levels[i]) != TYPE_DICTIONARY:
+			problems.append("%s must be an object" % level_where)
+			continue
+		var stats: Dictionary = levels[i]
+		problems.append_array(_validate_amounts(stats, "make_cost", level_where))
+		for field: String in needed:
+			if not _is_whole(stats.get(field)):
 				problems.append("%s.%s must be whole and non-negative" % [level_where, field])
 		if i == 0:
 			for field: String in RESEARCH_FIELDS:

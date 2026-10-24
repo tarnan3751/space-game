@@ -88,6 +88,16 @@
         "hp": 100 }
     ]
   },
+  "foundry": {
+    "name": "Foundry",
+    "size": 1,
+    "category": "army",
+    "max_count": [1, 1],
+    "levels": [
+      { "cost": { "metal": 10 }, "build_seconds": 0, "hp": 100, "capacity": 2 },
+      { "cost": { "metal": 20 }, "build_seconds": 10, "hp": 100, "capacity": 3 }
+    ]
+  },
   "lab": {
     "name": "Lab",
     "size": 2,

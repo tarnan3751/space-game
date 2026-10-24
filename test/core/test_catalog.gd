@@ -123,6 +123,56 @@ func test_shipped_unit_final_levels_require_the_top_lab() -> void:
 		assert_eq(int(stats.get("requires_lab", 0)), top, "%s's final level" % type)
 
 
+func test_shipped_abilities_fit_what_a_base_can_reach() -> void:
+	# An ability's making and research prices fit the storage a base can have when they unlock:
+	# the Command Center level its Foundry level needs, and for a research level the one its lab
+	# level needs. The Foundry's capacity holds at least one from its first level.
+	var catalog := Catalog.load_default()
+	assert_eq(catalog.load_error, "")
+	assert_eq(catalog.ability_types(), PackedStringArray(["repair_swarm", "emp_burst", "orbital_strike"]))
+	assert_true(int(catalog.level_stats(catalog.foundry_type, 1).get("capacity", 0)) >= 1)
+	for id: String in catalog.ability_types():
+		var foundry_cc := _requires_cc(catalog, catalog.foundry_type, catalog.ability_requires_foundry(id))
+		for level: int in range(1, catalog.ability_max_level(id) + 1):
+			var stats := catalog.ability_level_stats(id, level)
+			var cc := foundry_cc
+			if level > 1:
+				cc = maxi(cc, _requires_cc(catalog, catalog.research_type, int(stats["requires_lab"])))
+			for field: String in ["make_cost", "research_cost"]:
+				var cost: Dictionary = stats.get(field, {})
+				for res: Variant in cost:
+					var reachable := _reachable_storage(catalog, str(res), cc)
+					assert_true(int(cost[res]) <= reachable, "%s level %d %s is %d %s; storage at CC %d is %d" % [
+						id, level, field, int(cost[res]), res, cc, reachable])
+
+
+func test_shipped_ability_curves_never_go_down() -> void:
+	var catalog := Catalog.load_default()
+	assert_eq(catalog.load_error, "")
+	for id: String in catalog.ability_types():
+		for level: int in range(2, catalog.ability_max_level(id) + 1):
+			var before := catalog.ability_level_stats(id, level - 1)
+			var after := catalog.ability_level_stats(id, level)
+			for field: String in ["make_cost", "research_cost"]:
+				for res: String in catalog.resources:
+					assert_true(_amount(after, field, res) >= _amount(before, field, res),
+						"%s level %d %s.%s goes down" % [id, level, field, res])
+			var fields: Array = Catalog.EFFECT_FIELDS[catalog.ability_effect(id)]
+			for field: String in ["research_seconds", "requires_lab"] + fields:
+				assert_true(int(after.get(field, 0)) >= int(before.get(field, 0)),
+					"%s level %d %s goes down" % [id, level, field])
+
+
+func test_shipped_ability_final_levels_require_the_top_lab() -> void:
+	var catalog := Catalog.load_default()
+	assert_eq(catalog.load_error, "")
+	var top := catalog.max_level(catalog.research_type)
+	for id: String in catalog.ability_types():
+		assert_eq(catalog.ability_max_level(id), 5, id)
+		var stats := catalog.ability_level_stats(id, catalog.ability_max_level(id))
+		assert_eq(int(stats.get("requires_lab", 0)), top, "%s's final level" % id)
+
+
 func test_json_numbers_become_ints() -> void:
 	var catalog := Fixtures.catalog()
 	assert_eq(catalog.level_stats("extractor", 1)["build_seconds"], 60)
@@ -333,6 +383,108 @@ func test_dev_cheats_make_units_free_and_one_second_at_most() -> void:
 				rest.erase(field)
 				original_rest.erase(field)
 			assert_eq(rest, original_rest, "%s apart from its costs and times" % where)
+
+
+func test_dev_cheats_make_abilities_free_and_one_second_at_most() -> void:
+	var catalog := Fixtures.catalog()
+	var before := Fixtures.catalog()
+	catalog.apply_dev_cheats()
+	for id: String in catalog.ability_types():
+		assert_eq(catalog.ability_make_seconds(id), mini(before.ability_make_seconds(id), 1), id)
+		assert_eq(catalog.ability_requires_foundry(id), before.ability_requires_foundry(id), id)
+		for level: int in range(1, catalog.ability_max_level(id) + 1):
+			var stats := catalog.ability_level_stats(id, level)
+			var original := before.ability_level_stats(id, level)
+			var where := "%s level %d" % [id, level]
+			assert_eq(stats["make_cost"], {}, where)
+			var changed := ["make_cost"]
+			if level > 1:
+				assert_eq(stats["research_cost"], {}, where)
+				assert_eq(stats["research_seconds"], mini(int(original["research_seconds"]), 1), where)
+				changed.append_array(["research_cost", "research_seconds"])
+			var rest := stats.duplicate()
+			var original_rest := original.duplicate()
+			for field: String in changed:
+				rest.erase(field)
+				original_rest.erase(field)
+			assert_eq(rest, original_rest, "%s apart from its costs and times" % where)
+
+
+func test_ability_lookups() -> void:
+	var catalog := Fixtures.catalog()
+	assert_eq(catalog.ability_types(), PackedStringArray(["swarm", "burst", "strike"]), "abilities.json order")
+	assert_eq(catalog.foundry_type, "foundry")
+	assert_true(catalog.has_ability("strike"))
+	assert_false(catalog.has_ability("grunt"))
+	assert_eq(catalog.ability_name("burst"), "Burst")
+	assert_eq(catalog.ability_name("ghost"), "ghost", "falls back to the id")
+	assert_eq(catalog.ability_effect("swarm"), Catalog.EFFECT_SWARM)
+	assert_eq(catalog.ability_effect("burst"), Catalog.EFFECT_EMP)
+	assert_eq(catalog.ability_effect("strike"), Catalog.EFFECT_STRIKE)
+	assert_eq(catalog.ability_make_seconds("strike"), 30)
+	assert_eq(catalog.ability_requires_foundry("strike"), 2)
+	assert_eq(catalog.ability_radius("swarm"), 2000)
+	assert_eq(catalog.ability_max_level("swarm"), 2)
+	assert_eq(catalog.ability_max_level("burst"), 1)
+	assert_eq(catalog.ability_max_level("ghost"), 0)
+	assert_eq(catalog.ability_level_stats("swarm", 2)["heal_per_second"], 80)
+	assert_eq(catalog.ability_level_stats("strike", 1)["make_cost"], {"crystal": 30})
+	assert_eq(catalog.ability_level_stats("strike", 3), {})
+
+
+func test_no_abilities_file_is_no_abilities() -> void:
+	var catalog := Catalog.from_json(FileAccess.get_file_as_string(Fixtures.RULES),
+		FileAccess.get_file_as_string(Fixtures.BUILDINGS), FileAccess.get_file_as_string(Fixtures.UNITS))
+	assert_eq(catalog.load_error, "")
+	assert_true(catalog.ability_types().is_empty())
+	var missing := Catalog.from_json(FileAccess.get_file_as_string(Fixtures.RULES),
+		FileAccess.get_file_as_string(Fixtures.BUILDINGS), FileAccess.get_file_as_string(Fixtures.UNITS), "")
+	assert_true(missing.load_error.contains("abilities JSON is missing"), missing.load_error)
+
+
+func test_validation_reports_bad_abilities() -> void:
+	var cases := {
+		"rules.army.foundry names unknown type 'forge'": func(rules: Dictionary, _abilities: Dictionary) -> void:
+			rules["army"]["foundry"] = "forge",
+		"rules.army needs a foundry type when there are abilities": func(rules: Dictionary, _abilities: Dictionary) -> void:
+			rules["army"].erase("foundry"),
+		"ability swarm must be an object": func(_rules: Dictionary, abilities: Dictionary) -> void:
+			abilities["swarm"] = 3,
+		"ability grunt shares its id with a unit": func(_rules: Dictionary, abilities: Dictionary) -> void:
+			abilities["grunt"] = abilities["burst"].duplicate(true),
+		"ability swarm.effect must be swarm, emp or strike": func(_rules: Dictionary, abilities: Dictionary) -> void:
+			abilities["swarm"]["effect"] = "heal",
+		"ability swarm.make_seconds must be a whole number of at least 1": func(_rules: Dictionary, abilities: Dictionary) -> void:
+			abilities["swarm"]["make_seconds"] = 0,
+		"ability strike.requires_foundry must be 1-2": func(_rules: Dictionary, abilities: Dictionary) -> void:
+			abilities["strike"]["requires_foundry"] = 3,
+		"ability burst.radius_units must be whole and non-negative": func(_rules: Dictionary, abilities: Dictionary) -> void:
+			abilities["burst"]["radius_units"] = -5,
+		"ability burst.levels must be a list": func(_rules: Dictionary, abilities: Dictionary) -> void:
+			abilities["burst"]["levels"] = {},
+		"ability burst has no levels": func(_rules: Dictionary, abilities: Dictionary) -> void:
+			abilities["burst"]["levels"] = [],
+		"ability burst level 1 must be an object": func(_rules: Dictionary, abilities: Dictionary) -> void:
+			abilities["burst"]["levels"][0] = 1,
+		"ability burst level 1.make_cost uses unknown resource 'gold'": func(_rules: Dictionary, abilities: Dictionary) -> void:
+			abilities["burst"]["levels"][0]["make_cost"] = {"gold": 5},
+		"ability burst level 1.stun_ms must be whole and non-negative": func(_rules: Dictionary, abilities: Dictionary) -> void:
+			abilities["burst"]["levels"][0].erase("stun_ms"),
+		"ability swarm level 1.duration_ms must be whole and non-negative": func(_rules: Dictionary, abilities: Dictionary) -> void:
+			abilities["swarm"]["levels"][0]["duration_ms"] = 1.5,
+		"ability strike level 1.delay_ms must be whole and non-negative": func(_rules: Dictionary, abilities: Dictionary) -> void:
+			abilities["strike"]["levels"][0]["delay_ms"] = -1,
+		"ability burst level 1 must not have research_cost: level 1 needs no research": func(_rules: Dictionary, abilities: Dictionary) -> void:
+			abilities["burst"]["levels"][0]["research_cost"] = {},
+		"ability swarm level 2.research_seconds must be a whole number of at least 1": func(_rules: Dictionary, abilities: Dictionary) -> void:
+			abilities["swarm"]["levels"][1].erase("research_seconds"),
+		"ability strike level 2.requires_lab must be 1-2": func(_rules: Dictionary, abilities: Dictionary) -> void:
+			abilities["strike"]["levels"][1]["requires_lab"] = 3,
+	}
+	for message: String in cases:
+		var error := _ability_error_after(cases[message])
+		assert_true(error.contains(message), "%s: %s" % [message, error])
+	assert_eq(_ability_error_after(func(_rules: Dictionary, _abilities: Dictionary) -> void: pass), "")
 
 
 func test_validation_reports_unknown_resources() -> void:
@@ -738,3 +890,12 @@ func _unit_error_after(change: Callable) -> String:
 	change.call(rules, units)
 	return Catalog.from_json(JSON.stringify(rules), FileAccess.get_file_as_string(Fixtures.BUILDINGS),
 		JSON.stringify(units)).load_error
+
+
+## The same with one change made to the fixture rules and abilities; returns the load error.
+func _ability_error_after(change: Callable) -> String:
+	var rules: Dictionary = JSON.parse_string(FileAccess.get_file_as_string(Fixtures.RULES))
+	var abilities: Dictionary = JSON.parse_string(FileAccess.get_file_as_string(Fixtures.ABILITIES))
+	change.call(rules, abilities)
+	return Catalog.from_json(JSON.stringify(rules), FileAccess.get_file_as_string(Fixtures.BUILDINGS),
+		FileAccess.get_file_as_string(Fixtures.UNITS), JSON.stringify(abilities)).load_error

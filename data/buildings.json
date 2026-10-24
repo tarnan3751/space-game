@@ -335,22 +335,22 @@
     "category": "army",
     "max_count": [0, 0, 1, 1, 1, 1, 1, 1, 1, 1],
     "levels": [
-      { "cost": { "metal": 4000, "crystal": 1000 }, "build_seconds": 120, "hp": 500,
+      { "cost": { "metal": 4000, "crystal": 1000 }, "build_seconds": 120, "hp": 500, "capacity": 2,
         "requires_cc": 3 },
-      { "cost": { "metal": 10000, "crystal": 2500 }, "build_seconds": 300, "hp": 600,
+      { "cost": { "metal": 10000, "crystal": 2500 }, "build_seconds": 300, "hp": 600, "capacity": 2,
         "requires_cc": 3 },
-      { "cost": { "metal": 25000, "crystal": 6000 }, "build_seconds": 600, "hp": 700,
+      { "cost": { "metal": 25000, "crystal": 6000 }, "build_seconds": 600, "hp": 700, "capacity": 3,
         "requires_cc": 4 },
       { "cost": { "metal": 60000, "crystal": 15000, "antimatter": 80 }, "build_seconds": 1200,
-        "hp": 800, "requires_cc": 5 },
+        "hp": 800, "capacity": 3, "requires_cc": 5 },
       { "cost": { "metal": 130000, "crystal": 33000, "antimatter": 180 }, "build_seconds": 1200,
-        "hp": 920, "requires_cc": 6 },
+        "hp": 920, "capacity": 4, "requires_cc": 6 },
       { "cost": { "metal": 290000, "crystal": 73000, "antimatter": 400 }, "build_seconds": 1200,
-        "hp": 1060, "requires_cc": 7 },
+        "hp": 1060, "capacity": 4, "requires_cc": 7 },
       { "cost": { "metal": 640000, "crystal": 160000, "antimatter": 880 }, "build_seconds": 1800,
-        "hp": 1220, "requires_cc": 9 },
+        "hp": 1220, "capacity": 5, "requires_cc": 9 },
       { "cost": { "metal": 1400000, "crystal": 350000, "antimatter": 7000 }, "build_seconds": 2400,
-        "hp": 1400, "requires_cc": 10 }
+        "hp": 1400, "capacity": 6, "requires_cc": 10 }
     ]
   },
   "drydock": {
