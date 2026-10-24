@@ -73,8 +73,8 @@ The unit roster (eleven types in `data/units.json`: three humans on foot, six pi
 two autonomous; `docs/reference/data-format.md`), training as a timed queue per producer,
 housing as the sum of the Hangars' capacity and research in the lab are built in core
 (step 3, 2026-10-24; `docs/reference/core-economy.md`). The owner kept the roster's names;
-its numbers stay development-scale until the retune. Deployed units are spent (the owner,
-2026-10-24): Clash's model. Defences and traps
+its numbers were set by the retune (step 6a, `docs/plans/retune.md`). Deployed units are spent
+(the owner, 2026-10-24): Clash's model. Defences and traps
 already carry `targets` (ground, air, both), so the roster's ground/air split is fixed by the
 data that exists.
 
@@ -150,8 +150,9 @@ figures carry a thinner ink line than buildings so they stay readable at the gam
   the research tree hang off them.
 - Sessions are short and frequent: check the base, collect, queue builds and training, run an
   expedition. A battle is a few minutes.
-- Build and training times are on the development scale until Milestone 2 plays end to end;
-  then one data-only retune sets the real curve.
+- One data-only retune (step 6a, `docs/plans/retune.md`) set the real curve once Milestone 2
+  played end to end: builds of minutes to under three days, training of minutes, research up
+  to a day.
 - The economy keeps a slot for a premium currency (skipping timers, cosmetics), but nothing is
   sold until PvP exists. The retune is designed with that slot in mind.
 

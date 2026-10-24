@@ -1,8 +1,8 @@
 class_name TrainingQueue
 extends RefCounted
 ## The units one producer building has queued, oldest first: units[0] is the head, the one in
-## training. paid_levels[i] is the unit level units[i] was paid for, so a cancel refunds what
-## was paid.
+## training. paid_levels[i] is the unit level units[i] was paid for, so a cancel refunds the
+## catalog's current price for that level.
 ##
 ## Running: done_at is the unix time (seconds) the head completes, and left is 0. Stopped:
 ## done_at is 0 and left is the head's seconds still to go, while the producer is busy, or 0

@@ -94,7 +94,8 @@ matchmaking, an attack log, revenge and shields, then alliances. The design of e
 | Tests | Built | Own headless runner; fixture catalog; one test file per core area |
 | Tooling | Built | Gate script, landing script, behaviour harness (`tools/`), API dump |
 
-Balance numbers in `data/` are fast development values, not tuned. A debug build goes further:
+The numbers in `data/` are the retune's real timers and economy (`docs/plans/retune.md`). A debug
+build makes them fast:
 every level is free and builds in one second at most, and every unit trains and researches free
 in one second at most (`Catalog.apply_dev_cheats`; `-- --no-cheats` for the real numbers).
 
@@ -110,7 +111,7 @@ in one second at most (`Catalog.apply_dev_cheats`; `-- --no-cheats` for the real
 | 4 | The battle sim in `src/core/battle/`: fixed-point integer positions (1 cell = 1000 units), fixed tick, pathing round and through walls, targeting, defences, traps, status effects; replay = seed + layouts + deploy commands; byte-identical results tested headless; batch simulations for balance; the result applied to the base (`raid_result`) | Built (`docs/reference/battle.md`): 20 ticks a second, the deploy zone opening as buildings fall, every special and trap, loot by storage, save version 4 keeping the last five raids, the `battle` harness scenario and `tools/sim_battles.gd`; a full battle simulates in 0.15 to 1.6 s headless on the development Mac |
 | 4b | Abilities: `data/abilities.json` (a repair swarm, an EMP burst, an orbital strike), made in the Nanite Foundry as a timed queue with a stock, their effects in the battle sim, spent through `raid_result` | Core built (`docs/reference/core-economy.md`, **The Foundry**; `docs/reference/battle.md`, **Abilities**): three abilities of five levels, the Foundry's making queue and its stock capped by its `capacity`, ability levels researched in the lab's one slot, the swarm, the burst and the strike in the sim, the spend through `raid_result`, save version 6, a strike in the `battle` harness scenario and `--abilities` in `tools/sim_battles.gd`. The Foundry's HUD panel and the attack HUD's abilities bar are planned |
 | 5 | The battle view: units moving, projectiles, damage and destruction, the attack HUD; the phone target fixed, and the maxed base and a full battle measured on it | Built (`docs/reference/battle-view.md`, `hud.md` **Battle HUD**): the sim driven at its tick with interpolation, units from one MultiMesh pair a type with a shader gait, flash and death, shots, shells, lightning, impacts, rubble, shields, the attack HUD with tap and smear deploys over the red zone, End and the result panel, the debug Practice raid; the phone target fixed (§3.1). On the development Mac, the maxed template base and a full army at the widest zoom: 974 draw calls (1,031 with the attack HUD), 2.0 million primitives, 1.6 to 1.8 ms render CPU, 154 to 174 fps; the sim's step 0.2 to 0.5 ms a tick on average. The phone measurement stays with the owner |
-| 6 | Expeditions: the sector map, the outpost generator (the player's roster with a faction tint, loot deposits, hazards), loot into `BaseState` through a new command, re-training; then the real-timer retune (6a). Milestone 2 complete: a game that plays end to end offline | Core built (`docs/reference/expeditions.md`): the sector of six fields (two easy, two even, two hard) derived from a seed, the `scan` command on a cooldown, the outpost generator (walled compound, defences, collectors, deposits and hazards outside the walls, traps; loot sized to the player's capacity), `raid_result` clearing a field with a star, save version 5, the `expedition` harness scenario and `tools/gen_outposts.gd`. The sector map screen and the faction tint are planned |
+| 6 | Expeditions: the sector map, the outpost generator (the player's roster with a faction tint, loot deposits, hazards), loot into `BaseState` through a new command, re-training; then the real-timer retune (6a). Milestone 2 complete: a game that plays end to end offline | Retune built (6a, `docs/plans/retune.md`): real build, training, research and making times, prices and production tuned to the pace of `docs/vision.md` §5, a 3 h scan, the units' battle stats set so a full army beats its level's fields, measured with `tools/sim_matrix.sh`. Core built (`docs/reference/expeditions.md`): the sector of six fields (two easy, two even, two hard) derived from a seed, the `scan` command on a cooldown, the outpost generator (walled compound, defences, collectors, deposits and hazards outside the walls, traps; loot sized to the player's capacity), `raid_result` clearing a field with a star, save version 5, the `expedition` harness scenario and `tools/gen_outposts.gd`. The sector map screen and the faction tint are planned |
 | 7 | Milestone 3, the online game — the server: Nakama with accounts, base storage, migration of the local save and command validation; battles verified by replaying them in headless Godot running the same `src/core` | Planned |
 | 8 | Async PvP: matchmaking, attacking saved bases, a defence log with replays, shields, revenge, a league ladder | Planned |
 | 9 | Milestone 4, the social game — alliances through the Alliance Beacon: membership, donations, later wars; then a distinct PvE faction and the store release | Planned |
@@ -135,14 +136,13 @@ in one second at most (`Catalog.apply_dev_cheats`; `-- --no-cheats` for the real
   robots stay and what the unit budgets are. The sim's slowest tick, 5 to 10 ms on the Mac, varying
   by run, when a large group first searches, is over the 5 ms a tick proxy and parked for the next
   core batch.
-- **Build times are on the development scale**: 27 to 40 minutes at the top levels (the walls
-  and the Drone Bay instant), the Command Center's 75 to 150 minutes at levels 6 to 10
-  (`docs/reference/data-format.md`); the retune is parked until the economy is tuned. The
-  battle numbers are development values too: a 280-housing army at its top levels deployed all
-  on one edge of the template base reaches 2% from the bottom edge, 0% from the left, 65% and two
-  stars from the right, and the top edge has no deploy cells (its full-width fences of Crown
-  walls); the `battle` scenario, deploying in the base's open pockets, reaches 38%. The retune
-  has to weigh it.
+- **The balance is modelled, not played**: the retune (`docs/plans/retune.md`) sets the pace
+  from a model of maxing each Command Center level (four raids a day, builders busy 75% of the
+  time) and the beatability of the expedition fields from scripted attacks without abilities;
+  no player has played it through. A maxed base holds well against a maxed army: on the template
+  base the three edge strategies reach 16 to 22% mean destruction, a scattered deploy into its
+  open pockets about 50% and two stars on about four seeds in ten, which Milestone 3's PvP has to
+  weigh.
 - **The template base fills 46 of the field's 48 rows** at the Command Center 10 counts, so more
   walls or another type at the top needs its layout reworked (`docs/reference/input-camera.md`).
 - **Only a practice battle can be fought**: the battle view (step 5) runs the sim, but the only
@@ -277,7 +277,7 @@ in one second at most (`Catalog.apply_dev_cheats`; `-- --no-cheats` for the real
   choice); effect times are floored to ticks; a battle with no unit standing goes on while an
   ability is left or a strike is on its way; `raid_result` spends `abilities_used`, which must
   match the battle's ability commands; save version 6; an expedition's setup brings no abilities
-  until the HUD wiring; the numbers are development values.
+  until the HUD wiring; the numbers are development values (retuned in step 6a).
 - **The phone target** (the coordinator under the owner's mandate, 2026-10-24): a 2021 mid-range
   Android (Snapdragon 695 or Dimensity 700 class, 6 GB, 1080p) and an iPhone 11 as the floor; at
   least 30 fps in battle at the widest zoom with a maxed outpost and a full 280-housing army on
@@ -299,6 +299,23 @@ in one second at most (`Catalog.apply_dev_cheats`; `-- --no-cheats` for the real
   catalog without `rules.expedition` has no fields and `scan` still works; the hard band's
   density is 85% of `max_count`, a density that lays out with nothing dropped on every seed tried;
   drops begin around 88%.
+
+- **The retune** (the coordinator under the owner's mandate, 2026-10-24; step 6a;
+  `docs/plans/retune.md`): one data-only pass sets real timers and a tuned economy to the pace of
+  `docs/vision.md` §5 (Command Center 3 in about half a day, 7 by day 16, 10 by about day 80);
+  build times by a per-Command-Center curve up to 40 hours a top level and 66 hours for the
+  Command Center's level 10, nothing above three days (a shipped-data test); prices from Command
+  Center 5 up scaled by a factor per level (×0.55 to ×1.5), the walls included as the late sink;
+  production generous early and about half the income from Command Center 7 on, the raids the
+  other half; storage, counts and unlocks unchanged; training ×6 and priced at 5 to 8% of the
+  crystal storage per full army; research 15 minutes to a day; abilities made in minutes; a 3 h
+  scan; `rules.premium` reserved and unused, the timers chosen with a ten-minute skip in mind.
+  The beatability lever is the units' hull and damage, a factor per Command Center level, not the
+  defences (which defend players' bases in PvP) nor the bands; it is judged with the `edge`,
+  `two_edges` and `waves` strategies of `tools/sim_battles.gd` (`random` reported only) through
+  `tools/sim_matrix.sh`, and the model assumes four raids a day at about 17% of the storage,
+  builders busy 75% of the time. No expedition cost is added. The scripts that applied it stayed
+  in the developer's scratch directory; the plan states every rule they used.
 
 ### 3.2 Open
 

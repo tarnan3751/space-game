@@ -456,8 +456,10 @@ and 6 at its levels 1 to 8. Each has five levels, the last needing lab 10.
   when it unlocks, that no ability curve goes down, and that every final level requires the top
   lab level.
 
-**These are development values**, timed in seconds and minutes so a change can be seen in one
-sitting. The retune to production time scales is a later change to `data/` alone.
+**These are the retune's values** (`docs/plans/retune.md` records the rules that derived them from
+the development ones and the measurements behind them). A debug build's dev cheats make every
+price free and every timer one second at most, so development still sees a change in one
+sitting.
 
 ## The fixture catalog (`test/support/fixtures/`)
 
@@ -536,7 +538,8 @@ Saved every 10 ticks (10 s) and when the window closes or the app is paused. On 
 of unknown types or that no longer fit are dropped, missing keys take defaults (a resource the
 save does not list, such as antimatter in a save from before it existed, starts at 0), and the
 state is advanced to the current time for offline progress. An unreadable file starts a new
-base.
+base. A data change rewrites no saved timer: a build, a queue head, a research or the scan's
+cooldown in flight finishes at its saved time, and the new times apply from the next start.
 
 `grid` is the field the base was laid out on (`rules.json`'s `grid`), from version 2. A version
 1 save has none: every version 1 save was laid out on the 40×40 field, so `BaseState.from_dict`

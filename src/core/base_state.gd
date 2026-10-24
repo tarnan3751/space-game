@@ -1035,8 +1035,8 @@ func _train(id: int, unit: String, count: int) -> String:
 	return ""
 
 
-## Removes the newest queued `unit` and refunds what it was paid, up to storage. Removing the
-## head starts the next unit from the beginning.
+## Removes the newest queued `unit` and refunds the catalog's current price for the level it
+## was paid for, up to storage. Removing the head starts the next unit from the beginning.
 func _cancel_training(id: int, unit: String) -> String:
 	var error := check_cancel_training(id, unit)
 	if error != "":
@@ -1082,8 +1082,8 @@ func _make(id: int, ability: String, count: int) -> String:
 	return ""
 
 
-## Removes the newest queued `ability` and refunds what it was paid, up to storage. Removing the
-## head starts the next from the beginning.
+## Removes the newest queued `ability` and refunds the catalog's current price for the level it
+## was paid for, up to storage. Removing the head starts the next from the beginning.
 func _cancel_making(id: int, ability: String) -> String:
 	var error := check_cancel_making(id, ability)
 	if error != "":

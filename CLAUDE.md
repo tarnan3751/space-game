@@ -25,7 +25,8 @@ version 2 (`docs/plans/upgrade-pass.md` is its record), and the model feedback p
 **Milestone 2, the offline game, is in progress** (`docs/vision.md`): it opens with the humanoid
 design study, then the army, the battle sim, the battle view and expeditions, all offline.
 `docs/project_overview.md` holds the roadmap (§2.2), the known limitations (§2.3) and the
-decisions (§3). Balance numbers in `data/` are fast dev values, not tuned.
+decisions (§3). The numbers in `data/` are the retune's real timers and economy
+(`docs/plans/retune.md`); a debug build's dev cheats make them free and one second at most.
 
 ## Stack (pinned)
 

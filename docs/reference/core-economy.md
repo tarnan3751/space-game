@@ -252,7 +252,9 @@ reaches the unit's `producer_level`.
   housing (a save after a data change lowered it) waits. This is revisited when battles spend
   units: queueing the next army while the first is out is a change to that check alone.
 - **Cancel** refunds the newest queued unit of the type at the level it was paid for, up to
-  storage, never removing what is there. Cancelling the head starts the next unit from the
+  storage, never removing what is there. The refund is the catalog's price for that level now,
+  not the price paid, so one queued before a data change (the retune, a rebalance, the dev
+  cheats) and cancelled after it refunds the new price. Cancelling the head starts the next unit from the
   beginning.
 
 Housing: `housing_capacity()` is the `capacity` of every finished building of
@@ -301,7 +303,7 @@ level reaches the ability's `requires_foundry`; each takes the ability's `make_s
   lowered) waits. A raid that spends abilities frees room, and the apply's `_resume_training()`
   stocks a waiting head in it.
 - **Cancel** refunds the newest queued one of the ability at the level it was paid for, up to
-  storage. Cancelling the head starts the next from the beginning.
+  storage, at the catalog's price for that level now, as a unit's cancel does. Cancelling the head starts the next from the beginning.
 - **Levels**: an ability's level belongs to its whole type (`ability_levels`), researched in the
   lab's one slot (**The army: research**). The stock carries no level: a battle uses the levels
   the attacker has when it starts.
