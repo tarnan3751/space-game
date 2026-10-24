@@ -78,6 +78,7 @@ func _ready() -> void:
 	hud.template_pressed.connect(_template_base)
 	hud.train_pressed.connect(_on_train_pressed)
 	hud.cancel_training_pressed.connect(_on_cancel_training_pressed)
+	hud.research_pressed.connect(_on_research_pressed)
 	placement.selection_changed.connect(_refresh_hud)
 	placement.placing_changed.connect(_on_placing_changed)
 	placement.command_failed.connect(hud.show_error)
@@ -150,6 +151,13 @@ func _on_cancel_training_pressed(id: int, unit: String) -> void:
 		hud.show_message("Refunded")
 	else:
 		hud.show_error(error)
+
+
+## A research card: the research started, or the reason it was not as a toast.
+func _on_research_pressed(unit: String) -> void:
+	var error := placement.research(unit)
+	if error != "":
+		hud.show_message(Hud.research_error_text(error))
 
 
 func _set_state(new_state: BaseState) -> void:

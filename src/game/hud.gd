@@ -15,7 +15,7 @@ extends CanvasLayer
 ## indicator), refitted when the window resizes; apply_safe_area() sets it directly. The
 ## build panel alone reaches the screen's edges, with its content inside the safe area, and so
 ## does the army panel, which slides up in the same place: a producer's training (its unit
-## cards and its queue).
+## cards and its queue) or the research lab's research.
 
 signal build_pressed(type: String)
 signal confirm_pressed
@@ -28,9 +28,12 @@ signal template_pressed
 signal train_pressed(id: int, unit: String)
 ## A queue entry: cancel the newest queued `unit` at producer `id`.
 signal cancel_training_pressed(id: int, unit: String)
+## A research card: research `unit`'s next level.
+signal research_pressed(unit: String)
 
-## What the army panel shows: nothing (closed or closing) or a producer's training.
-enum ArmyPage { NONE, TRAIN }
+## What the army panel shows: nothing (closed or closing), a producer's training or the lab's
+## research.
+enum ArmyPage { NONE, TRAIN, RESEARCH }
 
 const ERROR_TEXT := {
 	BaseState.ERR_BLOCKED: "That spot is taken",
@@ -62,7 +65,8 @@ const ACCENT := Color("58e8ff")
 const GOLD := Color("ffc13b")
 const GOLD_PRESSED := Color("e0a52a")
 const TROUGH := Color("17162a")
-## The info panel's note when an upgrade is refused.
+## The info panel's note when an upgrade is refused, and a research card's lab level the lab
+## does not have yet.
 const WARNING := Color("ffb37a")
 ## The stripe along the top of a build card, by category: the category's MaterialKit role.
 const CATEGORY_STRIPE := {
@@ -139,6 +143,9 @@ const GLYPH_SIZE := Vector2(48, 48)
 ## An entry of the queue strip under the training cards, and its glyph.
 const QUEUE_ENTRY_SIZE := Vector2(180, 48)
 const QUEUE_GLYPH_SIZE := Vector2(32, 32)
+## A research card: a training card's with a line for the unit's level and one for the lab level
+## its next level needs.
+const RESEARCH_CARD_SIZE := Vector2(200, 164)
 
 ## The dev cheats are on (main.gd): every meter shows, full, reading "∞" instead of amount / cap.
 var cheats: bool = false
@@ -202,7 +209,7 @@ var _reset_button: Button
 var _template_button: Button
 ## The building selected at the last refresh, 0 for none.
 var _selected_id: int = 0
-## The info panel's Train button, shown for a finished producer.
+## The info panel's Train or Research button, shown for a finished producer or research building.
 var _action_button: Button
 ## The building types that train units (Catalog.units_of_producer is not empty).
 var _producers: Dictionary[String, bool] = {}
@@ -230,6 +237,16 @@ var _head_status: String = ""
 var _head_seconds: int = -1
 ## The state whose `changed` rebuilds the army panel's content; a tick only counts down.
 var _watched: BaseState
+var _research_page: Control
+var _research_scroll: ScrollContainer
+## The research running and its time left, or that none is.
+var _research_line: Label
+## One card per unit type, in units.json order; the panel shows the unlocked ones.
+var _research_cards: Dictionary[String, ArmyCard] = {}
+## The research line's words before its time left, "" with no research running, and the seconds it
+## last showed, so a tick sets its text only when they changed.
+var _research_prefix: String = ""
+var _research_seconds: int = -1
 
 
 ## A unit card or a queue entry: the button, what dims while it cannot be pressed, the glyph, the
@@ -240,6 +257,9 @@ class ArmyCard:
 	var heading: Control
 	var glyph: HudIcon
 	var title: Label
+	## A research card's "Level N"; null on a training card.
+	var level: Label
+	var cost_row: Control
 	var costs: Dictionary[String, Label] = {}
 	var free: Label
 	var time: Label
@@ -409,6 +429,11 @@ static func error_text(code: String) -> String:
 	return str(ERROR_TEXT.get(code, code))
 
 
+## A research's error: `busy` there is the lab's one research slot, not construction.
+static func research_error_text(code: String) -> String:
+	return "Research already running" if code == BaseState.ERR_BUSY else error_text(code)
+
+
 # --- Queries for the harness -----------------------------------------------------
 
 func build_button() -> Button:
@@ -501,7 +526,8 @@ func template_button() -> Button:
 	return _template_button
 
 
-## The info panel's Train button; hidden unless a finished producer is selected.
+## The info panel's Train or Research button; hidden unless a finished producer or research
+## building is selected.
 func action_button() -> Button:
 	return _action_button
 
@@ -514,6 +540,11 @@ func army_panel() -> Control:
 ## Whether the army panel shows a producer's training (open or opening).
 func is_training_open() -> bool:
 	return _army_page == ArmyPage.TRAIN
+
+
+## Whether the army panel shows the research (open or opening).
+func is_research_open() -> bool:
+	return _army_page == ArmyPage.RESEARCH
 
 
 func army_close_button() -> Button:
@@ -548,6 +579,26 @@ func queue_entry(index: int) -> Button:
 ## The head entry's state: the time left, "Waiting for room" or "Paused"; "" with no queue.
 func queue_head_status() -> String:
 	return _queue_entries[0].info.text if not _queue_units.is_empty() else ""
+
+
+## The toast's text while it shows; "" once it has faded.
+func toast_text() -> String:
+	return _toast_label.text if _toast.visible else ""
+
+
+## A unit's research card; shown while the unit is unlocked.
+func research_card(unit: String) -> Button:
+	return _research_cards[unit].button
+
+
+## A research card's level line and last line ("Needs Lab L", "Researching" or "Max level").
+func research_card_lines(unit: String) -> PackedStringArray:
+	return PackedStringArray([_research_cards[unit].level.text, _research_cards[unit].info.text])
+
+
+## The research panel's progress line.
+func research_line() -> String:
+	return _research_line.text
 
 
 # --- The build panel -------------------------------------------------------------
@@ -593,26 +644,38 @@ func _slide(panel: Control, open: bool, under_way: Tween) -> Tween:
 		panel.position.y = bottom
 		panel.show()
 	var tween := create_tween()
-	var target := bottom - panel.size.y if open else bottom
+	# The panel's size catches up with its content only at the next layout pass; its minimum size
+	# already has (the army panel's pages differ in height).
+	var height := maxf(panel.size.y, panel.get_combined_minimum_size().y)
+	var target := bottom - height if open else bottom
 	tween.tween_property(panel, "position:y", target, MENU_OPEN_SECONDS if open else MENU_CLOSE_SECONDS) \
 		.set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_OUT if open else Tween.EASE_IN)
-	if not open:
+	if open:
+		# Up, it rests on its anchors, on the bottom edge at its own height, whatever its content
+		# has done to that height since.
+		tween.tween_callback(func() -> void:
+			panel.offset_top = 0.0
+			panel.offset_bottom = 0.0)
+	else:
 		tween.tween_callback(panel.hide)
 	return tween
 
 
 # --- The army panel --------------------------------------------------------------
 
-## The info panel's Train: the army panel slides up in its place, on the selected building.
+## The info panel's Train or Research: the army panel slides up in its place, on the selected
+## building.
 func _on_action_pressed() -> void:
 	if _selected_id == 0 or _state == null:
 		return
 	_open_army(_page_for(_state.buildings[_selected_id].type))
 
 
-## The army panel's page for a building type: a producer's training, or none.
+## The army panel's page for a building type: a producer's training, the research, or none.
 func _page_for(type: String) -> ArmyPage:
-	return ArmyPage.TRAIN if _producers.has(type) else ArmyPage.NONE
+	if _producers.has(type):
+		return ArmyPage.TRAIN
+	return ArmyPage.RESEARCH if type == _catalog.research_type else ArmyPage.NONE
 
 
 func _open_army(page: ArmyPage) -> void:
@@ -621,8 +684,10 @@ func _open_army(page: ArmyPage) -> void:
 	_army_page = page
 	_army_id = _selected_id
 	_train_page.visible = page == ArmyPage.TRAIN
+	_research_page.visible = page == ArmyPage.RESEARCH
 	_info_panel.visible = false
 	_train_scroll.scroll_horizontal = 0
+	_research_scroll.scroll_horizontal = 0
 	_refresh_army(_state)
 	_army_tween = _slide(_army, true, _army_tween)
 
@@ -664,6 +729,8 @@ func _on_state_changed() -> void:
 func _tick_army(state: BaseState) -> void:
 	if _army_page == ArmyPage.TRAIN:
 		_refresh_head(state)
+	else:
+		_tick_research(state)
 
 
 ## Everything the army panel shows, on opening it and on each state change.
@@ -672,6 +739,8 @@ func _refresh_army(state: BaseState) -> void:
 	_army_title.text = "%s   Lv %d" % [_catalog.display_name(building.type), building.level]
 	if _army_page == ArmyPage.TRAIN:
 		_refresh_training(state, building)
+	else:
+		_refresh_research(state)
 
 
 ## The producer's unit cards, then its queue. A card is locked, disabled with its glyph, name
@@ -737,6 +806,52 @@ func _refresh_head(state: BaseState) -> void:
 		head.text = "%s left" % Format.duration(seconds)
 
 
+## The research running, then a card per unlocked unit: its level and its next level's cost, time
+## and the lab level it needs, or "Max level". A card whose next level the lab cannot research
+## yet, or at the top, is dimmed but still takes a tap, which toasts why.
+func _refresh_research(state: BaseState) -> void:
+	var running := state.research_unit
+	_research_prefix = ""
+	if running == "":
+		_research_line.text = "No research running"
+	else:
+		_research_prefix = "Researching %s to Lv %d: " % [_catalog.unit_name(running), state.unit_level(running) + 1]
+		_research_seconds = -1
+		_tick_research(state)
+	for unit: String in _research_cards:
+		var card := _research_cards[unit]
+		card.button.visible = state.is_unit_unlocked(unit)
+		if not card.button.visible:
+			continue
+		var level := state.unit_level(unit)
+		card.level.text = "Level %d" % level
+		var top := level >= _catalog.unit_max_level(unit)
+		card.cost_row.visible = not top
+		var dim := top
+		if top:
+			card.info.text = "Max level"
+			card.info.theme_type_variation = &"CardCount"
+		else:
+			var stats := _catalog.unit_level_stats(unit, level + 1)
+			_set_card_cost(card, stats.get("research_cost", _NO_COST), int(stats.get("research_seconds", 0)))
+			var lab := int(stats.get("requires_lab", 1))
+			dim = state.lab_level() < lab
+			card.info.text = "Researching" if unit == running else "Needs Lab %d" % lab
+			card.info.theme_type_variation = &"CardWarning" if dim else &"CardCount"
+		card.heading.modulate.a = DISABLED_ALPHA if dim else 1.0
+
+
+## The research line's time left; text only when the seconds changed.
+func _tick_research(state: BaseState) -> void:
+	if _research_prefix == "":
+		return
+	var seconds := state.research_seconds_left()
+	if seconds == _research_seconds:
+		return
+	_research_seconds = seconds
+	_research_line.text = "%s%s left" % [_research_prefix, Format.duration(seconds)]
+
+
 ## A card's cost, each amount in its resource's colour, or "Free"; and its time.
 func _set_card_cost(card: ArmyCard, cost: Dictionary, seconds: int) -> void:
 	var free := true
@@ -753,6 +868,10 @@ func _set_card_cost(card: ArmyCard, cost: Dictionary, seconds: int) -> void:
 
 func _on_train_card(unit: String) -> void:
 	train_pressed.emit(_army_id, unit)
+
+
+func _on_research_card(unit: String) -> void:
+	research_pressed.emit(unit)
 
 
 ## An entry cancels the newest queued unit of its type, not necessarily itself.
@@ -889,8 +1008,10 @@ func _refresh_info(state: BaseState, building: BuildingState) -> void:
 		var what := "Under construction" if building.level == 0 else "Upgrading to Lv %d" % building.target_level
 		lines.append("%s: %s left" % [what, Format.duration(state.seconds_left(building.id))])
 	_info_detail.text = "\n".join(lines)
-	# A finished producer trains.
-	_action_button.visible = _page_for(type) != ArmyPage.NONE and building.level >= 1
+	# A finished producer trains; a finished research building researches.
+	var page := _page_for(type)
+	_action_button.visible = page != ArmyPage.NONE and building.level >= 1
+	_action_button.text = "Research" if page == ArmyPage.RESEARCH else "Train"
 
 	_upgrade_note.text = ""
 	if building.is_busy():
@@ -1205,8 +1326,9 @@ func _build_entry(type: String) -> Button:
 
 ## The army panel: like the build panel, the screen's full width at its bottom edge, its content
 ## padded into the safe area and a column kept clear for the Build button. A header of the
-## building's name and level and a close button, over the training page: a strip of unit cards
-## and, under it, the queue strip. Built hidden; _open_army shows a page.
+## building's name and level and a close button, over one of two pages: the training page, a
+## strip of unit cards and, under it, the queue strip; or the research page, the research
+## running over a strip of unit cards. Built hidden; _open_army shows a page.
 func _build_army_panel() -> void:
 	_army = PanelContainer.new()
 	_army.theme = _theme
@@ -1272,6 +1394,24 @@ func _build_army_panel() -> void:
 	_queue_empty.custom_minimum_size.y = QUEUE_ENTRY_SIZE.y
 	_queue_empty.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 
+	_research_page = VBoxContainer.new()
+	_research_page.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_research_page.add_theme_constant_override("separation", 6)
+	pages.add_child(_research_page)
+	_research_line = Label.new()
+	_research_line.theme_type_variation = &"InfoDetail"
+	_research_page.add_child(_research_line)
+	var research_cards := _strip(_research_page, RESEARCH_CARD_SIZE.y + 18)
+	_research_scroll = research_cards.get_parent().get_parent() as ScrollContainer
+	for unit: String in _catalog.unit_types():
+		var card := _build_army_card(unit, RESEARCH_CARD_SIZE)
+		# "Level N" under the name.
+		card.level = _card_label(card.heading, "", &"CardCost")
+		card.heading.move_child(card.level, card.title.get_index() + 1)
+		card.button.pressed.connect(_on_research_card.bind(unit))
+		research_cards.add_child(card.button)
+		_research_cards[unit] = card
+
 
 ## A horizontal ScrollContainer under `parent`, `height` high (its cards' with room for their
 ## shadows and the scroll bar), holding the row it returns.
@@ -1334,6 +1474,7 @@ func _build_army_card(unit: String, card_size: Vector2) -> ArmyCard:
 	cost_row.alignment = BoxContainer.ALIGNMENT_CENTER
 	cost_row.add_theme_constant_override("separation", 10)
 	heading.add_child(cost_row)
+	card.cost_row = cost_row
 	for res: String in _catalog.resources:
 		var amount := _card_label(cost_row, "", &"CardCost")
 		amount.add_theme_color_override("font_color", _resource_color(res))
@@ -1611,6 +1752,7 @@ func _make_theme() -> Theme:
 	_label_variation(ui, &"CardCount", 16, TEXT_DIM, 0)
 	_label_variation(ui, &"CardReason", 15, TEXT_DIM, 0)
 	_label_variation(ui, &"QueueName", 16, TEXT, 0)
+	_label_variation(ui, &"CardWarning", 15, WARNING, 0)
 	_label_variation(ui, &"MeterText", 18, TEXT, 2, _meter_font())
 	_label_variation(ui, &"InfoTitle", 24, TEXT, 0, DISPLAY_FONT)
 	_label_variation(ui, &"InfoDetail", 17, TEXT, 0)
