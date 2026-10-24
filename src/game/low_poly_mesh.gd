@@ -23,8 +23,8 @@ extends RefCounted
 ## The outline holds the triangles of every part whose Surf has outline on and none of
 ## Surf.NO_OUTLINE's flags, with the face normals averaged by position across the whole mesh, so
 ## the hull the ink shader pushes out along them stays closed at hard edges. Each part's line is
-## `ink` times the full width, as `ink` was when the part was added: 1.0, the full line, unless a
-## caller thins it for its own parts. It goes into the outline's UV as the line's thinning,
+## `ink` times the full width, as `ink` was when the part was added: 1.0, the full line, but on
+## the figures' parts (Figures.FIGURE_INK). It goes into the outline's UV as the line's thinning,
 ## 1 - ink, so a mesh without UV draws the full line.
 
 ## Faces of a smooth part that meet at a smaller angle than this share normals.

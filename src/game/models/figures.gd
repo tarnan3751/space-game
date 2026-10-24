@@ -19,11 +19,18 @@ extends RefCounted
 ##   own from its joint's transform, the segment hanging along the joint's -Y, so posing is only
 ##   changing angles, and a unit pipeline can later build each segment on its own.
 ## - Nothing here moves: there are no moving parts and no Motion. The poses are static.
+## - A figure's ink line is FIGURE_INK of the full width (LowPolyMesh.ink): each builder sets it
+##   for its own parts and puts the mesh's value back after, so a figure in a building's mesh (the
+##   escort troopers) is thin and the rest of that mesh is not.
 
 ## How tall each figure stands at scale 1, and the primary proportion, in head units.
 const COLONIST_HEIGHT := 0.8
 const AUTOMATON_HEIGHT := 0.9
 const PRIMARY_HEADS := 3.5
+
+## The share of the full ink width a figure is outlined at: about 25 pixels tall at the gameplay
+## zoom, it would drown in the buildings' line.
+const FIGURE_INK := 0.5
 
 ## The figure's left (+X, since it faces +Z) and right sides, indexing a Pose's and Joints' pairs.
 const SIDES: Array[float] = [1.0, -1.0]
@@ -147,6 +154,8 @@ static func colonist(m: LowPolyMesh, foot: Vector3, yaw: float, pose: Pose, head
 	b.sole_back = 0.062 * b.k
 	b.sole_front = 0.111 * b.k
 	var j := _skeleton(b, pose, foot, yaw)
+	var ink := m.ink
+	m.ink = FIGURE_INK
 	_helmet(m, j.neck, b)
 	_suit_torso(m, j.waist, b)
 	for s: int in 2:
@@ -156,6 +165,7 @@ static func colonist(m: LowPolyMesh, foot: Vector3, yaw: float, pose: Pose, head
 		_suit_thigh(m, j.hips[s], b)
 		_suit_shin(m, j.knees[s], b)
 		_boot(m, j.ankles[s], b)
+	m.ink = ink
 
 
 ## An automaton, the humanoid robot, on the colonist's skeleton: a cream sensor block for a head
@@ -168,6 +178,8 @@ static func automaton(m: LowPolyMesh, foot: Vector3, yaw: float, pose: Pose, hea
 	b.sole_back = 0.06 * b.k
 	b.sole_front = 0.12 * b.k
 	var j := _skeleton(b, pose, foot, yaw)
+	var ink := m.ink
+	m.ink = FIGURE_INK
 	_sensor_head(m, j.neck, b)
 	_robot_torso(m, j.waist, b)
 	for s: int in 2:
@@ -177,6 +189,7 @@ static func automaton(m: LowPolyMesh, foot: Vector3, yaw: float, pose: Pose, hea
 		_robot_thigh(m, j.hips[s], b)
 		_robot_shin(m, j.knees[s], b, SIDES[s])
 		_foot_pad(m, j.ankles[s], b)
+	m.ink = ink
 
 
 # --- The skeleton ----------------------------------------------------------------

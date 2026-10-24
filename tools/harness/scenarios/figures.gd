@@ -12,7 +12,8 @@ extends HarnessScenario
 ## GROUND_SLACK, so no foot sinks into it or floats over it) and that each stance figure stands its
 ## height (Figures.COLONIST_HEIGHT, or Figures.AUTOMATON_HEIGHT to the head under its antenna).
 ## It reads the ink factor every outline vertex carries (LowPolyMesh.ink, as 1 - UV.x) back from
-## the outline meshes and checks it: FIGURE_INK on a figure's, 1.0 on its pad's and the academy's.
+## the outline meshes and checks it: Figures.FIGURE_INK on a figure's, 1.0 on its pad's and the
+## academy's.
 ## Rendered, the screenshots, each a different frame:
 ## - "row-24": the whole row at camera size 24, the gameplay view: does a figure read as a
 ##   character at the zoom the game is played at?
@@ -23,8 +24,6 @@ extends HarnessScenario
 ##   power unit show.
 
 const STUDY_BUDGET := 1500
-## The ink factor a figure's outline carries.
-const FIGURE_INK := 1.0
 const SPACING := 1.15
 ## How far past the last figure the academy's centre stands, along the row.
 const ACADEMY_GAP := 2.7
@@ -95,8 +94,8 @@ func run(main: MainScript) -> void:
 		p.body.box_chamfered(Vector3(PAD_SIDE, PAD_HEIGHT, PAD_SIDE), 0.03, Vector3.ZERO, Parts.CONCRETE_PAD)
 		var node := BuildingModels.instantiate(p)
 		var inks := _outline_inks(node)
-		check(_all_near(inks.slice(0, figure_outline), FIGURE_INK) and _all_near(inks.slice(figure_outline), 1.0),
-			"%s: its %d outline vertices carry ink %.2f, its pad's %d carry 1.00" % [spec[0], figure_outline, FIGURE_INK,
+		check(_all_near(inks.slice(0, figure_outline), Figures.FIGURE_INK) and _all_near(inks.slice(figure_outline), 1.0),
+			"%s: its %d outline vertices carry ink %.2f, its pad's %d carry 1.00" % [spec[0], figure_outline, Figures.FIGURE_INK,
 				inks.size() - figure_outline])
 		node.position = across * (first + SPACING * k)
 		node.rotation.y = deg_to_rad(facing + (STRIDE_TURN - TURN if walking else 0.0))

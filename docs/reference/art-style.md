@@ -143,12 +143,12 @@ that normal and draws the back faces in ink (`INK`, `1B1A2E`, never black):
 - The line is `ink_px` (2.2) pixels at a 720 px viewport height times the part's ink factor, and
   scales with the viewport height. The camera is orthographic, so that is a share of its vertical
   extent: `ink_px * 2 / (720 * abs(PROJECTION_MATRIX[1][1]))` world units times the factor.
-- The ink factor is `LowPolyMesh.ink` as it was when the part was added: 1.0, the full line, unless
-  a caller thins it for its own parts and puts it back after. The outline mesh carries it per
-  vertex in UV as the line's thinning, `(1 - ink, 0)`, so a mesh drawn with the ink material that
-  has no UV (the terrain's hull) draws the full line. It lives in the vertices, not the material:
-  `MaterialKit.ink()` and `ink_selected()` stay one shared material each, the selected outline's
-  override keeps every part's width, and a thinner part costs no draw call.
+- The ink factor is `LowPolyMesh.ink` as it was when the part was added: 1.0, the full line, on
+  every part but a figure's (`Figures.FIGURE_INK`, 0.5, **Figures**). The outline mesh carries it
+  per vertex in UV as the line's thinning, `(1 - ink, 0)`, so a mesh drawn with the ink material
+  that has no UV (the terrain's hull) draws the full line. It lives in the vertices, not the
+  material: `MaterialKit.ink()` and `ink_selected()` stay one shared material each, the selected
+  outline's override keeps every part's width, and a thinner part costs no draw call.
 - The push never takes a vertex below the ground (world y = 0) unless it already was, so a bottom
   edge does not dip into it. This assumes instances turn only about Y and scale uniformly, as all
   do.
@@ -652,9 +652,12 @@ even proportions with no neck, no joints, no taper and no hands or feet.
   security bot's and the ore hauler's surfaces (`Parts.HULL_LIGHT_ROUND`, `GUNMETAL`,
   `HULL_MID_ROUND`), so it reads as their cousin.
 - **Ink**: every part over 0.06 across is inked by default; the chest lamp, the automaton's core
-  and antenna bulb, the glint and the pistons are under it and are not. At camera size 24 the
-  2.2-pixel line is a large share of a figure about 25 pixels tall, so the outline carries much of
-  its read there.
+  and antenna bulb, the glint and the pistons are under it and are not. A figure's line is thinner
+  than a building's: `FIGURE_INK` (0.5) of the full width, about 1.1 pixels at 720 (**Ink
+  outlines**), since at camera size 24 a figure is about 25 pixels tall and the full 2.2-pixel
+  line swallowed it. Each builder sets `LowPolyMesh.ink` for its own parts and puts the mesh's
+  value back after, so a figure in a building's mesh (the escort troopers) is thin and the rest of
+  that mesh keeps the full line.
 - **Budget**: a study value, not the unit budget, which step 5 fixes after the phone measurement:
   at most 1,500 body triangles a figure. The colonist is 1,456 at every proportion and pose (the
   proportion changes lengths, not parts), the automaton 1,484.
