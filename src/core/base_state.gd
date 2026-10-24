@@ -9,7 +9,9 @@ extends RefCounted
 ##
 ## The army: `army` counts the units housed, per type; each producer building trains from a
 ## queue of its own (`training`, TrainingQueue), only while it is idle, and a finished unit
-## waits for room in the Hangars (`housing_capacity`).
+## waits for room in the Hangars (`housing_capacity`). The research building
+## (rules.army.research) raises one unit type a level at a time, and keeps researching while
+## it upgrades.
 
 ## Emitted after anything visible changes: resources, buildings, levels, timers, the army.
 signal changed
@@ -36,6 +38,7 @@ const ERR_BAD_COUNT := "bad_count"
 const ERR_PRODUCER_LEVEL := "needs_producer_level"
 const ERR_HOUSING := "not_enough_housing"
 const ERR_NOT_QUEUED := "not_queued"
+const ERR_LAB_LEVEL := "needs_lab_level"
 
 ## training_status(): nothing queued; the head training; the head stopped with time left while
 ## the producer is busy (constructing or upgrading); the head finished and waiting for room in
@@ -62,6 +65,9 @@ var army: Dictionary[String, int] = {}
 var unit_levels: Dictionary[String, int] = {}
 ## Training queues by producer building id. A queue stays when it empties.
 var training: Dictionary[int, TrainingQueue] = {}
+## The unit type being researched to its next level, "" when none; and when it completes.
+var research_unit: String = ""
+var research_done_at: int = 0
 
 ## Production not yet paid out, per resource, in "resource-seconds" (amount * 3600).
 ## Keeping the remainder means ticking every second or once a day gives the same total.
@@ -108,6 +114,7 @@ static func create_new(base_catalog: Catalog, start_time: int) -> BaseState:
 ##   {"op": "upgrade", "id": int}
 ##   {"op": "train",   "id": int,      "unit": String, "count": int}   (count optional, 1)
 ##   {"op": "cancel_training", "id": int, "unit": String}
+##   {"op": "research", "unit": String}
 func apply(command: Dictionary, at_time: int) -> String:
 	advance_to(at_time)
 	var result := ""
@@ -123,6 +130,8 @@ func apply(command: Dictionary, at_time: int) -> String:
 				int(command.get("count", 1)))
 		"cancel_training":
 			result = _cancel_training(int(command.get("id", 0)), str(command.get("unit", "")))
+		"research":
+			result = _research(str(command.get("unit", "")))
 		_:
 			result = ERR_UNKNOWN_OP
 	if result == "":
@@ -206,13 +215,32 @@ func check_cancel_training(id: int, unit: String) -> String:
 	return ""
 
 
+## Everything about researching `unit`'s next level. The research building's finished level
+## counts, so one being upgraded researches at the level it has.
+func check_research(unit: String) -> String:
+	if not catalog.has_unit(unit):
+		return ERR_UNKNOWN_UNIT
+	if unit_levels[unit] >= catalog.unit_max_level(unit):
+		return ERR_MAX_LEVEL
+	if not is_unit_unlocked(unit):
+		return ERR_PRODUCER_LEVEL
+	var stats := catalog.unit_level_stats(unit, unit_levels[unit] + 1)
+	if lab_level() < int(stats.get("requires_lab", 1)):
+		return ERR_LAB_LEVEL
+	if research_unit != "":
+		return ERR_BUSY
+	if not can_afford(stats.get("research_cost", _EMPTY)):
+		return ERR_FUNDS
+	return ""
+
+
 # --- Time ----------------------------------------------------------------------
 
 ## Moves the base forward to `time`: finishes construction and training in time order and
 ## pays out production for each stretch in between, so a building that completes mid-interval
-## only produces after it completes. At one second, buildings complete before units, so a
-## Hangar finishing then already houses them. Earlier times are ignored (clocks can go
-## backwards).
+## only produces after it completes. In one second, buildings complete first, then research,
+## then units, so a Hangar finishing then already houses them. Earlier times are ignored
+## (clocks can go backwards).
 func advance_to(time: int) -> void:
 	if time <= now:
 		return
@@ -220,18 +248,26 @@ func advance_to(time: int) -> void:
 	while true:
 		var building := _next_completion(time)
 		var queue := _next_training(time)
-		if building == null and queue == null:
+		var researched := research_unit != "" and research_done_at <= time
+		if building == null and queue == null and not researched:
 			break
 		any_change = true
-		if building != null and (queue == null or building.finish_at <= queue.done_at):
-			if _accumulate(building.finish_at - now):
-				any_change = true
-			now = maxi(now, building.finish_at)
+		# The earliest of the three; a strict comparison keeps the tie order.
+		var at := time + 1
+		if building != null:
+			at = building.finish_at
+		if researched and research_done_at < at:
+			at = research_done_at
+		if queue != null and queue.done_at < at:
+			at = queue.done_at
+		if _accumulate(at - now):
+			any_change = true
+		now = maxi(now, at)
+		if building != null and building.finish_at == at:
 			_complete(building)
+		elif researched and research_done_at == at:
+			_finish_research()
 		else:
-			if _accumulate(queue.done_at - now):
-				any_change = true
-			now = maxi(now, queue.done_at)
 			_finish_head(queue)
 		# A finished producer resumes, a finished Hangar or unit changes the room.
 		_resume_training()
@@ -321,6 +357,34 @@ func housing_queued() -> int:
 		for unit: String in queue.units:
 			total += catalog.unit_housing(unit)
 	return total
+
+
+## The research building's highest finished level; 0 when there is none.
+func lab_level() -> int:
+	var best := 0
+	for id: int in buildings:
+		var building: BuildingState = buildings[id]
+		if building.type == catalog.research_type:
+			best = maxi(best, building.level)
+	return best
+
+
+## Whether some producer of the unit has the finished level that trains it.
+func is_unit_unlocked(unit: String) -> bool:
+	var producer := catalog.unit_producer(unit)
+	var needed := catalog.unit_producer_level(unit)
+	for id: int in buildings:
+		var building: BuildingState = buildings[id]
+		if building.type == producer and building.level >= needed:
+			return true
+	return false
+
+
+## Seconds until the research running completes; 0 when none is.
+func research_seconds_left() -> int:
+	if research_unit == "":
+		return 0
+	return maxi(0, research_done_at - now)
 
 
 func army_count(unit: String) -> int:
@@ -522,6 +586,17 @@ func _cancel_training(id: int, unit: String) -> String:
 	return ""
 
 
+func _research(unit: String) -> String:
+	var error := check_research(unit)
+	if error != "":
+		return error
+	var stats := catalog.unit_level_stats(unit, unit_levels[unit] + 1)
+	_pay(stats.get("research_cost", _EMPTY))
+	research_unit = unit
+	research_done_at = now + int(stats.get("research_seconds", 0))
+	return ""
+
+
 func _check_level_requirements(stats: Dictionary) -> String:
 	if int(stats.get("requires_cc", 1)) > cc_level():
 		return ERR_CC_LEVEL
@@ -572,6 +647,12 @@ func _next_completion(limit: int) -> BuildingState:
 		elif building.finish_at == best.finish_at and building.id < best.id:
 			best = building
 	return best
+
+
+func _finish_research() -> void:
+	unit_levels[research_unit] += 1
+	research_unit = ""
+	research_done_at = 0
 
 
 ## Earliest running training queue finishing at or before `limit`; ties broken by producer id.

@@ -59,6 +59,7 @@ The authoritative model of one player's base. One per player; `main.gd` holds on
 | `army: Dictionary[String, int]` | Units housed, per unit type; every catalog unit has an entry, 0 by default. |
 | `unit_levels: Dictionary[String, int]` | Each unit type's level, for the whole type; every catalog unit has an entry, 1 by default. |
 | `training: Dictionary[int, TrainingQueue]` | Training queues by producer building id (**The army**). A queue stays when it empties. |
+| `research_unit: String`, `research_done_at: int` | The unit type being researched to its next level (`""` when none) and the unix second it completes. |
 | `signal changed` | Emitted after anything visible changed: by `apply` on success, by `advance_to` when a timer completed or a resource amount changed. |
 
 `BaseState.create_new(catalog, start_time)` lays out `catalog.start`: each listed building is
@@ -79,6 +80,7 @@ emits `changed`. A failed command changes nothing and charges nothing. The ops, 
 | `{"op": "upgrade", "id": int}` | `check_upgrade(id)` | Pays the next level's cost and starts work to that level. |
 | `{"op": "train", "id": int, "unit": String, "count": int}` | `check_train(id, unit, count)` | Pays `count` times the unit's `train_cost` at its current level and queues `count` of it at producer `id`. `count` is optional (1); all or nothing. |
 | `{"op": "cancel_training", "id": int, "unit": String}` | `check_cancel_training(id, unit)` | Removes the newest queued `unit` from producer `id`'s queue and refunds its `train_cost` at the level it was paid for, up to storage. |
+| `{"op": "research", "unit": String}` | `check_research(unit)` | Pays the unit's next level's `research_cost` and starts its research, `research_seconds` long. |
 
 `"cell"` may also be a `Vector2i`; anything else becomes `(-1, -1)` and fails as `blocked`.
 
@@ -104,6 +106,10 @@ Checks, in the order they are made:
   `insufficient_resources` unless `can_afford(train_cost, count)`.
 - `check_cancel_training(id, unit)`: `unknown_building`; `not_queued` unless the building's
   queue holds the unit.
+- `check_research(unit)`: `unknown_unit`; `max_level` at the unit's top level;
+  `needs_producer_level` unless `is_unit_unlocked(unit)`; `needs_lab_level` while
+  `lab_level()` is below the next level's `requires_lab`; `busy` while a research runs;
+  `insufficient_resources`.
 - Level requirements (`_check_level_requirements(stats)`): `needs_command_center_level` when
   `requires_cc` (default 1) exceeds `cc_level()`; `no_free_builder` when `build_seconds > 0`
   and `builders_free() <= 0`; `insufficient_resources` unless `can_afford(cost)`.
@@ -126,6 +132,7 @@ Checks, in the order they are made:
 | `ERR_PRODUCER_LEVEL` | `needs_producer_level` |
 | `ERR_HOUSING` | `not_enough_housing` |
 | `ERR_NOT_QUEUED` | `not_queued` |
+| `ERR_LAB_LEVEL` | `needs_lab_level` |
 
 `Hud.ERROR_TEXT` maps these to player-facing text (`hud.md`).
 
@@ -152,12 +159,12 @@ them per command. Neither does `advance_to` while no timer completes, and the bu
 allocate only the building a place adds. So the queries above iterate `for id: int in
 buildings` (not `buildings.values()`, which builds an Array), and the lookups on these paths
 default to shared read-only constants instead of a `{}` or `[]` literal. The army's hot paths
-(`advance_to` with no event, `_next_training`, `check_train`, `check_cancel_training`, the
-housing sums, `training_status`, `training_seconds_left`) allocate nothing by construction,
-verified by reading, not with the malloc counter. `queue_of` and `Catalog.units_of_producer`
-build a new array per call and are for the HUD on `changed`, not per frame. A `train` grows its
-queue's packed arrays and creates the queue on a producer's first train, and a unit finishing
-removes it from its queue.
+(`advance_to` with no event, `_next_training`, `check_train`, `check_cancel_training`,
+`check_research`, the housing sums, `lab_level`, `is_unit_unlocked`, `training_status`,
+`training_seconds_left`) allocate nothing by construction, verified by reading, not with the
+malloc counter. `queue_of` and `Catalog.units_of_producer` build a new array per call and are
+for the HUD on `changed`, not per frame. A `train` grows its queue's packed arrays and creates
+the queue on a producer's first train, and a unit finishing removes it from its queue.
 
 ### The army: training and housing
 
@@ -203,13 +210,26 @@ for a head that has trained and waits for room, busy producer or not),
 `training_seconds_left(id)` (0 while waiting), and the three housing sums. `can_afford(cost,
 times = 1)` answers for `times` of a price.
 
+### The army: research
+
+One research runs at a time, in the research building (`catalog.research_type`, the Research
+Lab): `research_unit` and `research_done_at`. A unit's level belongs to its whole type
+(`unit_levels`): the army trains at it, and a unit already queued keeps the price it was paid.
+Researching level k + 1 needs the unit unlocked (`is_unit_unlocked`: some producer of its type
+has a finished level of at least its `producer_level`) and `lab_level()`, the research
+building's highest finished level (0 without one), at least that level's `requires_lab`. It
+needs no builder, and the research building's own upgrade neither stops it nor counts until it
+completes. When it completes, `unit_levels[unit]` rises by one and the slot empties. There is
+no cancel. `research_seconds_left()` is the time left, 0 when none runs.
+
 ### Time and production
 
 `advance_to(time)` moves the base forward. Earlier or equal times are ignored, so a clock that
 goes backwards cannot undo anything. It finds the earliest completion at or before `time`, a
-building (`_next_completion`: lowest `finish_at`, ties broken by lowest id) or a training head
-(`_next_training`: lowest `done_at`, ties broken by lowest producer id), buildings first when
-both fall in the same second, so the order is the same on every device; pays production for the
+building (`_next_completion`: lowest `finish_at`, ties broken by lowest id), the research, or a
+training head (`_next_training`: lowest `done_at`, ties broken by lowest producer id); in the
+same second buildings come first, then the research, then training, so the order is the same on
+every device; pays production for the
 stretch up to it, completes it, brings the training queues in line, and repeats; then pays
 production for the rest of the interval and sets `now`. Ticking every second or once gives the
 same state (`test_training.gd`, `test_ticks_of_one_second_equal_one_big_tick`). A building that completes mid-interval
