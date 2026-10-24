@@ -361,5 +361,6 @@ body's shadow) however many walls there are.
 Display formatting shared by the views and the HUD: `amount(12345)` → `"12,345"`; `short`, the
 meters', as `amount` below a million, then `short(1250000)` → `"1.2M"`, `short(4000000)` →
 `"4M"`, `short(1200000000)` → `"1.2B"` (one decimal, cut, its `.0` dropped);
-`duration(75)` → `"1m 15s"`, `duration(4000)` → `"1h 06m"`; `cost({"metal": 150}, catalog)` →
+`duration(75)` → `"1m 15s"`, `duration(4000)` → `"1h 06m"`, `duration(66600)` → `"18h 30m"`,
+`duration(237600)` → `"2d 18h"` (days from 24 hours, the hours under them cut); `cost({"metal": 150}, catalog)` →
 `"150 Metal"`, each resource named by `catalog.resource_name`, an empty cost → `"Free"`.

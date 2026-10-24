@@ -26,9 +26,11 @@ static func short(value: int) -> String:
 	return ("-" if value < 0 else "") + text + unit
 
 
-## 75 -> "1m 15s", 4000 -> "1h 06m"
+## 75 -> "1m 15s", 4000 -> "1h 06m", 66600 -> "18h 30m", 237600 -> "2d 18h"
 static func duration(seconds: int) -> String:
 	var total := maxi(seconds, 0)
+	if total >= 86400:
+		return "%dd %02dh" % [total / 86400, (total % 86400) / 3600]
 	if total >= 3600:
 		return "%dh %02dm" % [total / 3600, (total % 3600) / 60]
 	if total >= 60:

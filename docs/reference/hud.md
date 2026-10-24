@@ -511,5 +511,7 @@ slot is taken, "Research already running"; any other code is `error_text(code)`.
 `PlacementController.command_failed` is connected to `show_error`; the army's commands return
 their error to `main.gd`, which toasts it (**Army panel**) and "Refunded" on a cancel;
 `_reset_base` shows "Base reset" and `_template_base` "Template base"; a Practice raid with no
-units "Train some units first", and its end "Practice: nothing applied" (`battle-view.md`). Amounts, costs and durations are formatted by
-`Format` (`input-camera.md`).
+units "Train some units first", and its end "Practice: nothing applied" (`battle-view.md`).
+Amounts, costs and durations are formatted by `Format` (`input-camera.md`): a duration in seconds
+under a minute ("45s"), minutes and seconds under an hour ("1m 15s"), hours and minutes under a
+day ("18h 30m"), then days and hours ("2d 18h").

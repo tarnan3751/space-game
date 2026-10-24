@@ -138,6 +138,10 @@ type through `PlacementController`: it builds for one second on the only drone. 
 checks that nothing was spent and that one `advance(1)` later the building is finished at level
 1. It takes no screenshots, so it is meant to run headless.
 
+`scenarios/format.gd` checks `Format` (`docs/reference/input-camera.md`, **Format**): durations
+from seconds to days ("45s", "1m 15s", "18h 30m", "2d 18h", and the edges between them), amounts
+and the meters' short form, each against its text. Headless; it acts on nothing in the game.
+
 `scenarios/battle.gd` runs the battle sim on the real data (`docs/reference/battle.md`): the
 five of the eleven unit types (100 Rangers, 40 Brawlers, 20 Jet Troopers, 5 Hover Tanks and 2
 Gunships, the Hangars' 280 housing) at their top levels, deployed in three groups on the
