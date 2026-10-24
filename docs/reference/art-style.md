@@ -338,7 +338,12 @@ battle's units at the wider zooms, **Units**). `spin`, kept the same way, is a p
 spin in a `CUSTOM0` channel (four floats a vertex, on the body and the outline; `format()` gives the
 flags `add_surface_from_arrays` takes for it), and the shaders turn them about the vertical line
 through the pivot on the clock (**Surface effects**), so a rotor is part of its model's one mesh
-(the gunship's, **Units**). A mesh with no spinning part carries no `CUSTOM0`.
+(the gunship's, **Units**). A mesh with no spinning part carries no `CUSTOM0`. `rig` and `rig2`,
+kept the same way, tag the parts added next with a rig channel (**Rig**): the part's own joint and
+the one it hangs from, each (pivot x, y, z, channel), made with `Rig.part(channel, pivot)`; the
+parts get the `RIG` flag and the two joints in `CUSTOM1` and `CUSTOM2` (four floats a vertex each,
+on the body and the outline, in `format()`), and a mesh with no rigged part carries neither.
+`socket(name, position, direction)` records a named point on the model (**Sockets**).
 
 | Builder | What |
 | --- | --- |
@@ -371,7 +376,7 @@ when nothing is outlined), for a caller that merges meshes itself, as `WallMesh`
   axis, a whole number of repeats around (about one per world unit at their widest radius), so
   bands wrap without a seam, and V from the distance along the profile; caps and discs are polar
   (V the radius). UV2 is (layer, flags); the vertex colour is the tint, its alpha the phase;
-  CUSTOM0, when a part spins, the spin.
+  CUSTOM0, when a part spins, the spin; CUSTOM1 and CUSTOM2, when a part is rigged, its joints.
 - **Smoothing**: a smooth part's faces that meet at under 40° share normals, averaged by position
   within the part and weighted by corner angle; caps, discs and sharper edges (chamfers, 45°;
   box corners, 90°) stay hard. A 16- to 24-sided cylinder shades as a curve; an 8-sided one
@@ -644,14 +649,20 @@ even proportions with no neck, no joints, no taper and no hands or feet.
   forearm, hand, thigh, shin and foot) is a function of its own taking its joint's transform,
   hanging along the joint's -Y, so posing is only changing angles and a unit pipeline can later
   move segments as step 5 decides. A figure is one `LowPolyMesh`, the caller's; nothing in it is a
-  moving part and it uses no `Motion`. Three poses: `stance()` (feet about shoulder width apart,
+  moving part and it uses no `Motion`. A rigged build (a battle unit's) poses it in `neutral()`
+  (legs straight but for a touch of knee, the torso pitched a little with no twist, so the
+  shoulders lie on one line across it) and passes a `Rigging` from `walk_rig(joints, arm_channel)`
+  to `colonist()` or `automaton()`: each thigh is stamped with its hip channel, each shin and foot
+  with its knee channel under the hip, the arms as one group on `arm_channel` about the shoulders'
+  midpoint, the head and the torso not at all (**Rig**). Without one (the study poses, the seated
+  pilot) nothing is rigged. Three poses: `stance()` (feet about shoulder width apart,
   knees a little bent, the torso a few degrees forward and twisted, the elbows bent and the arms a
   little out, the sides unalike), `stride()` (walking upright: the left leg reaching forward
   with its knee bent and its heel coming down, the right nearly straight behind pushing off its
   toe, the arms counter-swung, the torso only a little forward and the head level) and `seated()`
   (at the controls: the thighs level forward, the shins straight down to flat feet, the torso
   upright and a touch back, both forearms reaching forward at chest height). A caller may build
-  a `Pose` of its own (the units' port arms, flight and guard). `joints(foot, yaw, pose, heads,
+  a `Pose` of its own (the units' low ready, flight and guard). `joints(foot, yaw, pose, heads,
   scale, robot)` hands a caller the posed skeleton, to add to a figure (a rifle between its hands)
   or seat it (the pelvis is where its seat goes); `colonist(..., legs = false)` leaves the
   thighs, shins and boots out, for a pilot whose legs are hidden in its machine.
@@ -700,8 +711,10 @@ contract: origin on the ground under the unit's middle, +Y up, facing +Z; a hove
 unit is built at its height over that point. One cell is one unit. A unit has no moving part
 (`MAX_MOVING` is 0), so the battle draws every unit of a type from one MultiMesh of its body and
 one of its outline (`battle-view.md`, **Units**); what turns is a part tagged with
-`LowPolyMesh.spin`, which the shaders spin, and the hop, the lean, the hit flash and the death are
-the battle's per-instance data (**Surface effects**).
+`LowPolyMesh.spin`, which the shaders spin, what moves is a part tagged with `LowPolyMesh.rig`,
+which the shaders turn (**Rig**: the ranger's legs and its arms and rifle), and the hop, the lean,
+the aim, the hit flash and the death are the battle's per-instance data (**Surface effects**). A
+unit's muzzle is a socket (**Sockets**), which the battle fires its shots from.
 
 - **Tiers.** One shape per type; the tier repaints a machine's hull, panels, trim and glows, as
   the buildings' tiers do (**Tiers**), so a Crown unit reads black and gold with violet as a Crown
@@ -786,7 +799,7 @@ the battle's per-instance data (**Surface effects**).
 
 | Type | Model | Size (world units) | Triangles |
 | --- | --- | --- | --- |
-| `ranger` | the colonist at ease (`stance` with the arms brought in to port arms), a short rifle across the chest (a gunmetal receiver, a stock of the tier's trim, a magazine, a thin barrel and a muzzle in the tier's glow), a pistol in a holster on the right thigh | 0.80 tall | 1,662 |
+| `ranger` | the colonist rigged (`neutral` with the arms at low ready: the right hand at the grip in front of the belly, the left reaching down and forward to the fore end), a short rifle pointing forward and 30° down (a gunmetal receiver, a stock of the tier's trim, a magazine, a thin barrel and a muzzle in the tier's glow, its `muzzle` socket), a pistol in a holster on the right thigh (on the right hip's channel); in battle its legs walk and its arms and rifle rise level to aim and kick on each shot (**Rig**) | 0.80 tall | 1,662 |
 | `breacher` | the colonist at 0.85 tall in a bulkier suit: a belly plate and pauldrons of the tier's trim, heavy dark boot shells, a big dark charge pack on its back rising behind the helmet, hazard-banded, a gunmetal detonator block and a red fuse lamp blinking (red at every tier: the pack is live) | 0.90 tall | 1,778 |
 | `jet_trooper` | the colonist flying, leaning in with the legs trailing and the toes pointed, its lower sole 0.5 up; a jetpack (the tier's trim to Gold, its hull above) with two gunmetal nozzles blowing long flame cones of the tier's glow (unlit, PULSE, not inked) and short orange stub wings; every part bobs | 0.86 tall, flames to 0.46 up | 1,646 |
 | `brawler` | the automaton at 1.08 scale crouched with its guard up: big gunmetal fists with knuckle bands of the tier's trim, broad shoulder plates (orange to Gold, the tier's hull above), a thick girdle of the tier's hull round its middle | 1.06 tall | 1,732 |
@@ -810,13 +823,16 @@ hub, sunk in its nacelle (a mount).
 
 ## Animation
 
-Two ways for a model to move: **surface effects**, which the shaders animate from `anim_time` per
-part, and **moving parts**, nodes `BuildingView` moves. What each costs in draws:
+Three ways for a model to move: **surface effects**, which the shaders animate from `anim_time` per
+part, **moving parts**, nodes `BuildingView` moves, and the **rig**, parts of one mesh the shaders
+turn by a battle instance's state (**Rig**). What each costs in draws:
 
 - The shader effects (PULSE, BLINK, FLICKER, FLOW, FLOW_U, BOB, JITTER, LIGHTNING, RISE) add no
   draw: they are flags on parts of meshes that are drawn anyway.
 - A moving part is two more instances, its body and its outline: two draws, plus the body's draw
   into the shadow map.
+- A rigged part adds no draw: two more vec4 attributes a vertex and two turns in `vertex()`
+  (**Rig**).
 - A HOLO part puts one more surface on its mesh: one more draw, in the transparent pass, for each
   mesh (the body or a moving part) that has holograms.
 
@@ -847,7 +863,8 @@ rounds or truncates, and `surf_phase()` in `effects.gdshaderinc` reads round(alp
 so 0.5 (a FLOW part standing still) is exact. There are no per-instance uniforms: every instance
 of a mesh animates alike, but for the battle's MultiMesh instances, whose custom data
 (`INSTANCE_CUSTOM`) carries their own state: x a gait's phase in steps, y its share, z a hit
-flash, w a fade (`battle-view.md`, **Units**). The toon and ink shaders apply the gait
+flash, w a fade (`battle-view.md`, **Units**); while a rigged unit aims, y is minus the aim's share
+and x the fire phase instead (**Rig**), and the gait shows nothing. The toon and ink shaders apply the gait
 (`effect_gait`: once a step a hop of `GAIT_HOP` 0.09 on a half sine, landing squashed by
 `GAIT_SQUASH`, a forward lean `GAIT_LEAN` and a sway `GAIT_SWAY` to either side in turn, each a
 shear growing with the vertex's height, so the feet stay planted) before the surface effects; the
@@ -870,6 +887,7 @@ development Mac by the `battle_view` scenario's shots).
 | `HOLO` | 512 | a hologram (below) |
 | `LIGHTNING` | 1024 | with FLICKER and JITTER, a lightning arc's slow crackle, one speed on every arc: on or off 7 times a second (`LIGHTNING_FLICKER_RATE`), on about 60 % of the time (`LIGHTNING_ON`), and a new shake 5 times a second (`LIGHTNING_JITTER_RATE`) instead of a spark's 24 and 20. `Parts.spark()` carries it, so every arc built on it crackles alike; point sparks (welding, cutting, flares, grids, the construction drone's) are made without it and keep the fast rates |
 | `SPIN` | 4096 | the part turns about the vertical line (model +Y) through its pivot at its rate, radians a second on the clock, both per vertex in `CUSTOM0` (`LowPolyMesh.spin`), as `Motion.spin` turns a moving part; its normals turn with it. A part of the model's one mesh, so it costs no draw: the gunship's rotors |
+| `RIG` | 8192 | the part turns with a rig channel about its joints, both per vertex in `CUSTOM1` and `CUSTOM2` (`LowPolyMesh.rig`), by the battle instance's state (**Rig**); its normals turn with it. A part of the model's one mesh, so it costs no draw: the ranger's legs, arms and rifle |
 | `RISE` | 2048 | the part climbs 0.7 along world Y (`RISE_HEIGHT`) over 3 s (`RISE_PERIOD`) from its phase, drifting (0.12, 0, 0.08) world units sideways by the top (`RISE_DRIFT`), then starts again. A hologram-surface effect: on HOLO, `holo.gdshader` fades the part in over the first 12 % of the climb and out over its top half, so the restart never shows; the toon shader has no transparency, so on an opaque part the snap back shows. Rising smoke (`Parts.puffs`) |
 
 Effects compose: UNLIT + PULSE, UNLIT + FLICKER + JITTER, FLOW + PULSE. `anim_time` wraps every
@@ -910,6 +928,61 @@ at -amplitude and kicks out to +amplitude: point the axis the way the part kicks
 each one's transform every frame from `Motion.transform_at(Motion.clock(), rest)`, with no
 allocation; while it is busy the parts hold their last pose. A view with no moving part does no
 work per frame.
+
+### Rig
+
+A part rig in the vertex shader, for the battle's units, which are drawn from MultiMeshes and so
+can have no moving part: a model builder tags a limb's parts with a **rig channel** and a pivot
+(`LowPolyMesh.rig`), and the toon, ink and hologram shaders turn them by an angle the channel takes
+from the instance's state (`INSTANCE_CUSTOM`), two levels deep: a vertex turns about its own joint
+(`CUSTOM1`: a shin about its knee), then about the joint it hangs from (`CUSTOM2`: with the thigh
+about the hip). No skeleton (slow on GLES3, and a MultiMesh cannot be skinned), no draw, no
+instance. The turn comes after a spin and before the gait and the surface effects; the shadow pass
+and the outline (which turns its normals too) follow it. The `RIG` flag gates the reads, since a
+mesh without the attributes would read a default there.
+
+The state: x the gait's phase in steps (two a cycle) while y ≥ 0, the fire phase (0 at a shot, 1 by
+the next) while y < 0; y the gait's share while ≥ 0, minus the aim's share while < 0
+(`battle-view.md`, **Units**). Any other instance reads zeros: every channel at 0, the model as
+built, so a rigged model shows its bake pose in the base, the gallery and the cards' pictures. Each
+channel has a fixed axis and an angle function; the table is in `src/game/rig.gd` (`Rig`) and in
+`effects.gdshaderinc` (`rig_angle`, `rig_axis`), which must agree: `Rig` mirrors the shaders for the
+CPU (`Rig.posed`, `posed_direction`), so a view can find a point on a rigged part as it is drawn (a
+muzzle, **Sockets**). With walk = max(y, 0), s = sin(πx), aim = max(−y, 0) and kick = aim × (1 −
+smoothstep(0, `RECOIL_SPAN` 0.3, x)):
+
+| Id | Channel | Axis | Angle |
+| --- | --- | --- | --- |
+| 1, 2 | `HIP_L`, `HIP_R` | X | ∓`HIP_SWING` (44°) × walk × s: the left thigh forward while s > 0, the right back |
+| 3, 4 | `KNEE_L`, `KNEE_R` | X | `KNEE_BEND` (70°) × walk × max(∓s, 0): a knee bends while its leg is behind |
+| 5 | `AIM` | X | −(`AIM_RAISE` (30°) × aim + `RECOIL_KICK` (16°) × kick): the arms and the gun raised to aim, kicked up by each shot |
+
+Reserved, not yet built (ids, axes and functions fixed for the lanes that rig the rest of the
+roster): 6, 7 `SHOULDER_L`, `_R` (X, an arm's counter-swing, ±`ARM_SWING` × walk × s); 8, 9
+`ELBOW_L`, `_R` (X); 10 `WHEEL` (X, 2π x: whole turns a cycle, so the phase's wrap at 2 never jumps);
+11 `YAW` (Y); 12 `BANK` (Z, x read as radians on a hovering model, which never hops); 13 `SLIDE` (a
+translation by the pivot's vector times kick: a barrel's recoil); 14 `BAY` (X, a bomb bay's doors
+or a hatch opening with aim); 15 `FIST` (X, a melee swing on the fire phase). A model that needs a
+channel at another amplitude (a mech's hip swinging less than a colonist's) gets a variant row with
+its own id and constant, never per-instance data: the state is the same four numbers for every
+model.
+
+The figures carry it through `Figures.walk_rig(joints, arm_channel)` (**Figures**). The ranger is
+the first rigged unit: its legs walk, and its arms and rifle are one group on `AIM` about the
+shoulders' midpoint, so the hands never leave the rifle (**Units**). The `rig` harness scenario
+(`tools/harness/README.md`) poses a row of rangers and drives a battle.
+
+### Sockets
+
+`LowPolyMesh.socket(name, position, direction)` records a named point with the way it faces
+(`muzzle`, `muzzle_2`, …), in the mesh's own space, a moving part's own for a socket on a moving
+part, with the rig stamps current when it was added, so a muzzle on a rigged arm moves with the arm
+(`Rig.posed`) and one on a turning head with the head. `BuildingModels` keeps the sockets on its
+`Meshes` and `Moving` records and sets them on the model's root and each moving part's node
+(`SOCKETS_META`); `BuildingView.socket_point` and `socket_direction` give one in the world. A
+defence whose `muzzle` is on a moving part aims that part in battle (`battle-view.md`, **Aim and
+muzzles**). Sockets today: the ranger's rifle muzzle, and the laser turret's barrel tips on its
+head (`muzzle`, `muzzle_2`, from level 7 `muzzle_3` and `muzzle_4`).
 
 ### Budget and checks
 
@@ -1467,7 +1540,10 @@ MB with its mipmaps (5.7 with seventeen); the field texture, one 1024×1024 RGBA
 mipmaps too, and the ground and the terrain share it; the terrain's rock texture, one 512×512
 RGBA8 image, is about 1.4 MB with its mipmaps. The terrain's shader has two samplers (the field
 texture and the rock texture) and takes three texture reads a fragment (the field's marks and
-the rock texture along x and along z), with five value noises. Keep `_process` free of
+the rock texture along x and along z), with five value noises. A rigged vertex (**Rig**) carries
+two more vec4 attributes (32 bytes; the ranger's near and far meshes and their outlines only) and
+costs two axis turns in `vertex()`, in the colour pass, the shadow pass and the outline's, and no
+draw; every other vertex of the shared materials pays one flag test. Keep `_process` free of
 allocation, and keep every building to its eight instances, ten at Crown (**Animation**); a busy building adds
 its construction drone's four. The shader effects cost a few integer tests and a sine or two a
 vertex and a fragment, and no draw; a moving part costs two draws (its body and its outline)

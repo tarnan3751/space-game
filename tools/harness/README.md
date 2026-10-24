@@ -391,6 +391,24 @@ four big machines), each unit alone at size 4 at Base and at Crown (set directly
 camera's closest zoom), and the Base row at size 10 in two halves with every unit turned 180
 degrees.
 
+`scenarios/rig.gd` proves the part rig, sockets and defence aim (`docs/reference/art-style.md`,
+**Rig** and **Sockets**; `docs/reference/battle-view.md`, **Aim and muzzles**) on the ranger and
+the laser turret. First a row of rangers on the field, the base's own views hidden, each an instance
+of one MultiMesh (the shaders read a pose from `INSTANCE_CUSTOM` only there) in a fixed state:
+standing, walking at three phases, aiming half and fully raised, and a shot's kick at two moments,
+in profile. In both modes it poses every vertex of the ranger's mesh on the CPU through `Rig`
+(the shaders' mirror) and checks that the forward leg is the one each walking phase says, that no
+point dips below the ground, and that the muzzle socket points 30 degrees down as built, level
+when aimed and up at a kick. Then a battle (`main.open_battle`, practice): a level 3 laser turret
+and the Command Center against six rangers deployed by script. At the start of each frame it reads
+the bolt started last frame (`BattleEffects.bolts_fired`, `last_bolt_from`, `last_bolt_color`) and
+checks that a turret's starts at one of its muzzle sockets (within the hit shake), alternating
+between the two, with the head facing its target within 10 degrees, and that a ranger's starts in
+front of its ranger, towards the building it attacks, at its rifle and away from its middle.
+Rendered, it shoots the row at camera size 24, 8 and 4, the rangers walking in at 24 and 10, the
+battle paused a frame after a turret shot at 24 and 10 (the head turned, the flash at a barrel
+tip), and a ranger close at size 6 after its shot.
+
 `scenarios/view_states.gd` checks the comic style's view states on a fresh base, each with a
 close-up screenshot: the selected Command Center's outlines in gold (and the override cleared on
 deselecting), the placement ghost's body tinted valid on a free spot and invalid on the Command

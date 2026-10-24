@@ -9,7 +9,7 @@ The attack HUD, `BattleHud`, is in `hud.md`, **Battle HUD**.
 | File | What |
 | --- | --- |
 | `src/game/battle_view.gd` | `BattleView`: the sim, its clock, the field and the buildings, the events read into effects, the input |
-| `src/game/battle_units.gd` | `BattleUnits`: every unit of a type from one MultiMesh pair, interpolated, with the gait, the flash and the death |
+| `src/game/battle_units.gd` | `BattleUnits`: every unit of a type from one MultiMesh pair, interpolated, with the gait, the aim, the flash and the death, and its shots from its muzzle |
 | `src/game/battle_effects.gd` | `BattleEffects`: bolts, impacts, lightning, scorch marks, fallen walls' strips, health bars and shield domes, each kind batched |
 | `src/game/models/rubble.gd` | the heap a fallen building leaves (one per footprint size) and a fallen wall's strip |
 
@@ -121,7 +121,7 @@ The view stays on the field after the end, its last effects finishing, until `le
   (`rebuild_cells`); a fallen wall leaves it (one rebuild at the end of a frame, however many fell)
   and a low strip of stones takes its cell (`BattleEffects.wall_rubble`, one MultiMesh pair).
 - **Every other building** is a `BuildingView` at its level and tier, its moving parts turning as
-  in the base. A hit whitens its bodies for `FLASH_SECONDS` (`BuildingView.set_flash`, the shared
+  in the base but for an aiming head (**Aim and muzzles**). A hit whitens its bodies for `FLASH_SECONDS` (`BuildingView.set_flash`, the shared
   `MaterialKit.hit_flash` material on surface 0, no material per building) and shakes it for
   `SHAKE_SECONDS`, `SHAKE` either way; its health bar shows for `BAR_SECONDS` after the last hit.
   An expedition's buildings carry the faction tint and flash on `MaterialKit.hit_flash_rival`
@@ -142,7 +142,8 @@ The view stays on the field after the end, its last effects finishing, until `le
 data, sized to the type's count in the army; units not yet deployed or gone are left out with
 `visible_instance_count`. Each frame it writes one buffer a type and hands it to both. A unit has no
 moving part (`UnitModels.MAX_MOVING` is 0); the gunship's rotors are spun by the shaders
-(`LowPolyMesh.spin`, `art-style.md`).
+(`LowPolyMesh.spin`, `art-style.md`), and a rigged model's limbs turned by them (the rig,
+`art-style.md`, **Rig**: the ranger's legs and its arms and rifle).
 
 - **Transform**: the interpolated position, the heading turned smoothly (`TURN_RATE`) towards the
   last move (`unit_heading`) or, while attacking, towards the target's centre.
@@ -154,6 +155,19 @@ moving part (`UnitModels.MAX_MOVING` is 0); the gunship's rotors are spun by the
   hovering or flying one (its mesh bobs) bobs by its own surface flags. A hit (a defence's shot
   arriving, a lightning strike) whitens it over `HIT_SECONDS` (0.12); a death shrinks, sinks and
   fades it over `DEATH_SECONDS` (0.3), its outline thinning to nothing, after which it is not drawn.
+  A rigged type (its mesh carries `Surf.RIG`) walks with its legs while the gait shows (the hip and
+  knee channels read x and y as above), and aims while it attacks (`unit_state` `ATTACKING`): its
+  gait's share eases to 0 first, then its aim's share rises to 1 at `AIM_EASE` (10) a second, and
+  while the aim shows, y is minus its share and x the fire phase, 0 at its last shot and 1 by the
+  next (the seconds since over its `fire_ms` at its level), which raises the gun and kicks it on
+  each shot. Leaving the attack, the aim eases to 0 before the gait comes back, so the legs never
+  snap. An unrigged type's data is as before.
+- **Shots**: a unit's hit (`UNIT_HIT`) goes through `BattleUnits.shoot`, which fires its bolt on
+  the next draw (the same frame): from its `muzzle` socket posed by the state it is drawn in
+  (`Rig.posed`, the CPU mirror of the shaders' angles), with a muzzle flash (`MUZZLE_FLASH`), or from
+  its middle when the model has no socket. A rigged unit's is held until its aim's share reaches
+  `AIM_READY` (0.9), so a bolt never leaves a rifle still rising; the sim's hit is instant and the
+  bolt is the view's.
 - **Throws**: a unit a grav trap throws flies from where it stood to where it landed on an arc
   `THROW_HEIGHT` high over `THROW_SECONDS`.
 - **Health bars**: a damaged unit carries a cyan bar over its head, its fill easing towards the
@@ -172,8 +186,8 @@ a frame:
 
 | Event | Drawn as |
 | --- | --- |
-| `UNIT_HIT` | a cyan bolt from the unit's middle to the building, flying at `BOLT_SPEED`, flashing and shaking the building and making an impact where it lands (as wide as the unit's splash); a unit of reach `MELEE_REACH` (one cell) or less strikes instead: an impact at the building's side at once |
-| `SHOT` | a red bolt from the defence's muzzle (`MUZZLE_SHARE` of its height) to the unit, flashing it on arrival; the arc tower's is lightning (the LIGHTNING surface without its flicker, on a kinked strip stretched from the tower to the unit, `ARC_SECONDS`) with a blue impact |
+| `UNIT_HIT` | a cyan bolt from the unit's muzzle socket (with a flash; held until a rigged unit has aimed) or its middle to the building, flying at `BOLT_SPEED`, flashing and shaking the building and making an impact where it lands (as wide as the unit's splash); a unit of reach `MELEE_REACH` (one cell) or less strikes instead: an impact at the building's side at once |
+| `SHOT` | a red bolt from the defence's next muzzle socket with a muzzle flash, held until its head faces the unit (**Aim and muzzles**), or from its centre `MUZZLE_SHARE` of its height up when it has no socket, to the unit, flashing it on arrival; the arc tower's is lightning (the LIGHTNING surface without its flicker, on a kinked strip stretched from the tower to the unit, `ARC_SECONDS`) with a blue impact |
 | `SHELL`, `SHELL_LAND` | an orange shell on an arc landing where the sim aimed it when it lands; a blast as wide as the splash |
 | `HOLD` | a violet pull round the gravity well, half its range |
 | `DETONATE`, `THROW` | a hazard-yellow blast as wide as the trap's range, and a scorch mark for a mine; the thrown units' flights |
@@ -184,11 +198,37 @@ a frame:
 | `STRIKE_LAND` | the marker, the crosshair and the bolt end; a white-hot fireball (`BattleEffects.Timed`'s POP, an opaque unlit dome, `FIREBALL_SHARE` of the radius) pops over `STRIKE_BLAST_SECONDS` (0.6 s) from half the height of what it hit, so it shows over it, inside an orange ring 1.6 times the radius and a hotter disc, both lasting as long; pale smoke rises and swells from the landing for `SMOKE_SECONDS` (1.1 s), timed from it (not the RISE surface on the global clock), and fades |
 
 Bolts are unlit glow orbs stretched along their flight, tinted per instance (`use_colors`);
+muzzle flashes an unlit eight-pointed star facing the camera, at its size on the frame it is fired
+and shrinking away over `FLASH_SECONDS` (0.06 s; `Timed`'s FLASH), tinted as the shot;
 impacts are hologram discs that grow and fade by their custom data's w (`holo.gdshader`); bars are
 unshaded quads facing the fixed camera, drawn over everything; the abilities' domes, crosshairs
 and smoke are white holograms the instance colour tints, faded by the custom data's w, each kind
 one MultiMesh (`BattleEffects.Timed`). None casts a shadow or has an
 outline (sparks and arcs never do, `art-style.md`).
+
+## Aim and muzzles
+
+A model's sockets (`LowPolyMesh.socket`, `art-style.md`, **Sockets**) are named points with a
+direction; `BuildingView` collects them from its model's root and moving parts
+(`BuildingModels.SOCKETS_META`) and gives one in the world as the view stands now
+(`socket_point`, `socket_direction`).
+
+- **Aim**: a defence whose `muzzle` socket is on a moving part (the laser turret's head) aims it
+  (`BuildingView.can_aim`); one whose muzzle is on its body, or with none, never does. Each frame
+  the view turns the head towards the unit `BattleSim.building_target` names (unless it is dead) at
+  the type's `AIM_TURN` rate (10 for the laser turret, `AIM_TURN_DEFAULT` 4 otherwise, as an
+  exponential share of the way a second, in seconds of battle), starting from where its idle swing
+  had it (`aim_at`). While the defence is disabled it holds its aim. With no target it holds its
+  aim for `BuildingView.AIM_IDLE_SECONDS` (2.5), then eases back to its idle `Motion` at
+  `AIM_RETURN` and follows it again (`idle_aim`). The head turns about +Y; the yaw that faces a
+  point is measured from its pivot, against the way its muzzle faces as built.
+- **Muzzles**: a defence with a `muzzle` socket fires from its sockets in turn (`MUZZLES`:
+  `muzzle`, `muzzle_2`, `muzzle_3`, `muzzle_4`, as many as it has) with a muzzle flash
+  (`DEFENCE_FLASH`); every other defence fires from its centre as before. An aiming defence's shot
+  is held until its head faces the unit within `AIM_READY` (0.12 radians), `AIM_HOLD` (0.4 s) at
+  most: the sim picks a target and fires on one tick, so the head is still turning to a new target
+  when its shot comes; the hit is the sim's at once, the bolt the view's. A defence that falls or
+  is disabled while it holds a shot fires it at once, from wherever its head is.
 
 ## Input, deploying and the camera
 
@@ -241,7 +281,8 @@ been 2.40 million primitives (2.12 million without their shadows). The sim's ste
 (`battle.md`, **Determinism and performance**), the reach maps being built at setup so the first
 tick no longer pays for them: 2.3 to 3.3 ms in the `battle` scenario (the faster of two runs per
 tick), about 2.6 to 4.8 ms in this scenario's single run, depending on the machine's load. The frame's process time at its slowest is about 10 ms.
-Each unit type is three draws (its body, its outline and the body's shadow), each effect kind one;
+Each unit type is three draws (its body, its outline and the body's shadow), each effect kind one
+(the muzzle flashes one more since the rig pass);
 the buildings cost what they cost in the base, less the traps and the walls' own views.
 
 Two costs are measured fine on the Mac and unmeasured on a phone: every effect MultiMesh uploads
