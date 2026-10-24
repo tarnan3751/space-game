@@ -199,12 +199,12 @@ Foundry (`core-economy.md`, **The Foundry**). Each:
 "repair_swarm": {
   "name": "Repair Swarm",
   "effect": "swarm",
-  "make_seconds": 60,
+  "make_seconds": 180,
   "requires_foundry": 1,
   "radius_units": 3500,
   "levels": [
-    { "make_cost": { "crystal": 1500 }, "heal_per_second": 30, "duration_ms": 6000 },
-    { "make_cost": { "crystal": 2000 }, "research_cost": { "crystal": 40000 }, "research_seconds": 300,
+    { "make_cost": { "crystal": 900 }, "heal_per_second": 30, "duration_ms": 6000 },
+    { "make_cost": { "crystal": 1400 }, "research_cost": { "crystal": 40000 }, "research_seconds": 7200,
       "requires_lab": 4, "heal_per_second": 40, "duration_ms": 6000 }
   ]
 }
@@ -441,13 +441,15 @@ and 6 at its levels 1 to 8. Each has five levels, the last needing lab 10.
 
 | Ability | Name | Effect | Unlock: Foundry (CC) | Make (s) | Radius | Level 1 → 5 | Make cost, level 1 → 5 |
 | --- | --- | --- | --- | --- | --- | --- | --- |
-| `repair_swarm` | Repair Swarm | swarm | 1 (3) | 60 | 3.5 cells | 30 → 75 hp a second for 6 s | 1,500 → 5,000 crystal, 20 antimatter at 5 |
-| `emp_burst` | EMP Burst | emp | 3 (4) | 90 | 3 cells | defences off 3 → 5 s | 2,500 → 7,000 crystal, 35 antimatter at 5 |
-| `orbital_strike` | Orbital Strike | strike | 5 (6) | 120 | 2 cells | 600 → 1,300 damage after 1.5 s | 4,000 → 11,000 crystal, 20 → 90 antimatter |
+| `repair_swarm` | Repair Swarm | swarm | 1 (3) | 180 | 3.5 cells | 30 → 75 hp a second for 6 s | 900 → 9,500 crystal, 12 antimatter at 4, 38 at 5 |
+| `emp_burst` | EMP Burst | emp | 3 (4) | 300 | 3 cells | defences off 3 → 5 s | 1,800 → 13,000 crystal, 12 → 66 antimatter from 3 |
+| `orbital_strike` | Orbital Strike | strike | 5 (6) | 360 | 2 cells | 600 → 1,300 damage after 1.5 s | 3,200 → 21,000 crystal, 16 → 170 antimatter |
 
 - **Research** of each level sits on the units' price at the same lab level (40,000 crystal at
   lab 4 up to 1,200,000 crystal and 2,100 antimatter at lab 10), labs 4, 6, 8, 10 for the swarm,
-  6, 8, 9, 10 for the burst and 8, 9, 9, 10 for the strike.
+  6, 8, 9, 10 for the burst and 8, 9, 9, 10 for the strike, taking the units' research times.
+- **Making** takes 3, 5 and 6 minutes, so a top Foundry's stock of six refills in about the time
+  the top army trains; the make prices take the units' training factors (`units.json`, above).
 - `test_catalog.gd` checks that every making and research price fits the storage a base can reach
   when it unlocks, that no ability curve goes down, and that every final level requires the top
   lab level.
