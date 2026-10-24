@@ -41,6 +41,9 @@ const RISE := 2048
 ## The part spins about the vertical line through a pivot at a rate, both carried per vertex in
 ## CUSTOM0: set through LowPolyMesh.spin, never by a Surf, since the pivot is the part's.
 const SPIN := 4096
+## The part turns with a rig channel (Rig), its pivots and channels carried per vertex in CUSTOM1
+## and CUSTOM2: set through LowPolyMesh.rig, never by a Surf, since the pivots are the part's.
+const RIG := 8192
 ## The flags whose parts are never outlined, whatever `outline` says.
 const NO_OUTLINE := FLICKER | JITTER | HOLO
 

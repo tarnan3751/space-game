@@ -12,7 +12,9 @@ extends RefCounted
 ## has at most eight MeshInstance3D (ten at Crown), half of them at most outlines (OUTLINE_META),
 ## which cast no shadow; a part with nothing to outline (only hologram, flicker or jitter parts)
 ## has none. The meshes are built once per type, level and tier and shared; the nodes are per
-## view. A level above a type's models shows its top model.
+## view. A level above a type's models shows its top model. The root and each moving part's node
+## carry their sockets (LowPolyMesh.socket) as SOCKETS_META when they have any: a muzzle on a
+## turret's head is on the head's node, so it turns with it.
 ##
 ## Each category shares a look: every building but a wall stands on the concrete foundation pad
 ## (Parts.foundation) in its category's accent colour (docs/reference/art-style.md), and walls
@@ -32,6 +34,9 @@ extends RefCounted
 const MOVE_META := "motion"
 ## Set on the outline instances, so a view can tell them from the bodies.
 const OUTLINE_META := "outline"
+## Set on a model's root and on a moving part's node when the body or the part has sockets
+## (LowPolyMesh.socket): its sockets by name, in that node's space.
+const SOCKETS_META := "sockets"
 
 const CoreModels := preload("res://src/game/models/core.gd")
 const ResourceModels := preload("res://src/game/models/resources.gd")
@@ -89,6 +94,8 @@ class Meshes:
 	## Null when no part is outlined.
 	var outline: ArrayMesh
 	var moving: Array[Moving] = []
+	## The body's sockets (LowPolyMesh.socket), in the model's space.
+	var sockets: Dictionary[String, LowPolyMesh.Socket] = {}
 
 
 ## A moving part's meshes, where it rests, and how it moves.
@@ -98,6 +105,8 @@ class Moving:
 	var outline: ArrayMesh
 	var pivot := Vector3.ZERO
 	var motion: Motion
+	## The part's sockets, in its own space (the pivot at the origin).
+	var sockets: Dictionary[String, LowPolyMesh.Socket] = {}
 
 
 ## The Tier of the levels unlocked at Command Center `cc`: one mapping, used for every type.
@@ -254,6 +263,7 @@ static func _meshes(p: Parts) -> Meshes:
 	var meshes := Meshes.new()
 	meshes.body = p.body.to_mesh()
 	meshes.outline = p.body.to_outline_mesh()
+	meshes.sockets = p.body.sockets
 	for i: int in p.movers.size():
 		if p.movers[i].triangle_count() == 0:
 			continue
@@ -262,6 +272,7 @@ static func _meshes(p: Parts) -> Meshes:
 		moving.outline = p.movers[i].to_outline_mesh()
 		moving.pivot = p.pivots[i]
 		moving.motion = p.motions[i]
+		moving.sockets = p.movers[i].sockets
 		meshes.moving.append(moving)
 	return meshes
 
@@ -269,10 +280,14 @@ static func _meshes(p: Parts) -> Meshes:
 ## The body's instances under `root`, then a node at each moving part's pivot with its instances.
 static func _add_parts(root: Node3D, meshes: Meshes) -> void:
 	_add_instances(root, meshes.body, meshes.outline)
+	if not meshes.sockets.is_empty():
+		root.set_meta(SOCKETS_META, meshes.sockets)
 	for moving: Moving in meshes.moving:
 		var node := Node3D.new()
 		node.position = moving.pivot
 		node.set_meta(MOVE_META, moving.motion)
+		if not moving.sockets.is_empty():
+			node.set_meta(SOCKETS_META, moving.sockets)
 		root.add_child(node)
 		_add_instances(node, moving.body, moving.outline)
 

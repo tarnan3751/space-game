@@ -33,6 +33,16 @@ extends RefCounted
 ## the body and the outline, which a mesh with no spinning part leaves out, so the rotor is part
 ## of the one mesh and costs no draw of its own.
 ##
+## A part added while `rig` is set turns with a rig channel (Rig, Surf.RIG): rig is the part's own
+## joint (pivot x, y, z, channel), rig2 the joint it hangs from, so a shin turns about the knee and
+## then, with the thigh, about the hip. They go into CUSTOM1 and CUSTOM2 (four floats a vertex
+## each) on the body and the outline, which a mesh with no rigged part leaves out; the shaders turn
+## the part by the angle its channel takes from the battle instance's state (INSTANCE_CUSTOM).
+##
+## A socket (socket()) is a named point with a direction on the model, in the mesh's own space (a
+## moving part's own, for a socket on a moving part), carrying the rig stamps current when it was
+## added, so a muzzle on a rigged arm can be posed as the arm is (Rig.posed).
+##
 ## `detail`, below 1, builds a far version of a model: every round part with that share of its
 ## sides (at least MIN_SIDES, never more than asked) and its rings (at least MIN_RINGS), and its
 ## smooth parts smoothed up to 65 degrees (FAR_SMOOTH_COS), so the fewer sides still shade as a curve. The
@@ -63,6 +73,10 @@ var _inks := PackedFloat32Array()
 ## Per triangle: 0, or 1 + the index in _spin_list of the spin it was added with.
 var _spin_of := PackedByteArray()
 var _spin_list: Array[Vector4] = []
+## Per triangle: 0, or 1 + the index in _rig_list of the pair (rig, rig2) it was added with; the
+## list holds each pair as two entries.
+var _rig_of := PackedByteArray()
+var _rig_list := PackedVector4Array()
 
 ## The share of the full ink width the parts added from now on are outlined at: 1.0, the full
 ## line, but where a caller thins it for its own parts and puts it back after.
@@ -74,8 +88,35 @@ var flags: int = 0
 ## The spin given to the parts added from now on, as `ink` is kept: (pivot x, y, z, radians a
 ## second) about the mesh's +Y; a zero rate, the default, spins nothing.
 var spin: Vector4 = Vector4.ZERO
+## The rig given to the parts added from now on, as `ink` is kept: the part's own joint (pivot x,
+## y, z, channel; Rig.part) and the joint it hangs from (rig2); channel 0, the default, turns
+## nothing.
+var rig: Vector4 = Vector4.ZERO
+var rig2: Vector4 = Vector4.ZERO
 ## The share of their sides and rings round parts are built with; set before the first part.
 var detail: float = 1.0
+## The named points added with socket(), by name.
+var sockets: Dictionary[String, Socket] = {}
+
+
+## A named point on a model with the direction it faces (a muzzle and where it fires), in the
+## mesh's own space, and the rig stamps it was added under (LowPolyMesh.rig and rig2).
+class Socket:
+	extends RefCounted
+	var position := Vector3.ZERO
+	var direction := Vector3.FORWARD
+	var rig := Vector4.ZERO
+	var rig2 := Vector4.ZERO
+
+
+## Adds the socket `name` at `position` facing `direction`, turning with the rig set now.
+func socket(name: String, position: Vector3, direction: Vector3) -> void:
+	var s := Socket.new()
+	s.position = position
+	s.direction = direction.normalized()
+	s.rig = rig
+	s.rig2 = rig2
+	sockets[name] = s
 
 
 ## Triangles in the body mesh, both surfaces.
@@ -115,15 +156,24 @@ func to_arrays() -> Array:
 		for i: int in _vertices.size():
 			triangles.append(i / 3)
 		arrays[Mesh.ARRAY_CUSTOM0] = _spins_of(triangles)
+	if not _rig_list.is_empty():
+		var triangles := PackedInt32Array()
+		for i: int in _vertices.size():
+			triangles.append(i / 3)
+		_add_rigs(arrays, triangles)
 	return arrays
 
 
 ## The format flags add_surface_from_arrays takes for these arrays: CUSTOM0 as four floats a
-## vertex when a part spins, else none.
+## vertex when a part spins, CUSTOM1 and CUSTOM2 likewise when a part is rigged, else none.
 func format() -> int:
-	if _spin_list.is_empty():
-		return 0
-	return Mesh.ARRAY_CUSTOM_RGBA_FLOAT << Mesh.ARRAY_FORMAT_CUSTOM0_SHIFT
+	var bits := 0
+	if not _spin_list.is_empty():
+		bits |= Mesh.ARRAY_CUSTOM_RGBA_FLOAT << Mesh.ARRAY_FORMAT_CUSTOM0_SHIFT
+	if not _rig_list.is_empty():
+		bits |= Mesh.ARRAY_CUSTOM_RGBA_FLOAT << Mesh.ARRAY_FORMAT_CUSTOM1_SHIFT
+		bits |= Mesh.ARRAY_CUSTOM_RGBA_FLOAT << Mesh.ARRAY_FORMAT_CUSTOM2_SHIFT
+	return bits
 
 
 ## The ink outline, with the ink material; null when no part is outlined.
@@ -139,8 +189,8 @@ func to_outline_mesh() -> ArrayMesh:
 
 ## The outline's surface arrays (vertex, normal, each part's UV2 and colour, which carry the flags
 ## and the phase, so the ink shader moves the outline with a bobbing or jittering part, its
-## UV, which carries its line's thinning, (1 - ink, 0), and the spins' CUSTOM0 when a part
-## spins); empty when no part is outlined.
+## UV, which carries its line's thinning, (1 - ink, 0), the spins' CUSTOM0 when a part spins
+## and the rigs' CUSTOM1 and CUSTOM2 when a part is rigged); empty when no part is outlined.
 func to_outline_arrays() -> Array:
 	var vertices := PackedVector3Array()
 	var uvs := PackedVector2Array()
@@ -175,6 +225,7 @@ func to_outline_arrays() -> Array:
 	arrays[Mesh.ARRAY_COLOR] = colors
 	if not _spin_list.is_empty():
 		arrays[Mesh.ARRAY_CUSTOM0] = _spins_of(triangles)
+	_add_rigs(arrays, triangles)
 	return arrays
 
 
@@ -191,6 +242,27 @@ func _spins_of(triangles: PackedInt32Array) -> PackedFloat32Array:
 		spins[i * 4 + 2] = at.z
 		spins[i * 4 + 3] = at.w
 	return spins
+
+
+## The CUSTOM1 and CUSTOM2 channels for vertices of the triangles `triangles` (one entry a
+## vertex), into `arrays`: each triangle's rig and rig2, zeros where it is not rigged. Nothing when
+## no part is rigged.
+func _add_rigs(arrays: Array, triangles: PackedInt32Array) -> void:
+	if _rig_list.is_empty():
+		return
+	var inner := PackedFloat32Array()
+	var outer := PackedFloat32Array()
+	inner.resize(triangles.size() * 4)
+	outer.resize(triangles.size() * 4)
+	for i: int in triangles.size():
+		var k := _rig_of[triangles[i]]
+		var a := _rig_list[(k - 1) * 2] if k > 0 else Vector4.ZERO
+		var b := _rig_list[(k - 1) * 2 + 1] if k > 0 else Vector4.ZERO
+		for c: int in 4:
+			inner[i * 4 + c] = a[c]
+			outer[i * 4 + c] = b[c]
+	arrays[Mesh.ARRAY_CUSTOM1] = inner
+	arrays[Mesh.ARRAY_CUSTOM2] = outer
 
 
 ## Whether any part is a hologram.
@@ -226,6 +298,7 @@ func _select(holo: bool) -> Array:
 	arrays[Mesh.ARRAY_COLOR] = colors
 	if not _spin_list.is_empty():
 		arrays[Mesh.ARRAY_CUSTOM0] = _spins_of(triangles)
+	_add_rigs(arrays, triangles)
 	return arrays
 
 
@@ -620,7 +693,8 @@ func _emit(a: Vector3, b: Vector3, c: Vector3, uv_a: Vector2, uv_b: Vector2, uv_
 	_normals.append(normal)
 	_normals.append(normal)
 	var spinning := spin.w != 0.0
-	var uv2 := Vector2(surf.layer, surf.flags | flags | (Surf.SPIN if spinning else 0))
+	var rigged := rig.w != 0.0 or rig2.w != 0.0
+	var uv2 := Vector2(surf.layer, surf.flags | flags | (Surf.SPIN if spinning else 0) | (Surf.RIG if rigged else 0))
 	_uv2s.append(uv2)
 	_uv2s.append(uv2)
 	_uv2s.append(uv2)
@@ -643,6 +717,20 @@ func _emit(a: Vector3, b: Vector3, c: Vector3, uv_a: Vector2, uv_b: Vector2, uv_
 		_spin_of.append(index + 1)
 	else:
 		_spin_of.append(0)
+	if rigged:
+		var found := -1
+		for k: int in _rig_list.size() / 2:
+			if _rig_list[k * 2] == rig and _rig_list[k * 2 + 1] == rig2:
+				found = k
+				break
+		if found < 0:
+			assert(_rig_list.size() / 2 < 255, "a mesh has at most 255 rigs")
+			_rig_list.append(rig)
+			_rig_list.append(rig2)
+			found = _rig_list.size() / 2 - 1
+		_rig_of.append(found + 1)
+	else:
+		_rig_of.append(0)
 
 
 ## Ends a part begun at vertex `start`: a smooth one gets its shared normals.
