@@ -93,6 +93,13 @@ and every scenario runs on the real numbers; `scenarios/dev_cheats.gd` applies t
 checks them. `tools/harness/README.md` documents the driver, the clock, the isolation and how to
 write a scenario; `scenarios/place_and_build.gd` is the example.
 
+A scenario can shoot motion as a frame strip (`strip(name, count, step_ms)`: consecutive frames
+composed into one PNG, the gaps and the repeated frames in the log, optionally cropped to the
+centre of the window) and frame a subject with `frame_world(main, size, world_pos)` or two with
+`frame_span`; the `anim_units`, `anim_defences`, `anim_base` and
+`anim_effects` scenarios shoot every moving thing in the game that way, for the animation audit
+(`tools/harness/README.md`).
+
 `scenarios/battle.gd` runs a scripted attack with an Orbital Strike on the template base through
 the battle sim, headless, and applies its result to a copy of the base (`battle.md`, **Tools**);
 `scenarios/battle_view.gd` runs the same army, without the strike, through the battle view on the

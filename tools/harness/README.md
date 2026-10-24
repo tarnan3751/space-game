@@ -115,6 +115,25 @@ Helpers on `HarnessScenario`:
   before a screenshot or a check of a view.
 - `await screenshot(name, may_repeat = false)` — saves `NN-name.png` in a rendered run, logs a
   skip headless. `may_repeat` exempts the shot from the guard against repeated frames.
+- `await strip(name, count, step_ms, crop = false)` — a frame strip: `count` frames of the window about
+  `step_ms` of real time apart, each downscaled to 640x360 and laid out in reading order four to
+  a row, saved as one `NN-name.png` numbered with the screenshots. A frame is taken on the first
+  frame at least `step_ms` less 4 ms after the last (the driver's `STRIP_EARLY_MS`), so the log
+  line, `strip NN-name.png (8 frames, 100 ms, 0 identical; camera size 7.0; gaps 100 99 ... ms)`,
+  gives the gaps measured, the camera's size and how many frames were byte-identical to the one
+  before: a still subject or a stalled one, a signal for whoever reads the strip. Frames inside a
+  strip may repeat; the composed PNG is one shot to the guard against repeated frames, like a
+  screenshot. `crop` takes the centre half of the window each way instead of the whole (the log
+  line says "centre half"), twice the pixels on a close subject. A count under 1 fails a check
+  and saves nothing. Headless runs log and skip it.
+- `frame_world(main, size, world_pos)` — sets the camera to `size` with `world_pos` at the
+  screen's centre, the framing every close-up shares. A size under the camera's own closest zoom
+  (`IsoCamera.MIN_ZOOM_SIZE`, 10) is set directly, as no gesture can, so a unit can be framed at
+  size 4 to 8.
+- `frame_span(main, a, b, margin, minimum, crop = false)` — frames two world points together:
+  the camera centred between them, sized so the strip's tile shows their projected span (the
+  larger of its height and its width over the screen's aspect) plus `margin`, and at least
+  `minimum` high; twice that for a strip that will crop (`crop`). Returns the size set.
 - `tap_cell(main, cell)` — emits `WorldInput.tapped` at the screen position of a cell's
   centre, so `PlacementController` handles it exactly as a real tap.
 - `await open_build_menu(main)` — presses the HUD's Build button (unless the build panel is
@@ -562,3 +581,39 @@ size 16 or as far out as it takes for the part, as tall as the band's tallest mo
 view's `site_height()`, said in the log), to fill no more
 than 70% of the screen, so none runs under the HUD or off the screen; each part again a second
 later where a part turns in it, to compare the two.
+
+The `anim_*` scenarios shoot every moving thing in the game as frame strips, the evidence for
+the animation audit; each frame is framed with `frame_world` and every strip's line in the log
+names its camera size. Their checks only make sure each subject did what its strip is meant to
+hold; the strips are read by eye. The battles are practice battles opened through
+`main.open_battle` with a hand-made setup (`docs/reference/battle.md`, **The setup and the
+commands**), the battle HUD hidden and no unit selected, units deployed and abilities cast
+through `BattleView.deploy` and `cast` or `script_commands`, never a touch; each army brings one
+unit more than the scenario deploys, so a battle never ends and opens its result panel during a
+strip. Each battle is surrendered and left before the next.
+
+- `scenarios/anim_units.gd`: every unit type at level 1 against a Metal Silo, deployed beyond
+  its reach on the screen's right: `<unit>-move` (8 frames, 100 ms) framed close on the unit
+  (camera size 4 to 7 by its size; the four infantry cropped at size 5), `<unit>-fire` (8,
+  50 ms) framed with `frame_span` on the unit and the level 1 silo (cropped for the infantry),
+  from just before its second shot (the breacher's first, as it closes in); then
+  `ranger-death` and `dune_runner-death` (12, 50 ms) from just before a Laser Turret's last
+  shot at it, the ticks the strip ran over logged beside the tick it died by.
+- `scenarios/anim_defences.gd`: every type with a targets class (the guns and the traps) at
+  level 1 beside a level 1 Metal Silo, a Hover Tank (a Gunship for an air defence) deployed by
+  the silo, two cells from the defence, three ticks into `<type>-fire` (8, 50 ms; the plasma mortar 10 at 150 ms, the orbital cannon
+  12 at 200 ms, the gravity well and the grav trap 8 at 100 ms), framed with `frame_span` on the
+  defence's head and the unit and cropped; then `building-fall` (12, 100 ms, from 250 ms before
+  a Hover Tank's last shot on a Drone Bay) and
+  `wall-break` (12, 50 ms: a level 4 Breacher on a Barrier Wall).
+- `scenarios/anim_base.gd`: the construction drone over a Metal Silo placed on the fresh base,
+  `drone-arrive` and `drone-laser` (8, 150 ms, camera size 6); then on the Template base, one
+  building of every type but the walls and the traps, `<type>-idle` (8, 150 ms), framed on its
+  middle at 1.6 times its footprint plus 2.5.
+- `scenarios/anim_effects.gd`: `swarm-dome` (8, 250 ms), `emp-ring` (8, 50 ms) and `emp-grey`
+  (8, 500 ms: the stun and the waking), `strike-marker` (8, 100 ms), `strike-land` (16, 50 ms,
+  from 12 ticks before it lands) and `strike-smoke` (8, 150 ms); `shield-hit` and `shield-drop`
+  (8, 100 ms) on a shield generator's pool; `rubble-settle` (12, 100 ms) from a Drone Bay's fall
+  and `smoke-column` (8, 250 ms) two seconds later.
+
+Each runs in about one to two minutes rendered, inside the watchdog's 300 seconds.
