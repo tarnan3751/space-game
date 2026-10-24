@@ -75,12 +75,20 @@ static func slide(new_axis: Vector3, new_amplitude: float, new_period: float, ne
 ## nothing.
 func transform_at(time: float, rest: Vector3) -> Transform3D:
 	match kind:
-		Kind.SPIN:
-			return Transform3D(Basis(axis, fmod(rate * time, TAU)), rest)
-		Kind.SWING:
-			return Transform3D(Basis(axis, deg_to_rad(amplitude) * wave(time)), rest)
+		Kind.SPIN, Kind.SWING:
+			return Transform3D(Basis(axis, angle_at(time)), rest)
 		_:
 			return Transform3D(Basis.IDENTITY, rest + axis * amplitude * wave(time))
+
+
+## SPIN and SWING: the part's angle about `axis` at `time`, in radians; 0 for a slide.
+func angle_at(time: float) -> float:
+	match kind:
+		Kind.SPIN:
+			return fmod(rate * time, TAU)
+		Kind.SWING:
+			return deg_to_rad(amplitude) * wave(time)
+	return 0.0
 
 
 ## SWING and SLIDE: where in its swing the part is at `time`, from -1 to 1.

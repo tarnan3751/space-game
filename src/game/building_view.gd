@@ -15,6 +15,12 @@ extends Node3D
 ## faction tint (set_rival, MaterialKit.rival), and its flash and its grey are the tinted ones
 ## (hit_flash_rival, disabled_rival).
 ##
+## In battle a defence whose head carries a `muzzle` socket (a moving part's, LowPolyMesh.socket)
+## aims it: BattleView turns the head towards its target (aim_at) and, once it has had none for
+## AIM_IDLE_SECONDS, eases it back into its idle Motion (idle_aim), which it then follows again. The
+## head's Motion turns it about +Y. A defence whose muzzle is on its body, or that has none, never
+## aims. socket_point() and socket_direction() give a socket where it is now, in the world.
+##
 ## While the building is busy a ConstructionDrone works over it, driven from _process; when the
 ## work ends the drone leaves, and if the view is freed first (a finished level replaces it)
 ## BaseView hands the leaving drone over (release_drone).
@@ -34,6 +40,12 @@ const LABEL_OUTLINE_SIZE := 20
 ## While a drone works over the site, the label's centre sits this far above the highest point
 ## the drone reaches, so the text never overlaps its flight.
 const LABEL_OVER_DRONE := 0.5
+## How long an aiming head holds its last aim with no target before it returns to its idle swing,
+## in seconds of battle, and how close (radians) it comes to the swing before following it again.
+const AIM_IDLE_SECONDS := 2.5
+const AIM_SETTLED := 0.02
+
+enum Aim { IDLE, AIMING, RETURNING }
 
 var building_id: int = 0
 var building_type: String = ""
@@ -73,6 +85,18 @@ var _animate: bool = true
 var _merged: bool = false
 ## The builder drone over the site while the building is busy, and while it leaves.
 var _drone: ConstructionDrone = null
+## The sockets by name (LowPolyMesh.Socket) and the node each is on (the model's root or a moving
+## part's node).
+var _sockets: Dictionary[String, LowPolyMesh.Socket] = {}
+var _socket_nodes: Dictionary[String, Node3D] = {}
+## The moving part whose `muzzle` it carries, -1 for none (the view never aims), the way its muzzle
+## faces as built (radians about +Y from +Z), whether it aims, follows its Motion or returns to it,
+## its yaw while it aims or returns, and the seconds since it last had a target.
+var _aim_index: int = -1
+var _aim_heading: float = 0.0
+var _aim: Aim = Aim.IDLE
+var _aim_yaw: float = 0.0
+var _aim_wait: float = 0.0
 
 
 ## Call once, before adding to the tree. `level` picks the model (level 1's while it is 0),
@@ -86,6 +110,7 @@ func setup(id: int, type: String, level: int, size: int, tier: int) -> void:
 	_model = BuildingModels.create(type, maxi(level, 1), size, tier)
 	add_child(_model)
 	_collect_movers(_model)
+	_collect_sockets(_model)
 	_scaffold = BuildingModels.create_scaffold(size)
 	add_child(_scaffold)
 	_collect_meshes(_model)
@@ -270,7 +295,83 @@ func _process(delta: float) -> void:
 		return
 	var time := Motion.clock()
 	for i: int in _movers.size():
-		_movers[i].transform = _motions[i].transform_at(time, _rests[i])
+		if i == _aim_index and _aim != Aim.IDLE:
+			_movers[i].transform = Transform3D(Basis(Vector3.UP, _aim_yaw), _rests[i])
+		else:
+			_movers[i].transform = _motions[i].transform_at(time, _rests[i])
+
+
+## Whether the view has a head that aims (a `muzzle` socket on a moving part).
+func can_aim() -> bool:
+	return _aim_index >= 0
+
+
+## Turns the aiming head towards the world point `point`, at `rate` (the share of the way a second,
+## as an exponential rate) for `step` seconds of battle; from its idle swing, it starts from where
+## the swing has it.
+func aim_at(point: Vector3, step: float, rate: float) -> void:
+	if _aim_index < 0:
+		return
+	if _aim == Aim.IDLE:
+		_aim_yaw = _motions[_aim_index].angle_at(Motion.clock())
+	_aim = Aim.AIMING
+	_aim_wait = 0.0
+	_aim_yaw = lerp_angle(_aim_yaw, _aim_wanted(point), 1.0 - exp(-rate * step))
+	_pose_aim()
+
+
+## How far (radians) the aiming head is from facing the world point `point`.
+func aim_error(point: Vector3) -> float:
+	if _aim_index < 0:
+		return 0.0
+	var yaw := _aim_yaw if _aim != Aim.IDLE else _motions[_aim_index].angle_at(Motion.clock())
+	return absf(angle_difference(yaw, _aim_wanted(point)))
+
+
+## The aiming head has no target for `step` seconds of battle: it holds its aim, then after
+## AIM_IDLE_SECONDS eases back to its idle swing at `rate` and follows it again.
+func idle_aim(step: float, rate: float) -> void:
+	match _aim:
+		Aim.AIMING:
+			_aim_wait += step
+			if _aim_wait >= AIM_IDLE_SECONDS:
+				_aim = Aim.RETURNING
+		Aim.RETURNING:
+			var swing := _motions[_aim_index].angle_at(Motion.clock())
+			_aim_yaw = lerp_angle(_aim_yaw, swing, 1.0 - exp(-rate * step))
+			if absf(angle_difference(_aim_yaw, swing)) < AIM_SETTLED:
+				_aim = Aim.IDLE
+			_pose_aim()
+
+
+## The head's yaw (from its rest) that faces the world point `point`.
+func _aim_wanted(point: Vector3) -> float:
+	var at := _movers[_aim_index].global_position
+	return atan2(point.x - at.x, point.z - at.z) - _aim_heading
+
+
+## Poses the aiming head at once, so its sockets are where it now faces (_process poses it too).
+func _pose_aim() -> void:
+	_movers[_aim_index].transform = Transform3D(Basis(Vector3.UP, _aim_yaw), _rests[_aim_index])
+
+
+## Whether the model has the socket `name`.
+func has_socket(name: String) -> bool:
+	return _sockets.has(name)
+
+
+## Where the socket `name` is now, in the world (the view's origin if there is none).
+func socket_point(name: String) -> Vector3:
+	if not _sockets.has(name):
+		return global_position
+	return _socket_nodes[name].global_transform * _sockets[name].position
+
+
+## The way the socket `name` faces now, in the world.
+func socket_direction(name: String) -> Vector3:
+	if not _sockets.has(name):
+		return Vector3.FORWARD
+	return (_socket_nodes[name].global_transform.basis * _sockets[name].direction).normalized()
 
 
 ## The timer label's height with no drone over the site.
@@ -311,3 +412,23 @@ func _collect_movers(node: Node) -> void:
 			_motions.append(mover.get_meta(BuildingModels.MOVE_META) as Motion)
 			_rests.append(mover.position)
 		_collect_movers(child)
+
+
+## The sockets of the model's root and of its moving parts; the moving part with a `muzzle` aims.
+func _collect_sockets(root: Node3D) -> void:
+	_add_sockets(root)
+	for i: int in _movers.size():
+		_add_sockets(_movers[i])
+		if _socket_nodes.get("muzzle") == _movers[i]:
+			_aim_index = i
+			var facing := _sockets["muzzle"].direction
+			_aim_heading = atan2(facing.x, facing.z)
+
+
+func _add_sockets(node: Node3D) -> void:
+	if not node.has_meta(BuildingModels.SOCKETS_META):
+		return
+	var on: Dictionary[String, LowPolyMesh.Socket] = node.get_meta(BuildingModels.SOCKETS_META)
+	for name: String in on:
+		_sockets[name] = on[name]
+		_socket_nodes[name] = node
