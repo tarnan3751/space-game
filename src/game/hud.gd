@@ -405,33 +405,39 @@ func _on_card_pressed(type: String) -> void:
 
 
 ## Slides the panel up from below the screen's bottom edge, or back down and out of the
-## way: hidden once down, so it blocks nothing. A new slide replaces one under way.
+## way (_slide).
 func _slide_menu(open: bool) -> void:
 	if open == _menu_open:
 		return
 	_menu_open = open
-	if _menu_tween != null:
-		_menu_tween.kill()
-	var bottom := get_viewport().get_visible_rect().size.y
-	if open:
-		if not _menu.visible:
-			# On the bottom edge at its own height, then moved down out of sight.
-			_menu.offset_top = 0.0
-			_menu.offset_bottom = 0.0
-			_menu.position.y = bottom
-			_menu.show()
-		if _state != null:
-			_refresh_entries(_state)
+	if open and _state != null:
+		_refresh_entries(_state)
 	# The cards' pictures render while the panel is open, the selected tab's first.
 	if open:
 		_preview.prioritize(_tab_types(_tab))
 	_preview.run(open)
-	_menu_tween = create_tween()
-	var target := bottom - _menu.size.y if open else bottom
-	_menu_tween.tween_property(_menu, "position:y", target, MENU_OPEN_SECONDS if open else MENU_CLOSE_SECONDS) \
+	_menu_tween = _slide(_menu, open, _menu_tween)
+
+
+## Slides a bottom panel up from below the screen's bottom edge, or back down and out of the
+## way: hidden once down, so it blocks nothing. The new slide replaces `under_way`.
+func _slide(panel: Control, open: bool, under_way: Tween) -> Tween:
+	if under_way != null:
+		under_way.kill()
+	var bottom := get_viewport().get_visible_rect().size.y
+	if open and not panel.visible:
+		# On the bottom edge at its own height, then moved down out of sight.
+		panel.offset_top = 0.0
+		panel.offset_bottom = 0.0
+		panel.position.y = bottom
+		panel.show()
+	var tween := create_tween()
+	var target := bottom - panel.size.y if open else bottom
+	tween.tween_property(panel, "position:y", target, MENU_OPEN_SECONDS if open else MENU_CLOSE_SECONDS) \
 		.set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_OUT if open else Tween.EASE_IN)
 	if not open:
-		_menu_tween.tween_callback(_menu.hide)
+		tween.tween_callback(panel.hide)
+	return tween
 
 
 # --- Refresh helpers -------------------------------------------------------------
