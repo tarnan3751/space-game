@@ -82,12 +82,15 @@ static func generate_field(catalog: Catalog, sector_seed: int, epoch: int, index
 		player_cc, capacity)
 
 
-## The BattleSim setup for a field and an army, with no commands yet.
-static func battle_setup(field: Dictionary, army: Dictionary, unit_levels: Dictionary) -> Dictionary:
+## The BattleSim setup for a field and an army, with no commands yet; `abilities` (ability: count)
+## and `ability_levels` are the abilities the attacker brings and their levels, none by default.
+static func battle_setup(field: Dictionary, army: Dictionary, unit_levels: Dictionary,
+		abilities: Dictionary = {}, ability_levels: Dictionary = {}) -> Dictionary:
 	var defender: Dictionary = field["defender"]
 	return {
 		"seed": field["seed"],
-		"attacker": {"army": army.duplicate(), "unit_levels": unit_levels.duplicate(), "abilities": {}},
+		"attacker": {"army": army.duplicate(), "unit_levels": unit_levels.duplicate(),
+			"abilities": abilities.duplicate(), "ability_levels": ability_levels.duplicate()},
 		"defender": defender.duplicate(true),
 		"commands": [],
 	}

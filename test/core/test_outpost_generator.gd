@@ -195,6 +195,27 @@ func test_a_field_sets_up_a_battle() -> void:
 	assert_true(sim.is_deploy_cell(Vector2i(20, 1)), "so is the top edge's middle")
 
 
+func test_a_battle_setup_carries_the_abilities_brought() -> void:
+	var field := _field(4, 7)
+	var none := OutpostGenerator.battle_setup(field, {"melee": 3}, {"melee": 2})
+	assert_eq(none["attacker"]["abilities"], {}, "none brought by default")
+	assert_eq(none["attacker"]["ability_levels"], {})
+	var stock := {"strike": 2, "swarm": 1}
+	var levels := {"strike": 2}
+	var setup := OutpostGenerator.battle_setup(field, {"melee": 3}, {"melee": 2}, stock, levels)
+	assert_eq(setup["attacker"]["abilities"], {"strike": 2, "swarm": 1})
+	assert_eq(setup["attacker"]["ability_levels"], {"strike": 2})
+	stock["strike"] = 0
+	levels["strike"] = 1
+	assert_eq(setup["attacker"]["abilities"]["strike"], 2, "a copy: the caller's stock can change after")
+	assert_eq(setup["attacker"]["ability_levels"]["strike"], 2)
+	var sim := BattleSim.create(Fixtures.battle_catalog(), OutpostGenerator.battle_setup(
+		{"seed": 3, "defender": Fixtures.battle_setup([["command_center", 10, 10]], {})["defender"]},
+		{"melee": 1}, {}, {"strike": 1}, {"strike": 2}))
+	assert_eq(sim.setup_error, "", "the sim takes the abilities brought")
+	assert_eq(sim.left_to_use("strike"), 1)
+
+
 func test_a_crowded_field_still_ends_and_stays_valid() -> void:
 	# The fixture roster at Command Center 10 on a 20x20 field: not everything fits.
 	var small := Fixtures.expedition_catalog(func(rules: Dictionary) -> void:

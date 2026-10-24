@@ -84,9 +84,10 @@ is not a field gives `{}`.
 ```
 
 `defender` is the battle setup's (`battle.md`, **The setup and the commands**), with ids 1..n in
-placement order; `OutpostGenerator.battle_setup(field, army, unit_levels)` builds the whole setup
-with no commands. `rings` are the wall rings, inner first, each with the middle cell of every gap;
-`dropped` counts the buildings no room was left for (0 on the shipped data at every level, which
+placement order; `OutpostGenerator.battle_setup(field, army, unit_levels, abilities = {},
+ability_levels = {})` builds the whole setup with no commands, the abilities the attacker brings
+(ability: count, the stock) and their levels in `attacker` (none when left out). `rings` are the
+wall rings, inner first, each with the middle cell of every gap; `dropped` counts the buildings no room was left for (0 on the shipped data at every level, which
 `test_shipped_data_lays_out_every_field` checks).
 
 ### The plan
