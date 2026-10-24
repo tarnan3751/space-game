@@ -241,6 +241,25 @@ UV.x) and checks it on each figure's outline, its pad's and the academy's. Rende
 colonist and the automaton at size 4 (set directly, under the camera's closest zoom), and the row
 at size 10 with every figure turned 180 degrees so the backs show.
 
+`scenarios/unit_gallery.gd` is the unit models' gallery (`docs/reference/art-style.md`,
+**Units**): on the field, the base's own views hidden, every unit type in the catalog's order, each
+on a concrete pad and turned 25 degrees off the camera, in five rows, one per tier, Base nearest the
+screen's bottom, a level 1 Cadet Academy at the end of each row for scale; it turns the gunship's
+rotors itself each frame, as the effects rig does. It logs a seated colonist's triangles with and
+without its legs (the pilots'). In both modes it checks every type at every tier: the triangles of the body and the moving parts within the unit's budget, at most
+`UnitModels.MAX_MOVING` moving parts and one body instance, each with an outline on
+`MaterialKit.ink()` casting no shadow, every vertex's kit layer within the kit, the height, width
+and length (a spinning part's whole round included) within 20% of the size table, a flying unit's
+lowest point within 20% of its hover height, and that no point, BOB's lift taken off where it bobs,
+dips below its pad; each unit's line says its triangles, instances and extent. Each shot recentres
+the camera on the units showing, a little left of and below the screen's middle, and checks in both
+modes that every unit showing is on the screen and clear of the HUD's Build, Template base and Reset
+base buttons. Rendered, it shoots the five rows at camera size 24 (the silhouettes and the tiers
+side by side), each tier's row alone at size 10 in two halves (the seven smaller units, then the
+four big machines), each unit alone at size 4 at Base and at Crown (set directly, under the
+camera's closest zoom), and the Base row at size 10 in two halves with every unit turned 180
+degrees.
+
 `scenarios/view_states.gd` checks the comic style's view states on a fresh base, each with a
 close-up screenshot: the selected Command Center's outlines in gold (and the override cleared on
 deselecting), the placement ghost's body tinted valid on a free spot and invalid on the Command
