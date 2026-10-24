@@ -5,7 +5,8 @@ display and reports presses as signals; it never changes game state. `main.gd` w
 signals to `PlacementController` (`input-camera.md`). Two controls of its own draw in code:
 `HudIcon` (`hud_icon.gd`), the vector icons and the unit glyphs, and `DroneRing`
 (`drone_ring.gd`), the drones.
-`ModelPreview` (`model_preview.gd`), a node under it, renders the build cards' pictures.
+`ModelPreview` (`model_preview.gd`), a node under it, renders the cards' pictures, the buildings'
+and the units'.
 
 ## The touch rule
 
@@ -158,9 +159,8 @@ resource gets a plain cut gem. **army**, the army meter's, is a figure: a head o
 rounded shoulders, each with a lighter facet. `HudIcon.paint(pen, kind, rect, color, wing)` adds
 one to a `HudIcon.Pen`.
 
-**Unit glyphs.** The army panel's cards and queue entries show a unit by its crew
-(`catalog.unit_crew`), drawn the same way in the army accent until the unit models exist and
-`ModelPreview` renders them: **human** a space helmet from the front, a dome over two cheek guards
+**Unit glyphs.** The queue entries show a unit by its crew (`catalog.unit_crew`), drawn the same
+way in the army accent (the army panel's cards show the unit's picture instead, **Pictures**): **human** a space helmet from the front, a dome over two cheek guards
 with a cyan visor across it; **piloted** a cyan cockpit canopy on a hull over a track with three
 wheels; **autonomous** a block head with an ink sensor slit and a cyan eye, an antenna with a cyan
 bulb on top, over a darker shoulder bar. An air unit (`unit_class` `air`, `HudIcon.winged`) adds a
@@ -299,6 +299,13 @@ first. A card shows no picture, only its stripe, until its own is ready. Once ev
 cached the viewport is freed and the node stops processing, so the panel costs nothing more per
 frame. A headless run draws nothing: the queue is gone through but no picture is made.
 
+Units' pictures are keyed `ModelPreview.unit_key(unit, tier)` and rendered from
+`UnitModels.create(unit, tier)` the same way, asked for with `request(keys)`, which puts them at
+the queue's front and builds the viewport again if it was freed. The army panel asks for its shown
+cards' pictures (each unit at its researched level's tier, `UnitModels.tier_of`) when it opens
+and on each refresh, and the preview runs while the build panel or the army panel is open
+(`_run_preview`); a card is blank until its picture comes (`rendered`).
+
 ## Info panel
 
 For the selected building, the stats of its current level (level 1's while it is first being
@@ -350,12 +357,12 @@ still selected. Hidden while closed.
 
 **Training panel.** A horizontal strip of unit cards (200×140), one per unit the producer's type
 trains, in `units.json` order (`catalog.unit_types()`; a card per unit is built up front and the
-page shows its producer's). A card has the army accent's stripe along its top, the unit's glyph
-(48×48, **Unit glyphs**), its name (Lilita One 20, a 2 px ink outline), a row of its train cost at
+page shows its producer's). A card has the army accent's stripe along its top, the unit's picture
+(48×48, `PICTURE_SIZE`, **Pictures**: the unit at its researched level's tier), its name (Lilita One 20, a 2 px ink outline), a row of its train cost at
 its current level (`unit_level`), each amount in its resource's colour, or "Free", and its train
 time (`Format.duration`, dim), then "Housing N   Housed M" (16 px, dim: the unit's housing and
 `army_count`). A unit the producer's finished level does not train yet (`unit_producer_level`) is
-locked: the card is disabled, its glyph, name and cost at 55 %, its last line "Needs <producer>
+locked: the card is disabled, its picture, name and cost at 55 %, its last line "Needs <producer>
 <level>" (15 px, dim). Tapping a card emits `train_pressed(id, unit)`; `main.gd` queues one through
 `PlacementController.train` and toasts the error when it fails.
 
@@ -372,7 +379,7 @@ only sets text and swaps glyphs, and nothing is allocated per frame (**Refresh**
 **Research panel.** Under the header a line naming the research running, "Researching Ranger to
 Lv 2: 30s left" (`research_unit`, `research_seconds_left`), or "No research running"; under it a
 strip of cards (200×164), one per unit the base has unlocked (`is_unit_unlocked`), in `units.json`
-order: the glyph, the name, "Level N" (18 px), then the next level's research cost and time, and
+order: the picture, the name, "Level N" (18 px), then the next level's research cost and time, and
 "Needs Lab L" (its `requires_lab`), "Researching" on the unit being researched, or, at the unit's
 top level, "Max level" with no cost. A card whose lab level the lab lacks, or at the top, is shown
 at 55 % with its lab level in the warning colour, but still takes a tap. Tapping a card emits
@@ -389,7 +396,7 @@ coordinates (the viewport's visible rect: 1280×720 on a 16:9 screen under the `
 stretch), by setting its offsets. It pads the build panel's content, and the army panel's, by
 the same inset on the left, the right and the bottom, and sets their height for the screen's.
 `_fit_safe_area`
-fits it to the device in `setup`, on `get_viewport().size_changed`, and on every `refresh` (the
+fits it to the device (the rect is `Hud.safe_area(viewport)`, static) in `setup`, on `get_viewport().size_changed`, and on every `refresh` (the
 1 s tick's included), since turning a phone over moves the notch to the other side without a
 resize: `DisplayServer.get_display_safe_area()`, in screen pixels, is clipped to the window
 (`window_get_position`, `window_get_size`), made relative to it, and scaled by the visible
@@ -429,7 +436,8 @@ is the top bar's meter for a resource and `resource_fill(res)` its fill, whose p
 `place_button()` is the place bar's `Place` (or `Done`); `drones_panel()` is the `DroneRing`,
 whose `free_count()` and `total_count()` are the counts it shows; `reset_button()` and
 `template_button()` are the debug row's Reset base and Template base, and `practice_button()` its
-Practice raid (null in a release build).
+Practice raid (null in a release build). `train_card_picture(unit)` is a training card's picture
+(null until rendered); `ui_theme()` and `preview()` hand out the theme and the pictures.
 The army: `army_meter()`, `army_meter_text()` and `army_fill()` are the army meter, its text and
 its fill; `action_button()` is the info panel's Train or Research; `army_panel()` the army panel,
 `is_training_open()` and `is_research_open()` which page it shows (open or opening),
@@ -462,6 +470,9 @@ is none:
 | `not_enough_housing` | Not enough room in the Hangars |
 | `not_queued` | Nothing like that is queued |
 | `needs_lab_level` | Needs a higher Research Lab |
+| `bad_raid` | That battle does not add up |
+| `not_enough_units` | Not enough units for that battle |
+| `unknown_ability` | Unknown ability |
 
 `research_error_text(code)` is the research panel's: `busy` there means the lab's one research
 slot is taken, "Research already running"; any other code is `error_text(code)`.

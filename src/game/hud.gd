@@ -52,6 +52,9 @@ const ERROR_TEXT := {
 	BaseState.ERR_HOUSING: "Not enough room in the Hangars",
 	BaseState.ERR_NOT_QUEUED: "Nothing like that is queued",
 	BaseState.ERR_LAB_LEVEL: "Needs a higher Research Lab",
+	BaseState.ERR_BAD_RAID: "That battle does not add up",
+	BaseState.ERR_NOT_ENOUGH_UNITS: "Not enough units for that battle",
+	BaseState.ERR_UNKNOWN_ABILITY: "Unknown ability",
 }
 
 # The UI palette (docs/reference/hud.md, **Theme**).
@@ -139,9 +142,9 @@ const STRIP_RETURN_SECONDS := 0.2
 const _NO_COST := {}
 ## The info panel's Train button, beside Close.
 const ACTION_SIZE := Vector2(112, 44)
-## A unit card in the army panel, and its glyph (HudIcon) at the top.
+## A unit card in the army panel, and its picture (ModelPreview) at the top.
 const TRAIN_CARD_SIZE := Vector2(200, 140)
-const GLYPH_SIZE := Vector2(48, 48)
+const PICTURE_SIZE := Vector2(48, 48)
 ## An entry of the queue strip under the training cards, and its glyph.
 const QUEUE_ENTRY_SIZE := Vector2(180, 48)
 const QUEUE_GLYPH_SIZE := Vector2(32, 32)
@@ -252,12 +255,13 @@ var _research_prefix: String = ""
 var _research_seconds: int = -1
 
 
-## A unit card or a queue entry: the button, what dims while it cannot be pressed, the glyph, the
-## name, the cost (a label per resource, "Free" when it has none) and the time, and the lines
-## under them.
+## A unit card or a queue entry: the button, what dims while it cannot be pressed, the picture
+## (a card's) or the glyph (an entry's), the name, the cost (a label per resource, "Free" when it
+## has none) and the time, and the lines under them.
 class ArmyCard:
 	var button: Button
 	var heading: Control
+	var picture: TextureRect
 	var glyph: HudIcon
 	var title: Label
 	## A research card's "Level N"; null on a training card.
@@ -394,19 +398,25 @@ func apply_safe_area(inset: Rect2) -> void:
 		_army.offset_bottom = 0.0
 
 
+## The device's safe area in `viewport`'s visible rect, as _fit_safe_area fits it: the battle's HUD
+## (BattleHud) fits itself to it too.
+static func safe_area(viewport: Viewport) -> Rect2:
+	var visible_rect := viewport.get_visible_rect()
+	var window := Rect2i(DisplayServer.window_get_position(), DisplayServer.window_get_size())
+	var safe := DisplayServer.get_display_safe_area().intersection(window)
+	if not safe.has_area():
+		return visible_rect
+	var ui_scale := visible_rect.size / Vector2(window.size)
+	return Rect2(Vector2(safe.position - window.position) * ui_scale, Vector2(safe.size) * ui_scale)
+
+
 ## DisplayServer reports the safe area in screen pixels; on desktop it is the screen's
 ## usable rect, so it is clipped to the window first. The canvas_items stretch maps the
 ## window onto the visible rect, so the scale between them is their size ratio. A window
 ## with no size (headless) gets the whole rect. It applies only a rect that differs from
 ## the last one it fitted, so an inset the harness applied stays until the device's changes.
 func _fit_safe_area() -> void:
-	var visible_rect := get_viewport().get_visible_rect()
-	var window := Rect2i(DisplayServer.window_get_position(), DisplayServer.window_get_size())
-	var safe := DisplayServer.get_display_safe_area().intersection(window)
-	var area := visible_rect
-	if safe.has_area():
-		var ui_scale := visible_rect.size / Vector2(window.size)
-		area = Rect2(Vector2(safe.position - window.position) * ui_scale, Vector2(safe.size) * ui_scale)
+	var area := safe_area(get_viewport())
 	if area == _fitted_area:
 		return
 	_fitted_area = area
@@ -569,6 +579,21 @@ func train_card(unit: String) -> Button:
 	return _train_cards[unit].button
 
 
+## A training card's picture of its unit, null until rendered (always, headless).
+func train_card_picture(unit: String) -> Texture2D:
+	return _train_cards[unit].picture.texture
+
+
+## The HUD's theme, for the battle's HUD (BattleHud), which takes its look.
+func ui_theme() -> Theme:
+	return _theme
+
+
+## The cards' pictures, shared with the battle's deploy bar (BattleHud).
+func preview() -> ModelPreview:
+	return _preview
+
+
 ## A training card's last line: the housing and the count housed, or why it is locked.
 func train_card_info(unit: String) -> String:
 	return _train_cards[unit].info.text
@@ -635,8 +660,13 @@ func _slide_menu(open: bool) -> void:
 	# The cards' pictures render while the panel is open, the selected tab's first.
 	if open:
 		_preview.prioritize(_tab_types(_tab))
-	_preview.run(open)
+	_run_preview()
 	_menu_tween = _slide(_menu, open, _menu_tween)
+
+
+## The pictures render while a panel that shows them is open: the build panel or the army panel.
+func _run_preview() -> void:
+	_preview.run(_menu_open or _army_page != ArmyPage.NONE)
 
 
 ## Slides a bottom panel up from below the screen's bottom edge, or back down and out of the
@@ -697,6 +727,7 @@ func _open_army(page: ArmyPage) -> void:
 	_train_scroll.scroll_horizontal = 0
 	_research_scroll.scroll_horizontal = 0
 	_refresh_army(_state)
+	_run_preview()
 	_army_tween = _slide(_army, true, _army_tween)
 
 
@@ -705,6 +736,7 @@ func _close_army() -> void:
 	if _army_page == ArmyPage.NONE:
 		return
 	_army_page = ArmyPage.NONE
+	_run_preview()
 	_army_tween = _slide(_army, false, _army_tween)
 
 
@@ -749,9 +781,28 @@ func _refresh_army(state: BaseState) -> void:
 		_refresh_training(state, building)
 	else:
 		_refresh_research(state)
+	_set_pictures(state)
 
 
-## The producer's unit cards, then its queue. A card is locked, disabled with its glyph, name
+## The shown cards' pictures, each its unit at its researched level's tier (UnitModels.tier_of);
+## those not rendered yet are asked of the preview, and come in _on_preview_rendered.
+func _set_pictures(state: BaseState) -> void:
+	var cards := _train_cards if _army_page == ArmyPage.TRAIN else _research_cards
+	var missing := PackedStringArray()
+	for unit: String in cards:
+		var card := cards[unit]
+		if not card.button.visible:
+			continue
+		var key := ModelPreview.unit_key(unit, UnitModels.tier_of(_catalog, unit, state.unit_level(unit)))
+		card.picture.texture = _preview.texture_of(key)
+		if card.picture.texture == null:
+			missing.append(key)
+	if not missing.is_empty():
+		_preview.request(missing)
+		_run_preview()
+
+
+## The producer's unit cards, then its queue. A card is locked, disabled with its picture, name
 ## and cost dimmed, until the producer's finished level trains the unit.
 func _refresh_training(state: BaseState, building: BuildingState) -> void:
 	for unit: String in _train_cards:
@@ -960,8 +1011,13 @@ func _tab_types(category: String) -> PackedStringArray:
 	return types
 
 
-func _on_preview_rendered(type: String, texture: Texture2D) -> void:
-	_entry_preview[type].texture = texture
+## A picture rendered: a build card's, or a unit's at a tier, which the army panel's cards take if
+## it is open.
+func _on_preview_rendered(key: String, texture: Texture2D) -> void:
+	if _entry_preview.has(key):
+		_entry_preview[key].texture = texture
+	elif _army_page != ArmyPage.NONE and _state != null:
+		_set_pictures(_state)
 
 
 func _refresh_info(state: BaseState, building: BuildingState) -> void:
@@ -1442,7 +1498,8 @@ func _strip(parent: Control, height: float) -> HBoxContainer:
 	return row
 
 
-## A unit card, `card_size`: the army's stripe along its top, the unit's glyph, its name and a
+## A unit card, `card_size`: the army's stripe along its top, the unit's picture (set by
+## _set_pictures, empty until the preview has rendered it), its name and a
 ## row of its cost and time, then the line under them that the refresh fills. PASS, like a build
 ## card, so a drag on it scrolls the strip; its content takes no touch.
 func _build_army_card(unit: String, card_size: Vector2) -> ArmyCard:
@@ -1474,7 +1531,13 @@ func _build_army_card(unit: String, card_size: Vector2) -> ArmyCard:
 	heading.add_theme_constant_override("separation", 0)
 	content.add_child(heading)
 	card.heading = heading
-	card.glyph = _glyph(heading, unit, GLYPH_SIZE)
+	card.picture = TextureRect.new()
+	card.picture.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	card.picture.custom_minimum_size = PICTURE_SIZE
+	card.picture.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
+	card.picture.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	card.picture.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+	heading.add_child(card.picture)
 	card.title = _card_label(heading, _catalog.unit_name(unit), &"CardName")
 	card.title.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
 	var cost_row := HBoxContainer.new()
