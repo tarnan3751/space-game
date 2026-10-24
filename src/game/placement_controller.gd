@@ -5,8 +5,9 @@ extends Node
 ## Walls are painted instead: until Done, a tap places one, and a drag one on every free
 ## cell the finger crosses. The ground's cell grid shows only during these (_show_grid).
 ## It also applies the army's commands the HUD's panels ask for: train, cancel_training,
-## research, and the Foundry's make, cancel_making and research_ability. This is the only
-## game-layer code that calls BaseState.apply().
+## research, and the Foundry's make, cancel_making and research_ability; and the expedition's: the
+## sector map's scan, and an expedition battle's raid_result. This is the only game-layer code that
+## calls BaseState.apply().
 ##
 ## While the ghost, a building or the wall brush is dragged with the finger near the
 ## screen's edge, the camera scrolls toward that edge and the dragged thing keeps following
@@ -249,6 +250,26 @@ func cancel_making(id: int, ability: String) -> String:
 ## error code.
 func research_ability(ability: String) -> String:
 	return state.apply({"op": "research", "ability": ability}, clock.call())
+
+
+# --- Expeditions -----------------------------------------------------------------
+
+## Starts the sector's next epoch. Returns the error code: the sector map toasts it.
+func scan() -> String:
+	return state.apply({"op": "scan"}, clock.call())
+
+
+## Applies an expedition battle's end: `setup` the battle it was made from, `result` the sim's
+## (BattleSim.result()), `expedition` {"epoch", "index"} of its field. The accepted commands go
+## with the battle and the rest of the result beside it. Applied once, not checked first: the
+## check lays the field out again (docs/reference/expeditions.md). Returns the error code.
+func raid_result(setup: Dictionary, result: Dictionary, expedition: Dictionary) -> String:
+	var battle := setup.duplicate(true)
+	battle["commands"] = result.get("commands", [])
+	var carried := result.duplicate(true)
+	carried.erase("commands")
+	return state.apply({"op": "raid_result", "battle": battle, "result": carried, "expedition": expedition},
+		clock.call())
 
 
 # --- Gestures --------------------------------------------------------------------
