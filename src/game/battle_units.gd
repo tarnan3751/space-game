@@ -273,6 +273,12 @@ func socket_point(id: int, name: String) -> Vector3:
 	return drawn * Rig.posed(socket.position, socket.rig, socket.rig2, _state[u])
 
 
+## Whether unit `id`'s model has the socket `name`.
+func has_socket(id: int, name: String) -> bool:
+	var u := id - 1
+	return u >= 0 and u < _count and _sockets[_type[u]].has(name)
+
+
 ## Unit `id` fired at `to` (a hit on `building`) at `now`: its type's weapon from its next socket,
 ## making an impact of `impact` radius at least on arrival, with a muzzle flash where the model has
 ## the socket; a rigged unit holds it until its aim's share reaches AIM_READY. Fired on the next

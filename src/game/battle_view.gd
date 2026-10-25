@@ -131,10 +131,11 @@ const RUBBLE_POP := 0.15
 const SMOKE_COLUMN_SECONDS := 4.0
 ## A stunned unit's crackle, its size.
 const STUN_SIZE := 0.4
-## A crashing aircraft's smoke trail: a puff this often, this big, from this socket.
+## A crashing aircraft's smoke trail: a puff this often, this big, from the first of these sockets
+## its model has (its middle with none).
 const CRASH_STEP := 0.06
 const CRASH_PUFF := 0.18
-const CRASH_SOCKET := "muzzle"
+const CRASH_SOCKETS: Array[String] = ["exhaust", "muzzle"]
 ## A sprung trap: how long its model takes to pop up before it goes off, how long a grav trap's
 ## funnel spins and how fast, and how long it takes to sink away after.
 const TRAP_POP := 0.15
@@ -764,9 +765,9 @@ func _finish_deaths() -> void:
 		_wrecked.erase(unit)
 
 
-## The crashing aircraft: a puff of smoke from each, where it is drawn now (its `muzzle` socket as
-## last drawn, BattleUnits.socket_point, so the trail follows its spiral down), every CRASH_STEP,
-## until it comes to rest.
+## The crashing aircraft: a puff of smoke from each, where it is drawn now (its `exhaust` socket as
+## last drawn, else its `muzzle`, else its middle: BattleUnits.socket_point, so the trail follows
+## its spiral down), every CRASH_STEP, until it comes to rest.
 func _trail_crashes() -> void:
 	if _crashing.is_empty():
 		return
@@ -777,10 +778,19 @@ func _trail_crashes() -> void:
 			continue
 		if _clock >= _crash_puff.get(unit, 0.0):
 			_crash_puff[unit] = _clock + CRASH_STEP
-			effects.puff(units.socket_point(unit, CRASH_SOCKET), CRASH_PUFF, Weapons.SMOKE, _clock, 0.9, 0.3)
+			effects.puff(units.socket_point(unit, _crash_socket(unit)), CRASH_PUFF, Weapons.SMOKE, _clock, 0.9, 0.3)
 	for unit: int in _done:
 		_crashing.erase(unit)
 		_crash_puff.erase(unit)
+
+
+## The first of CRASH_SOCKETS unit `unit`'s model has, or the last (socket_point gives its middle
+## for one it lacks).
+func _crash_socket(unit: int) -> String:
+	for name: String in CRASH_SOCKETS:
+		if units.has_socket(unit, name):
+			return name
+	return CRASH_SOCKETS[-1]
 
 
 ## A bolt reached `building` or `unit` (0 for none): it flashes, a building shakes and shows its bar.

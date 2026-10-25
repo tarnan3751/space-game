@@ -6,9 +6,10 @@ extends RefCounted
 ## set to Surf.BOB for the build), so nothing comes apart as it bobs, and banks into its turns, every
 ## part on Rig.BANK about its middle (the bomber's bay doors hang from it). Every rotor, wing, engine
 ## and canopy is a function of its own taking its pivot's transform. Each gun's muzzle is a socket,
-## `muzzle` the left one and `muzzle_2` the right; the bomber's bomb rack is `bay`, and its engines'
-## tails `exhaust` and `exhaust_2`. The tier repaints the hull, the
-## panels, the trim and the glows (UnitModels.hull, panel, trim, glow).
+## `muzzle` the left one and `muzzle_2` the right; the bomber's bomb rack is `bay`; the exhausts are
+## `exhaust` and `exhaust_2`: the bomber's engines' tails, the gunship's nacelles' backs and the
+## skimmer's under-ring's rear. The tier repaints the hull, the panels, the trim and the glows
+## (UnitModels.hull, panel, trim, glow).
 
 ## How high each flies: its lowest point over the ground, at rest.
 const SKIMMER_HOVER := 0.62
@@ -38,7 +39,8 @@ const SKIMMER_DECK := 0.21
 ## hull and its top veined (UnitModels.veined), a rim of the tier's trim and a second trim ring round
 ## its crown, four glow slots round a glass sensor dome with a dark
 ## iris and a glowing pupil, a tall orange heading fin behind, two gunmetal gun pods under its front
-## rim with glowing tips and a glowing ring under it; hovering and bobbing.
+## rim with glowing tips and a glowing ring under it, whose rear holds its `exhaust` (right) and
+## `exhaust_2` (left) sockets; hovering and bobbing.
 static func build_skimmer(p: Parts) -> void:
 	var m := p.body
 	m.flags = Surf.BOB
@@ -69,6 +71,9 @@ static func _saucer(m: LowPolyMesh, xf: Transform3D, tier: int) -> void:
 		m.box(Vector3(0.1, 0.03, 0.03), xf * Parts.around(0.27, degrees, 0.118), UnitModels.glow(tier, Surf.PULSE, false),
 			UnitModels.euler(xf, Vector3(0, -degrees - 90.0, 0)))
 	Parts.torus(m, 0.24, 0.03, 20, 4, xf * Vector3(0, -0.05, 0), UnitModels.glow(tier, Surf.PULSE), rot)
+	for side: float in [1.0, -1.0]:
+		m.socket("exhaust" if side > 0.0 else "exhaust_2", xf * Vector3(side * 0.12, -0.05, -0.208),
+			xf.basis * Vector3(0, -1, -1))
 	m.box_chamfered(Vector3(0.045, 0.2, 0.26), 0.015, xf * Vector3(0, 0.1, -0.18), ORANGE, UnitModels.euler(xf, Vector3(-18, 0, 0)))
 	_dome_eye(m, xf * UnitModels.pivot(Vector3(0, 0.162, -0.01)), tier)
 	for side: float in [1.0, -1.0]:
@@ -101,7 +106,8 @@ static func _gun_pod(m: LowPolyMesh, xf: Transform3D, tier: int, muzzle: String)
 ## windscreen, a twin chin gun, stub wings of the tier's panels carrying a nacelle at each tip with a
 ## band of the tier's glow and a cap of the tier's trim, the two rotors spinning on them (parts of
 ## the body tagged with LowPolyMesh.spin, which the shaders turn), and a tail boom (the hull, the
-## trim from Obsidian) with orange fins; hovering and bobbing.
+## trim from Obsidian) with orange fins; hovering and bobbing. The nacelles' backs are its `exhaust`
+## (right) and `exhaust_2` (left) sockets.
 static func build_gunship(p: Parts) -> void:
 	var m := p.body
 	var tier := p.tier
@@ -123,7 +129,7 @@ static func build_gunship(p: Parts) -> void:
 	_chin_gun(m, UnitModels.pivot(Vector3(0, bottom, 0.45)), tier)
 	for side: float in [1.0, -1.0]:
 		var hub := Vector3(side * 0.48, bottom + 0.06, -0.02)
-		_nacelle(m, UnitModels.pivot(hub), tier)
+		_nacelle(m, UnitModels.pivot(hub), tier, "exhaust" if side > 0.0 else "exhaust_2")
 		var pivot := hub + Vector3(0, 0.34, 0)
 		m.spin = Vector4(pivot.x, pivot.y, pivot.z, side * ROTOR_RATE)
 		_rotor(m, UnitModels.pivot(pivot), tier)
@@ -145,15 +151,17 @@ static func _chin_gun(m: LowPolyMesh, xf: Transform3D, tier: int) -> void:
 		m.socket("muzzle" if k > 0.0 else "muzzle_2", muzzle, xf.basis.z)
 
 
-## A nacelle standing on the pivot `xf` at a wing's tip: a tier-hull capsule with a band of the tier's
-## glow round it and a cap of the tier's trim, the rotor's hub on its top.
-static func _nacelle(m: LowPolyMesh, xf: Transform3D, tier: int) -> void:
+## A nacelle standing on the pivot `xf` at a wing's tip, facing its +Z: a tier-hull capsule with a
+## band of the tier's glow round it and a cap of the tier's trim, the rotor's hub on its top, the
+## middle of its back the socket `exhaust`.
+static func _nacelle(m: LowPolyMesh, xf: Transform3D, tier: int, exhaust: String) -> void:
 	var rot := UnitModels.euler(xf)
 	m.lathe(PackedVector2Array([
 		Vector2(0.05, 0.0), Vector2(0.085, 0.05), Vector2(0.085, 0.24), Vector2(0.07, 0.29), Vector2(0, 0.29),
 	]), 12, xf.origin, UnitModels.hull(tier, true), rot)
 	m.lathe(PackedVector2Array([Vector2(0.088, 0.1), Vector2(0.088, 0.15)]), 12, xf.origin, UnitModels.glow(tier), rot)
 	m.ring(0.04, 0.074, 0.03, 12, xf * Vector3(0, 0.275, 0), UnitModels.trim(tier, true), rot)
+	m.socket(exhaust, xf * Vector3(0, 0.145, -0.085), xf.basis * Vector3(0, 0, -1))
 
 
 ## A rotor on the pivot `xf` on its nacelle's top: a gunmetal hub sunk in the nacelle under a cap

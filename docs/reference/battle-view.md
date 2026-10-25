@@ -218,7 +218,8 @@ moving part (`UnitModels.MAX_MOVING` is 0); the gunship's rotors are spun by the
   so `after_step` also marks each unit's `UNIT_HIT` from the sim's events: a blow no shot follows
   starts the fire phase and counts as a shot all the same (the brawler's punches, the walker's
   recoil). `socket_point(id, name)` gives any of a unit's sockets (`muzzle`, `muzzle_2`, `bay`,
-  `exhaust`, `exhaust_2`, `eye`) in the world as last drawn.
+  `exhaust`, `exhaust_2`, `eye`) in the world as last drawn, and `has_socket(id, name)` whether its
+  model has one.
 - **Throws**: a unit a grav trap throws flies from where it stood to where it landed on an arc
   `THROW_HEIGHT` high over `THROW_SECONDS`.
 - **Health bars**: a damaged unit carries a cyan bar over its head, its fill easing towards the
@@ -355,8 +356,9 @@ Deaths, timed by the body's fall (`BattleUnits.death_seconds`) and drawn where t
 rolls; where its fall left it once it is over), at its standing middle's height: a
 **wreck** is a fireball and a glow `WRECK_BLAST` (0.3) of the way through, then dark smoke and a
 scorch where it came to rest; a **crash** trails smoke from the aircraft as it spirals down (a puff
-every `CRASH_STEP`, 60 ms, at its `muzzle` socket as last drawn; the skimmer and the bomber fall
-back to the model's middle until they have exhaust sockets), then a blast and a scorch land where
+every `CRASH_STEP`, 60 ms, at the first of `CRASH_SOCKETS` its model has, as last drawn: its
+`exhaust`, which the skimmer, the gunship and the bomber all have, else its `muzzle`, else the
+model's middle), then a blast and a scorch land where
 it comes to rest; a **blast** is a small one at the end. A figure gets nothing
 beyond its topple.
 
