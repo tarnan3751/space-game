@@ -114,6 +114,8 @@ const COLLAPSE_TILT := 12.0
 const RUBBLE_FROM := 0.6
 const RUBBLE_POP := 0.15
 const SMOKE_COLUMN_SECONDS := 4.0
+## A stunned unit's crackle, its size.
+const STUN_SIZE := 0.4
 ## A crashing aircraft's smoke trail: a puff this often, this big, from this socket.
 const CRASH_STEP := 0.06
 const CRASH_PUFF := 0.18
@@ -528,6 +530,17 @@ func _wake_defences() -> void:
 		_disabled.erase(id)
 		if _views.has(id):
 			_views[id].set_disabled(false)
+			_wake_flash(id)
+
+
+## Defence `id` woke from an EMP burst: a flash of energy over it, a ring and a glow.
+func _wake_flash(id: int) -> void:
+	var centre := _centres[id]
+	var top := Vector3(centre.x, _muzzles[id], centre.y)
+	var size := 0.4 + 0.2 * _sizes[id]
+	effects.flash(top, size, MaterialKit.ENERGY, _clock)
+	effects.ring_flash(top, size * 1.4, MaterialKit.ENERGY, _clock, 0.3)
+	effects.glow(Vector3(centre.x, 0.0, centre.y), size * 1.5, MaterialKit.ENERGY, _clock, 0.4)
 
 
 ## The last tick's events (BattleEvents) turned into effects, flashes, falls and deaths.
@@ -965,9 +978,16 @@ func _release_shot(id: int) -> void:
 
 
 ## Defence `id` fires its weapon (its Weapons record, BattleEffects.fire) from its next muzzle at
-## unit `target`, which flashes when it arrives.
+## unit `target`, which flashes when it arrives; a stunning shot (the EMP tower's) leaves the unit
+## crackling for its stun from when it arrives.
 func _fire_defence(id: int, target: int) -> void:
-	effects.fire(_weapons[id], _muzzle(id), units.aim_point(target), 0, target, DEFENCE_IMPACT, _clock)
+	var weapon := _weapons[id]
+	var from := _muzzle(id)
+	var to := units.aim_point(target)
+	effects.fire(weapon, from, to, 0, target, DEFENCE_IMPACT, _clock)
+	var stun := float(_stat(id, "stun_ms")) / 1000.0
+	if stun > 0.0:
+		effects.stun(to, STUN_SIZE, weapon.color, _clock + from.distance_to(to) / weapon.speed, stun)
 
 
 ## A gravity well `id` at `at` pulled: a violet ring round it, and its vortex from its top to every
