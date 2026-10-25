@@ -146,8 +146,6 @@ const FLASH_RISE_TICKS := 1.5
 ## The seconds since the last refresh weighed against a rise are capped here: a stalled tick or
 ## two still never flashes, while a longer gap's catch-up (the app resumed) does.
 const FLASH_MAX_SECONDS := 5
-## The army meter's key among the meters: no resource id begins with "@".
-const ARMY_METER := "@army"
 ## The build panel's height, never past a share of the screen's.
 const MENU_HEIGHT := 300.0
 const MENU_MAX_SHARE := 0.4
@@ -192,8 +190,7 @@ var _root: Control
 var _fitted_area: Rect2 = Rect2()
 ## The top bar's rows: the meters and the drone ring, then the debug buttons in debug builds.
 var _top: VBoxContainer
-## Each resource's meter, and the army's under ARMY_METER, the fill that grows across it, and its
-## amount.
+## Each resource's meter, the fill that grows across it, and its amount.
 var _meters: Dictionary[String, Control] = {}
 var _meter_fills: Dictionary[String, Control] = {}
 var _meter_labels: Dictionary[String, Label] = {}
@@ -371,13 +368,6 @@ func refresh(state: BaseState, selected_id: int, placing: bool, ghost_ok: bool, 
 			_meter_shaders[res].set_shader_parameter(&"flash_time", Motion.clock())
 		_meter_amounts[res] = amount
 		_meter_labels[res].text = "∞" if cheats else "%s / %s" % [Format.short(amount), Format.short(capacity)]
-	# The army's housing shows once a Hangar is built; the cheats leave it as it is.
-	var housing := state.housing_capacity()
-	_meters[ARMY_METER].visible = housing > 0
-	if housing > 0:
-		var used := state.housing_used()
-		_set_fill(ARMY_METER, clampf(float(used) / housing, 0.0, 1.0))
-		_meter_labels[ARMY_METER].text = "%s / %s" % [Format.short(used), Format.short(housing)]
 	_drone_ring.set_counts(state.builders_free(), state.builders_total())
 
 	var has_selection := selected_id != 0 and state.buildings.has(selected_id)
@@ -564,21 +554,6 @@ func entry_strip() -> ScrollContainer:
 ## The top bar's meter for one resource; hidden while the base cannot store it.
 func resource_panel(res: String) -> Control:
 	return _meters[res]
-
-
-## The top bar's army meter; hidden while the base houses no army.
-func army_meter() -> Control:
-	return _meters[ARMY_METER]
-
-
-## The army meter's text: housing used / capacity.
-func army_meter_text() -> String:
-	return _meter_labels[ARMY_METER].text
-
-
-## The army meter's fill; its parent is the track it grows across.
-func army_fill() -> Control:
-	return _meter_fills[ARMY_METER]
 
 
 ## A meter's fill; its parent is the track it grows across.
@@ -1335,7 +1310,7 @@ static func _seconds(ms: int) -> String:
 
 # --- Construction ----------------------------------------------------------------
 
-## The top-left row: a meter per resource, the army's, then the drone ring.
+## The top-left row: a meter per resource, then the drone ring.
 func _build_top_bar() -> void:
 	_top = VBoxContainer.new()
 	_top.mouse_filter = Control.MOUSE_FILTER_IGNORE
@@ -1354,13 +1329,11 @@ func _build_top_bar() -> void:
 	for i: int in _catalog.resources.size():
 		var res := _catalog.resources[i]
 		_build_meter(bar, res, res, _resource_color(res), stripe, fmod(i * GLINT_STAGGER, 1.0))
-	_build_meter(bar, ARMY_METER, "army", MaterialKit.ARMY, stripe,
-		fmod(_catalog.resources.size() * GLINT_STAGGER, 1.0))
 	_drone_ring = DroneRing.new()
 	bar.add_child(_drone_ring)
 
 
-## One meter, under `key` (a resource's id, or ARMY_METER): a trough that the fill, textured with
+## One meter, under `key` (a resource's id): a trough that the fill, textured with
 ## `stripe` and tinted `color`, grows across by amount over storage, the amount on it, and the
 ## HudIcon `icon_kind` over its left end. The stripes drift and glint (meter.gdshader), the glint
 ## at `phase` of its period. The meter stops a touch on it, as any opaque part does, so it never

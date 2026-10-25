@@ -16,9 +16,9 @@ const OUTLINE := 2.5
 const EDGE := 2.0
 const SHADOW_OFFSET := Vector2(2, 2)
 
-## "metal", "crystal", "antimatter", "drones", "army" (the army meter's figure), or a unit's
-## crew, "human", "piloted" or "autonomous", or an ability's effect, "swarm", "emp" or "strike";
-## anything else draws a plain gem.
+## "metal", "crystal", "antimatter", "drones", "army" (the army's figure, on the training panel's
+## housing line), or a unit's crew, "human", "piloted" or "autonomous", or an ability's effect,
+## "swarm", "emp" or "strike"; anything else draws a plain gem.
 var kind: String = ""
 var color: Color = Color.WHITE
 ## A wing mark at the lower right: an air unit.
@@ -142,7 +142,7 @@ static func _drone(pen: Pen, tint: Color) -> void:
 	pen.facet(_ellipse(Vector2(20, 21), Vector2(2.6, 2.6), 0.0, TAU, 12), Hud.INK)
 
 
-## The army meter's figure: a head over a pair of rounded shoulders, each with a lighter facet.
+## The army's figure: a head over a pair of rounded shoulders, each with a lighter facet.
 static func _figure(pen: Pen, tint: Color) -> void:
 	var shoulders := _ellipse(Vector2(20, 30), Vector2(13, 9), PI, TAU, 12)
 	shoulders.append_array(PackedVector2Array([Vector2(33, 37), Vector2(7, 37)]))

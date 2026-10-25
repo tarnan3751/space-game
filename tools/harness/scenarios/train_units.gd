@@ -1,16 +1,18 @@
 extends HarnessScenario
 ## The training and research HUD on the debug build's Template base (every producer and the
 ## Research Lab at their top level, the Hangars built): a Cadet Academy selected by a tap, its
-## info panel's Train opening the army panel; two Rangers and a Breacher queued from the cards
-## (the first by a real touch), paid for and shown in the queue strip; the newest Ranger
-## cancelled from the strip and refunded; the head counted down by the game's tick; the first
-## Ranger trained and housed, on the army meter.
+## info panel reading the army's housing and its Train opening the army panel, whose header reads
+## it too; two Rangers and a Breacher queued from the cards (the first by a real touch), paid for
+## and shown in the queue strip; the newest Ranger cancelled from the strip and refunded; the head
+## counted down by the game's tick; the first Ranger trained and housed, on the header's housing
+## line.
 ## Then the Research Lab selected, which closes the training panel, its Research opening the
 ## research page; the Ranger's next level researched from its card, paid for and shown on the
 ## progress line, a second research refused while it runs, and the level reached. Last, a tap on
-## the panel that reaches nothing behind it, and a real tap on another building above the panel
-## that selects it and closes the panel. Then, on a fresh base (Reset base) with a Cadet Academy
-## placed and finished at level 1 and no Hangar: the army meter hidden, the Breacher's card locked
+## the panel that reaches nothing behind it, a real tap on another building above the panel that
+## selects it and closes the panel, and a Hangar's info panel with the army housed. Then, on a
+## fresh base (Reset base) with a Cadet Academy placed and finished at level 1 and no Hangar: the
+## header reading "No Hangar", with no bar; the Breacher's card locked
 ## ("Needs Cadet Academy 2", disabled; a real touch on it queues nothing and reaches nothing
 ## behind it), a Ranger refused for want of room; the panel's close button back to the info panel
 ## with the academy still selected; and Build over the open panel closing it and opening the build
@@ -34,8 +36,6 @@ func run(main: MainScript) -> void:
 	var catalog: Catalog = state.catalog
 	await frames(2)
 	var capacity := state.housing_capacity()
-	check(hud.army_meter().visible and hud.army_meter_text() == "0 / %d" % capacity,
-		"the army meter shows once there are Hangars: %s" % hud.army_meter_text())
 
 	var academy := _first(state, PRODUCER)
 	_focus(main, academy)
@@ -104,8 +104,6 @@ func run(main: MainScript) -> void:
 	await frames(2)
 	check(state.army_count("ranger") == 1 and state.queue_of(academy.id) == PackedStringArray(["breacher"]),
 		"the first Ranger is housed, the Breacher next")
-	var expected := "%d / %d" % [state.housing_used(), capacity]
-	check(hud.army_meter_text() == expected, "the army meter reads %s (expected %s)" % [hud.army_meter_text(), expected])
 	check(hud.train_card_info("ranger") == "Housing %d   Housed 1" % catalog.unit_housing("ranger"),
 		"the Ranger card counts it: %s" % hud.train_card_info("ranger"))
 	_check_housing(hud, state)
@@ -200,7 +198,7 @@ func _fresh_academy(main: MainScript) -> void:
 	await frames(2)
 	var state: BaseState = main.state
 	var catalog: Catalog = state.catalog
-	check(state.housing_capacity() == 0 and not hud.army_meter().visible, "a fresh base has no Hangar and no army meter")
+	check(state.housing_capacity() == 0, "a fresh base has no Hangar")
 	main.placement.begin_place(PRODUCER)
 	main.placement.confirm_place()
 	var academy: BuildingState = state.buildings.get(main.placement.selected_id)
