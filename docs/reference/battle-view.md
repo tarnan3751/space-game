@@ -221,9 +221,10 @@ moving part (`UnitModels.MAX_MOVING` is 0); the gunship's rotors are spun by the
   `exhaust`, `exhaust_2`, `eye`) in the world as last drawn, and `has_socket(id, name)` whether its
   model has one.
 - **Flight**: an air unit flies higher than its model is built, its middle `FLIGHT_MIDDLE` over
-  the ground (the jet trooper 1.5, the skimmer 2.0, the gunship 3.0, the bomber 3.5), over the walls
-  and most roofs: a lift on its instance's transform (`_altitude`, the target less the model's own
-  middle), so its sockets (`socket_point`), its aim point, its bar, its shadow, its bank and its
+  the ground (the jet trooper 1.5, the skimmer 2.0, the gunship and the bomber 4.0, so even the
+  tall top-level anti-air guns look up at them), over the walls and most roofs: a lift on its
+  instance's transform (`_altitude`, the target less the model's own middle), so its sockets
+  (`socket_point`), its aim point, its bar, its shadow, its bank and its
   shots go with it; `rest_point(id)` is its middle as built, unlifted, where its death's effects go. It appears at that height and its death spirals down from it to the ground over
   the same 0.6 s. Ground units, the hover tank included, keep their built height; outside a battle
   (the gallery, the cards) nothing is lifted. The sim is 2D and untouched.

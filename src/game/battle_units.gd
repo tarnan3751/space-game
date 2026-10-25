@@ -103,7 +103,7 @@ const THROW_SECONDS := 0.45
 const THROW_HEIGHT := 1.6
 ## How high an air unit's middle flies in battle (world units over the ground), per type; its
 ## model's own height over its origin is made up to it by a lift on the instance.
-const FLIGHT_MIDDLE := {"jet_trooper": 1.5, "skimmer": 2.0, "gunship": 3.0, "bomber": 3.5}
+const FLIGHT_MIDDLE := {"jet_trooper": 1.5, "skimmer": 2.0, "gunship": 4.0, "bomber": 4.0}
 ## How fast a health bar's fill follows the hull, and how high over a unit's top it floats.
 const BAR_EASE := 10.0
 const BAR_OVER := 0.25
