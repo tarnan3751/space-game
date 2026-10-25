@@ -174,18 +174,19 @@ const MARSHAL_AT := Vector3(-1.0, 0.65, 1.85)
 
 
 ## A long vaulted hangar: the main bay with its striped door, the control tower in the back
-## corner, landing lights along the apron. Wider door at 2 and 3, a second bay at 3, roof
-## dishes at 4. The main bay's door rises over its lit inside and drops again, the lights chase
-## along the apron, the cab's glass pulses and a radar turns on its roof; from 4 the big roof
-## dish sweeps.
+## corner, its cream column banded orange under the cab, landing lights along the apron, an orange
+## deck ringed in hazard stripes across the front. Wider door at 2 and 3, a second bay at 3 (an
+## orange landing pad in its place before), roof dishes at 4. The main bay's door rises over its
+## lit inside and drops again, the lights chase along the apron, the cab's glass pulses and a radar
+## turns on its roof; from 4 the big roof dish sweeps.
 ##
 ## From 6 the tower grows taller at each level and the apron's lights stand in two rows before
 ## the main door, chasing apart: L6 chrome roofs with cyan ribs, a chrome tower with cyan strips
 ## and a bigger radar dish, chrome lamps, a skiff parked on a pad on the apron; L7 a third, small
 ## bay on the apron's right and a chrome gallery round the tower; L8 obsidian walls and tower,
-## violet-veined doors, ribs glowing violet, crystal beacons in the second row, crystal inlays on
-## the tower; L9 a landing ring hovering over the skiff, obsidian rimmed in violet, and a second
-## gallery; L10 an obsidian roof under gold filigree ribs with the antimatter core glowing in
+## violet-veined doors, the ribs orange as at the Base tier, crystal beacons in the second row,
+## crystal inlays on the tower; L9 a landing ring hovering over the skiff, obsidian rimmed in
+## violet, and a second gallery; L10 an obsidian roof under gold filigree ribs with the antimatter core glowing in
 ## broad bands along its crests, filigree banners on the bays' gables and bands up the tower, a
 ## violet core beacon on a gold spire atop it, and a marshaller bot hovering on the apron before
 ## the main door, rocking as it waves its glowing wands, as its escort.
@@ -201,22 +202,27 @@ static func build_hangar(p: Parts, level: int) -> void:
 		_vault(p, Vector3(1.35, g, -0.9), 1.8, 2.25, 0.55, 1.2, false, level)
 	else:
 		m.disc(0.75, 24, Vector3(1.35, g + 0.002, 0.2), Parts.HAZARD)
-		m.disc(0.6, 24, Vector3(1.35, g + 0.004, 0.2), ARMOUR)
+		m.disc(0.6, 24, Vector3(1.35, g + 0.004, 0.2), ORANGE)
+	# The apron: an orange deck across the front, ringed in hazard stripes, the lamps on it.
+	m.box_chamfered(Vector3(4.7, 0.05, 0.88), 0.02, Vector3(0, g, 1.94), Parts.HAZARD)
+	m.box_chamfered(Vector3(4.5, 0.08, 0.72), 0.02, Vector3(0, g, 1.94), ORANGE)
+	var deck := g + 0.08
 	if level < 6:
 		var lights := 4 + level
 		for i: int in lights:
 			var x := -1.85 + 3.9 * i / (lights - 1)
-			Parts.landing_light(m, Vector3(x, g, 2.05), 0.11, LAMP.phased(float(i) / lights))
+			Parts.landing_light(m, Vector3(x, deck, 2.05), 0.11, LAMP.phased(float(i) / lights))
 	else:
-		_apron(p, level)
-	# The control tower, taller from 6.
+		_apron(p, level, deck)
+	# The control tower, taller from 6: a cream column banded orange under the cab.
 	var tower := Vector3(1.45, g, -1.65)
 	m.box_chamfered(Vector3(0.95, 0.3, 0.95), 0.06, tower, _plating(p.tier, ARMOUR))
 	var extra: Array[float] = [0.0, 0.45, 0.75, 1.05, 1.3, 1.4]
 	var shaft := 1.0 + 0.06 * level + extra[clampi(level - 5, 0, 5)]
-	m.prism(0.3, 0.25, shaft, 16, tower + Vector3(0, 0.3, 0), _plating(p.tier, MID_ROUND, true))
+	m.prism(0.3, 0.25, shaft, 16, tower + Vector3(0, 0.3, 0), _plating(p.tier, HULL_ROUND, true))
 	if level >= 6:
 		_tower_dress(m, tower + Vector3(0, 0.3, 0), shaft, level, p.tier)
+	m.prism(0.31, 0.3, 0.32, 16, tower + Vector3(0, shaft - 0.2, 0), ORANGE_ROUND)
 	var cab := tower + Vector3(0, 0.3 + shaft, 0)
 	m.prism(0.42, 0.42, 0.1, 16, cab, HULL_ROUND)
 	m.ring(0.41, 0.44, 0.05, 16, cab + Vector3(0, 0.03, 0), GLOW)
@@ -227,11 +233,11 @@ static func build_hangar(p: Parts, level: int) -> void:
 	if level >= 10:
 		_crown_beacon(m, cab + Vector3(0.12, 0.6, -0.1), 0.62)
 	else:
-		Parts.mast(m, cab + Vector3(0.12, 0.6, -0.1), 0.3 + 0.03 * level, 0.06, GLOW)
+		_mast(m, cab + Vector3(0.12, 0.6, -0.1), 0.3 + 0.03 * level, GLOW)
 	# The radar turning on the cab's roof, clear of the mast; bigger from 6.
 	var big := 1.45 if level >= 6 else 1.0
 	var stub := cab + Vector3(-0.14, 0.6, 0.12)
-	m.prism(0.05, 0.04, 0.12, 12, stub, Parts.GUNMETAL)
+	m.box_chamfered(Vector3(0.16, 0.12, 0.16), 0.03, stub, Parts.GUNMETAL)
 	var radar := p.moving(stub + Vector3(0, 0.12, 0), Motion.spin(Vector3.UP, Parts.DISH_RATE))
 	radar.box_chamfered(Vector3(0.08, 0.08, 0.08), 0.02, Vector3.ZERO, Parts.GUNMETAL)
 	var tilt := Vector3(60, 90, 0)
@@ -242,8 +248,8 @@ static func build_hangar(p: Parts, level: int) -> void:
 	radar.orb(0.03 * big, 10, 4, hub + axis * 0.15 * big, CYAN_LAMP if chrome else GLOW)
 	if level >= 2:
 		# Fuel tanks on the apron, beside the main door.
-		for z: float in [1.68, 1.92]:
-			Parts.tank(m, 0.1, 0.32, Vector3(-2.2, g, z), ORANGE_ROUND, 0.03)
+		for z: float in [1.75, 1.99]:
+			Parts.tank(m, 0.1, 0.32, Vector3(-2.15, deck, z), ORANGE_ROUND, 0.03)
 	if level >= 4:
 		_roof_dish(p, Vector3(-1.0, g + 1.98, -1.5), 0.5, true)
 		_roof_dish(p, Vector3(1.35, g + 1.38, -0.4), 0.32, false)
@@ -279,19 +285,18 @@ static func _marshaller(p: Parts, at: Vector3) -> void:
 		bot.prism(0.05 * K, 0.04 * K, 0.34 * K, 8, hand, MARSHAL_WAND, Parts.facing(up))
 
 
-## The apron from 6 (_hangar's): two rows of lamps before the main door chasing apart, chrome
-## housings, the front row orange, the back row cyan (crystal beacons from the Obsidian tier); a
-## hazard pad left of the second bay's door with a skiff parked on it; from 9 a landing ring
-## hovering over the skiff, obsidian with a violet rim, a violet hologram ring over it.
-static func _apron(p: Parts, level: int) -> void:
+## The apron from 6 (_hangar's), on its deck at `g`: two rows of lamps before the main door
+## chasing apart, chrome housings, the front row orange, the back row cyan (crystal beacons from
+## the Obsidian tier); a hazard pad left of the second bay's door with a skiff parked on it; from 9
+## a landing ring hovering over the skiff, obsidian with a violet rim, a violet hologram ring over it.
+static func _apron(p: Parts, level: int, g: float) -> void:
 	var m := p.body
-	var g := Parts.PAD_HEIGHT
 	var housing := _plating(p.tier, Parts.GUNMETAL, true)
 	var lights := level - 1
 	for i: int in lights:
 		var x := -1.85 + 1.9 * i / (lights - 1)
 		Parts.landing_light(m, Vector3(x, g, 1.98), 0.11, LAMP.phased(Parts.chase(i, lights)), housing)
-		var back := Vector3(x + 0.95 / (lights - 1), g, 2.3)
+		var back := Vector3(x + 0.95 / (lights - 1), g, 2.24)
 		if i == lights - 1:
 			continue
 		if p.tier >= Parts.Tier.OBSIDIAN:
@@ -299,7 +304,7 @@ static func _apron(p: Parts, level: int) -> void:
 			m.cone(0.045, 0.2, 8, back + Vector3(0, 0.05, 0), INLAY.phased(Parts.chase(lights - 2 - i, lights - 1)))
 		else:
 			Parts.landing_light(m, back, 0.075, CYAN_LAMP.phased(Parts.chase(lights - 2 - i, lights - 1)), housing)
-	var pad := Vector3(0.62, g, 1.92)
+	var pad := Vector3(0.62, g, 1.94)
 	m.disc(0.42, 24, pad + Vector3(0, 0.002, 0), Parts.HAZARD)
 	m.disc(0.34, 24, pad + Vector3(0, 0.004, 0), _plating(p.tier, ARMOUR))
 	_parked_skiff(m, pad + Vector3(0, 0.004, 0), p.tier)
@@ -352,10 +357,10 @@ static func _tower_dress(m: LowPolyMesh, foot: Vector3, shaft: float, level: int
 			m.lathe(PackedVector2Array([Vector2(0.31, 0), Vector2(0.31, 0.1)]), 16, foot + Vector3(0, y, 0), FILIGREE_ROUND)
 
 
-## The Crown tier's beacon: a gold spire `height` tall on `foot` under a gold crown of four
-## prongs round a violet antimatter core, pulsing.
+## The Crown tier's beacon: a gold spire `height` tall on `foot`, 0.14 across at its foot and
+## tapered, under a gold crown of four prongs round a violet antimatter core, pulsing.
 static func _crown_beacon(m: LowPolyMesh, foot: Vector3, height: float) -> void:
-	m.prism(0.06, 0.035, height, 12, foot, GOLD_ROUND)
+	m.prism(0.07, 0.04, height, 12, foot, GOLD_ROUND)
 	var top := foot + Vector3(0, height, 0)
 	m.ring(0.05, 0.12, 0.05, 12, top - Vector3(0, 0.03, 0), GOLD_ROUND)
 	for k: int in 4:
@@ -392,12 +397,12 @@ static func _trim(tier: int, base: Surf) -> Surf:
 	return Parts.GOLD_TRIM if tier >= Parts.Tier.GOLD else base
 
 
-## A dish on a stub at `foot`, turned to the right of the view, with a glowing feed. One that
-## `sweeps` stands on a taller stub, clear of the roof, and swings to and fro about it.
+## A dish on a chamfered post at `foot`, turned to the right of the view, with a glowing feed. One
+## that `sweeps` stands on a taller post, clear of the roof, and swings to and fro about it.
 static func _roof_dish(p: Parts, foot: Vector3, radius: float, sweeps: bool) -> void:
 	var aim := Vector3(55, 135, 0)
 	var stub := 0.42 if sweeps else 0.22
-	p.body.prism(0.07, 0.06, stub, 16, foot, Parts.GUNMETAL)
+	p.body.box_chamfered(Vector3(0.16, stub, 0.16), 0.04, foot, Parts.GUNMETAL)
 	var m := p.body
 	var centre := foot + Vector3(0, stub - 0.02, 0)
 	if sweeps:
@@ -415,7 +420,7 @@ static func _roof_dish(p: Parts, foot: Vector3, radius: float, sweeps: bool) -> 
 ## part: it rises behind its lintel and a hood over it, as far as the roof leaves room, and the
 ## lit bay shows under it. The tier paints it (_hangar's levels): from Chrome a chrome roof
 ## with cyan ribs and a cyan strip along its +X wall; from Obsidian obsidian walls, veined door
-## leaves and ribs glowing violet; at Crown an obsidian roof under filigree ribs, and from 10 the
+## leaves, the ribs staying orange; at Crown an obsidian roof under filigree ribs, and from 10 the
 ## antimatter core glowing in a broad band along its crest and a filigree banner with a violet
 ## emblem on a gable wide enough for it.
 static func _vault(p: Parts, back: Vector3, width: float, length: float, wall: float,
@@ -441,14 +446,11 @@ static func _vault(p: Parts, back: Vector3, width: float, length: float, wall: f
 	var rib := ORANGE_ROUND
 	if crown:
 		rib = FILIGREE_ROUND
-	elif obsidian:
-		rib = VIOLET_RIB
-	elif chrome:
+	elif chrome and not obsidian:
 		rib = Parts.CYAN_STRIP
 	for k: int in 3:
 		var rib_z := back.z + length * (0.18 + 0.32 * k)
-		m.ring(radius - 0.02, radius + 0.07, 0.14, 24, Vector3(back.x, axis.y, rib_z), rib.phased(k / 3.0) if obsidian and not crown else rib,
-			Vector3(90, 0, 0))
+		m.ring(radius - 0.02, radius + 0.07, 0.14, 24, Vector3(back.x, axis.y, rib_z), rib, Vector3(90, 0, 0))
 	if chrome:
 		m.box(Vector3(0.02, 0.07, length - 0.1), Vector3(back.x + width * 0.5 + 0.005, back.y + wall - 0.17, back.z + length * 0.5),
 			_glow(p.tier))
@@ -711,6 +713,16 @@ static func _pennant(m: LowPolyMesh, root: Vector3, length: float, depth: float,
 static func _whip(m: LowPolyMesh, foot: Vector3, height: float, bulb: Surf) -> void:
 	m.prism(0.03, 0.022, height, 8, foot, Parts.ROD)
 	m.orb(0.05, 10, 4, foot + Vector3(0, height, 0), bulb)
+
+
+## A mast standing on `foot`, `height` tall: a fat foot under a tapered gunmetal shaft (0.14
+## across at its foot, 0.1 at its top), thick enough to carry its own outline, ending in a lamp of
+## `bulb`.
+static func _mast(m: LowPolyMesh, foot: Vector3, height: float, bulb: Surf) -> void:
+	m.lathe(PackedVector2Array([
+		Vector2(0.1, 0), Vector2(0.1, 0.06), Vector2(0.07, 0.1), Vector2(0.05, height), Vector2(0, height),
+	]), 10, foot, Parts.GUNMETAL)
+	m.orb(0.075, 12, 4, foot + Vector3(0, height + 0.04, 0), bulb)
 
 
 ## The flight simulator standing on `foot`: a pod with a pulsing canopy on a stub, held in
