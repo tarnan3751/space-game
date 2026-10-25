@@ -89,9 +89,10 @@ eye to make up for its dots. The measured column is the rendered pixel over the 
 layer, whose own grey is about 0.95; it holds for every tint but the darkest, where sRGB's linear
 toe makes the shadow a little darker.
 
-- **Halftone**: in the shadow band only, a dot grid turned 45°, period 4 px at a 720 px viewport
-  height and scaled with it (`FRAGCOORD.xy * 720 / VIEWPORT_SIZE.y`), dots covering 35 % of a
-  cell, each darkening the band by 0.12 of its tone. Its edge is antialiased analytically (one
+- **Halftone**: in the shadow band only, a dot grid turned 45°, period 7 px at a 720 px viewport
+  height and scaled with it (`FRAGCOORD.xy * 720 / VIEWPORT_SIZE.y`), dots covering 25 % of a
+  cell, each darkening the band by 0.08 of its tone. A finer, darker screen (4 px, 35 %, 0.12)
+  read as sandy pixel noise at the widest zoom. Its edge is antialiased analytically (one
   pixel's width in grid cells is known), not with `fwidth`: derivatives inside `light()` are not
   safe, since it can run in non-uniform control flow. It is a screen-space pattern, so the dots
   are the same size at every zoom. Print grain, not polka dots.

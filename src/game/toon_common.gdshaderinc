@@ -28,10 +28,11 @@ const vec3 BAND_SHADOW = vec3(0.29) * vec3(0.64, 0.67, 1.0) / vec3(1.0, 0.905, 0
 
 // The halftone: a dot grid turned 45 degrees, its period in pixels at 720p (scaled with the
 // viewport height), the share of each cell a dot covers, and how much of the shadow band a dot
-// takes away (linear: 0.12 of its sRGB tone).
-const float HALFTONE_PERIOD = 4.0;
-const float HALFTONE_COVERAGE = 0.35;
-const float HALFTONE_DARKEN = 0.245;
+// takes away (linear: 0.08 of its sRGB tone). Coarse and faint, so it reads as print at the
+// widest zoom rather than as sandy dither.
+const float HALFTONE_PERIOD = 7.0;
+const float HALFTONE_COVERAGE = 0.25;
+const float HALFTONE_DARKEN = 0.168;
 
 // The cast shadow's penumbra: where the filtered shadow term runs from fully shadowed to fully
 // lit, the window shadow_cover()'s dot screen is spread over: the term at which a pixel is all
