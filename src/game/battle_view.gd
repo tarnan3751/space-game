@@ -101,7 +101,15 @@ const DEFENCE_IMPACT := 0.3
 const MINE_BLAST := MaterialKit.HAZARD
 const WELL_PULL := MaterialKit.ANTIMATTER
 const FALL_DUST := Color("c9c2e0")
-const SCORCH_RADIUS := 0.7
+## A sprung trap: how long its model takes to pop up before it goes off, how long a grav trap's
+## funnel spins and how fast, and how long it takes to sink away after.
+const TRAP_POP := 0.15
+const FUNNEL_SECONDS := 0.6
+const FUNNEL_SPIN := 14.0
+const FUNNEL_SINK := 0.2
+## A camera shake's strength (world units) and length for a mega mine.
+const QUAKE := 0.18
+const QUAKE_SECONDS := 0.45
 ## The abilities' tints: the swarm's dome, the EMP's ring, the strike's marker and its blast.
 const SWARM_GLOW := MaterialKit.NANITE_GREEN
 const EMP_RING := MaterialKit.ARC_BLUE
@@ -168,6 +176,13 @@ var _shields := PackedInt32Array()
 ## step, reused.
 var _disabled: Dictionary[int, bool] = {}
 var _woken := PackedInt32Array()
+## The traps, each a hidden view shown while it springs, and when each sprang.
+var _traps: Dictionary[int, BuildingView] = {}
+var _sprung: Dictionary[int, float] = {}
+## The camera shake: its strength and when it started and ends (-1: none).
+var _quake: float = 0.0
+var _quake_from: float = 0.0
+var _quake_until: float = -1.0
 ## Each building's weapon record (Weapons), traps' included.
 var _weapons: Dictionary[int, Weapons.Weapon] = {}
 ## The punches still to land, at which building, and when.
@@ -248,7 +263,15 @@ func setup(battle_catalog: Catalog, setup_data: Dictionary, iso_camera: IsoCamer
 				_walls[cell] = level
 				walls += 1
 			Catalog.CLASS_TRAP:
-				pass
+				# Hidden until it springs; made now so its meshes are built before the battle.
+				var trap := BuildingView.new()
+				trap.setup(id, type, level, size, BuildingModels.tier_of(catalog, type, level))
+				trap.position = centre
+				trap.visible = false
+				if rival:
+					trap.set_rival(true)
+				root.add_child(trap)
+				_traps[id] = trap
 			_:
 				var view := BuildingView.new()
 				view.setup(id, type, level, size, BuildingModels.tier_of(catalog, type, level))
@@ -373,6 +396,8 @@ func _process(delta: float) -> void:
 	_land_blows()
 	_aim_defences(shown)
 	_draw_buildings(shown)
+	_draw_traps()
+	_shake_camera()
 	effects.end_bars()
 	effects.draw(_clock)
 	if _walls_changed:
@@ -384,6 +409,13 @@ func _process(delta: float) -> void:
 	if deploy_unit != "":
 		var flash := clampf(1.0 - (_clock - _mask_flash_at) / (MASK_FLASH_SECONDS * maxi(speed, 1)), 0.0, 1.0)
 		field.set_deploy_mask(_mask, lerpf(MASK_STRENGTH, MASK_FLASH, flash))
+
+
+## The camera is the base's: a shake still on leaves no offset behind.
+func _exit_tree() -> void:
+	if camera != null:
+		camera.h_offset = 0.0
+		camera.v_offset = 0.0
 
 
 ## Selects the unit type a tap or a drag deploys, "" for none: the red zone shows while one is.
@@ -493,10 +525,7 @@ func _read_events() -> void:
 			BattleEvents.HOLD:
 				_hold(source, _point(events.from_x[i], events.from_y[i]))
 			BattleEvents.DETONATE:
-				var at := _point(events.from_x[i], events.from_y[i])
-				effects.impact(at, maxf(1.0, float(_stat(source, "range_cells"))), MINE_BLAST, _clock)
-				if _stat(source, "damage") > 0:
-					effects.scorch(at, SCORCH_RADIUS * _sizes.get(source, 1))
+				_spring(source, _point(events.from_x[i], events.from_y[i]))
 			BattleEvents.THROW:
 				units.throw_unit(target, Vector2i(events.from_x[i], events.from_y[i]), _clock)
 			BattleEvents.REVEAL:
@@ -657,6 +686,86 @@ func _fall(id: int) -> void:
 	effects.impact(at + Vector3(0, 0.3, 0), size * 0.7, FALL_DUST, _clock)
 	if _shields.has(id):
 		effects.set_shield(id, 0, _clock)
+
+
+## Trap `id` sprang at `at`: its model pops up out of the ground (TRAP_POP), then goes off by its
+## weapon record: a mine's blast with its ring, scorch and debris (a mega mine's bigger, shaking the
+## camera), a flak mine's flash up to each air unit over it bursting there, a grav trap's funnel
+## spinning in a violet ring as it throws.
+func _spring(id: int, at: Vector3) -> void:
+	var weapon := _weapons[id]
+	var reach := float(_stat(id, "range_cells"))
+	var goes := _clock + TRAP_POP
+	if _traps.has(id):
+		_traps[id].visible = true
+		_traps[id].scale = Vector3.ONE * 0.01
+		_sprung[id] = _clock
+	effects.glow(at, maxf(weapon.light, reach * 0.6), weapon.color, goes, 0.4)
+	match weapon.kind:
+		Weapons.Kind.MINE:
+			effects.impact(at, maxf(1.0, reach), MINE_BLAST, goes)
+			effects.land(weapon, at + Vector3.UP * 0.25, weapon.impact_size, goes)
+			effects.scorch(at, weapon.impact_size * 0.45, goes)
+			effects.debris(at + Vector3.UP * 0.15, 4, 0.6, 0.1, goes, MaterialKit.HULL_DARK, MaterialKit.HAZARD)
+		Weapons.Kind.MEGA_MINE:
+			effects.impact(at, maxf(1.0, reach), MINE_BLAST, goes)
+			effects.land(weapon, at + Vector3.UP * 0.35, weapon.impact_size, goes)
+			effects.debris(at + Vector3.UP * 0.2, 6, 0.9, 0.14, goes, MaterialKit.HULL_DARK, MaterialKit.HAZARD)
+			_quake = QUAKE
+			_quake_from = goes
+			_quake_until = goes + QUAKE_SECONDS
+		Weapons.Kind.FLAK_MINE:
+			effects.impact(at, maxf(1.0, reach), weapon.color, goes)
+			effects.flash(at + Vector3.UP * 0.3, 0.5, weapon.color, goes)
+			for unit: int in _in_reach(id, reach):
+				var over := units.aim_point(unit)
+				effects.beam(at + Vector3.UP * 0.2, over, weapon.width, weapon.color, goes, 0.18, 2.0)
+				effects.land(weapon, over, weapon.impact_size, goes + 0.05)
+		Weapons.Kind.GRAV_TRAP:
+			effects.impact(at, maxf(1.0, reach), MINE_BLAST, goes)
+			effects.impact(at + Vector3.UP * 0.05, weapon.impact_size, weapon.color, _clock, FUNNEL_SECONDS)
+			effects.ring_flash(at + Vector3.UP * 0.4, 0.8, weapon.color, goes, 0.35)
+
+
+## The sprung traps' models: popping up over TRAP_POP and gone as their blast covers them; a grav
+## trap's funnel spinning for FUNNEL_SECONDS, then sinking away.
+func _draw_traps() -> void:
+	if _sprung.is_empty():
+		return
+	_done.clear()
+	for id: int in _sprung:
+		var view := _traps[id]
+		var t := _clock - _sprung[id]
+		var funnel := _weapons[id].kind == Weapons.Kind.GRAV_TRAP
+		var ends := TRAP_POP + (FUNNEL_SECONDS + FUNNEL_SINK if funnel else 0.05)
+		if t >= ends:
+			view.visible = false
+			_done.append(id)
+			continue
+		var up := clampf(t / (TRAP_POP * 0.6), 0.0, 1.0)
+		var size := up * (1.0 + 0.2 * sin(PI * clampf(t / TRAP_POP, 0.0, 1.0)))
+		if funnel:
+			size *= clampf((ends - t) / FUNNEL_SINK, 0.0, 1.0)
+			view.rotation.y = FUNNEL_SPIN * maxf(t - TRAP_POP * 0.5, 0.0)
+		var centre := _centres[id]
+		view.position = Vector3(centre.x, 0.12 * sin(PI * clampf(t / TRAP_POP, 0.0, 1.0)), centre.y)
+		view.scale = Vector3.ONE * maxf(size, 0.01)
+	for id: int in _done:
+		_sprung.erase(id)
+
+
+## Shakes the camera (its offsets) while a quake is on, easing out to exactly none at its end.
+func _shake_camera() -> void:
+	if _quake_until < 0.0:
+		return
+	if _clock >= _quake_until:
+		_quake_until = -1.0
+		camera.h_offset = 0.0
+		camera.v_offset = 0.0
+		return
+	var left := clampf((_quake_until - _clock) / (_quake_until - _quake_from), 0.0, 1.0) if _clock >= _quake_from else 0.0
+	camera.h_offset = _quake * left * sin(_clock * 91.0)
+	camera.v_offset = _quake * left * cos(_clock * 77.0)
 
 
 ## Turns each aiming head towards its defence's target, `shown` seconds of battle after the last
