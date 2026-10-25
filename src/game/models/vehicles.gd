@@ -101,16 +101,20 @@ static func _twin_gun(m: LowPolyMesh, xf: Transform3D, tier: int) -> void:
 
 # --- The siege walker -----------------------------------------------------------------
 
-## The siege walker: an armoured biped, a tier-hull chamfered hull on two thick digitigrade legs with
-## orange hip caps, knee joints and broad feet, a gun arm on each side with twin gunmetal barrels,
-## a colonist pilot sunk in the top behind a glass windscreen and a dark dashboard, and a short mast
-## with a lamp of the tier's glow.
+## The siege walker: an armoured biped, a tier-hull chamfered hull with a chest band (orange to
+## Gold, the tier's trim above), on two thick
+## digitigrade legs with orange hip caps and thigh plates, knee joints and broad feet; a big gun arm
+## on each side with twin barrels in a shroud; a colonist pilot sunk in the top behind a glass
+## windscreen and a dark dashboard, a raised block behind it carrying its deck plate
+## (UnitModels.deck), and a short mast with a lamp of the tier's glow.
 static func build_siege_walker(p: Parts) -> void:
 	var m := p.body
 	var tier := p.tier
 	m.box_chamfered(Vector3(0.54, 0.36, 0.56), 0.07, Vector3(0, 0.78, 0), UnitModels.hull(tier))
-	m.box_chamfered(Vector3(0.44, 0.13, 0.05), 0.02, Vector3(0, 0.84, 0.27), UnitModels.trim(tier))
-	m.box_chamfered(Vector3(0.44, 0.12, 0.18), 0.04, Vector3(0, 1.14, -0.17), Parts.HULL_DARK)
+	var band := ORANGE_FINE if tier <= Parts.Tier.GOLD else UnitModels.trim(tier)
+	m.box_chamfered(Vector3(0.44, 0.13, 0.05), 0.02, Vector3(0, 0.84, 0.27), band)
+	m.box_chamfered(Vector3(0.44, 0.12, 0.18), 0.04, Vector3(0, 1.14, -0.17), UnitModels.hull(tier))
+	UnitModels.deck(m, Vector3(0.36, 0.012, 0.1), Vector3(0, 1.26, -0.17), tier)
 	for side: float in [1.0, -1.0]:
 		_walker_leg(m, UnitModels.pivot(Vector3(side * 0.31, 0.86, -0.02)), side, tier)
 		_gun_arm(m, UnitModels.pivot(Vector3(side * 0.25, 1.04, 0.04)), side, tier)
@@ -122,37 +126,41 @@ static func build_siege_walker(p: Parts) -> void:
 
 
 ## A walker leg from the hip pivot `xf` on side `side`: an orange-capped gunmetal hip joint, a
-## thigh down and forward to the knee's joint and the knee cap of the tier's trim, a shin down and
-## back to the ankle with a piston behind it, and a broad dark foot flat on the ground.
+## thigh of the tier's panels down and forward to the knee's joint with an orange plate on its
+## front, the knee cap of the tier's trim, a shin down and back to the ankle, and a broad foot with
+## a toe cap of the tier's trim flat on the ground.
 static func _walker_leg(m: LowPolyMesh, xf: Transform3D, side: float, tier: int) -> void:
 	var knee := Vector3(side * 0.02, -0.36, 0.2)
 	var ankle := Vector3(side * 0.03, -0.72, -0.04)
 	m.orb(0.1, 12, 4, xf.origin, Parts.GUNMETAL)
-	Parts.drum(m, 0.1, 0.05, 0.02, 16, xf * Vector3(side * 0.05, 0, 0), ORANGE_ROUND,
+	Parts.drum(m, 0.1, 0.05, 0.02, 12, xf * Vector3(side * 0.05, 0, 0), ORANGE_ROUND,
 		UnitModels.euler(xf, Vector3(0, 0, -side * 90.0)))
 	Parts.beam(m, xf.origin, xf * knee, 0.15, UnitModels.panel(tier), 0.04)
+	_leg_plate(m, xf * Vector3(0, -0.06, 0.02), xf * (knee + Vector3(0, 0.06, 0)), 0.17, 0.1, ORANGE_FINE)
 	m.orb(0.085, 12, 4, xf * knee, Parts.GUNMETAL)
 	m.dome(0.07, 0.05, 12, 2, xf * (knee + Vector3(0, 0, 0.05)), UnitModels.trim(tier, true), UnitModels.euler(xf, Vector3(90, 0, 0)))
 	Parts.beam(m, xf * knee, xf * ankle, 0.12, UnitModels.hull(tier), 0.035)
-	Parts.pipe(m, xf * (knee + Vector3(0, -0.04, -0.08)), xf * (ankle + Vector3(0, 0.06, -0.07)), 0.018, Parts.ROD, 8)
 	m.orb(0.06, 10, 3, xf * ankle, Parts.GUNMETAL)
-	m.box_chamfered(Vector3(0.22, 0.08, 0.36), 0.035, xf * Vector3(side * 0.03, -xf.origin.y, 0.02), Parts.HULL_DARK,
-		UnitModels.euler(xf))
+	var foot := Vector3(side * 0.03, -xf.origin.y, 0.02)
+	m.box_chamfered(Vector3(0.22, 0.08, 0.36), 0.035, xf * foot, Parts.HULL_MID, UnitModels.euler(xf))
+	m.box_chamfered(Vector3(0.2, 0.06, 0.1), 0.025, xf * (foot + Vector3(0, 0.05, 0.14)), UnitModels.trim(tier),
+		UnitModels.euler(xf, Vector3(-14, 0, 0)))
 
 
 ## A gun arm from the shoulder pivot `xf` on side `side`: a gunmetal shoulder drum out of the hull,
-## a tier-hull pod with an orange top plate, twin gunmetal barrels forward and their muzzles glowing in
-## the tier's glow.
+## a big tier-hull pod with an orange top plate, twin fat gunmetal barrels forward out of a shared
+## shroud, and their muzzles glowing in the tier's glow.
 static func _gun_arm(m: LowPolyMesh, xf: Transform3D, side: float, tier: int) -> void:
-	Parts.drum(m, 0.075, 0.08, 0.02, 16, xf.origin, Parts.GUNMETAL, UnitModels.euler(xf, Vector3(0, 0, -side * 90.0)))
-	var pod := Vector3(side * 0.15, -0.07, 0.06)
-	m.box_chamfered(Vector3(0.13, 0.14, 0.34), 0.04, xf * pod, UnitModels.hull(tier), UnitModels.euler(xf))
-	m.box_chamfered(Vector3(0.1, 0.03, 0.26), 0.012, xf * (pod + Vector3(0, 0.14, -0.01)), ORANGE, UnitModels.euler(xf))
+	Parts.drum(m, 0.075, 0.08, 0.02, 12, xf.origin, Parts.GUNMETAL, UnitModels.euler(xf, Vector3(0, 0, -side * 90.0)))
+	var pod := Vector3(side * 0.145, -0.09, 0.02)
+	m.box_chamfered(Vector3(0.17, 0.18, 0.42), 0.045, xf * pod, UnitModels.hull(tier), UnitModels.euler(xf))
+	m.box_chamfered(Vector3(0.13, 0.03, 0.32), 0.012, xf * (pod + Vector3(0, 0.18, -0.01)), ORANGE_FINE, UnitModels.euler(xf))
+	m.box_chamfered(Vector3(0.19, 0.11, 0.12), 0.03, xf * (pod + Vector3(0, 0.035, 0.24)), Parts.GUNMETAL,
+		UnitModels.euler(xf))
 	for k: float in [-1.0, 1.0]:
-		var from := xf * (pod + Vector3(k * 0.034, 0.07, 0.16))
-		var to := xf * (pod + Vector3(k * 0.034, 0.07, 0.4))
-		Parts.pipe(m, from, to, 0.03, Parts.GUNMETAL, 12)
-		m.disc(0.02, 8, to + xf.basis * Vector3(0, 0, 0.002), UnitModels.glow(tier, Surf.PULSE, false),
+		var to := xf * (pod + Vector3(k * 0.045, 0.09, 0.46))
+		Parts.pipe(m, xf * (pod + Vector3(k * 0.045, 0.09, 0.3)), to, 0.042, Parts.GUNMETAL, 12)
+		m.disc(0.03, 8, to + xf.basis * Vector3(0, 0, 0.002), UnitModels.glow(tier, Surf.PULSE, false),
 			UnitModels.euler(xf, Vector3(90, 0, 0)))
 
 
@@ -263,11 +271,11 @@ static func _titan_leg(m: LowPolyMesh, xf: Transform3D, side: float, tier: int) 
 	var ankle := Vector3(side * 0.05, -1.02, -0.02)
 	m.orb(0.16, 16, 4, xf.origin, Parts.GUNMETAL)
 	Parts.beam(m, xf.origin, xf * knee, 0.26, UnitModels.panel(tier), 0.06)
-	_leg_plate(m, xf * Vector3(0, -0.06, 0), xf * knee, 0.3, 0.13)
+	_leg_plate(m, xf * Vector3(0, -0.06, 0), xf * knee, 0.3, 0.13, ORANGE)
 	m.orb(0.15, 16, 4, xf * knee, Parts.GUNMETAL)
 	m.dome(0.12, 0.08, 16, 2, xf * (knee + Vector3(0, 0, 0.1)), UnitModels.trim(tier, true), UnitModels.euler(xf, Vector3(90, 0, 0)))
 	Parts.beam(m, xf * knee, xf * ankle, 0.24, UnitModels.hull(tier), 0.06)
-	_leg_plate(m, xf * (knee + Vector3(0, -0.12, 0)), xf * (ankle + Vector3(0, 0.08, 0)), 0.27, 0.12)
+	_leg_plate(m, xf * (knee + Vector3(0, -0.12, 0)), xf * (ankle + Vector3(0, 0.08, 0)), 0.27, 0.12, ORANGE)
 	m.orb(0.1, 12, 4, xf * ankle, Parts.GUNMETAL)
 	var foot := Vector3(side * 0.05, -xf.origin.y, 0.06)
 	m.box_chamfered(Vector3(0.38, 0.13, 0.6), 0.06, xf * foot, Parts.HULL_DARK, UnitModels.euler(xf))
@@ -275,14 +283,14 @@ static func _titan_leg(m: LowPolyMesh, xf: Transform3D, side: float, tier: int) 
 		UnitModels.euler(xf, Vector3(-14, 0, 0)))
 
 
-## An orange armour plate along a leg segment from `from` to `to`, `width` across and standing
-## `out` in front of the segment's axis.
-static func _leg_plate(m: LowPolyMesh, from: Vector3, to: Vector3, width: float, out: float) -> void:
+## An armour plate of `surface` (an orange) along a leg segment from `from` to `to`, `width` across
+## and standing `out` in front of the segment's axis.
+static func _leg_plate(m: LowPolyMesh, from: Vector3, to: Vector3, width: float, out: float, surface: Surf) -> void:
 	var along := to - from
 	var front := Vector3.RIGHT.cross(along).normalized()
 	if front.z < 0.0:
 		front = -front
-	m.box_chamfered(Vector3(width, along.length(), 0.06), 0.025, from + front * (out - 0.03), ORANGE, Parts.facing(along))
+	m.box_chamfered(Vector3(width, along.length(), 0.06), 0.025, from + front * (out - 0.03), surface, Parts.facing(along))
 
 
 ## A cannon arm from the shoulder pivot `xf` on side `side`: a gunmetal shoulder drum, a big tier-hull
