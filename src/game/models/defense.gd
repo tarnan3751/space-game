@@ -1067,6 +1067,8 @@ static func build_arc_tower(p: Parts, level: int) -> void:
 	var sphere := 0.28 + 0.03 * level
 	var centre := crown + Vector3(0, sphere * 0.85, 0)
 	m.orb(sphere, 16, 8, centre, BRIGHT_CORE if level >= 8 else ARC_PULSE)
+	# Where its lightning leaves: the sphere's centre, on the body (the tower never aims).
+	m.socket("muzzle", centre, Vector3.UP)
 	# Arcs climb the coil from skirt to skirt on the side facing the viewer, then leap from the
 	# corona to the sphere. From L5 they zigzag over the front, so the taller coil's arcs show.
 	var skirts := _skirts(height)
@@ -1274,6 +1276,8 @@ static func build_gravity_well(p: Parts, level: int) -> void:
 		core_radius = WELL_CORES[level - 4]
 		core_surf = BRIGHT_CORE if crown else (CRYSTAL_CORE if obsidian else CORE)
 	m.orb(core_radius, 12 if level < 4 else 16, 6, core, core_surf)
+	# Where its pull leaves: the core's centre, on the body (the well never aims).
+	m.socket("muzzle", core, Vector3.UP)
 	if level >= 4:
 		# The housing ring joining the pillars low over the well, under the core, so the core shows
 		# over it; a red armour band round it.
@@ -1356,6 +1360,8 @@ static func build_emp_tower(p: Parts, level: int) -> void:
 	Parts.drum(m, 0.46, 0.08, 0.02, 16, cage, Parts.GUNMETAL)
 	# The core is 0.34 from L1, as big as the cage's bars (at 0.4) let it be and still show round it.
 	m.orb(EMP_CORE_RADIUS, 16, 6, cage + Vector3(0, 0.34, 0), BRIGHT_FLOAT if crown else EMP_CORE)
+	# Where its pulse leaves: the core's centre, on the body (the tower never aims).
+	m.socket("muzzle", cage + Vector3(0, 0.34, 0), Vector3.UP)
 	for k: int in 8:
 		m.box(Vector3(0.05, 0.56, 0.05), Parts.around(0.4, 22.5 + 45.0 * k, cage.y + 0.08), Parts.ROD,
 			Vector3(0, -22.5 - 45.0 * k, 0))
