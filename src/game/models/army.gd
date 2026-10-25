@@ -1504,18 +1504,19 @@ static func _vat(m: LowPolyMesh, foot: Vector3, radius: float, height: float, ti
 
 
 ## A drydock: an orange gantry crane over a cradle holding a half-built ship, its nose plated,
-## its stern still bare ribs, welders glowing where the gantries reach down. A bigger, more
-## plated hull and a third gantry at 2. The bare stern is completed in a hologram of the hull
+## its stern still bare ribs, welders glowing where the gantries reach down: the gantries on
+## chamfered legs 0.22 across, an orange crane cab on the first, the cradle's blocks orange at
+## every tier. A bigger, more plated hull and a third gantry at 2. The bare stern is completed in a hologram of the hull
 ## to come, the first gantry rides its rails along the dock, the welds flash and throw sparks,
 ## and the reactor pulses (the engines too, at 2).
 ##
 ## From 3 the gantries stand taller at each level, the chocks lift the ship higher and the plating
 ## runs further aft, the hull growing from 5: L3 the gantries slim chrome cantilevers on posts at
 ## the back, braced, with cyan strips up the posts, so the camera sees the ship under their beams;
-## a chrome hull, cradle and booth, an engine bank on the stern, its bells ringed in cyan, and the
+## a chrome hull, rails and booth, an engine bank on the stern, its bells ringed in cyan, and the
 ## welders' sparks cyan, the reactor glowing through a port on the near flank; L4 a fourth gantry;
 ## L5 obsidian plates veined violet along the hull's spine and a broad violet band glowing on the
-## chrome flank the camera sees, an obsidian cradle, crystal arcs crackling from the welders onto
+## chrome flank the camera sees, obsidian rails, crystal arcs crackling from the welders onto
 ## the hull; L6 a welder bot working low along the near flank, sliding to and fro; L7 the ship
 ## complete, gold filigree gantries, the antimatter reactor's light violet in its port, along the
 ## near flank, in a band round the stern and under a gold-ringed blister, gold fins, and a second
@@ -1535,11 +1536,11 @@ static func build_drydock(p: Parts, level: int) -> void:
 	var lifts: Array[float] = [0.0, 0.0, 0.1, 0.15, 0.2, 0.25, 0.3]
 	var lift := lifts[clampi(level, 1, 7) - 1]
 	for x: float in [-1.15, -0.35, 0.45, 1.2]:
-		m.box_chamfered(Vector3(0.24, 0.36 + lift, 0.86), 0.04, Vector3(x, g, 0), _plating(p.tier, Parts.HAZARD))
+		m.box_chamfered(Vector3(0.24, 0.36 + lift, 0.86), 0.04, Vector3(x, g, 0), ORANGE)
 		if chrome:
 			m.box(Vector3(0.26, 0.06, 0.88), Vector3(x, g + 0.22 + lift, 0), _strip(p.tier))
 	# The hull lies along X, nose to +X. [distance from the stern, radius] down its profile.
-	var scales: Array[float] = [1.0, 1.08, 1.08, 1.08, 1.15, 1.15, 1.2]
+	var scales: Array[float] = [1.2, 1.3, 1.3, 1.3, 1.38, 1.38, 1.44]
 	var scale := scales[clampi(level, 1, 7) - 1]
 	var stern := -1.65
 	var axis_y := g + 0.36 + lift + 0.55 * scale
@@ -1572,16 +1573,12 @@ static func build_drydock(p: Parts, level: int) -> void:
 		if level >= 3:
 			plan.append(Vector2(_hull_radius(profile, plated_from) * scale + 0.01, plated_from))
 		m.lathe(plan, 24, Vector3(stern, axis_y, 0), HOLO_HULL, lie)
-		# Bare ribs aft of the plating, with a keel, a spine and stringers through them.
+		# Bare ribs aft of the plating.
 		var x := stern + 0.12
 		while x < stern + plated_from - 0.05:
 			var radius := _hull_radius(profile, x - stern) * scale
 			m.ring(radius - 0.07, radius, 0.08, 24, Vector3(x, axis_y, 0), ARMOUR_ROUND, lie)
 			x += 0.34
-		var aft := Vector3(stern + 0.05, axis_y, 0)
-		var fore := Vector3(stern + plated_from + 0.05, axis_y, 0)
-		for offset: Vector3 in [Vector3(0, -0.5, 0), Vector3(0, 0.5, 0), Vector3(0, 0, 0.5), Vector3(0, 0, -0.5)]:
-			Parts.beam(m, aft + offset * scale, fore + offset * scale, 0.06, Parts.GUNMETAL, 0.015)
 	# The reactor glowing inside the bare ribs; engine bells on the stern at 2, an engine bank
 	# from 3.
 	if level < 3:
@@ -1630,20 +1627,25 @@ static func build_drydock(p: Parts, level: int) -> void:
 			# From 3 a slim cantilever on a post at the back, braced, its beam reaching out over the
 			# hull, so the camera sees the ship under it; cyan strips up the post's faces to the
 			# camera, below Crown.
-			crane.box_chamfered(Vector3(0.24, 0.12, 0.24), 0.03, at + Vector3(0, g, -1.6), ORANGE)
-			crane.box_chamfered(Vector3(0.12, top - g - 0.12, 0.12), 0.03, at + Vector3(0, g + 0.12, -1.6), post)
+			crane.box_chamfered(Vector3(0.32, 0.12, 0.32), 0.03, at + Vector3(0, g, -1.6), ORANGE)
+			crane.box_chamfered(Vector3(0.22, top - g - 0.12, 0.22), 0.05, at + Vector3(0, g + 0.12, -1.6), post)
 			if not crown:
-				crane.box(Vector3(0.02, top - g - 0.3, 0.07), at + Vector3(0.061, g + 0.2, -1.6), Parts.CYAN_STRIP)
-				crane.box(Vector3(0.07, top - g - 0.3, 0.02), at + Vector3(0, g + 0.2, -1.539), Parts.CYAN_STRIP)
-			Parts.beam(crane, at + Vector3(0, top, -1.68), at + Vector3(0, top, 0.55), 0.13, span, 0.03)
-			Parts.beam(crane, at + Vector3(0, top - 0.75, -1.58), at + Vector3(0, top - 0.02, -0.75), 0.06, post, 0.015)
+				crane.box(Vector3(0.02, top - g - 0.3, 0.1), at + Vector3(0.111, g + 0.2, -1.6), Parts.CYAN_STRIP)
+				crane.box(Vector3(0.1, top - g - 0.3, 0.02), at + Vector3(0, g + 0.2, -1.489), Parts.CYAN_STRIP)
+			Parts.beam(crane, at + Vector3(0, top, -1.68), at + Vector3(0, top, 0.55), 0.16, span, 0.04)
+			Parts.beam(crane, at + Vector3(0, top - 0.75, -1.5), at + Vector3(0, top - 0.02, -0.75), 0.14, post, 0.03)
 		else:
 			for z: float in [-1.6, 1.6]:
-				crane.box_chamfered(Vector3(0.24, 0.12, 0.24), 0.03, at + Vector3(0, g, z), DARK_PLATE)
-				crane.box_chamfered(Vector3(0.14, top - g - 0.12, 0.14), 0.03, at + Vector3(0, g + 0.12, z), post)
+				crane.box_chamfered(Vector3(0.32, 0.12, 0.32), 0.03, at + Vector3(0, g, z), DARK_PLATE)
+				crane.box_chamfered(Vector3(0.22, top - g - 0.12, 0.22), 0.05, at + Vector3(0, g + 0.12, z), post)
 			Parts.beam(crane, at + Vector3(0, top, -1.7), at + Vector3(0, top, 1.7), 0.18, span, 0.04)
 		var trolley := at + Vector3(0, top - 0.16, 0.25)
-		crane.box_chamfered(Vector3(0.22, 0.14, 0.26), 0.03, trolley, ORANGE if chrome else Parts.GUNMETAL)
+		if k == 0:
+			# The first gantry's crane cab, orange, its window to the camera.
+			crane.box_chamfered(Vector3(0.36, 0.28, 0.34), 0.05, trolley + Vector3(0, -0.12, 0), ORANGE)
+			crane.box(Vector3(0.26, 0.1, 0.02), trolley + Vector3(0, -0.02, 0.171), CAB_GLASS)
+		else:
+			crane.box_chamfered(Vector3(0.22, 0.14, 0.26), 0.03, trolley, ORANGE if chrome else Parts.GUNMETAL)
 		var surface := axis_y + _hull_radius(profile, gx - stern) * scale
 		var tip := at + Vector3(0, surface + 0.16, 0.25)
 		Parts.pipe(crane, trolley, tip, 0.03, Parts.ROD)
@@ -1662,7 +1664,7 @@ static func build_drydock(p: Parts, level: int) -> void:
 	var booth := Vector3(-1.45, g, 1.4)
 	m.box_chamfered(Vector3(0.5, 0.45, 0.4), 0.05, booth, _plating(p.tier, Parts.HULL_LIGHT))
 	m.box_chamfered(Vector3(0.4, 0.16, 0.03), 0.01, booth + Vector3(0, 0.24, 0.2), Parts.GLASS)
-	Parts.mast(m, booth + Vector3(0.12, 0.45, -0.08), 0.35, 0.05, GLOW)
+	_mast(m, booth + Vector3(0.12, 0.45, -0.08), 0.35, GLOW)
 	if level >= 6:
 		# Welder bots working along the hull's flank to the camera (+Z), clear of the gantries'
 		# beams and welders, sliding along it over its fat middle: from 6 one low, its torch up at
@@ -1675,7 +1677,7 @@ static func build_drydock(p: Parts, level: int) -> void:
 		if level >= 7:
 			welders.append(Vector3(1.95, 35.0, 0.5))
 		for spec: Vector3 in welders:
-			var at := Vector3(middle, spec.x, 0.98)
+			var at := Vector3(middle, spec.x, hull + 0.34)
 			var angle := deg_to_rad(spec.y)
 			var hit := Vector3(middle, axis_y + hull * sin(angle), hull * cos(angle))
 			_welder(p, at, hit - at, spec.z)
