@@ -182,6 +182,9 @@ const MORTAR_BOWL := 1.1
 const MORTAR_LOADER_CLEAR := 0.4
 ## The L7 charge ring: how far past the muzzle's lip it hovers, and its radii.
 const MORTAR_CHARGE_OFF := 0.38
+## How far (degrees) the mortar's gun scans either way: from L7 its charge ring reaches the extent's
+## edge past ±10.
+const MORTAR_SCAN := 10.0
 const MORTAR_CHARGE_INNER := 0.52
 const MORTAR_CHARGE_OUTER := 0.68
 ## The L8 ammunition rack on the near corner: an octagonal pedestal level with the plinth's top,
@@ -655,6 +658,11 @@ static func build_plasma_mortar(p: Parts, level: int) -> void:
 	var breech := Vector3(0, seat + chamber, 0)
 	var tilt := Vector3(34, SCREEN_RIGHT, 0)
 	var heading := Vector3(0, SCREEN_RIGHT, 0)
+	# The gun: the cheeks and the barrel rising out of the chamber, one moving part turning about
+	# the mortar's axis, the pivot at the origin so it is built in the model's space; it scans slowly
+	# and aims in battle (BuildingView), its muzzle socket at the bore's mouth. The round chamber
+	# turns in place, so it stays on the body with its cage, bubbles and tongues facing the camera.
+	var gun := p.moving(Vector3.ZERO, Motion.swing(Vector3.UP, MORTAR_SCAN, 9.0))
 	m.orb(chamber, 16, 6, breech, PLASMA_PULSE)
 	var band := GOLD if p.tier >= Parts.Tier.GOLD else Parts.GUNMETAL
 	Parts.torus(m, chamber + 0.01, 0.045, 20, 10, breech - Vector3(0, 0.045, 0), band)
@@ -686,26 +694,27 @@ static func build_plasma_mortar(p: Parts, level: int) -> void:
 		rotor.box(Vector3(0.06, 0.1, 0.02), Vector3(0, 0, -0.01), SHELL_MID, Vector3(0, 0, 120.0 * k))
 	for side: float in [-1.0, 1.0]:
 		var cheek := LowPolyMesh.turn(Vector3(side * (chamber + 0.12), 0, 0.05), heading)
-		m.box_chamfered(Vector3(0.14, 0.24, 0.5), 0.04, Vector3(cheek.x, seat - 0.1, cheek.z), SHELL, heading)
+		gun.box_chamfered(Vector3(0.14, 0.24, 0.5), 0.04, Vector3(cheek.x, seat - 0.1, cheek.z), SHELL, heading)
 	var muzzle := 0.95
 	var mouth := _at(breech, Vector3(0, chamber * 0.85, 0), tilt)
 	var shell := _by_tier(p.tier, SHELL, Parts.CHROME_ROUND, Parts.OBSIDIAN_ROUND)
-	m.lathe(PackedVector2Array([Vector2(0.3, -0.12), Vector2(0.44, 0.0), Vector2(0.44, muzzle - 0.24)]),
+	gun.lathe(PackedVector2Array([Vector2(0.3, -0.12), Vector2(0.44, 0.0), Vector2(0.44, muzzle - 0.24)]),
 		20, mouth, shell, tilt)
-	m.lathe(PackedVector2Array([
+	gun.lathe(PackedVector2Array([
 		Vector2(0.44, muzzle - 0.24), Vector2(0.52, muzzle - 0.18), Vector2(0.52, muzzle), Vector2(0.42, muzzle + 0.04),
 		Vector2(0.32, muzzle - 0.04),
 	]), 20, mouth, GOLD if p.tier >= Parts.Tier.GOLD else SHELL, tilt)
 	# The bore's lining glows, its bands running up and out of the muzzle.
-	m.lathe(PackedVector2Array([Vector2(0.32, muzzle - 0.04), Vector2(0.32, muzzle - 0.3)]), 20, mouth, BORE, tilt)
-	m.disc(0.32, 20, _at(mouth, Vector3(0, muzzle - 0.3, 0), tilt), PLASMA_PULSE.phased(0.5), tilt)
-	m.tube(0.44, 0.47, 0.12, 20, _at(mouth, Vector3(0, 0.22, 0), tilt), ARMOUR_ROUND, tilt)
+	gun.lathe(PackedVector2Array([Vector2(0.32, muzzle - 0.04), Vector2(0.32, muzzle - 0.3)]), 20, mouth, BORE, tilt)
+	gun.disc(0.32, 20, _at(mouth, Vector3(0, muzzle - 0.3, 0), tilt), PLASMA_PULSE.phased(0.5), tilt)
+	gun.tube(0.44, 0.47, 0.12, 20, _at(mouth, Vector3(0, 0.22, 0), tilt), ARMOUR_ROUND, tilt)
+	gun.socket("muzzle", _at(mouth, Vector3(0, muzzle, 0), tilt), LowPolyMesh.turn(Vector3.UP, tilt))
 	if level < 5:
 		return
 	# Plasma coils round the breech: cyan, violet from the Obsidian tier.
 	var coil := Parts.CORE_GLOW if p.tier >= Parts.Tier.OBSIDIAN else Parts.CYAN_STRIP
 	for along: float in ([0.4, 0.5] if level < 6 else [0.38, 0.47, 0.56]):
-		Parts.torus(m, 0.455, 0.032, 12, 6, _at(mouth, Vector3(0, along, 0), tilt), coil, tilt)
+		Parts.torus(gun, 0.455, 0.032, 12, 6, _at(mouth, Vector3(0, along, 0), tilt), coil, tilt)
 	if level >= 6:
 		if level < 8:
 			_loader_arm(p, Parts.around(MORTAR_LOADER, 45.0, Parts.PAD_HEIGHT), Parts.around(0.95, 108.0, 0.0), p.tier,
@@ -713,22 +722,23 @@ static func build_plasma_mortar(p: Parts, level: int) -> void:
 	if level >= 7:
 		_plinth_panels(m, radius, plinth)
 		# Veins round the barrel's breech and across the bowl's flank the camera sees.
-		m.lathe(PackedVector2Array([Vector2(0.446, 0.02), Vector2(0.446, 0.2)]), 20, mouth, VEIN_PANEL, tilt)
+		gun.lathe(PackedVector2Array([Vector2(0.446, 0.02), Vector2(0.446, 0.2)]), 20, mouth, VEIN_PANEL, tilt)
 		m.lathe(PackedVector2Array([Vector2(1.068 * bowl, 0.07), Vector2(1.068 * bowl, 0.17)]), 20, Vector3(0, base, 0), VEIN_PANEL,
 			Vector3.ZERO, -5.0, 80.0)
 		# The plasma pool on the armour ring round the chamber's foot, the antimatter core at the Crown.
 		m.lathe(PackedVector2Array([Vector2(0.775, 0.205), Vector2(0.58, 0.205)]), 20, Vector3(0, seat - 0.2, 0),
 			Parts.CORE_GLOW if p.tier >= Parts.Tier.CROWN else PLASMA_PULSE)
-		# The charge ring hovering well past the muzzle, glowing violet all over, turning about the barrel.
-		var axis := LowPolyMesh.turn(Vector3.UP, tilt)
-		var charge := p.moving(_at(mouth, Vector3(0, muzzle + MORTAR_CHARGE_OFF, 0), tilt), Motion.spin(axis, 1.6))
-		charge.ring(MORTAR_CHARGE_INNER, MORTAR_CHARGE_OUTER, 0.1, 24, LowPolyMesh.turn(Vector3(0, -0.05, 0), tilt), HOVER_RIM, tilt)
-		charge.lathe(PackedVector2Array([Vector2(MORTAR_CHARGE_OUTER - 0.02, 0.052), Vector2(MORTAR_CHARGE_INNER + 0.02, 0.052)]),
-			24, Vector3.ZERO, HOVER_RIM, tilt)
-		charge.lathe(PackedVector2Array([Vector2(MORTAR_CHARGE_OUTER + 0.006, -0.04), Vector2(MORTAR_CHARGE_OUTER + 0.006, 0.04)]),
-			24, Vector3.ZERO, HOVER_RIM, tilt)
+		# The charge ring hovering well past the muzzle, glowing violet all over, carried by the gun
+		# (its spin given up so the gun's aim stays within the moving parts' budget).
+		var charge := _at(mouth, Vector3(0, muzzle + MORTAR_CHARGE_OFF, 0), tilt)
+		gun.ring(MORTAR_CHARGE_INNER, MORTAR_CHARGE_OUTER, 0.1, 24, charge + LowPolyMesh.turn(Vector3(0, -0.05, 0), tilt), HOVER_RIM,
+			tilt)
+		gun.lathe(PackedVector2Array([Vector2(MORTAR_CHARGE_OUTER - 0.02, 0.052), Vector2(MORTAR_CHARGE_INNER + 0.02, 0.052)]),
+			24, charge, HOVER_RIM, tilt)
+		gun.lathe(PackedVector2Array([Vector2(MORTAR_CHARGE_OUTER + 0.006, -0.04), Vector2(MORTAR_CHARGE_OUTER + 0.006, 0.04)]),
+			24, charge, HOVER_RIM, tilt)
 		for k: int in 4:
-			charge.orb(0.07, 8, 4, LowPolyMesh.turn(Parts.around((MORTAR_CHARGE_INNER + MORTAR_CHARGE_OUTER) * 0.5, 90.0 * k, 0.06),
+			gun.orb(0.07, 8, 4, charge + LowPolyMesh.turn(Parts.around((MORTAR_CHARGE_INNER + MORTAR_CHARGE_OUTER) * 0.5, 90.0 * k, 0.06),
 				tilt), (HOVER_GOLD if p.tier >= Parts.Tier.CROWN else HOVER_SIGHT))
 	if level >= 8:
 		_plinth_filigree(m, radius)
