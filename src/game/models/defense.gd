@@ -1618,7 +1618,8 @@ static func build_orbital_cannon(p: Parts, level: int) -> void:
 	var bunker := top + 0.24
 	Parts.drum(m, 1.0, 0.16, 0.05, 24, Vector3(0, bunker, 0), _by_tier(p.tier, SHELL_MID, Parts.CHROME_ROUND, Parts.OBSIDIAN_ROUND))
 	var deck := bunker + 0.16
-	var yaw := SCREEN_RIGHT + 12.0
+	# The barrel leans to the right of the screen, so its whole length shows at every zoom.
+	var yaw := SCREEN_RIGHT
 	var heading := Vector3(0, yaw, 0)
 	var aim := Vector3(47.0 if level < 3 else float(ORBITAL_PITCHES[level - 3]), yaw, 0)
 	var trunnion := Vector3(0, deck + 0.36, 0)
