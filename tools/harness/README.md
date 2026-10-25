@@ -317,7 +317,12 @@ failed: a built-in mount, a pivot sunk in the body, is allowed contact, and tell
 from a clash is the review's call. A second pass applies BOB wherever either side has it, each
 flagged vertex lifted along Y as `effects.gdshaderinc` lifts it (0.08 times the sine of the
 2.4-second period plus its phase), on the clock with the parts' poses, at least eight samples a
-BOB period: a pair crossing there fails too, and the body's are counted. The last line says the
+BOB period: a pair crossing there fails too, and the body's are counted. A moving part that rides
+another (`BuildingModels.RIDES_META`, `Parts.riding`) is posed on the clock carried by it, as
+`BuildingView` carries it, and is not paired with it: its poses touching it are counted ("on its
+carrier"), as a mount's with the body. An aiming part (one with a `muzzle` socket) is also turned
+through a whole turn about +Y, every 10 degrees, against the body, its touching poses counted as
+its "aim sweep", never failed: battle turns it anywhere. The last line says the
 models, moving parts and pairs and how many pairs crossed: every model of the roster passes, with
 no pair crossing. The whole roster takes about half a minute.
 
@@ -651,6 +656,19 @@ strip. Each battle is surrendered and left before the next.
   collapse, the rubble popping up, debris and smoke) and `wall-break` (12, 50 ms: a level 4
   Breacher on a Barrier Wall). It first checks that every armed type (one that targets, holds,
   throws or shields) and every unit has a weapon record of its own (`Weapons.has`).
+- `scenarios/anim_aim.gd`: every defence that aims, at level 1 (and the plasma mortar, flak
+  cannon, ion beam and orbital cannon at their top level), with a Metal Silo off to its upper
+  right and a level 7 Dune Runner (a Gunship for the flak cannon) deployed off to its upper left,
+  crossing its arc on the way to the silo (the next one deployed whenever the last falls):
+  `<type>-<level>-aim` (16, 200 ms, camera size 9, cropped) from the deploy, the head turning
+  towards the unit, checked to turn at least 25 degrees and face it within `AIM_READY`, and not
+  to kick before its first shot; `<type>-<level>-fire` (12, 50 ms, size 7, cropped) from 100 ms
+  before its next shot, checked to kick back at least 0.3 of its travel and no more often than
+  it fires. Then `emp-freeze` (16, 250 ms): a level 6 missile battery aiming when an EMP Burst
+  lands on it, checked that no moving part moves while it is disabled and that they move again
+  once it wakes; and `reveal` (8, 60 ms): a cloaked sentry as the unit comes within its range,
+  checked to show every step of its fade in and end as itself. Headless, each strip still takes
+  its time, so the checks read the battle it would have shown.
 - `scenarios/anim_base.gd`: the construction drone over a Metal Silo placed on the fresh base,
   `drone-arrive` and `drone-laser` (8, 150 ms, camera size 6), then at its next shots
   `drone-beam` (framed on the beam at camera size 10, cropped) and `drone-sparks` (on the work
