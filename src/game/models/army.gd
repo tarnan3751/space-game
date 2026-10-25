@@ -132,8 +132,11 @@ static var CRYSTAL_POUR := Surf.make(MaterialKit.Layer.GLOW, MaterialKit.CRYSTAL
 static var HOT_CRYSTAL_POUR := Surf.make(MaterialKit.Layer.GLOW, MaterialKit.CRYSTAL.lerp(Color.WHITE, 0.5), 1.0,
 	Surf.UNLIT | Surf.FLOW, false, true, 0.8)
 static var VIOLET_SPARK := Surf.make(MaterialKit.Layer.GLOW, Parts.CORE_GLOW_TINT, 1.0, Surf.UNLIT | Surf.FLICKER)
-## The research lab's: screens glowing cyan, their rows scrolling (phased() sets the speed).
+## The research lab's: screens glowing cyan, their rows scrolling (phased() sets the speed); the
+## glowing cores in its hologram, cyan, then violet, pulsing and bobbing with it.
 static var CYAN_SCREEN := Surf.make(MaterialKit.Layer.SCREEN, MaterialKit.ENERGY, 1.0, Surf.UNLIT | Surf.FLOW)
+static var HOLO_CORE := Surf.make(MaterialKit.Layer.GLOW, MaterialKit.ENERGY, 1.0, Surf.UNLIT | Surf.PULSE | Surf.BOB, true)
+static var CORE_BOB := Surf.make(MaterialKit.Layer.GLOW, Parts.CORE_GLOW_TINT, 1.0, Surf.UNLIT | Surf.PULSE | Surf.BOB, true)
 ## The nanite foundry's: cyan pipes, their bands flowing; the goo brighter, lapping and swirling;
 ## the hovering stirrer ring's crystal vanes, bobbing with it (HOVER's phase).
 static var CYAN_PIPE := Surf.make(MaterialKit.Layer.PIPE, MaterialKit.ENERGY, 2.0, Surf.UNLIT | Surf.FLOW, true, true, 0.3)
@@ -1138,12 +1141,9 @@ static func build_research_lab(p: Parts, level: int) -> void:
 	if level >= 5:
 		m.orb(0.07, 16, 6, centre + Vector3(0, 0.66, 0), GOLD_ROUND if p.tier >= Parts.Tier.GOLD else MID_ROUND)
 	if level >= 3:
-		# The hologram over the dome: an orb in two tilted rings, floating.
-		var subject := centre + Vector3(0, 1.0, 0)
-		m.orb(0.13, 12, 4, subject, HOLOGRAM)
-		for tilt: Vector3 in [Vector3(35, 0, 0), Vector3(0, 0, -35)]:
-			m.lathe(PackedVector2Array([Vector2(0.26, 0), Vector2(0.26, 0.025), Vector2(0.22, 0.025)]), 16,
-				subject, HOLOGRAM, tilt)
+		# The hologram over the dome: an orb round a glowing core in two tilted rings, floating.
+		var subject := centre + Vector3(0, 1.1, 0)
+		_hologram(m, subject, HOLOGRAM, HOLOGRAM, HOLO_CORE)
 	_lab_corners(p, level)
 
 
@@ -1171,9 +1171,9 @@ static func _lab_corners(p: Parts, level: int) -> void:
 		if level >= 4:
 			_antenna(m, Vector3(-1.0, g, 0.98), 1.0)
 	var mast := Vector3(0.85, g, -0.85)
-	m.prism(0.12, 0.11, 0.14, 16, mast, _plating(p.tier, ARMOUR_ROUND, true))
+	m.prism(0.14, 0.13, 0.14, 16, mast, _plating(p.tier, ARMOUR_ROUND, true))
 	var height := 1.25 + 0.08 * level
-	m.prism(0.08, 0.06, height, 16, mast + Vector3(0, 0.14, 0), Parts.GUNMETAL)
+	m.box_chamfered(Vector3(0.16, height, 0.16), 0.04, mast + Vector3(0, 0.14, 0), Parts.GUNMETAL)
 	var radar := p.moving(mast + Vector3(0, 0.14 + height, 0), Motion.spin(Vector3.UP, Parts.DISH_RATE))
 	radar.box_chamfered(Vector3(0.12, 0.16, 0.12), 0.03, Vector3.ZERO, Parts.GUNMETAL)
 	var tilt := Vector3(60, 90, 0)
@@ -1246,20 +1246,27 @@ static func _lab_tower(p: Parts, foot: Vector3, level: int) -> void:
 	else:
 		m.orb(0.08, 16, 6, centre + Vector3(0, R + 0.04, 0), GOLD_ROUND)
 	var holo := HOLO_VIOLET if obsidian else HOLOGRAM
-	m.orb(0.17, 12, 4, subject, holo)
-	for tilt: Vector3 in [Vector3(35, 0, 0), Vector3(0, 0, -35)]:
-		m.lathe(PackedVector2Array([Vector2(0.32, 0), Vector2(0.32, 0.03), Vector2(0.27, 0.03)]), 16,
-			subject, GOLD_BOB if crown else holo, tilt)
+	_hologram(m, subject, holo, GOLD_BOB if crown else holo, CORE_BOB if obsidian else HOLO_CORE)
 	if level >= 9:
 		# The ring of rings hovering round the hologram, turning: a ring with six upright rings
 		# standing round it, obsidian rimmed in violet, gold at Crown.
 		var gyro := p.moving(subject - Vector3(0, 0.05, 0), Motion.spin(Vector3.UP, -0.6))
-		gyro.ring(0.44, 0.52, 0.05, 24, Vector3.ZERO, GOLD_BOB.phased(0.6) if crown else HOVER)
+		gyro.ring(0.6, 0.68, 0.05, 24, Vector3.ZERO, GOLD_BOB.phased(0.6) if crown else HOVER)
 		for k: int in 6:
 			var degrees := 60.0 * k
-			Parts.torus(gyro, 0.075, 0.022, 8, 6, Parts.around(0.48, degrees, -0.045), HOVER_RIM,
+			Parts.torus(gyro, 0.075, 0.022, 8, 6, Parts.around(0.64, degrees, -0.045), HOVER_RIM,
 				Vector3(90, 90 - degrees, 0))
 	_lab_corners(p, level)
+
+
+## The lab's hologram floating at `subject`: an orb 0.3 in radius on `shell` round a core glowing
+## on `core`, so it reads brighter than a hologram alone, in two tilted rings on `rings`.
+static func _hologram(m: LowPolyMesh, subject: Vector3, shell: Surf, rings: Surf, core: Surf) -> void:
+	m.orb(0.14, 12, 4, subject, core)
+	m.orb(0.3, 16, 6, subject, shell)
+	for tilt: Vector3 in [Vector3(35, 0, 0), Vector3(0, 0, -35)]:
+		m.lathe(PackedVector2Array([Vector2(0.44, 0), Vector2(0.44, 0.03), Vector2(0.39, 0.03)]), 16,
+			subject, rings, tilt)
 
 
 ## The lab's band of light round a ring's lip: cyan at the Chrome tier, violet veins from the
@@ -1276,12 +1283,12 @@ static func _screen(m: LowPolyMesh, radius: float, degrees: float, y: float, wid
 		surface.phased(speed), Vector3(0, 90 - degrees, 0))
 
 
-## A sensor mast on a little foot (gunmetal unless `foot_surf`): a thin rod with a bulb (orange
-## unless `bulb`).
+## A sensor mast on a little foot (gunmetal unless `foot_surf`): a tapered mast (_mast) with a
+## lamp (orange unless `bulb`).
 static func _antenna(m: LowPolyMesh, foot: Vector3, height: float, foot_surf: Surf = Parts.GUNMETAL,
 		bulb: Surf = GLOW) -> void:
-	m.box_chamfered(Vector3(0.18, 0.1, 0.18), 0.03, foot, foot_surf)
-	Parts.mast(m, foot + Vector3(0, 0.1, 0), height, 0.06, bulb)
+	m.box_chamfered(Vector3(0.24, 0.1, 0.24), 0.03, foot, foot_surf)
+	_mast(m, foot + Vector3(0, 0.1, 0), height, bulb)
 
 
 ## Vats of glowing green nanite goo seen through glass bands, round a pump block, with pipes
