@@ -369,6 +369,18 @@ any of them can be reversed as a data or model change.
   halftone, the hologram cadet, the structural rule, the rival-tint-neutral flames, and the
   animation architecture.
 
+- **The model and animation pass, the animation phase** (the coordinator, 2026-10-25;
+  `docs/plans/model-animation-pass.md` §3): rigid-part animation in the vertex shader rather
+  than skeletons (`src/game/rig.gd`, the channel table mirrored in the shaders, the instance
+  state in INSTANCE_CUSTOM, deaths by class in the instance transform); sockets on models with a
+  defence's aiming part the mover holding its `muzzle` socket, turned toward
+  `BattleSim.building_target` (the only core change, a read) with a per-type rate and a
+  fire-driven kick, movers frozen while EMP-disabled, the sentry fading in on reveal; a weapon
+  table in the view (`src/game/weapons.gd`) with one projectile, muzzle effect, impact and death
+  kind per type, traps drawn when sprung, buildings collapsing into rubble, blasts standing off
+  the face they hit, scorches fading, the shield never vanishing; every building's idle made to
+  read and every dish on one speed. The owner's review list is §4 of the plan record.
+
 ### 3.2 Open
 
 - **Economy validation on the server.** Either port the small economy rules to TypeScript,

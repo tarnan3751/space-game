@@ -26,11 +26,12 @@ version 2 (`docs/plans/upgrade-pass.md` is its record), and the model feedback p
 figures and the eleven unit models, the army trained and researched in the base, the
 deterministic battle sim with abilities, the battle view and attack HUD, expeditions from a
 sector map against generated rival colonies, and the retune to real timers. Everything after
-that (the server, PvP, alliances) is planned. **A model and animation pass is in progress**
-(2026-10-25, the owner's ask; `docs/project_overview.md` §3.1): every model has been reworked to the
-art critiques' standard (the model phase, main d595cbd); the animation phase (a vertex-shader
-part rig with sockets, defence aim, per-weapon projectiles and effects, base idles) is running,
-verified from the harness's frame strips (`tools/harness/README.md`).
+that (the server, PvP, alliances) is planned. **The model and animation pass is built** (2026-10-25,
+the owner's ask; `docs/plans/model-animation-pass.md`): every model reworked to the art critiques'
+standard, then a vertex-shader part rig with sockets (units walk, drive, fly, fire and die by
+class), defences that aim and kick, a weapon table with one projectile and impact per type, traps
+and collapses drawn, and every building idling, all verified from the harness's frame strips
+(`tools/harness/README.md`).
 `docs/project_overview.md` holds the roadmap (§2.2), the known limitations (§2.3) and the
 decisions (§3). The numbers in `data/` are the retune's real timers and economy
 (`docs/plans/retune.md`); a debug build's dev cheats make them free and one second at most.
