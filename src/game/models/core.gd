@@ -30,10 +30,16 @@ static var BEACON := Surf.make(MaterialKit.Layer.GLOW, MaterialKit.CORE_GOLD, 1.
 static var DOOR_LAMP := Surf.make(MaterialKit.Layer.GLOW, MaterialKit.HAZARD, 1.0, Surf.UNLIT | Surf.BLINK)
 ## The hologram of the base's own planet over the dome (L3+): the globe in a light violet round a
 ## solid violet core that bobs with it, so it stands off the cyan dome and reads at mid zoom, its
-## ring and its projector in core glass.
-static var HOLO_GLOBE := Surf.make(MaterialKit.Layer.GLOW, Color("c9a2ff"), 1.0, Surf.HOLO | Surf.BOB, true)
-static var HOLO_CORE := Surf.make(MaterialKit.Layer.GLOW, MaterialKit.ANTIMATTER, 1.0, Surf.UNLIT | Surf.BOB, true)
-static var HOLO_RING := Surf.make(MaterialKit.Layer.GLOW, MaterialKit.CORE_GLASS, 1.0, Surf.HOLO | Surf.BOB, true)
+## ring and its projector in core glass. The globe is on the crystal layer, whose cells read as
+## its continents, turning as they scroll round it (FLOW_U at HOLO_PHASE); every part of the
+## hologram bobs on that phase, so they bob together.
+const HOLO_PHASE := 0.6
+static var HOLO_GLOBE := Surf.make(MaterialKit.Layer.CRYSTAL, Color("c9a2ff"), 1.0, Surf.HOLO | Surf.BOB | Surf.FLOW_U, true,
+	true, HOLO_PHASE)
+static var HOLO_CORE := Surf.make(MaterialKit.Layer.GLOW, MaterialKit.ANTIMATTER, 1.0, Surf.UNLIT | Surf.BOB, true, true,
+	HOLO_PHASE)
+static var HOLO_RING := Surf.make(MaterialKit.Layer.GLOW, MaterialKit.CORE_GLASS, 1.0, Surf.HOLO | Surf.BOB, true, true,
+	HOLO_PHASE)
 static var PROJECTOR := Surf.make(MaterialKit.Layer.GLOW, MaterialKit.CORE_GLASS, 1.0, Surf.UNLIT | Surf.PULSE)
 static var DOOR := Surf.make(MaterialKit.Layer.VENT, MaterialKit.HULL_DARK, 2.0)
 static var ROOF_VENT := Surf.make(MaterialKit.Layer.VENT, MaterialKit.HULL_MID, 2.0)
@@ -50,7 +56,8 @@ static var HOVER_VEINS := Surf.make(MaterialKit.Layer.VEINS, MaterialKit.ANTIMAT
 	0.7)
 static var HOVER_RIM := Surf.make(MaterialKit.Layer.GLOW, Parts.CORE_GLOW_TINT, 1.0, Surf.UNLIT | Surf.PULSE | Surf.BOB, true, true,
 	0.7)
-static var HOLO_STATION := Surf.make(MaterialKit.Layer.GLOW, MaterialKit.CORE_GOLD, 1.0, Surf.HOLO | Surf.BOB, true)
+static var HOLO_STATION := Surf.make(MaterialKit.Layer.GLOW, MaterialKit.CORE_GOLD, 1.0, Surf.HOLO | Surf.BOB, true, true,
+	HOLO_PHASE)
 static var ARC := Parts.spark(Parts.CORE_GLOW_TINT)
 static var CORE_GLASS_BAND := Surf.make(MaterialKit.Layer.GLASS, Parts.CORE_GLOW_TINT, 1.0, Surf.HOLO, true)
 static var BEAM := Surf.make(MaterialKit.Layer.GLOW, Parts.CORE_GLOW_TINT, 1.0, Surf.HOLO, true)
@@ -91,6 +98,8 @@ const DISH_CORNER := 250.0
 const HOLO_LIFT := 0.5
 const HOLO_RADIUS := 0.38
 const HOLO_TILT := Vector3(20, 0, 0)
+## The hologram's ring's turn, radians a second: brisk enough to read in a second of play.
+const HOLO_RING_RATE := 1.0
 ## The L9 arcs leave the spire this far over the dome's apex and land on the top of its gold ring,
 ## so they clear the grown dome.
 const ARC_FROM := 1.1
@@ -349,7 +358,7 @@ static func _hologram(p: Parts, m: LowPolyMesh, apex: float, level: int) -> void
 	var centre := Vector3(0, apex + HOLO_LIFT, 0)
 	m.orb(HOLO_RADIUS, 16, 5, centre, HOLO_GLOBE)
 	m.orb(HOLO_RADIUS * 0.45, 12, 5, centre, HOLO_CORE)
-	var ring := p.moving(centre, Motion.spin(Vector3.UP, 0.35))
+	var ring := p.moving(centre, Motion.spin(Vector3.UP, HOLO_RING_RATE))
 	ring.lathe(PackedVector2Array([Vector2(HOLO_RADIUS + 0.16, 0), Vector2(HOLO_RADIUS + 0.08, 0)]), 24, Vector3.ZERO,
 		HOLO_RING, HOLO_TILT)
 	if level >= 7:
@@ -551,7 +560,7 @@ static func _wing_dish(p: Parts, gold: bool) -> void:
 	if p.tier >= Parts.Tier.CROWN:
 		_comms_dish(m, gold, 0.65, turntable, WING_DISH_AIM)
 	else:
-		_comms_dish(p.moving(turntable, Motion.spin(Vector3.UP, -0.6)), gold, 0.65)
+		_comms_dish(p.moving(turntable, Motion.spin(Vector3.UP, -Parts.DISH_RATE)), gold, 0.65)
 
 
 ## The ring of rooms round the drum's foot, `radius` round (from L6 grown into floor A): a low

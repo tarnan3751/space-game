@@ -198,8 +198,9 @@ static func tank(m: LowPolyMesh, radius: float, height: float, pos: Vector3, sur
 	]), sides, pos, surface)
 
 
-## Radians a second every spinning radar dish turns at, the Command Center's.
-const DISH_RATE := 0.8
+## Radians a second every spinning radar dish turns at, one speed across the base: brisk enough
+## to read in a second of play.
+const DISH_RATE := 1.6
 
 
 ## A dish of `radius`, `depth` deep: a bowl opening along +Y before `rot`, the centre of its

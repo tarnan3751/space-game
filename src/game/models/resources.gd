@@ -37,6 +37,9 @@ static var BAY_SKIRT := Surf.make(MaterialKit.Layer.PLATE, MaterialKit.ARMY, 1.0
 const BAY_PAD := Vector3(0.52, 0.0, -0.56)
 const BAY_PAD_TOP := 0.86
 const BAY_PAD_LEGS := 0.3
+## The parked drone's lift off its cradle, either way of its middle (a slide), and its period.
+const BAY_LIFT := 0.12
+const BAY_LIFT_PERIOD := 3.0
 
 ## The high levels' own: the L2 landing strips' lamps chasing round the deck (cyan; violet at the
 ## Crown tier, between gold ones); the L3 gold trim on each parked drone's saucer, bobbing with
@@ -49,10 +52,10 @@ static var CORE_BEACON := Surf.make(MaterialKit.Layer.GLOW, Parts.CORE_GLOW_TINT
 
 
 ## A landing deck raised on a chamfered army-orange skirt, with a hazard ring and a chase of
-## landing lights, the builder drone (its ducts orange) idling over its docking cradle, its rotors
-## a spinning blur, a raised control booth on the far corner with a scrolling screen and a
-## rotating beacon on its orange roof, a fuel tank and a stack of crates. The booth's roof is gold
-## at the Gold tier.
+## landing lights, the builder drone (its ducts orange) lifting off its docking cradle and
+## settling again, its rotors a spinning blur, a raised control booth on the far corner with a
+## scrolling screen and a rotating beacon on its orange roof, a fuel tank and a stack of crates.
+## The booth's roof is gold at the Gold tier.
 ##
 ## L2 (Chrome): the deck plated in chrome, its landing lights become a chase of landing strips
 ## round its rim with two cyan strips across it, a raised chrome pad over the crates carrying a
@@ -87,14 +90,16 @@ static func build_drone_bay(p: Parts, level: int) -> void:
 		m.lathe(PackedVector2Array([Vector2(0.675, 0.08), Vector2(0.675, 0.2), Vector2(0.63, 0.2)]), 16,
 			BAY_DECK + Vector3(0, BAY_DECK_TOP - BAY_PLATING - 0.08, 0), Parts.FILIGREE)
 	_cradle(m, top)
-	# High enough that at the bottom of its bob its tool arm's lens just clears the deck.
-	DroneModels.add_drone(m, top + Vector3(0, 0.28, 0), true)
+	# The parked drone lifts off its cradle and settles again (a moving part), bobbing as it does:
+	# at the bottom of its slide and its bob its tool arm's lens just clears the deck.
+	var lifting := p.moving(top + Vector3(0, 0.28 + BAY_LIFT, 0), Motion.slide(Vector3.UP, BAY_LIFT, BAY_LIFT_PERIOD))
+	DroneModels.add_drone(lifting, Vector3.ZERO, true)
 	if level >= 2:
 		_raised_pad(m, level, p.tier)
 	if level >= 3:
-		for at: Vector3 in [top, BAY_PAD + Vector3(0, BAY_PAD_TOP, 0)]:
-			# Over the saucer's top shoulder, round the canopy.
-			m.ring(0.095, 0.16, 0.03, 12, at + Vector3(0, 0.28 + 0.06, 0), PARKED_GOLD)
+		# Over each saucer's top shoulder, round the canopy.
+		lifting.ring(0.095, 0.16, 0.03, 12, Vector3(0, 0.06, 0), PARKED_GOLD)
+		m.ring(0.095, 0.16, 0.03, 12, BAY_PAD + Vector3(0, BAY_PAD_TOP + 0.28 + 0.06, 0), PARKED_GOLD)
 
 	# The control booth on the far corner: a column, a glazed cab and a roof, army orange, gold at
 	# the Gold tier. From L2 the column and the cab are clad in chrome under a chrome roof, gold
@@ -262,6 +267,13 @@ const ROCKER_AXIS := Vector3(0.70710678, 0, 0.70710678)
 const PUMPJACK := Vector3(0.95, 0, -0.95)
 const PUMPJACK_PIN := 0.7
 const PUMPJACK_LENGTH := 0.62
+## The walking beams' rock either way (degrees) and their period, the pumpjack's half a period out
+## of step, and the drill string's turn (radians a second): bold enough to read in a second of
+## play, the drill under an eighth of a turn a frame at 150 ms, so its fins never seem to stand.
+const ROCKER_SWING := 18.0
+const PUMPJACK_SWING := 20.0
+const ROCKER_PERIOD := 1.6
+const DRILL_RATE := 4.0
 ## The L9 collar hovering round the derrick, this far under the crown block's foot.
 const COLLAR_DROP := 0.4
 ## The L10 ore hauler's track from over the housing's front edge out over the hopper, along the
@@ -396,7 +408,7 @@ static func build_metal_extractor(p: Parts, level: int) -> void:
 	m.box_chamfered(Vector3(0.16, pin.y - 0.04 - crown_top, 0.16), 0.04, Vector3(crown.x, crown_top, crown.z), Parts.GUNMETAL,
 		Vector3(0, 45, 0))
 	Parts.pipe(m, pin - ROCKER_AXIS * 0.1, pin + ROCKER_AXIS * 0.1, 0.05, Parts.GUNMETAL, 12)
-	_rocker(p.moving(pin, Motion.swing(ROCKER_AXIS, 12.0, 2.0)), gold)
+	_rocker(p.moving(pin, Motion.swing(ROCKER_AXIS, ROCKER_SWING, ROCKER_PERIOD)), gold)
 	if level >= 9:
 		# The obsidian collar hovering round the derrick under its crown, bobbing.
 		var collar := crown - Vector3(0, COLLAR_DROP, 0)
@@ -424,7 +436,7 @@ static func build_metal_extractor(p: Parts, level: int) -> void:
 	_stack(m, STACK_SPOT + Vector3(0, ground, 0), housing_height + 0.5, gold, 0.0, 4 if chrome else 2)
 
 	var pivot := Vector3(DRILL.x, roof, DRILL.z)
-	_drill(p.moving(pivot, Motion.spin(Vector3.UP, 3.0)), crown.y - pivot.y, DRIVE_TOP,
+	_drill(p.moving(pivot, Motion.spin(Vector3.UP, DRILL_RATE)), crown.y - pivot.y, DRIVE_TOP,
 		Parts.VEINS if obsidian else Parts.GUNMETAL)
 	if level >= 7:
 		_pumpjack(p, p.tier)
@@ -597,7 +609,7 @@ static func _pumpjack(p: Parts, tier: int) -> void:
 	var well := base + ACROSS * (PUMPJACK_LENGTH * 0.5 - 0.02) + Vector3(0, 0.08, 0)
 	m.prism(0.07, 0.06, 0.14, 12, well, Parts.GUNMETAL)
 	m.prism(0.022, 0.022, PUMPJACK_PIN - 0.4, 8, well + Vector3(0, 0.14, 0), Parts.ROD)
-	var s := p.moving(pin, Motion.swing(ROCKER_AXIS, 14.0, 2.0, 0.5))
+	var s := p.moving(pin, Motion.swing(ROCKER_AXIS, PUMPJACK_SWING, ROCKER_PERIOD, 0.5))
 	var half := PUMPJACK_LENGTH * 0.5
 	s.box_chamfered(Vector3(0.07, 0.07, PUMPJACK_LENGTH), 0.02, Vector3(0, -0.035, 0), Parts.GOLD_TRIM if tier >= Parts.Tier.GOLD else Parts.HULL_LIGHT, yaw)
 	s.box_chamfered(Vector3(0.09, 0.2, 0.1), 0.03, ACROSS * (half - 0.03) + Vector3(0, -0.15, 0), METAL_ACCENT, yaw)
@@ -637,7 +649,7 @@ const RING_SHARE := 1.1
 const RING_RADII := [0.7, 0.7, 0.7, 0.7, 0.7, 0.8, 0.8, 1.0, 1.0, 1.0]
 const RING_THICKNESS := 0.04
 const STRUT_RADIUS := 0.03
-const RING_RATE := 0.35
+const RING_RATE := 1.0
 ## Where the emitters aim on the crystal they cut (the biggest shard, the mega-shard from L8): this
 ## share of its height up, on its face towards each emitter, where the beam ends just inside its
 ## surface (this share of its radius there); at L10 higher, over the mega-shard's gold collar.
@@ -901,7 +913,9 @@ static func _shard(m: LowPolyMesh, foot: Vector3, height: float, radius: float, 
 ## beam keeps on it.
 static func _laser_ring(s: LowPolyMesh, radius: float, drop: float, count: int, aim: Vector3, trim: Surf, gold: bool,
 		beam: Surf, lens: Surf) -> void:
-	Parts.torus(s, radius, RING_THICKNESS, 24, 8, Vector3(0, -drop - RING_THICKNESS, 0), lens)
+	# The ring glows in the lens's colour, pulsing.
+	Parts.torus(s, radius, RING_THICKNESS, 24, 8, Vector3(0, -drop - RING_THICKNESS, 0),
+		Surf.make(lens.layer, lens.tint, lens.uv_scale, lens.flags | Surf.PULSE, lens.smooth, lens.outline))
 	s.prism(0.11, 0.11, 0.1, 16, Vector3(0, -0.05, 0), Parts.HULL_DARK_ROUND)
 	for k: int in 3:
 		var degrees := 90.0 + 120.0 * k
@@ -1204,6 +1218,11 @@ const BEACON_MAST := 0.8
 const SILO_GUARD_RADIUS := 1.38
 const SILO_GUARD_HEIGHT := 3.95
 const SILO_GUARD_RATE := 0.5
+## To L5, before the pump on the pipe: the plunger pump on the near corner, past the tank's plinth
+## and the valves, its plunger's stroke either way of its middle and its period.
+const PLUNGER_PUMP := Vector3(1.1, 0, 1.1)
+const PLUNGER_STROKE := 0.1
+const PLUNGER_PERIOD := 1.2
 
 
 ## A squat riveted tank in plate bands on a round plinth, with an access ladder up its lit
@@ -1226,6 +1245,8 @@ static func build_metal_silo(p: Parts, level: int) -> void:
 	var gold := p.tier >= Parts.Tier.GOLD
 	var height: float = METAL_SILO_HEIGHTS[level - 1]
 	Parts.foundation(m, 3)
+	if level < 6:
+		_plunger_pump(p, PLUNGER_PUMP + Vector3(0, Parts.PAD_HEIGHT, 0), gold)
 	if level < 4:
 		_metal_tank(m, Vector3(0, Parts.PAD_HEIGHT, 0), 0.95, height, level, p.tier, 0.0)
 		if level >= 3:
@@ -1394,6 +1415,23 @@ static func _metal_pump(p: Parts, centre: Vector3, level: int) -> void:
 		m.prism(0.05, 0.02, 0.06, 12, top + Vector3(0, 0.32, 0), Parts.GOLD_ROUND)
 
 
+## The plunger pump on the near corner to L5, standing at `foot`: a dark skid, a barrel in the
+## metal accent with a glowing sight, and a plunger bobbing in and out of it (a moving part): a rod
+## under a cap, gold from the Gold tier, round a glowing metal lamp. A pipe runs from the barrel's
+## foot towards the tank. Few sides: the twin tanks at L4 and L5 leave it little budget.
+static func _plunger_pump(p: Parts, foot: Vector3, gold: bool) -> void:
+	var m := p.body
+	var yaw := Vector3(0, 45, 0)
+	m.box(Vector3(0.34, 0.08, 0.34), foot, Parts.HULL_DARK, yaw)
+	m.prism(0.14, 0.13, 0.4, 8, foot + Vector3(0, 0.08, 0), METAL_ACCENT_ROUND, Parts.OCTAGON)
+	m.box(Vector3(0.06, 0.18, 0.03), foot + Vector3(0.095, 0.16, 0.095), GAUGE, yaw)
+	Parts.pipe(m, foot + Vector3(-0.08, 0.14, -0.08), foot + Vector3(-0.3, 0.14, -0.3), 0.045, Parts.GUNMETAL, 6, false)
+	var plunger := p.moving(foot + Vector3(0, 0.47 + PLUNGER_STROKE, 0), Motion.slide(Vector3.UP, PLUNGER_STROKE, PLUNGER_PERIOD))
+	plunger.prism(0.035, 0.035, 0.3, 8, Vector3(0, -0.2, 0), Parts.ROD)
+	plunger.prism(0.12, 0.1, 0.08, 12, Vector3(0, 0.1, 0), Parts.GOLD_ROUND if gold else Parts.HULL_LIGHT_ROUND)
+	plunger.orb(0.055, 10, 4, Vector3(0, 0.22, 0), GAUGE)
+
+
 ## The gauge ring hovering over the deck between the tanks (L9), its middle at `centre`, turning:
 ## an obsidian ring of `radius` spanning both domes, a metal-lit dial on its top marked by six
 ## obsidian ticks, and a violet rim (gold at the Crown tier), all bobbing together.
@@ -1417,8 +1455,10 @@ static func _valves(m: LowPolyMesh, pos: Vector3, gold: bool) -> void:
 		Parts.torus(m, 0.07, 0.02, 10, 4, foot + Vector3(0, 0.14, 0), GOLD_WHEEL if gold else WHEEL)
 
 
-## The glass panels shimmer, each pulsing on a phase of its own; the finial pulses as it turns.
+## The glass panels shimmer, pulsing in a wave that climbs the container (_panel_phase); the
+## finial pulses as it turns, to L5 bobbing too, floating over its cap.
 static var CRYSTAL_PANEL := Surf.make(MaterialKit.Layer.GLASS, MaterialKit.CRYSTAL, 1.0, Surf.GLOSSY | Surf.PULSE)
+static var FINIAL_SHARD := Surf.make(MaterialKit.Layer.CRYSTAL, MaterialKit.CRYSTAL, 1.5, Surf.GLOSSY | Surf.PULSE | Surf.BOB)
 ## The high levels' own: the L7 lid lamps, pulsing in a wave round it; from the Obsidian tier the panels in
 ## a deeper pink, and the L8 crystal inlays round the plinth; the L9 crystal crown hovering over
 ## the finial, its shards and its obsidian ring bobbing together (their one phase is also the
@@ -1448,6 +1488,12 @@ const MEGA_CRYSTAL := 1.1
 const CRYSTAL_GUARD_RADIUS := 1.38
 const CRYSTAL_GUARD_HEIGHT := 2.0
 const CRYSTAL_GUARD_RATE := 0.5
+## The finial's turn and the L9 crown's, the other way (radians a second); the panels' wave, the
+## phase it falls by a row up and a face round.
+const FINIAL_RATE := 1.4
+const CROWN_RATE := -0.9
+const PANEL_ROW_PHASE := 0.2
+const PANEL_FACE_PHASE := 0.07
 
 
 ## A tall hexagonal container of glass panels shimmering with the crystal inside, framed by
@@ -1483,7 +1529,7 @@ static func build_crystal_silo(p: Parts, level: int) -> void:
 			var a := Parts.around(radius, 15.0 + 60.0 * k, base + row * PANEL_ROW)
 			var b := Parts.around(radius, 75.0 + 60.0 * k, base + row * PANEL_ROW)
 			m.polygon(PackedVector3Array([a, a + Vector3(0, PANEL_ROW, 0), b + Vector3(0, PANEL_ROW, 0), b]),
-				CRYSTAL_PANEL.phased(fposmod(0.23 * k + 0.41 * row, 1.0)))
+				CRYSTAL_PANEL.phased(_panel_phase(row, k)))
 	for k: int in 6:
 		var degrees := 15.0 + 60.0 * k
 		m.box_chamfered(Vector3(0.13, height, 0.13), 0.03, Parts.around(radius, degrees, base), Parts.HULL_LIGHT,
@@ -1498,8 +1544,8 @@ static func build_crystal_silo(p: Parts, level: int) -> void:
 	]), 6, Vector3(0, lid, 0), Parts.GOLD_TRIM if gold else Parts.HULL_MID, HEXAGON)
 	m.lathe(PackedVector2Array([Vector2(0.24, 0), Vector2(0.24, 0.05), Vector2(0.2, 0.08), Vector2(0, 0.08)]), 6,
 		Vector3(0, lid + 0.22, 0), Parts.HULL_DARK, HEXAGON)
-	var finial := p.moving(Vector3(0, lid + 0.28, 0), Motion.spin(Vector3.UP, 0.5))
-	_shard(finial, Vector3.ZERO, 0.46, 0.12, Vector3(0, 15, 0), CRYSTAL_SHARD)
+	var finial := p.moving(Vector3(0, lid + 0.28, 0), Motion.spin(Vector3.UP, FINIAL_RATE))
+	_shard(finial, Vector3.ZERO, 0.46, 0.12, Vector3(0, 15, 0), FINIAL_SHARD)
 	Parts.landing_light(m, Vector3(0.4, lid + 0.18, 0.24), 0.09, CRYSTAL_GLOW)
 	# A ladder up the face on the camera's right.
 	var apothem := radius * cos(PI / 6.0)
@@ -1536,7 +1582,7 @@ static func _grown_crystal_silo(p: Parts, level: int) -> void:
 			var a := Parts.around(radius, 15.0 + 60.0 * k, base + row * row_height)
 			var b := Parts.around(radius, 75.0 + 60.0 * k, base + row * row_height)
 			m.polygon(PackedVector3Array([a, a + Vector3(0, row_height, 0), b + Vector3(0, row_height, 0), b]),
-				panel.phased(fposmod(0.23 * k + 0.41 * row, 1.0)))
+				panel.phased(_panel_phase(row, k)))
 	for k: int in 6:
 		var degrees := 15.0 + 60.0 * k
 		var yaw := Vector3(0, 90.0 - degrees, 0)
@@ -1584,7 +1630,7 @@ static func _grown_crystal_silo(p: Parts, level: int) -> void:
 		_shard(m, Vector3(0, top + 0.06, 0), MEGA_CRYSTAL * 0.92, 0.22, Vector3(0, 15, 0), Parts.CORE_GLOW)
 		_shard(m, Vector3(0, top + 0.02, 0), MEGA_CRYSTAL, 0.34, Vector3(0, 15, 0), MEGA_SHELL)
 		finial_at = top + MEGA_CRYSTAL - 0.04
-	var finial := p.moving(Vector3(0, finial_at, 0), Motion.spin(Vector3.UP, 0.5))
+	var finial := p.moving(Vector3(0, finial_at, 0), Motion.spin(Vector3.UP, FINIAL_RATE))
 	var collar := Parts.GOLD_ROUND if crown else Parts.CHROME_ROUND
 	Parts.torus(finial, 0.13, 0.035, 16, 6, Vector3.ZERO, collar)
 	for k: int in 3:
@@ -1597,7 +1643,7 @@ static func _grown_crystal_silo(p: Parts, level: int) -> void:
 	if level >= 9:
 		# The crystal crown hovering over the finial, round the mega crystal at L10.
 		var crown_at := top + MEGA_CRYSTAL * 0.45 if crown else finial_at + 0.82
-		var hover := p.moving(Vector3(0, crown_at, 0), Motion.spin(Vector3.UP, -0.35))
+		var hover := p.moving(Vector3(0, crown_at, 0), Motion.spin(Vector3.UP, CROWN_RATE))
 		var ring_radius := 0.5 if crown else 0.26
 		Parts.torus(hover, ring_radius, 0.035, 24, 6, Vector3.ZERO, CROWN_GOLD_RING if crown else CROWN_RING)
 		for k: int in 6:
@@ -1617,6 +1663,12 @@ static func _grown_crystal_silo(p: Parts, level: int) -> void:
 		0.065, Parts.GUNMETAL, 12)
 	if crown:
 		Parts.escort_guard(p, CRYSTAL_GUARD_RADIUS, CRYSTAL_GUARD_HEIGHT, CRYSTAL_GUARD_RATE)
+
+
+## The phase of the crystal silo's panel in `row` (from the bottom) on face `k`: a wave of light
+## climbing the container, leaning a little round it.
+static func _panel_phase(row: int, k: int) -> float:
+	return fposmod(-PANEL_ROW_PHASE * row + PANEL_FACE_PHASE * k, 1.0)
 
 
 ## The crystal silo's frame by tier from L6: chrome, obsidian from the Obsidian tier, gold
@@ -1689,6 +1741,10 @@ const OUTER_CONTAINMENT_RADIUS := 0.64
 const VAULT_GUARD_RADIUS := 1.25
 const VAULT_GUARD_HEIGHT := 3.3
 const VAULT_GUARD_RATE := -0.5
+## The door's handwheel's turn, and the containment rings' (radians a second), counter-turning.
+const VAULT_WHEEL_RATE := 1.0
+const CONTAINMENT_RATE := 1.0
+const OUTER_CONTAINMENT_RATE := -1.2
 
 
 ## A heavy chamfered armoured cube on a skirt, violet glow seams with current flowing round it
@@ -1727,7 +1783,7 @@ static func build_antimatter_vault(p: Parts, level: int) -> void:
 		var edge := Vector3(corner.x, 0, corner.y) * (half - VAULT_CHAMFER * 0.5)
 		m.box(Vector3(VAULT_SEAM, VAULT_HEIGHT - 0.2, 0.03), edge + Vector3(corner.x, 0, corner.y) * 0.012 + Vector3(0, floor_y + 0.06, 0),
 			SEAM, Vector3(0, rad_to_deg(atan2(corner.x, corner.y)), 0))
-	_vault_door(m, Vector3(0, floor_y + VAULT_DOOR_HEIGHT, half))
+	_vault_door(p, Vector3(0, floor_y + VAULT_DOOR_HEIGHT, half))
 	# The control screen on the shadowed face.
 	m.box_chamfered(Vector3(0.06, 0.36, 0.56), 0.02, Vector3(half, floor_y + 0.5, 0), Parts.HULL_DARK)
 	m.box(Vector3(0.02, 0.26, 0.44), Vector3(half + 0.05, floor_y + 0.55, 0), VAULT_SCREEN)
@@ -1788,9 +1844,9 @@ static func build_antimatter_vault(p: Parts, level: int) -> void:
 		# Veins up the lid between its blocks.
 		for k: int in 4:
 			Parts.dome_seam(m, 0.62, 0.3, Vector3(0, top + 0.1, 0), 90.0 * k, Parts.VEINS)
-		_containment_ring(p, core, CONTAINMENT_RADIUS, Vector3(18, 0, 0), 0.4)
+		_containment_ring(p, core, CONTAINMENT_RADIUS, Vector3(18, 0, 0), CONTAINMENT_RATE)
 	if level >= 7:
-		_containment_ring(p, core, OUTER_CONTAINMENT_RADIUS, Vector3(0, 0, 28), -0.55)
+		_containment_ring(p, core, OUTER_CONTAINMENT_RADIUS, Vector3(0, 0, 28), OUTER_CONTAINMENT_RATE)
 	if crown:
 		m.lathe(PackedVector2Array([Vector2(0.725, 0.0), Vector2(0.725, 0.08)]), 24, Vector3(0, top + 0.01, 0), Parts.FILIGREE)
 		# The halo over the core.
@@ -1818,16 +1874,21 @@ static func _containment_ring(p: Parts, core: Vector3, r: float, tilt: Vector3, 
 
 
 ## The vault door, VAULT_DOOR_RADIUS round, in the antimatter accent at every tier: a round plate
-## in a gunmetal rim, a gunmetal hub and three-spoke handwheel, and eight gold bolts round it.
-static func _vault_door(m: LowPolyMesh, centre: Vector3) -> void:
+## in a gunmetal rim, a gunmetal hub and three-spoke handwheel with a gold grip turning slowly on
+## it (a moving part, VAULT_WHEEL_RATE), and eight gold bolts round it.
+static func _vault_door(p: Parts, centre: Vector3) -> void:
+	var m := p.body
 	var facing := Vector3(90, 0, 0)
 	var r := VAULT_DOOR_RADIUS
 	m.tube(0, r, 0.06, 24, centre, ANTIMATTER_ACCENT_ROUND, facing)
 	Parts.torus(m, r + 0.02, 0.04, 24, 6, centre + Vector3(0, 0, -0.01), Parts.GUNMETAL, facing)
-	m.tube(0, 0.12, 0.1, 16, centre + Vector3(0, 0, 0.06), Parts.GUNMETAL, facing)
+	var wheel := p.moving(centre + Vector3(0, 0, 0.06), Motion.spin(Vector3.BACK, VAULT_WHEEL_RATE))
+	wheel.tube(0, 0.12, 0.1, 16, Vector3.ZERO, Parts.GUNMETAL, facing)
 	for k: int in 3:
 		var spoke := Vector3(cos(PI * k / 3), sin(PI * k / 3), 0) * 0.32
-		m.strut(centre + Vector3(0, 0, 0.12) - spoke, centre + Vector3(0, 0, 0.12) + spoke, 0.07, Parts.GUNMETAL)
+		wheel.strut(Vector3(0, 0, 0.06) - spoke, Vector3(0, 0, 0.06) + spoke, 0.07, Parts.GUNMETAL)
+	# A gold grip on one spoke's end, so the turn reads on the symmetric wheel.
+	wheel.orb(0.06, 10, 4, Vector3(0.32, 0, 0.08), Parts.GOLD_ROUND)
 	for k: int in 8:
 		var angle := TAU * (k + 0.5) / 8
 		var turn := Vector3(0, 0, rad_to_deg(angle))

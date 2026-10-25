@@ -1,13 +1,14 @@
 extends HarnessScenario
 ## The construction drone on the real build times: a Metal Silo placed on a fresh base gets a
 ## drone over its scaffold, which descends, moves, and fires its laser at a point on the site;
-## when the silo is finished the view has no drone and stops processing while the old drone
-## climbs away and frees itself. The timer label sits above the drone's flight, over the scaffold
-## and over the model. Then, the Command Center taken to level 2 (the metal and the
+## when the silo is finished the view has no drone and processes only for its moving parts while
+## the old drone climbs away and frees itself. The timer label sits above the drone's flight, over
+## the scaffold and over the model. Then, the Command Center taken to level 2 (the metal and the
 ## crystal topped up by the scenario: the start's amounts and caps do not cover both upgrades),
 ## an upgrade of the silo gets a drone again, firing at the finished model. Last, a Metal
 ## Extractor finishes while the player drags it: the dragged view is kept, now showing the
-## finished model, and its drone leaves clear of that model's top (site_height()).
+## finished model, and its drone leaves clear of that model's top (site_height()). Last, a
+## finished model with no moving part (the first such type at level 1) does not process.
 
 const CLOSE_UP_SIZE := 10.0
 ## How long to wait for the drone's first shot: arriving, an orbit and the swoop take about 5 s.
@@ -56,14 +57,15 @@ func run(main: MainScript) -> void:
 	await _wait(main, 0.2)
 	await screenshot("firing-later")
 
-	# Finished: the new level's view has no drone and does not process; the old drone leaves.
+	# Finished: the new level's view has no drone and processes only for its moving parts (the
+	# silo's plunger pump); the old drone leaves.
 	advance(state.seconds_left(id))
 	main.base_view.sync(state)
 	await frames(1)
 	var built: BuildingView = main.base_view.views[id]
 	check(state.buildings[id].level == 1 and built != view, "the silo is finished at level 1, in a new view")
 	check(built.drone() == null, "the finished silo has no drone")
-	check(not built.is_processing(), "the finished silo's view does not process")
+	check(built.is_processing() == _moves(built), "the finished silo's view processes only for its moving parts")
 	check(drone.is_leaving() and drone.get_parent() == main.base_view, "the drone leaves under the base view")
 	_check_clear(drone, built.site_height(), "the leaving drone starts clear of the finished model")
 	var leaving_from := drone.drone_position().y
@@ -156,6 +158,7 @@ func run(main: MainScript) -> void:
 		and moved.position.is_equal_approx(main.base_view.cell_to_world(drop, moved.footprint_size)),
 		"the move landed: the extractor and its view at %s" % drop)
 	_check_grid(state)
+	await _check_still(main)
 
 
 ## Waits in steps of a tenth of a second until the drone fires, up to FIRE_WAIT_SECONDS.
@@ -211,6 +214,32 @@ func _check_label(view: BuildingView, drone: ConstructionDrone) -> void:
 		and label.position.y >= drone.drone_position().y + BuildingView.LABEL_OVER_DRONE,
 		"the timer label is above the drone's flight (at %.2f; the drone reaches %.2f, is at %.2f)"
 		% [label.position.y if label != null else 0.0, drone.ceiling(), drone.drone_position().y])
+
+
+## A finished model with no moving part does not process: a view of the first type in the catalog
+## whose level 1 has none, made beside the base and freed again.
+func _check_still(main: MainScript) -> void:
+	var catalog: Catalog = main.catalog
+	for type: String in catalog.types():
+		var view := BuildingView.new()
+		view.setup(0, type, 1, catalog.size_of(type), BuildingModels.tier_of(catalog, type, 1))
+		if _moves(view):
+			view.free()
+			continue
+		main.add_child(view)
+		await frames(1)
+		check(not view.is_processing(), "a finished %s at level 1, with no moving part, does not process" % type)
+		view.queue_free()
+		return
+	check(false, "some type has no moving part at level 1")
+
+
+## Whether a view's model has a moving part (BuildingModels.MOVE_META).
+func _moves(view: BuildingView) -> bool:
+	for child: Node in view.find_children("*", "Node3D", true, false):
+		if child.has_meta(BuildingModels.MOVE_META):
+			return true
+	return false
 
 
 func _instances(node: Node) -> int:

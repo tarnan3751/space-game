@@ -562,8 +562,8 @@ drone of four instances over its scaffold and its view processes; the drone desc
 beam running from the drone down to a point on the site within the footprint (plus the models'
 0.15 slack) and the work band, its lowest point clearing the site's top by `CLEARANCE`, and the
 timer label above the drone and `LABEL_OVER_DRONE` above the highest point it reaches. Advanced
-past completion and synced, the finished silo's new view has no drone and does not process,
-while the old drone leaves under the base view, starting clear of the finished model, climbs and
+past completion and synced, the finished silo's new view has no drone and processes only for its
+moving parts (the plunger pump), while the old drone leaves under the base view, starting clear of the finished model, climbs and
 frees itself. Then, with the metal and the crystal topped up by the scenario (the start's
 amounts and caps do not cover both), the Command Center goes to level 2 and an upgrade of the
 silo gets a drone again, clear of the model on its orbit a second in and firing at it with the
@@ -572,7 +572,8 @@ same checks, the label's included. Last, with the upgrade finished, a Metal Extr
 finishes while the drag holds: synced, the dragged view is kept and shows the finished model,
 and its drone leaves, starting clear of that model's top (`site_height()`, which includes the
 drag's lift); dropped one cell along x, the new view has no drone, the building and its view are
-at the drop cell, and the grid's occupancy matches every footprint. It screenshots the drone
+at the drop cell, and the grid's occupancy matches every footprint. Last, a view of the first
+type whose level 1 has no moving part, finished, does not process. It screenshots the drone
 arriving, firing at the scaffold (twice, a fifth of a second apart, to compare the sparks, the
 rotors and the beam's flow), leaving, firing at the upgrading silo, and leaving the dragged
 extractor, at camera size 10.
