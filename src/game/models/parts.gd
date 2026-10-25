@@ -259,6 +259,59 @@ static func ladder(m: LowPolyMesh, foot: Vector3, height: float, width: float, y
 		m.box(Vector3(width, 0.035, 0.035), foot + Vector3(0, 0.12 + 0.16 * k, 0), surface, turn)
 
 
+# --- The post family: masts, dish posts and lamp posts (docs/reference/art-style.md, **Shared shapes**)
+
+## Nothing structural is thinner than this across: under it a part reads as a scratch at the
+## overview and as ink stacked on ink close up.
+const STRUCTURAL_MIN := 0.14
+## A tapered mast's radius at its foot and at its top, and how far its foot flares past it.
+const MAST_FOOT_RADIUS := 0.09
+const MAST_TOP_RADIUS := 0.07
+const MAST_FLARE := 0.03
+## A dish post's width; a lamp post's pole's width and its bulb's radius.
+const DISH_POST_WIDTH := 0.16
+const LAMP_POLE_WIDTH := 0.1
+const LAMP_BULB_RADIUS := 0.12
+## A lamp post's pole: cream and never inked, so a pole this thin reads as a light line on the
+## violet ground, not as a line of ink; the bulb carries the outline.
+static var LAMP_POLE := Surf.make(MaterialKit.Layer.HULL, MaterialKit.HULL_LIGHT, 1.0, Surf.LIT, true, false)
+
+
+## A mast standing on `foot`, `height` tall, on `surface` (a smooth one, so it shades round): a
+## lathe tapering from MAST_FOOT_RADIUS to MAST_TOP_RADIUS over a foot flared MAST_FLARE wider,
+## `sides` round (12; 8 where a budget is tight); with a `bulb` of `bulb_radius` sitting on its top.
+## Returns the top's centre.
+static func tapered_mast(m: LowPolyMesh, foot: Vector3, height: float, surface: Surf, bulb_radius: float = 0.0,
+		bulb: Surf = null, sides: int = 12) -> Vector3:
+	var flare := MAST_FOOT_RADIUS + MAST_FLARE
+	m.lathe(PackedVector2Array([
+		Vector2(flare, 0), Vector2(flare, 0.05), Vector2(MAST_FOOT_RADIUS, 0.1),
+		Vector2(MAST_TOP_RADIUS, height), Vector2(0, height),
+	]), sides, foot, surface)
+	var top := foot + Vector3(0, height, 0)
+	if bulb != null:
+		m.orb(bulb_radius, 12, 6, top + Vector3(0, bulb_radius * 0.7, 0), bulb)
+	return top
+
+
+## A dish post standing on `foot`, `height` tall: a chamfered square column DISH_POST_WIDTH
+## across on `surface`, turned `yaw` degrees. Returns its top's centre, where a dish's
+## turntable stands.
+static func dish_post(m: LowPolyMesh, foot: Vector3, height: float, surface: Surf, yaw: float = 0.0) -> Vector3:
+	m.box_chamfered(Vector3(DISH_POST_WIDTH, height, DISH_POST_WIDTH), 0.04, foot, surface, Vector3(0, yaw, 0))
+	return foot + Vector3(0, height, 0)
+
+
+## A lamp post standing on `foot`, its bulb's centre `height` up: a pole LAMP_POLE_WIDTH across on
+## `pole` (LAMP_POLE, never inked, unless a caller gives its own) and a bulb of LAMP_BULB_RADIUS
+## on `bulb`, which carries the outline. Returns the bulb's centre.
+static func lamp_post(m: LowPolyMesh, foot: Vector3, height: float, bulb: Surf, pole: Surf = LAMP_POLE) -> Vector3:
+	m.prism(LAMP_POLE_WIDTH * 0.5, LAMP_POLE_WIDTH * 0.5, height, 8, foot, pole)
+	var at := foot + Vector3(0, height, 0)
+	m.orb(LAMP_BULB_RADIUS, 12, 6, at, bulb)
+	return at
+
+
 # --- Effects shared by the model files (docs/reference/art-style.md, **Animation**) ----
 
 ## A crackling arc's radius: its segments are three-sided tubes about 0.03 across.
