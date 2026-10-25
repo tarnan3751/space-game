@@ -395,6 +395,20 @@ any of them can be reversed as a data or model change.
   at range, and the lever is that table. Reversible as data: the limits and lob spans in
   `battle_view.gd`, the heights in `battle_units.gd`.
 
+- **The owner's three corrections after the pass** (the owner, 2026-10-25; `docs/reference/hud.md`
+  **Army panel**; `docs/reference/art-style.md`, the Command Center's row; `docs/reference/battle-view.md`,
+  **Vortices**): the army's housing leaves the top bar, which holds the resource meters and the drone
+  ring only, and shows as "Housing used / capacity" with a bar in the training panel's header and as a
+  line on the training facilities' info panels (the Cadet Academy, Drydock, Fabricator and Heavy
+  Fabricator), "No Hangar: build one to house units" while the capacity is 0; the Command Center's
+  dome never overhangs the storey it rides at any level (`dome_fit`, checked in the gallery), and from
+  L7 the tower and base are broad with the dome a cap, which reverses the critique's growing dome; the
+  gravity well's hold is a vortex (a same-handed double helix in a soft gradient sheath with bands
+  scrolling toward the well, rings sliding along it, a tightening ring at the aircraft and one glowing
+  source per well), after a counter-twisting version read as a diamond lattice. The HUD principle
+  recorded: a capacity that belongs to a building family shows in that family's panels, not the top
+  bar.
+
 ### 3.2 Open
 
 - **Economy validation on the server.** Either port the small economy rules to TypeScript,
