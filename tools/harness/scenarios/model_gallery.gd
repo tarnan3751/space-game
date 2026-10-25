@@ -16,7 +16,9 @@ extends HarnessScenario
 ## (docs/reference/art-style.md, **Budgets**); its reach in x and z (the body's bounds, each
 ## moving part's over its whole motion) within its footprint plus EXTENT_SLACK; and its top (the
 ## body's bounds, each moving part's over its whole motion) within its height cap,
-## CC_HEIGHT_CAP for the Command Center and HEIGHT_CAP for every other type.
+## CC_HEIGHT_CAP for the Command Center and HEIGHT_CAP for every other type. For the Command
+## Center, also that its dome with its gold ring, and the L8 ring hovering over it, reach no further
+## out than the storey they ride (CoreModels.dome_fit).
 ##
 ## Rows follow the catalog's categories: "core" (the Command Center), then catalog.categories
 ## in tab order. The views hang under a Node3D of the scenario's own under main, not under
@@ -202,6 +204,13 @@ func _check_budget(catalog: Catalog, entry: Dictionary) -> void:
 			"%s %d: %d body instance(s), %d of %d outlined, top kit layer %d, %d triangles (limit %d), reach %.2f (limit %.2f%s), %s tier, top %.2f (cap %.1f)"
 			% [type, level, bodies.size(), outlined, need_outline, top_layer, triangles, limit, reach, bound, over,
 			str(Parts.Tier.keys()[tier]).to_lower(), top, cap])
+		if type == Catalog.HQ_TYPE:
+			# The dome caps the tower: with its gold ring, and the ring hovering over it, it reaches no
+			# further out than the lip of what it rides (CoreModels.dome_fit).
+			var fit := BuildingModels.CoreModels.dome_fit(level)
+			check(fit.x <= fit.z + 0.001 and fit.y <= fit.z + 0.001,
+				"%s %d: dome %.2f out with its gold ring, hovering ring %.2f, the storey under them %.2f" % [type, level, fit.x,
+				fit.y, fit.z])
 
 
 ## How high a model stands, in world units, times the model's scale: the static body's bounds,

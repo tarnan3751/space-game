@@ -296,7 +296,9 @@ included; a SLIDE part's are shifted to both ends. A failure says by how much it
 And its top within its height cap, 7 units for the Command Center and 5 for every other type:
 the body's bounds, and each moving part's bounds' corners over its whole motion (turned every 5
 degrees through a SPIN's whole turn or a SWING's range, shifted to a SLIDE's ends). Each model's
-line names its tier, its budget and its top.
+line names its tier, its budget and its top. For the Command Center it also checks that the dome with its gold ring,
+and from L8 the ring hovering over it, reach no further out than the lip of the storey they ride
+(`CoreModels.dome_fit`), its line saying the three radii.
 
 `scenarios/model_clash.gd` is the clash rule's check (`docs/reference/art-style.md`, **The clash
 rule**), headless, with no screenshots. For every type and level in the catalog, built for its
