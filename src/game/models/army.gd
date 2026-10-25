@@ -29,6 +29,7 @@ static var HULL_ROUND := Surf.make(MaterialKit.Layer.HULL, MaterialKit.HULL_LIGH
 static var MID_ROUND := Surf.make(MaterialKit.Layer.HULL, MaterialKit.HULL_MID, 1.0, Surf.LIT, true)
 static var ARMOUR := Surf.make(MaterialKit.Layer.PLATE, MaterialKit.HULL_MID)
 static var ARMOUR_ROUND := Surf.make(MaterialKit.Layer.PLATE, MaterialKit.HULL_MID, 1.0, Surf.LIT, true)
+static var PLATE_LIGHT := Surf.make(MaterialKit.Layer.PLATE, MaterialKit.HULL_LIGHT)
 static var DARK_PLATE := Surf.make(MaterialKit.Layer.PLATE, MaterialKit.HULL_DARK)
 static var GOLD_ROUND := Surf.make(MaterialKit.Layer.FLAT, MaterialKit.CORE_GOLD, 1.0, Surf.GLOSSY, true)
 static var PIPE := Surf.make(MaterialKit.Layer.PIPE, MaterialKit.GUNMETAL, 2.0, Surf.LIT, true)
@@ -916,18 +917,19 @@ static func _stack(m: LowPolyMesh, foot: Vector3, radius: float, height: float, 
 	m.disc(radius * 0.56, 16, mouth + Vector3(0, 0.03, 0), GLOW)
 
 
-## The bulky fabricator: an armoured hall with a furnace in its front, an orange press arm
-## hammering an anvil beside it. A second arm at 2, a chimney cluster at 3. The arms hammer
+## The bulky fabricator: a cream hall and roof block with a broad orange band round the hall's
+## top, a furnace in its front, a fat orange press arm hammering an anvil beside it. A second arm
+## at 2, a chimney cluster at 3. The arms hammer
 ## in turn, sparks fly at the anvils, the furnace mouth pulses and the molten pour runs out of
 ## it.
 ##
 ## From 4 the stacks stand taller with chrome collars: L4 a chrome hall and roof block, cyan
 ## strips up the furnace mouth's posts, the press heads and the front slabs' caps chrome; L5 a
 ## fourth stack and a cyan band round the roof block; L6 the hall obsidian under chrome
-## armour slabs, violet veins between the side slabs, a violet band round the hall's top and the
-## pour crystal pink; L7 a forge ring hovering round each press head over its anvil, obsidian
-## rimmed in violet; L8 gold filigree over the roof block and the hall's top, the antimatter core
-## glowing in a crowned gold ring on the roof block and the anvils' sparks violet. Every stack
+## armour slabs, violet veins between the side slabs, a violet band under the orange one and the
+## pour crystal pink; L7 a forge ring hovering round each press's ram over its head, obsidian
+## rimmed in violet; L8 gold filigree over the roof block and along the orange band, the
+## antimatter core glowing in a crowned gold ring on the roof block and the anvils' sparks violet. Every stack
 ## smokes, the smoke rising and fading, crystal-lit from the Obsidian tier.
 static func build_heavy_fabricator(p: Parts, level: int) -> void:
 	var m := p.body
@@ -937,16 +939,16 @@ static func build_heavy_fabricator(p: Parts, level: int) -> void:
 	var crown := p.tier >= Parts.Tier.CROWN
 	Parts.foundation(m, 3)
 	var hall := Vector3(-0.42, g, -0.42)
-	m.box_chamfered(Vector3(1.76, 1.0, 1.76), 0.08, hall, _plating(p.tier, ARMOUR))
+	m.box_chamfered(Vector3(1.76, 1.0, 1.76), 0.08, hall, _plating(p.tier, Parts.HULL_LIGHT))
 	var block := hall + Vector3(-0.18, 1.0, -0.18)
-	var roof_surf := DARK_PLATE
+	var roof_surf := Parts.HULL_LIGHT
 	if crown:
 		roof_surf = Parts.FILIGREE
 	elif chrome:
 		roof_surf = Parts.CHROME
 	m.box_chamfered(Vector3(1.2, 0.4, 1.2), 0.08, block, roof_surf)
-	# Armour slabs down the sides, chrome over the obsidian hall.
-	var slab := Parts.CHROME if obsidian else ARMOUR
+	# Armour slabs down the sides, cream plate on the cream hall, chrome over the obsidian one.
+	var slab := Parts.CHROME if obsidian else PLATE_LIGHT
 	for z: float in [-1.0, -0.45, 0.1]:
 		m.box_chamfered(Vector3(0.1, 0.8, 0.45), 0.03, Vector3(0.5, g + 0.06, z), slab)
 	for x: float in [-1.12, 0.22]:
@@ -957,16 +959,19 @@ static func build_heavy_fabricator(p: Parts, level: int) -> void:
 	if level >= 5:
 		m.lathe(PackedVector2Array([Vector2(0.86, 0), Vector2(0.86, 0.1)]), 4, block + Vector3(0, 0.16, 0), _glow(p.tier),
 			Vector3(0, 45, 0))
+	# The orange band round the hall's top, proud of the slabs, across the faces the camera sees.
+	m.lathe(PackedVector2Array([Vector2(1.42, 0), Vector2(1.42, 0.2), Vector2(1.3, 0.2)]), 4, hall + Vector3(0, 0.8, 0), ORANGE,
+		Vector3(0, 45, 0))
 	if obsidian:
-		# Violet veins between the side slabs, a violet band round the hall's top.
+		# Violet veins between the side slabs, a violet band under the orange one.
 		for z: float in [-0.725, -0.175]:
-			m.box(Vector3(0.02, 0.8, 0.08), Vector3(0.465, g + 0.08, z), VIOLET_PANEL)
-		m.lathe(PackedVector2Array([Vector2(1.25, 0), Vector2(1.25, 0.06)]), 4, hall + Vector3(0, 0.88, 0), VIOLET_RIB,
+			m.box(Vector3(0.02, 0.62, 0.08), Vector3(0.465, g + 0.08, z), VIOLET_PANEL)
+		m.lathe(PackedVector2Array([Vector2(1.4, 0), Vector2(1.4, 0.06)]), 4, hall + Vector3(0, 0.7, 0), VIOLET_RIB,
 			Vector3(0, 45, 0))
 	if crown:
-		# Filigree over the hall's top edge (the roof block is filigree), and the core furnace on
+		# Filigree along the orange band (the roof block is filigree), and the core furnace on
 		# the block's top, the face the camera sees: a violet core dome in a gold ring under a crown.
-		m.lathe(PackedVector2Array([Vector2(1.27, 0), Vector2(1.27, 0.12)]), 4, hall + Vector3(0, 0.88, 0), Parts.FILIGREE,
+		m.lathe(PackedVector2Array([Vector2(1.44, 0), Vector2(1.44, 0.12)]), 4, hall + Vector3(0, 0.84, 0), Parts.FILIGREE,
 			Vector3(0, 45, 0))
 		var core := block + Vector3(0.3, 0.4, 0.3)
 		Parts.torus(m, 0.2, 0.04, 16, 6, core, GOLD_ROUND)
@@ -977,7 +982,7 @@ static func build_heavy_fabricator(p: Parts, level: int) -> void:
 	# The furnace mouth and the glowing slag trough in front of it.
 	var mouth := Vector3(-0.45, g, 0.48)
 	m.box(Vector3(0.6, 0.55, 0.02), mouth, GLOW_PULSE)
-	m.box(Vector3(0.36, 0.32, 0.02), mouth + Vector3(0, 0, 0.01), HOT_PULSE.phased(0.5))
+	m.box(Vector3(0.5, 0.42, 0.02), mouth + Vector3(0, 0, 0.01), HOT_PULSE.phased(0.5))
 	for side: float in [-1.0, 1.0]:
 		m.box_chamfered(Vector3(0.14, 0.62, 0.16), 0.04, mouth + Vector3(side * 0.37, 0, 0.02), DARK_PLATE)
 		if level >= 4:
@@ -1009,40 +1014,42 @@ static func build_heavy_fabricator(p: Parts, level: int) -> void:
 		Parts.puffs(m, foot + Vector3(0, height, 0), 0.29 * i, 4, 8, 3, CRYSTAL_SMOKE if obsidian else Parts.SMOKE)
 	if level >= 7:
 		for anvil: Vector3 in [Vector3(0.88, g, 0.85), Vector3(0.88, g, -0.85)]:
-			# A forge ring hovering round the press head's path over the anvil.
-			var ring := anvil + Vector3(0, 0.72, 0)
-			m.ring(0.36, 0.46, 0.06, 24, ring, HOVER)
-			m.lathe(PackedVector2Array([Vector2(0.465, 0.01), Vector2(0.465, 0.05)]), 24, ring, HOVER_RIM)
-			m.lathe(PackedVector2Array([Vector2(0.44, 0.062), Vector2(0.38, 0.062)]), 24, ring, HOVER_RIM)
+			# A forge ring hovering round the press's ram over the head's path, clear of the hall's
+			# top.
+			var ring := anvil + Vector3(0, 1.16, 0)
+			m.ring(0.46, 0.55, 0.06, 24, ring, HOVER)
+			m.lathe(PackedVector2Array([Vector2(0.555, 0.01), Vector2(0.555, 0.05)]), 24, ring, HOVER_RIM)
+			m.lathe(PackedVector2Array([Vector2(0.53, 0.062), Vector2(0.48, 0.062)]), 24, ring, HOVER_RIM)
 
 
 ## A press arm: a turret on the hall's roof at `shoulder`, a fat orange boom up to an elbow
-## over an anvil standing at `anvil`, a hydraulic ram down from the elbow to a heavy head. The
+## over an anvil standing at `anvil`, a hydraulic ram down from the elbow to a heavy head, all
+## drawn 1.3 times as thick as they were, so the arms read from across the base. The
 ## head and its piston are a moving part that hammers down onto the anvil, `phase` into its
 ## cycle, the piston sliding in the ram's cylinder; sparks flicker off the anvil's face.
 ## From the Chrome tier the head is chrome, at Crown the sparks violet.
 static func _press_arm(p: Parts, shoulder: Vector3, anvil: Vector3, phase: float) -> void:
 	var m := p.body
-	m.prism(0.3, 0.27, 0.24, 16, shoulder, Parts.GUNMETAL)
-	var pivot := shoulder + Vector3(0, 0.36, 0)
+	m.prism(0.36, 0.33, 0.24, 16, shoulder, Parts.GUNMETAL)
+	var pivot := shoulder + Vector3(0, 0.4, 0)
 	var elbow := Vector3(anvil.x, shoulder.y + 1.0, anvil.z)
-	m.prism(0.2, 0.2, 0.36, 16, pivot + Vector3(0, 0, -0.18), Parts.GUNMETAL, Vector3(90, 0, 0))
-	Parts.beam(m, pivot, elbow, 0.28, ORANGE, 0.06)
-	Parts.pipe(m, shoulder + Vector3(0.18, 0.24, 0), elbow + Vector3(-0.08, -0.22, 0), 0.06, MID_ROUND)
-	m.prism(0.19, 0.19, 0.34, 16, elbow + Vector3(0, 0, -0.17), Parts.GUNMETAL, Vector3(90, 0, 0))
-	Parts.pipe(m, elbow, anvil + Vector3(0, 1.28, 0), 0.12, Parts.GUNMETAL)
+	m.prism(0.26, 0.26, 0.46, 16, pivot + Vector3(0, 0, -0.23), Parts.GUNMETAL, Vector3(90, 0, 0))
+	Parts.beam(m, pivot, elbow, 0.36, ORANGE, 0.07)
+	Parts.pipe(m, shoulder + Vector3(0.2, 0.24, 0), elbow + Vector3(-0.1, -0.26, 0), 0.08, HULL_ROUND)
+	m.prism(0.25, 0.25, 0.44, 16, elbow + Vector3(0, 0, -0.22), Parts.GUNMETAL, Vector3(90, 0, 0))
+	Parts.pipe(m, elbow, anvil + Vector3(0, 1.28, 0), 0.16, Parts.GUNMETAL)
 	# The head strikes the anvil's face (0.3 up) and lifts to 0.66, where it hung before it moved.
 	var head := p.moving(anvil + Vector3(0, 0.48, 0),
 		Motion.slide(Vector3.UP, 0.18, 2.4, phase, Motion.Ease.HAMMER))
-	Parts.pipe(head, Vector3(0, 0.3, 0), Vector3(0, 1.1, 0), 0.07, MID_ROUND, 16, false)
-	head.box_chamfered(Vector3(0.46, 0.32, 0.46), 0.07, Vector3.ZERO, Parts.CHROME if p.tier >= Parts.Tier.CHROME else ORANGE)
-	head.box(Vector3(0.48, 0.07, 0.48), Vector3(0, 0.04, 0), Parts.GOLD_TRIM if p.tier >= Parts.Tier.GOLD else Parts.HAZARD)
-	m.box_chamfered(Vector3(0.52, 0.3, 0.52), 0.05, anvil, Parts.GUNMETAL)
-	m.box(Vector3(0.54, 0.06, 0.54), anvil + Vector3(0, 0.2, 0), Parts.HAZARD)
+	Parts.pipe(head, Vector3(0, 0.36, 0), Vector3(0, 1.1, 0), 0.09, HULL_ROUND, 16, false)
+	head.box_chamfered(Vector3(0.6, 0.38, 0.6), 0.08, Vector3.ZERO, Parts.CHROME if p.tier >= Parts.Tier.CHROME else ORANGE)
+	head.box(Vector3(0.62, 0.08, 0.62), Vector3(0, 0.04, 0), Parts.GOLD_TRIM if p.tier >= Parts.Tier.GOLD else Parts.HAZARD)
+	m.box_chamfered(Vector3(0.6, 0.3, 0.6), 0.05, anvil, Parts.GUNMETAL)
+	m.box(Vector3(0.62, 0.06, 0.62), anvil + Vector3(0, 0.2, 0), Parts.HAZARD)
 	for k: int in 6:
 		var degrees := 15.0 + 60.0 * k
 		var out := Parts.around(1.0, degrees, 0.5 + 0.2 * (k % 3))
-		m.cone(0.035, 0.16, 8, anvil + Parts.around(0.3, degrees, 0.3),
+		m.cone(0.035, 0.16, 8, anvil + Parts.around(0.36, degrees, 0.3),
 			(VIOLET_SPARK if p.tier >= Parts.Tier.CROWN else SPARK).phased(fposmod(phase + k / 6.0 + 0.04, 1.0)), Parts.facing(out))
 
 
