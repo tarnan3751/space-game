@@ -382,7 +382,8 @@ direction; `BuildingView` collects them from its model's root and moving parts
 - **Aim**: a defence whose `muzzle` socket is on a moving part aims it (`BuildingView.can_aim`):
   the laser turret's head, the missile battery's launcher, the plasma mortar's barrel, the flak
   cannon's head, the cloaked sentry's lid, the railgun's rail assembly, the ion beam's emitter and
-  the orbital cannon's gun (`art-style.md`, **Moving parts**). One whose muzzle is on its body (the
+  the orbital cannon's mount, which carries its gun and its fire-control spire (`art-style.md`,
+  **Moving parts**). One whose muzzle is on its body (the
   arc tower, the EMP tower, the gravity well), or with none, never does. Each frame the view turns
   the head towards the unit `BattleSim.building_target` names (unless it is dead) at the type's
   `AIM_TURN` rate, as an exponential share of the way a second, in seconds of battle: 10 for the
@@ -392,13 +393,29 @@ direction; `BuildingView` collects them from its model's root and moving parts
   aim for `BuildingView.AIM_IDLE_SECONDS` (2.5), then eases back to its idle `Motion` at
   `AIM_RETURN` and follows it again (`idle_aim`). The head turns about +Y; the yaw that faces a
   point is measured from its pivot, against the way its muzzle faces as built. An idle Motion that
-  is not a scan about +Y (the orbital cannon's elevation) runs on under the aim. Yaw only: no head
-  pitches towards an air unit.
+  is not a scan about +Y (the orbital cannon's elevation) runs on under the aim, until the gun
+  pitches.
+- **Pitch**: a defence whose aiming part has a `trunnion` socket also pitches its barrels
+  (`BuildingView.can_pitch`, `art-style.md`, **Aiming parts**) towards the elevation `_elevation`
+  gives, easing from their built elevation and back to it with the yaw. A direct-fire gun aims
+  straight at the unit's drawn middle (`BattleUnits.aim_point`, an aircraft's height and a hovering
+  machine's lift in it) from its trunnion (`pitch_origin`), within `PITCH_LIMITS` (degrees over
+  level: the laser turret and the cloaked sentry -15 to 45, the flak cannon 0 to 75, the missile
+  battery 0 to 60, the railgun 0 to 20, its mount lifting it clear of its capacitors at every level and
+  its L6 targeting ring hovering clear over its raised rails, the
+  ion beam -15 to 45), at its `AIM_TURN` rate. A lobbing gun elevates by the unit's range instead
+  (`LOB_ELEVATION`, straight from the elevation at its full range to the one at its foot: the
+  orbital cannon 20 to 70 degrees, the plasma mortar 45 to 70; the orbital cannon's far end at 0.7
+  of its 50 cells, `LOB_REACH`, since the field's farthest unit is about 34 cells off), at
+  `LOB_TURN` (1.5). The orbital cannon's barrel starts from where its elevation swing has it and
+  eases back into the swing, so it never snaps. `aim_error`
+  is the larger of the yaw's and the pitch's, so a held shot waits for both.
 - **Kick**: as a shot leaves a muzzle socket (`_muzzle`) the view calls `BuildingView.fired(now,
   reach)` on the battle's clock with its type's weapon record's `recoil` (**Weapons**: the laser
   turret 0.18, the missile battery 0.1, the plasma mortar 0.25, the flak cannon 0.2, the cloaked
   sentry 0.1, the railgun 0.35, the ion beam 0.075, the orbital cannon 0.45 world units; 0, no
-  kick, for a type with none), and the aiming part kicks back along its muzzle by it over
+  kick, for a type with none), and the aiming part (the pitching barrels when they pitch on their
+  own) kicks back along its pitched muzzle by it over
   `RECOIL_SECONDS` (0.25 s), then eases back; the head's pose is its
   aim's yaw, its idle Motion, then the kick. `recoil_share()` says how far into its kick it is.
 - **EMP**: while a defence is disabled (`BattleSim.building_disabled`) every one of its moving parts

@@ -14,8 +14,9 @@ extends Node3D
 ## (BattleEffects, each kind one MultiMesh). A defence whose head carries a muzzle socket (every
 ## defence with a direction: the laser turret, missile battery, plasma mortar, flak cannon, cloaked
 ## sentry, railgun, ion beam and orbital cannon) turns it towards its target
-## (BattleSim.building_target) at its type's AIM_TURN rate, and goes back to its idle scan a while
-## after its target is gone (BuildingView.aim_at, idle_aim); its shots leave its muzzle sockets in
+## (BattleSim.building_target) at its type's AIM_TURN rate, pitching its barrels at the unit's
+## drawn height (PITCH_LIMITS) or, a lobbing gun, by its range (LOB_ELEVATION), and goes back to its
+## idle scan a while after its target is gone (BuildingView.aim_at, idle_aim); its shots leave its muzzle sockets in
 ## turn (its weapon record's, MUZZLES for most), each kicking the head back (BuildingView.fired) and
 ## held (the sim's hit is instant; the shot is the view's) until the head faces its target within
 ## AIM_READY, AIM_HOLD at most, so a shot never leaves a barrel turned away. A defence with its

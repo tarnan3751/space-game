@@ -321,8 +321,17 @@ BOB period: a pair crossing there fails too, and the body's are counted. A movin
 another (`BuildingModels.RIDES_META`, `Parts.riding`) is posed on the clock carried by it, as
 `BuildingView` carries it, and is not paired with it: its poses touching it are counted ("on its
 carrier"), as a mount's with the body. An aiming part (one with a `muzzle` socket) is also turned
-through a whole turn about +Y, every 10 degrees, against the body, its touching poses counted as
-its "aim sweep", never failed: battle turns it anywhere. The last line says the
+through a whole turn about +Y, every 10 degrees, about its pivot or the pivot of the part it
+rides (which turns it), and, when it pitches (a `trunnion` socket), at every 10 degrees of its
+travel (`BattleView.PITCH_LIMITS` or `LOB_ELEVATION`), both ends included, at each, against the
+body, its touching poses counted as its "aim sweep", never failed: battle turns it anywhere. A
+pitching part's poses across its travel are also tested against the part that turns it (turned
+with it) and every other moving part (one riding the same carrier turned with it, any other at rest; one riding the
+pitching part moves with it and is left out), counted per part as its "pitch sweep": the laser
+turret's and the flak cannon's barrels against their head, which they are mounted in, touch at
+every pose; the barrels against the flak cannon's radar, the railgun's rails against its ring and
+the mortar's barrel against its loader arm, and the orbital cannon's gun against its mount and the
+spire turning with it, are what the review reads. The last line says the
 models, moving parts and pairs and how many pairs crossed: every model of the roster passes, with
 no pair crossing. The whole roster takes about half a minute.
 
@@ -668,7 +677,15 @@ strip. Each battle is surrendered and left before the next.
   it fires. Then `emp-freeze` (16, 250 ms): a level 6 missile battery aiming when an EMP Burst
   lands on it, checked that no moving part moves while it is disabled and that they move again
   once it wakes; and `reveal` (8, 60 ms): a cloaked sentry as the unit comes within its range,
-  checked to show every step of its fade in and end as itself. Headless, each strip still takes
+  checked to show every step of its fade in and end as itself. Before those, per pitching
+  defence (at level 1, and the laser turret, flak cannon and ion beam at their top level too),
+  `<type>-<level>-pitch` (16, 300 ms; the orbital cannon's 700 ms; size 9, cropped): a unit
+  deployed off to the screen's right comes at it (a Bomber for the guns that shoot at the air, a
+  Brawler for the laser turret, the cloaked sentry and the plasma mortar, a Hover Tank from far
+  off for the orbital cannon), checked that the barrels' elevation sweeps at least 15 degrees (or
+  0.9 of the way to the elevation they want at the end, if that is less) and ends within
+  `AIM_READY` of it; against the Bomber, that the elevation they want rises at least 5 degrees as
+  it closes and that they never point lower than 5 degrees at it. Headless, each strip still takes
   its time, so the checks read the battle it would have shown.
 - `scenarios/anim_base.gd`: the construction drone over a Metal Silo placed on the fresh base,
   `drone-arrive` and `drone-laser` (8, 150 ms, camera size 6), then at its next shots
