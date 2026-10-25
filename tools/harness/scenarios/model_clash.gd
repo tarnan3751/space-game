@@ -34,12 +34,19 @@ extends HarnessScenario
 ##   part it rides at rest, and so against the part it rides: counted as for the body ("on its
 ##   carrier"), not paired, since a ring round a barrel is mounted on it.
 ## - An aiming part (a moving part with a `muzzle` socket, which BuildingView turns towards its
-##   target in battle) is also turned through a whole turn about +Y through its pivot, every
-##   SPIN_STEP degrees, against the body: counted as its "aim sweep", never failed, for the review.
+##   target in battle) is also turned through a whole turn about +Y, every SPIN_STEP degrees, about
+##   its pivot or the pivot of the part it rides (which turns it), and, when it pitches (a
+##   `trunnion` socket), at every PITCH_STEP of its travel (BattleView.PITCH_LIMITS or
+##   LOB_ELEVATION), both ends included, at each: counted against the body as its "aim sweep",
+##   never failed, for the review. A pitching part's poses across its travel are also tested
+##   against the part that turns it and every other moving part (as _pitch_sweep poses them),
+##   counted per part as its "pitch sweep".
 ##
 ## Each model with moving parts gets one line: its parts and motions, its pair crossings and its
 ## poses touching the body per part.
 
+## Degrees between the elevations a pitching part's travel is sampled at, both ends included.
+const PITCH_STEP := 10.0
 ## Degrees a SPIN turns between samples.
 const SPIN_STEP := 10.0
 ## Poses of a SWING and of a SLIDE against the body, both ends included.
@@ -71,8 +78,14 @@ class Shape:
 	var pivot := Vector3.ZERO
 	## The part it rides (Parts.riding), null for none.
 	var carrier: Shape = null
-	## Whether it aims in battle (its node carries a `muzzle` socket).
+	## Whether it aims in battle (its node carries a `muzzle` socket), and, for one that pitches its
+	## barrels (a `trunnion` socket too), the trunnion in its own space, the axis it pitches about
+	## (raising the muzzle) and its pitches across its travel, every PITCH_STEP and both ends, from its
+	## built elevation.
 	var aims := false
+	var trunnion := Vector3.ZERO
+	var pitch_axis := Vector3.RIGHT
+	var pitches := PackedFloat32Array([0.0])
 
 
 ## Where the last crossing _edges_cross found is, in the model's space.
@@ -99,6 +112,7 @@ func run(main: MainScript) -> void:
 ## Reads back `model`'s body and moving parts, checks every pair of its moving parts and counts
 ## each one's poses touching the body, says it as `label`, and frees it.
 func _check_model(label: String, model: Node3D) -> void:
+	var type := label.get_slice(" ", 0)
 	var lift := BOB_HEIGHT / model.scale.y
 	var body := Shape.new()
 	var parts: Array[Shape] = []
@@ -115,6 +129,8 @@ func _check_model(label: String, model: Node3D) -> void:
 			if child.has_meta(BuildingModels.SOCKETS_META):
 				var sockets: Dictionary = child.get_meta(BuildingModels.SOCKETS_META)
 				part.aims = sockets.has("muzzle")
+				if part.aims and sockets.has("trunnion"):
+					_travel(part, type, sockets["muzzle"], sockets["trunnion"])
 			for grandchild: Node in child.get_children():
 				if grandchild is MeshInstance3D and not grandchild.has_meta(BuildingModels.OUTLINE_META):
 					_read((grandchild as MeshInstance3D).mesh, part)
@@ -149,6 +165,8 @@ func _check_model(label: String, model: Node3D) -> void:
 			touching.append("%d on its carrier %s" % [i + 1, _body_contact(parts[i], _at_rest(parts[i].carrier), lift)])
 		if parts[i].aims:
 			touching.append("%d's aim sweep %s" % [i + 1, _aim_sweep(parts[i], body)])
+			if parts[i].pitches.size() > 1:
+				touching.append("%d's pitch sweep %s" % [i + 1, _pitch_sweep(parts[i], parts)])
 	check(pair_hits.is_empty(), "%s: %d moving part(s) (%s), %s; against the body: %s" % [label, parts.size(),
 		", ".join(motions), "no pair crossing" if pair_hits.is_empty() else "pairs crossing: " + ", ".join(pair_hits),
 		", ".join(touching)])
@@ -302,12 +320,42 @@ func _at_rest(part: Shape) -> Shape:
 	return rest
 
 
-## How many of an aiming part's poses through a whole turn about +Y (every SPIN_STEP degrees)
-## touch the static body: "a of n".
+## A pitching part's travel (BattleView.PITCH_LIMITS or LOB_ELEVATION for `type`): its trunnion,
+## its pitch axis and its pitches every PITCH_STEP across it, both ends included, from its `muzzle`
+## socket's built elevation.
+func _travel(part: Shape, type: String, muzzle: LowPolyMesh.Socket, trunnion: LowPolyMesh.Socket) -> void:
+	var limits := Vector2.ZERO
+	if BattleView.PITCH_LIMITS.has(type):
+		limits = BattleView.PITCH_LIMITS[type]
+	elif BattleView.LOB_ELEVATION.has(type):
+		limits = BattleView.LOB_ELEVATION[type]
+	else:
+		return
+	var facing := muzzle.direction.normalized()
+	var built := asin(clampf(facing.y, -1.0, 1.0))
+	part.trunnion = trunnion.position
+	part.pitch_axis = Vector3(facing.x, 0.0, facing.z).cross(Vector3.UP).normalized()
+	part.pitches = PackedFloat32Array()
+	var elevation := limits.x
+	while elevation < limits.y:
+		part.pitches.append(deg_to_rad(elevation) - built)
+		elevation += PITCH_STEP
+	part.pitches.append(deg_to_rad(limits.y) - built)
+
+
+## How many of an aiming part's poses through a whole turn about +Y (every SPIN_STEP degrees), the
+## part it rides turning it about that part's pivot, and, for one that pitches, at every sampled
+## elevation of its travel at each, touch the static body: "a of n".
 func _aim_sweep(part: Shape, body: Shape) -> String:
 	var poses: Array[Transform3D] = []
+	var turner := part.carrier if part.carrier != null else part
 	for k: int in roundi(360.0 / SPIN_STEP):
-		poses.append(Transform3D(Basis(Vector3.UP, deg_to_rad(SPIN_STEP * k)), part.pivot))
+		var yaw := Transform3D(Basis(Vector3.UP, deg_to_rad(SPIN_STEP * k)), Vector3.ZERO)
+		yaw = Transform3D(Basis.IDENTITY, turner.pivot) * yaw * Transform3D(Basis.IDENTITY, -turner.pivot)
+		for pitch: float in part.pitches:
+			var turn := Transform3D(Basis(part.pitch_axis, pitch), Vector3.ZERO)
+			turn = Transform3D(Basis.IDENTITY, part.trunnion) * turn * Transform3D(Basis.IDENTITY, -part.trunnion)
+			poses.append(yaw * Transform3D(Basis.IDENTITY, part.pivot) * turn)
 	var swept := AABB()
 	for k: int in poses.size():
 		swept = (poses[k] * part.box) if k == 0 else swept.merge(poses[k] * part.box)
@@ -318,6 +366,58 @@ func _aim_sweep(part: Shape, body: Shape) -> String:
 				(at * part.box).grow(SLACK)):
 			touching += 1
 	return "%d of %d" % [touching, poses.size()]
+
+
+## A pitching part's poses at every sampled elevation of its travel at every SPIN_STEP of the turn (as
+## _aim_sweep), against the part that turns it (its carrier, turned with it) and every other moving
+## part (one riding the same carrier turned with it, any other at rest; a part riding the pitching
+## one moves with it and is left out): "carrier a of n, part k b of n, ..." counting the poses that
+## touch each.
+func _pitch_sweep(part: Shape, parts: Array[Shape]) -> String:
+	var turner := part.carrier if part.carrier != null else part
+	var others: Array[Shape] = []
+	var names := PackedStringArray()
+	for k: int in parts.size():
+		var other := parts[k]
+		if other == part or _rides_on(other, part) or (other == turner and turner == part):
+			continue
+		others.append(other)
+		names.append("carrier" if other == turner else "part %d" % (k + 1))
+	var counts := PackedInt32Array()
+	counts.resize(others.size())
+	var poses := 0
+	for k: int in roundi(360.0 / SPIN_STEP):
+		var yaw := Transform3D(Basis(Vector3.UP, deg_to_rad(SPIN_STEP * k)), Vector3.ZERO)
+		yaw = Transform3D(Basis.IDENTITY, turner.pivot) * yaw * Transform3D(Basis.IDENTITY, -turner.pivot)
+		for pitch: float in part.pitches:
+			var turn := Transform3D(Basis(part.pitch_axis, pitch), Vector3.ZERO)
+			turn = Transform3D(Basis.IDENTITY, part.trunnion) * turn * Transform3D(Basis.IDENTITY, -part.trunnion)
+			var at := yaw * Transform3D(Basis.IDENTITY, part.pivot) * turn
+			var points := _posed(part, at, 0.0, 0.0)
+			var box := (at * part.box).grow(SLACK)
+			poses += 1
+			for o: int in others.size():
+				var other := others[o]
+				var moved := other == turner or _rides_on(other, turner)
+				var other_at := (yaw if moved else Transform3D.IDENTITY) * Transform3D(Basis.IDENTITY, other.pivot)
+				var other_box := (other_at * other.box).grow(SLACK)
+				if box.intersects(other_box) and _crosses(points, part.edges, _posed(other, other_at, 0.0, 0.0), other.edges,
+						box.intersection(other_box)):
+					counts[o] += 1
+	var said := PackedStringArray()
+	for o: int in others.size():
+		said.append("%s %d of %d" % [names[o], counts[o], poses])
+	return ", ".join(said) if not said.is_empty() else "no other part"
+
+
+## Whether `part` rides `carrier`, directly or through the parts it rides.
+func _rides_on(part: Shape, carrier: Shape) -> bool:
+	var on := part.carrier
+	while on != null:
+		if on == carrier:
+			return true
+		on = on.carrier
+	return false
 
 
 ## The body's triangles whose bounds meet `region`, as a shape of their own.
