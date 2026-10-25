@@ -430,6 +430,16 @@ func bolt(from: Vector3, to: Vector3, color: Color, now: float, seconds: float =
 	_bolt_unit[i] = unit
 
 
+## `weapon` (a Weapons record) fired from `from` at `to`, from `now`: its projectile, making an
+## impact of `impact` radius on arrival and calling `arrived` with `building` and `unit`, with its
+## muzzle flash at `from` when `flash_on`.
+func fire(weapon: Weapons.Weapon, from: Vector3, to: Vector3, building: int, unit: int, impact: float, now: float,
+		flash_on: bool = true) -> void:
+	bolt(from, to, weapon.color, now, 0.0, impact, building, unit)
+	if flash_on and weapon.flash > 0.0:
+		flash(from, weapon.flash, weapon.color, now)
+
+
 ## A muzzle flash at `at`, `radius` across, in `color`, from `now`, for FLASH_SECONDS.
 func flash(at: Vector3, radius: float, color: Color, now: float) -> void:
 	_flashes.add(at, radius, now, FLASH_SECONDS, color)

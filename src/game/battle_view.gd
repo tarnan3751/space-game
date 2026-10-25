@@ -576,7 +576,7 @@ func _unit_hit(unit: int, building: int, x: int, y: int) -> void:
 		effects.impact(Vector3(side.x, HIT_HEIGHT * 0.6, side.y), maxf(0.3, splash), UNIT_SHOT, _clock)
 		_on_arrived(building, 0)
 		return
-	units.shoot(unit, hit_at, building, maxf(0.3, splash), UNIT_SHOT, _clock)
+	units.shoot(unit, hit_at, building, maxf(0.3, splash), _clock)
 
 
 ## A bolt reached `building` or `unit` (0 for none): it flashes, a building shakes and shows its bar.
