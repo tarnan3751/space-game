@@ -85,13 +85,15 @@ jet flames in fixed fire colours at every tier; the vault door on the front face
 early walls; the structural minimum of 0.14; the rival-neutral violet holograms; the deaths'
 timings; the kick amplitudes (the `recoil` of the defences' records in `weapons.gd`); the kinds and colours in `weapons.gd`.
 
-## 5. Left for later
+## 5. The follow-ups, and what is left
 
-- Building figures do not walk (a building has no instance state): a flag taking the gait
-  phase from the clock would let the hangar's trooper march and the cadet pace.
-- The gunship and skimmer have no `exhaust` socket, so their crash smoke trails from the gun.
-- `Weapons` records carry a `recoil` field nothing reads; the kicks live in
-  `BuildingView.RECOIL`. One source would be better.
-- The `effects` scenario's pulse check compares two shots 0.3 s apart on a real-time pulse and
-  can read no change; the `battle` scenario's step budget fails under machine load.
-- The phone measurement still needs a device (`docs/reference/testing-tools.md`).
+Landed the same day: building figures march on the clock (`Surf.MARCH`: the hangar's trooper
+patrols its pad, the academy's cadet marches in place, both hidden while the building is busy);
+exhaust sockets on the gunship and skimmer so crashes trail from the engines; the kick read from
+the weapon record's `recoil`; the `effects` pulse check on any pair of shots; aircraft flying
+higher in battle; and the defences' barrel pitch (§3.1 **Aircraft fly higher and defences pitch
+their barrels**).
+
+Left: the `battle` scenario's step budget fails under machine load (core measurement); the
+mortar at L7 brushes its loader arm at two yaws in battle; the phone measurement still needs a
+device (`docs/reference/testing-tools.md`).

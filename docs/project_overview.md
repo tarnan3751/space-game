@@ -381,6 +381,20 @@ any of them can be reversed as a data or model change.
   the face they hit, scorches fading, the shield never vanishing; every building's idle made to
   read and every dish on one speed. The owner's review list is §4 of the plan record.
 
+- **Aircraft fly higher and defences pitch their barrels** (the coordinator, 2026-10-25, after the
+  owner asked that "some of the defenses also need to have their barrels tilt up and down to angle
+  towards what they're shooting at"; `docs/reference/battle-view.md`, **Aim and muzzles**, **Units**):
+  every direct-fire defence elevates its barrels toward its target's drawn height and the lobbing
+  guns by range, with honest geometry (no view-only floors): the laser, flak and sentry barrels pitch
+  as riders while the dome, carriage and radar stay level; the missile launcher, railgun rails, ion
+  emitter and mortar barrel pitch whole; the orbital's gun rides a yawing mount with its fire-control
+  spire behind the breech. The clash check sweeps every pitching part across its whole travel. Since
+  the anti-air guns' trunnions sat at the aircraft's drawn height, aircraft now fly higher in battle
+  (`BattleUnits.FLIGHT_MIDDLE`: jet trooper 1.5, skimmer 2.0, gunship and bomber 4.0 units), view
+  only, the sim untouched; the top-level flak and ion still sit near level against a gunship holding
+  at range, and the lever is that table. Reversible as data: the limits and lob spans in
+  `battle_view.gd`, the heights in `battle_units.gd`.
+
 ### 3.2 Open
 
 - **Economy validation on the server.** Either port the small economy rules to TypeScript,
