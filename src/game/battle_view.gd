@@ -87,6 +87,10 @@ const AIM_RETURN := 3.0
 ## longest a shot is held (seconds of battle).
 const AIM_READY := 0.12
 const AIM_HOLD := 0.4
+## A wreck's fireball, its share of the way through the death, and the socket a death's effects
+## follow.
+const WRECK_BLAST := 0.3
+const DEATH_SOCKET := "muzzle"
 ## A punch: how long after the blow it lands at the fist, its ring's size against the record's
 ## impact size, its white flash's.
 const PUNCH_DELAY := 0.06
@@ -110,6 +114,10 @@ const COLLAPSE_TILT := 12.0
 const RUBBLE_FROM := 0.6
 const RUBBLE_POP := 0.15
 const SMOKE_COLUMN_SECONDS := 4.0
+## A crashing aircraft's smoke trail: a puff this often, this big, from this socket.
+const CRASH_STEP := 0.06
+const CRASH_PUFF := 0.18
+const CRASH_SOCKET := "muzzle"
 ## A sprung trap: how long its model takes to pop up before it goes off, how long a grav trap's
 ## funnel spins and how fast, and how long it takes to sink away after.
 const TRAP_POP := 0.15
@@ -191,6 +199,9 @@ var _collapsing: Dictionary[int, BuildingView] = {}
 var _collapse_at: Dictionary[int, float] = {}
 var _rubble_pop: Dictionary[int, Node3D] = {}
 var _rubble_at: Dictionary[int, float] = {}
+## The crashing aircraft: when each comes to rest, and when it leaves its next puff.
+var _crashing: Dictionary[int, float] = {}
+var _crash_puff: Dictionary[int, float] = {}
 ## The traps, each a hidden view shown while it springs, and when each sprang.
 var _traps: Dictionary[int, BuildingView] = {}
 var _sprung: Dictionary[int, float] = {}
@@ -200,6 +211,10 @@ var _quake_from: float = 0.0
 var _quake_until: float = -1.0
 ## Each building's weapon record (Weapons), traps' included.
 var _weapons: Dictionary[int, Weapons.Weapon] = {}
+## The dying units with a death's effects to draw, and when each died; the wrecks whose fireball
+## is drawn.
+var _dying: Dictionary[int, float] = {}
+var _wrecked: Dictionary[int, bool] = {}
 ## The punches still to land, at which building, and when.
 var _blows: Dictionary[int, int] = {}
 var _blow_at: Dictionary[int, float] = {}
@@ -409,6 +424,8 @@ func _process(delta: float) -> void:
 	effects.begin_bars()
 	units.draw(alpha, _clock, shown, effects, camera.size >= BattleUnits.FAR_ZOOM)
 	_land_blows()
+	_trail_crashes()
+	_finish_deaths()
 	_aim_defences(shown)
 	_draw_buildings(shown)
 	_draw_traps()
@@ -553,6 +570,7 @@ func _read_events() -> void:
 				_mask_changed = true
 			BattleEvents.DEATH:
 				units.die(target, _clock)
+				_death(target)
 			BattleEvents.ABILITY:
 				_ability_used(source, events.to_x[i], events.to_y[i], events.land_tick[i])
 			BattleEvents.STRIKE_LAND:
@@ -657,6 +675,80 @@ func _land_blows() -> void:
 	for unit: int in _done:
 		_blow_at.erase(unit)
 		_blows.erase(unit)
+
+
+## Unit `unit` died: by its weapon record's death, past the body's own fall (BattleUnits, over
+## its death_seconds): a wreck's fireball as it rolls, smoke and a scorch left; a crash's smoke
+## trailing from it as it spirals down (_trail_crashes) and its blast where it comes to rest; a
+## small blast at the end; a figure nothing more.
+func _death(unit: int) -> void:
+	var weapon := Weapons.of(sim.unit_type(unit))
+	if weapon.death == Weapons.Death.NONE:
+		return
+	_dying[unit] = _clock
+	if weapon.death == Weapons.Death.CRASH:
+		_crashing[unit] = _clock + units.death_seconds(unit)
+
+
+## The dying units' effects, where each is drawn now (its `muzzle` socket as drawn,
+## BattleUnits.socket_point, which turns with the body as it rolls or spirals; once its fall is
+## over, where the fall left it), no lower than its standing middle: a wreck's fireball
+## and glow WRECK_BLAST of the way through its death, then at its end a scorch where it came to
+## rest and dark smoke; a crash's blast, glow and scorch where it comes to rest; a small blast at
+## the end of the rest.
+func _finish_deaths() -> void:
+	if _dying.is_empty():
+		return
+	_done.clear()
+	for unit: int in _dying:
+		var weapon := Weapons.of(sim.unit_type(unit))
+		var seconds := units.death_seconds(unit)
+		var since := _clock - _dying[unit]
+		var middle := units.aim_point(unit)
+		var at := units.socket_point(unit, DEATH_SOCKET)
+		at.y = middle.y
+		var ground := Vector3(at.x, 0.0, at.z)
+		var size := clampf(middle.y * 1.4, 0.45, 1.4)
+		if weapon.death == Weapons.Death.WRECK and since >= seconds * WRECK_BLAST and not _wrecked.has(unit):
+			_wrecked[unit] = true
+			effects.blast(at, size, 0, _clock)
+			effects.glow(ground, size * 1.2, Weapons.BLAST_RIM, _clock, 0.4)
+		if since < seconds:
+			continue
+		_done.append(unit)
+		match weapon.death:
+			Weapons.Death.WRECK:
+				effects.scorch(ground, size * 0.5)
+				for k: int in 3:
+					effects.puff(ground + Parts.around(size * 0.2, 120.0 * k, 0.3), size * 0.3, Weapons.DARK_SMOKE,
+						_clock + 0.2 * k, 1.5, 1.0)
+			Weapons.Death.CRASH:
+				effects.blast(ground + Vector3.UP * 0.2, size, 1, _clock, true)
+				effects.glow(ground, size * 1.4, Weapons.BLAST_RIM, _clock, 0.4)
+			Weapons.Death.BLAST:
+				effects.blast(at, size * 0.6, 0, _clock)
+	for unit: int in _done:
+		_dying.erase(unit)
+		_wrecked.erase(unit)
+
+
+## The crashing aircraft: a puff of smoke from each, where it is drawn now (its `muzzle` socket as
+## last drawn, BattleUnits.socket_point, so the trail follows its spiral down), every CRASH_STEP,
+## until it comes to rest.
+func _trail_crashes() -> void:
+	if _crashing.is_empty():
+		return
+	_done.clear()
+	for unit: int in _crashing:
+		if _clock >= _crashing[unit]:
+			_done.append(unit)
+			continue
+		if _clock >= _crash_puff.get(unit, 0.0):
+			_crash_puff[unit] = _clock + CRASH_STEP
+			effects.puff(units.socket_point(unit, CRASH_SOCKET), CRASH_PUFF, Weapons.SMOKE, _clock, 0.9, 0.3)
+	for unit: int in _done:
+		_crashing.erase(unit)
+		_crash_puff.erase(unit)
 
 
 ## A bolt reached `building` or `unit` (0 for none): it flashes, a building shakes and shows its bar.
