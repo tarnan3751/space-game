@@ -1,15 +1,15 @@
 extends RefCounted
 ## Models of the defences (docs/reference/art-style.md). Every defence stands on the family's
-## squat armoured plinth, an octagon of gunmetal plate belted in defence red on its concrete
-## pad, and glows in its weapon's own colour: laser red, plasma violet, arc electric blue, ion
+## squat armoured plinth, an octagon of gunmetal plate on its concrete pad whose upper third, its
+## deck, is plated in defence red, and glows in its weapon's own colour: laser red, plasma violet, arc electric blue, ion
 ## and railgun cyan, EMP yellow. Levels add barrels, armour, coils or capacitors to the same
 ## weapon; the Gold tier (Parts.tier) adds gold trim. The laser turret, the missile battery, the
 ## plasma mortar, the flak cannon, the shield generator, the arc tower, the cloaked sentry, the
 ## gravity well, the EMP tower, the railgun, the ion beam and the orbital cannon go on to their
 ## tops through the high tiers: chrome with cyan strips, then obsidian with glowing violet vein
 ## panels on the faces the camera sees and a hovering ring, then gold filigree, the antimatter
-## core and a crown; the plinth keeps its octagon and its red belt, plated in the tier's
-## chrome or obsidian (the cloaked sentry, which has no plinth, rises on a hex skirt banded in
+## core and a crown; the plinth keeps its octagon and its red deck over the tier's chrome or
+## obsidian plate (the cloaked sentry, which has no plinth, rises on a hex skirt banded in
 ## red). Where the core is the weapon's heart (the shield's orb, the arc tower's sphere, the well's
 ## core, the EMP's emitter, the railgun's and the orbital cannon's breech, the ion beam's lens) it
 ## glows steady and light violet at the Crown (BRIGHT_CORE).
@@ -47,7 +47,7 @@ static var PLASMA := _glow(MaterialKit.ANTIMATTER)
 static var ION := _glow(MaterialKit.ENERGY)
 ## The cloaked sentry's shimmer: a hologram, phasing.
 static var SHIMMER := Surf.make(MaterialKit.Layer.GLOW, MaterialKit.ENERGY, 1.0, Surf.HOLO)
-## The plinth's red belt, its plates creeping round it.
+## The laser turret's red deck, its plates creeping round it.
 static var BELT := Surf.make(MaterialKit.Layer.PLATE, MaterialKit.DEFENCE, 1.0, Surf.FLOW_U, false, true, 0.6)
 static var LASER_PULSE := _glow(MaterialKit.DEFENCE, Surf.PULSE)
 static var LASER_BLINK := _glow(MaterialKit.DEFENCE, Surf.BLINK)
@@ -147,6 +147,8 @@ const TOWARD_CAMERA := Vector3(0.70710678, 0, 0.70710678)
 ## The armoured octagon plinth's faces the camera sees, by the Parts.around() angle of each face's
 ## normal: the vein panels' and the filigree's places.
 const PLINTH_FACES := [0.0, 45.0, 90.0]
+## The Crown's filigree band round a plinth's foot: tall enough for its pattern to read.
+const PLINTH_FILIGREE := 0.1
 
 ## The laser turret from L6, by level from L6: the plinth's height, and how far the mount lifts
 ## the head above the turret ring.
@@ -310,7 +312,7 @@ static func build_laser_turret(p: Parts, level: int) -> void:
 			m.prism(0.07, 0.07, 0.05, 4, Parts.around(0.8, degrees, top + 0.08), INLAY.phased(degrees / 90.0),
 				Vector3(90, 90.0 - degrees, 0))
 	if level >= 10:
-		_plinth_filigree(m, 1.2, plinth)
+		_plinth_filigree(m, 1.2)
 		m.ring(0.98, 1.12, 0.02, 8, Vector3(0, top, 0), Parts.FILIGREE, Parts.OCTAGON)
 	var pivot := Vector3(0, foot + lift, 0)
 	# The head is built turned to SCREEN_RIGHT - 25, so the middle of its scan shows the barrels'
@@ -466,7 +468,7 @@ static func build_missile_battery(p: Parts, level: int) -> void:
 			m.prism(0.07, 0.07, 0.05, 4, Parts.around(0.96, degrees, top), INLAY.phased(degrees / 90.0),
 				Vector3(90, 90.0 - degrees, 0))
 	if level >= 10:
-		_plinth_filigree(m, 1.2, plinth)
+		_plinth_filigree(m, 1.2)
 		m.ring(0.86, 1.1, 0.02, 8, Vector3(0, top, 0), Parts.FILIGREE, Parts.OCTAGON)
 	# The radar mast up the launcher's centre, through the slot between its pods.
 	var dish_y: float = deck + trunnion.y + float(MISSILE_DISH_LIFTS[level - 6])
@@ -669,8 +671,8 @@ static func build_plasma_mortar(p: Parts, level: int) -> void:
 			charge.orb(0.07, 8, 4, LowPolyMesh.turn(Parts.around((MORTAR_CHARGE_INNER + MORTAR_CHARGE_OUTER) * 0.5, 90.0 * k, 0.06),
 				tilt), (HOVER_GOLD if p.tier >= Parts.Tier.CROWN else HOVER_SIGHT))
 	if level >= 8:
-		_plinth_filigree(m, radius, plinth)
-		m.ring(0.885, 0.905, 0.08, 20, Vector3(0, top + rise * 0.6, 0), Parts.FILIGREE)
+		_plinth_filigree(m, radius)
+		m.ring(0.885, 0.905, 0.1, 20, Vector3(0, top + rise * 0.6, 0), Parts.FILIGREE)
 		Parts.torus(m, chamber + 0.04, 0.06, 20, 8, Vector3(0, seat, 0), Parts.CORE_GLOW)
 		# The gold crown round the bowl's rim.
 		Parts.torus(m, 0.86, 0.04, 24, 8, Vector3(0, seat - 0.06, 0), Parts.GOLD_ROUND)
@@ -824,7 +826,7 @@ static func build_shield_generator(p: Parts, level: int) -> void:
 		var ring := p.moving(orb - Vector3(0, SHIELD_RING_DROP, 0), Motion.spin(Vector3.UP, 0.5))
 		_hover_ring(ring, orb_radius + SHIELD_RING, orb_radius + SHIELD_RING + 0.14, p.tier)
 	if level >= 8:
-		_plinth_filigree(m, 1.15, plinth)
+		_plinth_filigree(m, 1.15)
 		m.ring(0.96, 1.08, 0.02, 8, Vector3(0, top, 0), Parts.FILIGREE, Parts.OCTAGON)
 		Parts.torus(m, orb_radius + SHIELD_FIELD + 0.09, 0.03, 24, 8, orb - Vector3(0, 0.03, 0), Parts.GOLD_ROUND)
 		# The gold halo floating over the orb, bobbing with it.
@@ -929,7 +931,7 @@ static func build_flak_cannon(p: Parts, level: int) -> void:
 		var ring := p.moving(Vector3(0, deck + FLAK_RING_LIFT, 0), Motion.spin(Vector3.UP, 0.7))
 		_hover_ring(ring, 0.36, 0.48, p.tier)
 	if level >= 8:
-		_plinth_filigree(m, 1.15, plinth)
+		_plinth_filigree(m, 1.15)
 		m.ring(0.6, 0.64, 0.06, 20, Vector3(0, top + 0.04, 0), Parts.FILIGREE)
 		# The antimatter core round the mount's foot and in a gold housing on its near side.
 		Parts.torus(m, 0.52, 0.06, 20, 8, Vector3(0, top + 0.12, 0), Parts.CORE_GLOW)
@@ -1035,7 +1037,7 @@ static func build_arc_tower(p: Parts, level: int) -> void:
 		var ring := p.moving(centre - Vector3(0, 0.035, 0), Motion.spin(Vector3.UP, 0.7))
 		_hover_ring(ring, sphere + ARC_RING, sphere + ARC_RING + 0.14, p.tier)
 	if level >= 8:
-		_plinth_filigree(m, 1.1, plinth)
+		_plinth_filigree(m, 1.1)
 		Parts.torus(m, sphere - 0.01, 0.035, 20, 6, centre - Vector3(0, 0.035, 0), Parts.GOLD_ROUND)
 
 
@@ -1211,7 +1213,7 @@ static func build_gravity_well(p: Parts, level: int) -> void:
 		rotor.box(Vector3(0.06, 0.05, 0.12), Parts.around(WELL_RING_INNER - 0.02, 60.0 + 120.0 * k, ring_y + 0.01), HOVER_SIGHT,
 			Vector3(0, 30.0 - 120.0 * k, 0))
 	if level >= 6:
-		_plinth_filigree(m, 0.8, plinth)
+		_plinth_filigree(m, 0.8)
 		m.ring(0.64, 0.76, 0.02, 8, Vector3(0, top, 0), Parts.FILIGREE, Parts.OCTAGON)
 
 
@@ -1295,7 +1297,7 @@ static func build_emp_tower(p: Parts, level: int) -> void:
 	var ring := p.moving(cage - Vector3(0, EMP_RING_DROP, 0), Motion.spin(Vector3.UP, 0.7))
 	_hover_ring(ring, EMP_RING_INNER, EMP_RING_OUTER, p.tier)
 	if level >= 6:
-		_plinth_filigree(m, 1.2, plinth)
+		_plinth_filigree(m, 1.2)
 		m.box(Vector3(0.86, 0.04, 0.86), Vector3(0, top + 0.62, 0), Parts.FILIGREE)
 		# The gold crown on the cage's ring, over the core.
 		_crown(m, cage + Vector3(0, 0.68, 0), 0.44, 8, 0.16)
@@ -1400,7 +1402,7 @@ static func build_railgun(p: Parts, level: int) -> void:
 	_hover_ring(ring, 0.56, 0.7, p.tier)
 	if level < 7:
 		return
-	_plinth_filigree(m, 1.2, plinth)
+	_plinth_filigree(m, 1.2)
 	m.ring(0.37, 0.39, 0.06, 24, foot + Vector3(0, 0.24, 0), Parts.FILIGREE)
 	# The breech: the antimatter core glowing light violet behind the rails, in gold rings, where the
 	# camera sees it; a gold crown on the muzzle.
@@ -1503,7 +1505,7 @@ static func build_ion_beam(p: Parts, level: int) -> void:
 		_ion_focus(focus, 0.22, 0.32, aim, p.tier)
 	if level < 6:
 		return
-	_plinth_filigree(m, 0.78, plinth)
+	_plinth_filigree(m, 0.78)
 	_ion_crown(m, _at(lens, Vector3(0, 0.02, 0), aim), 0.36, 5, 0.24, aim)
 
 
@@ -1642,7 +1644,7 @@ static func build_orbital_cannon(p: Parts, level: int) -> void:
 	_ion_focus(uplink, 0.62, 0.78, aim, p.tier)
 	if level < 5:
 		return
-	_plinth_filigree(m, 1.78, plinth)
+	_plinth_filigree(m, 1.78)
 	# The antimatter core: light violet in a gold rim on the breech block's back, where the camera
 	# sees it; a gold crown round the muzzle.
 	var back := LowPolyMesh.turn(Vector3(0, 0, -1), aim)
@@ -1655,39 +1657,40 @@ static func build_orbital_cannon(p: Parts, level: int) -> void:
 # --- Shared parts --------------------------------------------------------------------
 
 ## The family's plinth on its pad: an armoured octagon of gunmetal plate (`plate`: chrome or
-## obsidian at the high tiers), `radius` to its corners and `height` tall, belted in defence red
-## (`belt_surf`). Returns the height of its top.
+## obsidian at the high tiers), `radius` to its corners and `height` tall, its upper third, deck
+## and chamfer, plated in defence red (`belt_surf`) at every tier, so the family reads red from
+## across the base. Returns the height of its top.
 static func _plinth(m: LowPolyMesh, size: int, radius: float, height: float, belt_surf: Surf = ARMOUR,
 		plate: Surf = Parts.GUNMETAL) -> float:
 	Parts.foundation(m, size)
 	var base := Vector3(0, Parts.PAD_HEIGHT, 0)
-	Parts.drum(m, radius, height, 0.08, 8, base, plate, Parts.OCTAGON)
-	var belt := minf(0.08, height * 0.3)
-	m.ring(radius - 0.04, radius + 0.03, belt, 8, base + Vector3(0, height * 0.45 - belt * 0.5, 0), belt_surf, Parts.OCTAGON)
+	var deck := _deck(height)
+	m.lathe(PackedVector2Array([Vector2(radius, 0), Vector2(radius, height - deck)]), 8, base, plate, Parts.OCTAGON)
+	Parts.drum(m, radius, deck, minf(0.08, deck * 0.5), 8, base + Vector3(0, height - deck, 0), belt_surf, Parts.OCTAGON)
 	return Parts.PAD_HEIGHT + height
 
 
-## Glowing violet vein panels on the faces of a plinth (_plinth) the camera sees, a row under its
-## belt and a row over it, clear of the filigree's place under the chamfer; a row too short to
-## read is left out.
+## The height of a plinth's red deck (_plinth): its upper third.
+static func _deck(height: float) -> float:
+	return height / 3.0
+
+
+## Glowing violet vein panels on the faces of a plinth (_plinth) the camera sees, on its plate
+## under the red deck, clear of the filigree band round its foot; too short a plinth has none.
 static func _plinth_panels(m: LowPolyMesh, radius: float, height: float) -> void:
 	var apothem := radius * cos(deg_to_rad(22.5))
 	var width := 2.0 * radius * sin(deg_to_rad(22.5)) * 0.7
-	var belt := minf(0.08, height * 0.3)
-	var rows: Array[Vector2] = [Vector2(0.05, height * 0.45 - belt * 0.5 - 0.025),
-		Vector2(height * 0.45 + belt * 0.5 + 0.025, height - 0.15)]
+	var row := Vector2(PLINTH_FILIGREE + 0.02, height - _deck(height) - 0.03)
+	if row.y - row.x < 0.08:
+		return
 	for degrees: float in PLINTH_FACES:
-		for row: Vector2 in rows:
-			if row.y - row.x < 0.08:
-				continue
-			m.box(Vector3(width, row.y - row.x, 0.02), Parts.around(apothem + 0.008, degrees, Parts.PAD_HEIGHT + row.x),
-				VEIN_PANEL, Vector3(0, 90.0 - degrees, 0))
+		m.box(Vector3(width, row.y - row.x, 0.02), Parts.around(apothem + 0.008, degrees, Parts.PAD_HEIGHT + row.x),
+			VEIN_PANEL, Vector3(0, 90.0 - degrees, 0))
 
 
-## Gold filigree bands round a plinth (_plinth): under its chamfer and round its foot.
-static func _plinth_filigree(m: LowPolyMesh, radius: float, height: float) -> void:
-	for y: float in [height - 0.13, 0.0]:
-		m.ring(radius - 0.03, radius + 0.025, 0.05, 8, Vector3(0, Parts.PAD_HEIGHT + y, 0), Parts.FILIGREE, Parts.OCTAGON)
+## A broad gold filigree band round a plinth's foot (_plinth), under its vein panels.
+static func _plinth_filigree(m: LowPolyMesh, radius: float) -> void:
+	m.ring(radius - 0.03, radius + 0.025, PLINTH_FILIGREE, 8, Vector3(0, Parts.PAD_HEIGHT, 0), Parts.FILIGREE, Parts.OCTAGON)
 
 
 ## A gold crown standing on `pos`: a band `radius` round with `points` spikes `spike` tall on it.
