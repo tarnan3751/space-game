@@ -953,16 +953,29 @@ static var SIPHON_CORE_GLOW := Surf.make(MaterialKit.Layer.GLOW, MaterialKit.ANT
 static var COIL_CURRENT := Surf.make(MaterialKit.Layer.SCREEN, MaterialKit.ANTIMATTER, 3.0, Surf.UNLIT | Surf.FLOW, true, true, 0.75)
 static var ARC := Parts.spark(MaterialKit.ANTIMATTER)
 
-## The antimatter siphon's core (the torus turns round it), its field pylons (degrees, the
-## camera's corner left open) and the coils on the torus by level.
+## The antimatter siphon's core (the torus turns round it), its radius to L3, its field pylons
+## (degrees, the camera's corner left open) and the coils on the torus, six at every level so the
+## violet shows between them. The torus: a real
+## ring of TORUS_MAJOR and TORUS_MINOR in the antimatter accent, its coils COIL_WIDTH across.
 const SIPHON_CORE := 1.3
+const SIPHON_CORE_RADIUS := 0.4
 const SIPHON_PYLONS := [105.0, 225.0, 345.0]
-const SIPHON_COILS := [6, 9, 9, 12, 12, 12, 12, 12]
-## From L4 the core floats higher and grows, by level from L4: its height and its radius; the
-## pylons grow PYLON_GROWTH a level from L3's height.
+const SIPHON_COILS := 6
+const TORUS_MAJOR := 0.72
+const TORUS_MINOR := 0.2
+const COIL_WIDTH := 0.25
+## From L4 the core floats higher and grows, by level from L4: its height and its radius, no more
+## than keeps it inside the coils turning round it (their inner faces 0.5 out); the pylons grow
+## PYLON_GROWTH a level from L3's height.
 const RAISED_CORES := [1.45, 1.55, 1.7, 1.8, 1.95]
-const CORE_RADII := [0.31, 0.34, 0.36, 0.36, 0.38]
+const CORE_RADII := [0.44, 0.46, 0.47, 0.47, 0.47]
 const PYLON_GROWTH := 0.4
+## The field pylons: their columns' width, how far their tops lean in towards the core (no further
+## than keeps them clear of the torus's coils and the L3 ring turning inside them), and their
+## emitter heads' width.
+const PYLON_WIDTH := 0.22
+const PYLON_LEAN := 0.08
+const EMITTER_HEAD := 0.3
 ## The L5 third capacitor, on the right corner past the right pylon, where the camera sees it, and
 ## where its pipe meets the pedestal.
 const THIRD_CAPACITOR := Vector3(0.72, 0, -1.12)
@@ -971,7 +984,7 @@ const THIRD_PIPE_END := Vector3(0.37, 0, -0.57)
 ## go on the faces turned to it.
 const TOWARD_CAMERA := Vector3(0.70710678, 0, 0.70710678)
 ## The L6 ring hovering over the core and the L8 halo over it: their heights over the core.
-const SIPHON_HOVER_LIFT := 0.55
+const SIPHON_HOVER_LIFT := 0.62
 const HALO_LIFT := 0.95
 
 ## The high levels' arcs: cyan at the Chrome tier, violet from the Obsidian tier. From the Obsidian
@@ -982,15 +995,16 @@ static var VIOLET_ARC := Parts.spark(Parts.CORE_GLOW_TINT)
 static var VEIN_PANEL := Surf.make(MaterialKit.Layer.GLOW, Parts.CORE_GLOW_TINT, 1.0 / 3.0, Surf.UNLIT | Surf.FLOW, false, true, 0.45)
 
 
-## A magnetic torus turning round a pulsing violet core floating on a pedestal, wound with
-## field coils whose current flows, three field pylons aiming glowing emitters at it with arcs
-## crackling from their tips to the core, a capacitor piped to the pedestal.
-## Unlocked at Command Center 4, so it looks advanced from L1. L2 adds coils, pylon armour and
+## A fat antimatter-violet torus turning round a big pulsing violet core floating on a cream
+## pedestal, wound with fat field coils whose current flows, three chamfered field pylons leaning
+## in, aiming fat emitter heads at it with arcs crackling from their tips to the core's upper half,
+## a capacitor piped to the pedestal.
+## Unlocked at Command Center 4, so it looks advanced from L1. L2 adds pylon armour and
 ## a second capacitor; L3 a second, larger torus tilted round the first, and gold trim.
 ##
 ## From L4 the pylons grow PYLON_GROWTH a level, their heads aimed down at the core, which floats
-## higher and grows. L4 (Chrome): chrome pylons with cyan strips up them, a chrome torus with twelve
-## coils, cyan arcs. L5 two cyan rings round each pylon and a third capacitor on the right
+## higher and grows. L4 (Chrome): chrome pylons with cyan strips up them, six chrome coils on the
+## violet torus (obsidian coils from the Obsidian tier), cyan arcs. L5 two cyan rings round each pylon and a third capacitor on the right
 ## corner. L6 (Obsidian): obsidian pylons with glowing violet vein panels and violet rings, an
 ## obsidian ring hovering over the core, violet arcs. L7 crystal inlays at the pylons' feet and
 ## crystal crowns on their heads. L8 (Crown): gold filigree bands round the pylons, a halo glowing over the core (its crown),
@@ -1002,13 +1016,13 @@ static func build_antimatter_siphon(p: Parts, level: int) -> void:
 	var chrome := p.tier >= Parts.Tier.CHROME
 	var obsidian := p.tier >= Parts.Tier.OBSIDIAN
 	var core_y := SIPHON_CORE if level < 4 else float(RAISED_CORES[level - 4])
-	var core_radius := 0.27 if level < 4 else float(CORE_RADII[level - 4])
+	var core_radius := SIPHON_CORE_RADIUS if level < 4 else float(CORE_RADII[level - 4])
 	Parts.foundation(m, 3)
 	var ground := Parts.PAD_HEIGHT
 	m.lathe(PackedVector2Array([
 		Vector2(1.0, 0), Vector2(1.0, 0.14), Vector2(0.62, 0.26), Vector2(0.44, 0.5),
 		Vector2(0.42, 0.66), Vector2(0.54, 0.78), Vector2(0, 0.78),
-	]), 24, Vector3(0, ground, 0), Parts.HULL_MID_ROUND)
+	]), 24, Vector3(0, ground, 0), Parts.HULL_LIGHT_ROUND)
 	m.lathe(PackedVector2Array([Vector2(1.04, 0), Vector2(1.04, 0.07), Vector2(0.99, 0.07)]), 24,
 		Vector3(0, ground + 0.05, 0), Parts.GOLD_ROUND if gold else ANTIMATTER_ACCENT_ROUND)
 	for k: int in 6:
@@ -1023,12 +1037,13 @@ static func build_antimatter_siphon(p: Parts, level: int) -> void:
 		arc = VIOLET_ARC
 	elif chrome:
 		arc = CYAN_ARC
-	var core := Vector3(0, core_y + 0.1, 0)
+	# The arcs land on the core's upper half, over the torus's coils.
+	var core := Vector3(0, core_y + core_radius * 0.6, 0)
 	var tips: Array[Vector3] = []
 	for k: int in SIPHON_PYLONS.size():
 		var tip := _field_pylon(m, SIPHON_PYLONS[k], level, gold, p.tier, core)
 		tips.append(tip)
-		Parts.arc(m, tip, core + (tip - core).normalized() * (0.2 + core_radius - 0.27), 4, 0.05, arc.phased(k / 3.0))
+		Parts.arc(m, tip, core + (tip - core).normalized() * (core_radius * 0.45), 4, 0.05, arc.phased(k / 3.0))
 
 	# Capacitors piped to the pedestal.
 	_capacitor(m, Vector3(0.95, ground, 0.95), gold)
@@ -1061,21 +1076,23 @@ static func build_antimatter_siphon(p: Parts, level: int) -> void:
 			Parts.arc(m, tips[k], tips[(k + 1) % tips.size()], 6, 0.06, arc.phased(fposmod(k / 3.0 + 0.17, 1.0)))
 
 	var s := p.moving(Vector3(0, core_y, 0), Motion.spin(Vector3.UP, 1.4))
-	Parts.torus(s, 0.72, 0.12, 24, 10, Vector3(0, -0.12, 0), Parts.CHROME_ROUND if chrome else Parts.HULL_LIGHT_ROUND)
-	var coils: int = SIPHON_COILS[level - 1]
+	Parts.torus(s, TORUS_MAJOR, TORUS_MINOR, 24, 10, Vector3(0, -TORUS_MINOR, 0), ANTIMATTER_ACCENT_ROUND)
+	var coils := SIPHON_COILS
 	for k: int in coils:
 		var degrees := 360.0 * k / coils
 		var yaw := Vector3(0, 90.0 - degrees, 0)
-		s.box_chamfered(Vector3(0.12, 0.34, 0.36), 0.04, Parts.around(0.72, degrees, -0.17), Parts.HULL_DARK, yaw)
-		s.box(Vector3(0.13, 0.06, 0.37), Parts.around(0.72, degrees, 0.04), COIL_CURRENT, yaw)
+		s.box_chamfered(Vector3(COIL_WIDTH, 0.48, 0.44), 0.05, Parts.around(TORUS_MAJOR, degrees, -0.24), _rig_armour(p.tier, Parts.HULL_DARK),
+			yaw)
+		s.box(Vector3(COIL_WIDTH + 0.01, 0.07, 0.45), Parts.around(TORUS_MAJOR, degrees, 0.1), COIL_CURRENT, yaw)
 	if level >= 3:
 		var tilt := Vector3(12, 0, 0)
-		Parts.torus(s, 1.05, 0.07, 24, 10, -LowPolyMesh.turn(Vector3(0, 0.07, 0), tilt),
-			Parts.GOLD_ROUND if gold else Parts.HULL_MID_ROUND, tilt)
+		Parts.torus(s, 0.94, 0.06, 24, 10, -LowPolyMesh.turn(Vector3(0, 0.06, 0), tilt),
+			Parts.GOLD_ROUND if gold else Parts.HULL_LIGHT_ROUND, tilt)
 
 
-## A field pylon on the pedestal's rim: a column on a foot with an antimatter band, its
-## emitter head leaning in towards the torus with a glowing tip. Returns the tip's centre.
+## A field pylon on the pedestal's rim: a chamfered column PYLON_WIDTH across leaning in, its top
+## PYLON_LEAN nearer the core, on a foot with an antimatter band, its emitter head EMITTER_HEAD
+## across leaning in towards the torus with a glowing tip. Returns the tip's centre.
 ## From L4 it grows PYLON_GROWTH a level and its head aims down at `core`; its column is chrome
 ## with a cyan strip up its outer face, from the Obsidian tier obsidian with a glowing violet vein
 ## panel on each face turned to the camera; from L5 two glowing rings round it (cyan, violet from
@@ -1085,57 +1102,61 @@ static func _field_pylon(m: LowPolyMesh, degrees: float, level: int, gold: bool,
 	var yaw := Vector3(0, 90.0 - degrees, 0)
 	var foot := Parts.around(1.22, degrees, Parts.PAD_HEIGHT)
 	var height := 1.3 + 0.08 * level if level < 4 else 1.54 + PYLON_GROWTH * (level - 3)
+	# The column's frame: its local +Z points out from the core, and it leans in about X.
+	var lean := yaw + Vector3(-rad_to_deg(atan2(PYLON_LEAN, height)), 0, 0)
+	var w := PYLON_WIDTH
 	var column := Parts.HULL_LIGHT
 	if tier >= Parts.Tier.OBSIDIAN:
 		column = Parts.OBSIDIAN
 	elif tier >= Parts.Tier.CHROME:
 		column = Parts.CHROME
-	m.box_chamfered(Vector3(0.32, 0.12, 0.32), 0.04, foot, Parts.HULL_DARK, yaw)
-	m.box_chamfered(Vector3(0.18, height, 0.18), 0.04, foot, column, yaw)
-	m.box(Vector3(0.2, 0.1, 0.2), foot + Vector3(0, height * 0.62, 0), ANTIMATTER_ACCENT, yaw)
+	m.box_chamfered(Vector3(0.36, 0.12, 0.36), 0.04, foot, Parts.HULL_DARK, yaw)
+	m.box_chamfered(Vector3(w, height, w), 0.05, foot, column, lean)
+	m.box(Vector3(w + 0.03, 0.14, w + 0.03), foot + LowPolyMesh.turn(Vector3(0, height * 0.62, 0), lean), ANTIMATTER_ACCENT, lean)
 	if level >= 2:
-		m.box_chamfered(Vector3(0.24, 0.42, 0.24), 0.04, foot + Vector3(0, 0.12, 0), _rig_armour(tier, PYLON_ARMOUR), yaw)
+		m.box_chamfered(Vector3(w + 0.07, 0.42, w + 0.07), 0.04, foot + Vector3(0, 0.12, 0), _rig_armour(tier, PYLON_ARMOUR), lean)
 	if level >= 4 and tier < Parts.Tier.OBSIDIAN:
-		m.box(Vector3(0.06, height - 0.75, 0.02), foot + LowPolyMesh.turn(Vector3(0, 0.6, 0.095), yaw), _rig_strip(tier), yaw)
+		m.box(Vector3(0.07, height - 0.75, 0.02), foot + LowPolyMesh.turn(Vector3(0, 0.6, w * 0.5 + 0.005), lean), _rig_strip(tier),
+			lean)
 	elif level >= 4:
 		# A glowing violet vein panel on each face turned to the camera.
 		for normal: Vector3 in [Vector3.BACK, Vector3.FORWARD, Vector3.RIGHT, Vector3.LEFT]:
 			if LowPolyMesh.turn(normal, yaw).dot(TOWARD_CAMERA) > 0.2:
-				var size := Vector3(0.12, height - 0.77, 0.02) if normal.x == 0.0 else Vector3(0.02, height - 0.77, 0.12)
-				m.box(size, foot + LowPolyMesh.turn(normal * 0.1 + Vector3(0, 0.62, 0), yaw), VEIN_PANEL, yaw)
+				var size := Vector3(0.15, height - 0.77, 0.02) if normal.x == 0.0 else Vector3(0.02, height - 0.77, 0.15)
+				m.box(size, foot + LowPolyMesh.turn(normal * (w * 0.5 + 0.01) + Vector3(0, 0.62, 0), lean), VEIN_PANEL, lean)
 	if level >= 5:
 		# Two glowing rings round the column, between the accent band and the filigree's places.
 		for ring: float in [0.42, 0.78]:
-			m.box(Vector3(0.22, 0.05, 0.22), foot + Vector3(0, height * ring, 0),
-				Parts.CORE_GLOW if tier >= Parts.Tier.OBSIDIAN else Parts.CYAN_STRIP, yaw)
+			m.box(Vector3(w + 0.04, 0.06, w + 0.04), foot + LowPolyMesh.turn(Vector3(0, height * ring, 0), lean),
+				Parts.CORE_GLOW if tier >= Parts.Tier.OBSIDIAN else Parts.CYAN_STRIP, lean)
 	if level >= 7:
-		m.prism(0.07, 0.07, 0.04, 4, foot + LowPolyMesh.turn(Vector3(0, 0.06, 0.165), yaw), INLAY.phased(degrees / 360.0),
+		m.prism(0.07, 0.07, 0.04, 4, foot + LowPolyMesh.turn(Vector3(0, 0.06, 0.2), yaw), INLAY.phased(degrees / 360.0),
 			Vector3(90, yaw.y, 0))
 	if level >= 8:
-		for band: float in [0.3, 0.85]:
-			m.box(Vector3(0.24, 0.06, 0.24), foot + Vector3(0, height * band, 0), Parts.FILIGREE, yaw)
-	var head := foot + Vector3(0, height, 0)
-	m.box_chamfered(Vector3(0.24, 0.12, 0.24), 0.04, head, Parts.GOLD_TRIM if gold else Parts.HULL_MID, yaw)
+		for band: float in [0.3, 0.88]:
+			m.box(Vector3(w + 0.05, 0.1, w + 0.05), foot + LowPolyMesh.turn(Vector3(0, height * band, 0), lean), Parts.FILIGREE, lean)
+	var head := foot + LowPolyMesh.turn(Vector3(0, height, 0), lean)
+	m.box_chamfered(Vector3(EMITTER_HEAD, 0.16, EMITTER_HEAD), 0.05, head, Parts.GOLD_TRIM if gold else Parts.HULL_LIGHT, lean)
 	if level >= 7:
 		# A crown of crystals on the head's outer half, leaning out.
 		for k: int in 3:
-			var lean := Parts.facing(LowPolyMesh.turn(Vector3((k - 1) * 0.35, 1, 0.3), yaw))
-			m.cone(0.045, 0.2 - 0.05 * absf(k - 1), 8, head + LowPolyMesh.turn(Vector3((k - 1) * 0.07, 0.12, 0.06), yaw),
-				INLAY.phased(fposmod(degrees / 360.0 + k / 3.0, 1.0)), lean)
+			var out := Parts.facing(LowPolyMesh.turn(Vector3((k - 1) * 0.35, 1, 0.3), yaw))
+			m.cone(0.045, 0.2 - 0.05 * absf(k - 1), 8, head + LowPolyMesh.turn(Vector3((k - 1) * 0.08, 0.16, 0.08), yaw),
+				INLAY.phased(fposmod(degrees / 360.0 + k / 3.0, 1.0)), out)
 	var tilt := yaw + Vector3(-50, 0, 0)
-	var neck := head + Vector3(0, 0.08, 0)
+	var neck := head + Vector3(0, 0.12, 0)
 	if level >= 4:
 		tilt = Parts.facing(core - neck)
 	var inward := LowPolyMesh.turn(Vector3.UP, tilt)
-	m.prism(0.08, 0.06, 0.26, 12, neck, Parts.HULL_MID_ROUND, tilt)
+	m.prism(0.11, 0.08, 0.26, 12, neck, Parts.HULL_DARK_ROUND, tilt)
 	var tip := neck + inward * 0.3
-	m.orb(0.07 + 0.015 * level, 10, 4, tip, ANTIMATTER_GLOW)
+	m.orb(0.08 + 0.015 * level, 10, 4, tip, ANTIMATTER_GLOW)
 	return tip
 
 
-## A capacitor: an armoured block with a violet glass window and a glowing cap.
+## A capacitor: an armoured cream block with a violet glass window and a glowing cap.
 static func _capacitor(m: LowPolyMesh, pos: Vector3, gold: bool) -> void:
-	m.box_chamfered(Vector3(0.38, 0.4, 0.38), 0.05, pos, Parts.HULL_MID)
+	m.box_chamfered(Vector3(0.38, 0.4, 0.38), 0.05, pos, Parts.HULL_LIGHT)
 	m.box(Vector3(0.24, 0.2, 0.4), pos + Vector3(0, 0.1, 0), ANTIMATTER_GLASS)
 	m.box_chamfered(Vector3(0.26, 0.05, 0.26), 0.02, pos + Vector3(0, 0.4, 0), Parts.GOLD_TRIM if gold else ANTIMATTER_GLOW)
 
