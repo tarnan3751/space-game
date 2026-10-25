@@ -64,21 +64,36 @@ static var BEAM := Surf.make(MaterialKit.Layer.GLOW, Parts.CORE_GLOW_TINT, 1.0, 
 
 ## The Command Center's stepped foundation: the lower step's width and the height of its top, the
 ## upper step's width, and the deck (the upper step's top, a plinth 0.5 tall) with the tall drum on
-## it. The steps stop well inside the pad, so the building, not a platform, fills the lot.
+## it. The steps stop well inside the pad, so the building, not a platform, fills the lot. From
+## WIDE_LEVEL the tower and its floors widen and the steps with them (WIDE_LOWER_STEP and
+## WIDE_UPPER_STEP), so the building, not its dome, is the broad thing on the base.
 const LOWER_STEP := 3.0
 const LOWER_TOP := 0.32
 const UPPER_STEP := 2.6
+const WIDE_LEVEL := 7
+const WIDE_LOWER_STEP := 3.4
+const WIDE_UPPER_STEP := 2.9
 const DECK := 0.82
 const DRUM_RADIUS := 1.05
 const DRUM_HEIGHT := 1.17
 const DOME_RADIUS := 1.0
 const DOME_HEIGHT := 0.73
-## The dome's radius by level, a share of DOME_RADIUS, so it grows with the tower (1.25 by L7, 1.5
-## by L10) and its gold ring with it; its height grows by DOME_RISE of that share.
-const DOME_SCALES := [1.0, 1.0, 1.0, 1.0, 1.0, 1.12, 1.25, 1.33, 1.42, 1.5]
+## The dome's radius by level, a share of DOME_RADIUS, and its gold ring with it; its height grows
+## by DOME_RISE of that share. It caps the tower: with its gold ring it never reaches past the lip
+## of the storey it rides (dome_fit, checked by the model_gallery scenario).
+const DOME_SCALES := [1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.05, 1.07, 1.09, 1.1]
+## The gold ring round the dome's foot: how far out past the dome its tube's middle runs, and its
+## tube's radius, both times the dome's share. The L8 obsidian ring hovers just outside it,
+## HOVER_GAP clear of it and HOVER_WIDTH wide, inside the top storey's lip as the dome is.
+const GOLD_RING_GAP := 0.02
+const GOLD_RING_SECTION := 0.08
+const HOVER_GAP := 0.04
+const HOVER_WIDTH := 0.07
 const DOME_RISE := 0.6
-## How far out on the lower step's ledge, along each axis, its lamps and (from L6) the masts stand.
+## How far out on the lower step's ledge, along each axis, its lamps and (from L6) the masts stand
+## (WIDE_LEDGE from WIDE_LEVEL).
 const LEDGE := 1.4
+const WIDE_LEDGE := 1.6
 ## The ring of rooms L3 adds round the drum's foot, out to this radius.
 const ROOMS_RADIUS := 1.28
 const ROOMS_HEIGHT := 0.55
@@ -106,27 +121,39 @@ const ARC_FROM := 1.1
 ## The floors that replace the drum from L6, bottom up: A and B wide, C and D mid, each wider
 ## than the tower; the level each is added at, its radius and its height. A is the rooms grown,
 ## C the drum's successor, taller (C_ALONE, its top where the drum's was) until B lifts it at L8.
+## From WIDE_LEVEL the floors widen and step in less (WIDE_FLOOR_RADII).
 const FLOOR_LEVELS := [6, 8, 6, 9]
 const FLOOR_RADII := [ROOMS_RADIUS, 1.22, 1.14, 1.06]
+const WIDE_FLOOR_RADII := [1.44, 1.38, 1.33, 1.3]
 const FLOOR_HEIGHTS := [ROOMS_HEIGHT, 0.45, 0.45, 0.4]
 const C_ALONE := 0.62
-## The tower the dome rides from L6, on the floors: its storeys' heights by level from L6, so each
-## level keeps its height as the floors grow under it; at L10 the antimatter core's band between
-## the floors and them.
-const STOREY_RADIUS := 0.98
+## The tower the dome rides from L6, on the floors: its radius (WIDE_STOREY_RADIUS from WIDE_LEVEL),
+## its storeys' gold lip's reach past it, its storeys' heights by level from L6, so each level keeps
+## its height as the floors grow under it; at L10 the antimatter core's band between the floors and
+## them.
+const STOREY_RADIUS := 1.04
+const WIDE_STOREY_RADIUS := 1.27
+const STOREY_LIP := 0.06
 const TOWER_STOREYS := [[0.7], [0.7, 0.5], [0.5, 0.42], [0.52, 0.5], [0.52, 0.5]]
 const CORE_BAND := 0.32
 ## From L6 the floors would swallow the deck's sensor masts and the dish's pylon: the masts stand
 ## on the lower step's ledge (LEDGE) instead, and the pylon, a chrome column, on the pad past the
-## steps, PYLON_RADIUS out.
+## steps, PYLON_RADIUS out; from WIDE_LEVEL on the wider lower step, squared to its edge and just
+## outside the plinth's (its inner face WIDE_PYLON_CLEAR past it), WIDE_PYLON_RADIUS out, inside
+## the L10 security bots' round.
 const PYLON_RADIUS := 1.75
+const WIDE_PYLON_CLEAR := 0.005
+## (0.93969262 is sin 70°: along DISH_CORNER the plinth's -Z edge is that share of the way out.)
+const WIDE_PYLON_RADIUS := (WIDE_UPPER_STEP * 0.5 + Parts.STRUCTURAL_MIN * 0.5 + WIDE_PYLON_CLEAR) / 0.93969262
 ## The wing the second comms dish (L6) stands on, across the dome from the first dish's pylon,
 ## and at L10, where it stands still, the way it is aimed (degrees about Y): towards the camera.
 const WING_DISH := 135.0
 const WING_DISH_AIM := -135.0
-## The L10 security bots' round, between the tower's conduits and the dish's pylon, and their
-## heights: one low over floor D, one high under the dome, flying opposite ways.
-const GUARD_RADIUS := 1.39
+## The L10 security bots' round, outside the tower's conduits and the dish's column, at
+## GUARD_SCALE of their size so the round stays within the reach, and their heights: one low over
+## floor D, one high under the dome, flying opposite ways.
+const GUARD_RADIUS := 1.94
+const GUARD_SCALE := 0.8
 const GUARD_LOW := 2.95
 const GUARD_HIGH := 3.65
 ## Where the masts stop at L10 (the deck's second 0.06 higher), under the low bot's round, which
@@ -146,21 +173,21 @@ const MAST_TOP_CROWN := 2.5
 ## spire up to 3.74, the tallest building on the base, its beacon pulsing.
 ##
 ## From L6 the drum gives way to floors, stepping in from the base to the tower the dome rides
-## (_storey), the dome growing with the tower (DOME_SCALES), the masts moved out to the lower
-## step's ledge and the dish's pylon to a chrome column on the pad, carrying the dish up beside
-## the dome: L6 the rooms grown into floor A and the drum widened into floor C, the containment
+## (_storey), the dome capping it within its top storey's lip (dome_fit), the masts moved out to
+## the lower step's ledge and the dish's pylon to a chrome column on the pad, carrying the dish up
+## beside the dome: L6 the rooms grown into floor A and the drum widened into floor C, the containment
 ## ring on A's roof round it, a chrome storey with a band of windows and cyan strips, chrome caps
 ## on the wings, a second dish on a wing (a third moving part) and the landing lamps chasing in
-## two rings, up to 4.49; L7 a second storey with a lit observation band, cyan conduits up the
-## tower to the dome, three hologram moons turning with the ring and a chrome collar on the spire,
-## 5.05; L8 a second wide floor, B, lifting C, obsidian over B, the storeys and the wing caps, one
+## two rings, up to 4.44; L7 the tower, its floors and the steps widened (WIDE_LEVEL), a second
+## storey with a lit observation band, cyan conduits up the tower to the dome, three hologram
+## moons turning with the ring and a chrome collar on the spire, 4.96; L8 a second wide floor, B, lifting C, obsidian over B, the storeys and the wing caps, one
 ## violet vein band round each storey under its gold lip, crystal inlays on the wing tips, an
 ## obsidian ring hovering over the dome's gold ring and the spire grown on an obsidian shaft,
-## 5.64; L9 a second mid floor, D, with a lit band, a second containment ring round it, its
+## 5.53; L9 a second mid floor, D, with a lit band, a second containment ring round it, its
 ## current running the other way, violet arcs from the spire to the dome's gold ring and a station
-## orbiting the hologram, 6.48; L10 gold filigree bands round floor B and the storeys in the veins'
+## orbiting the hologram, 6.34; L10 gold filigree bands round floor B and the storeys in the veins'
 ## place and on the wing caps' tops, filigree banners on the wings, the antimatter core glowing in a
-## glass band at the tower's foot, a crown spire with a hologram beam up to 6.91, the wing dish
+## glass band at the tower's foot, a crown spire with a hologram beam up to 6.73, the wing dish
 ## standing still, aimed at the camera, and two security bots circling the tower as its escort,
 ## one low and one high, opposite ways. Each level keeps its height as the floors grow under the
 ## tower: its storeys are squeezed (TOWER_STOREYS).
@@ -168,21 +195,27 @@ static func build_command_center(p: Parts, level: int) -> void:
 	var m := p.body
 	var gold := p.tier >= Parts.Tier.GOLD
 	var chrome := p.tier >= Parts.Tier.CHROME
+	var wide := level >= WIDE_LEVEL
+	var lower_step := WIDE_LOWER_STEP if wide else LOWER_STEP
+	var upper_step := WIDE_UPPER_STEP if wide else UPPER_STEP
+	var ledge := WIDE_LEDGE if wide else LEDGE
+	var storey_radius := _storey_radius(level)
+	var floor_radii: Array = WIDE_FLOOR_RADII if wide else FLOOR_RADII
 	Parts.foundation(m, 4)
-	m.box_chamfered(Vector3(LOWER_STEP, LOWER_TOP - Parts.PAD_HEIGHT, LOWER_STEP), 0.08, Vector3(0, Parts.PAD_HEIGHT, 0), STEP)
-	m.box_chamfered(Vector3(UPPER_STEP, DECK - LOWER_TOP, UPPER_STEP), 0.08, Vector3(0, LOWER_TOP, 0), Parts.HULL_LIGHT)
+	m.box_chamfered(Vector3(lower_step, LOWER_TOP - Parts.PAD_HEIGHT, lower_step), 0.08, Vector3(0, Parts.PAD_HEIGHT, 0), STEP)
+	m.box_chamfered(Vector3(upper_step, DECK - LOWER_TOP, upper_step), 0.08, Vector3(0, LOWER_TOP, 0), Parts.HULL_LIGHT)
 	if gold:
 		# The deck's top in core gold from the Gold tier: gold on a part, lapping over its edge.
-		m.box_chamfered(Vector3(UPPER_STEP + 0.02, 0.06, UPPER_STEP + 0.02), 0.03, Vector3(0, DECK - 0.05, 0), Parts.GOLD_TRIM)
+		m.box_chamfered(Vector3(upper_step + 0.02, 0.06, upper_step + 0.02), 0.03, Vector3(0, DECK - 0.05, 0), Parts.GOLD_TRIM)
 	for k: int in 4:
 		# Landing lights on the lower step's corners, chasing round it from the Chrome tier.
-		Parts.landing_light(m, Parts.around(LEDGE * sqrt(2.0), 45 + 90 * k, LOWER_TOP), 0.09,
+		Parts.landing_light(m, Parts.around(ledge * sqrt(2.0), 45 + 90 * k, LOWER_TOP), 0.09,
 			MAST_LAMP.phased(Parts.chase(k, 4)) if chrome else GLOW)
 	if level >= 6:
 		# A second ring of lamps on the lower step, chasing the other way.
 		for k: int in 8:
 			var degrees := 22.5 + 45.0 * k
-			var out := LEDGE / maxf(absf(cos(deg_to_rad(degrees))), absf(sin(deg_to_rad(degrees))))
+			var out := ledge / maxf(absf(cos(deg_to_rad(degrees))), absf(sin(deg_to_rad(degrees))))
 			m.prism(0.06, 0.05, 0.05, 8, Parts.around(out, degrees, LOWER_TOP), MAST_LAMP.phased(Parts.chase(7 - k, 8)),
 				Parts.OCTAGON)
 
@@ -205,9 +238,9 @@ static func build_command_center(p: Parts, level: int) -> void:
 		var y := DECK
 		for k: int in floors.size():
 			var i := floors[k]
-			var radius: float = FLOOR_RADII[i]
+			var radius: float = floor_radii[i]
 			var height: float = C_ALONE if i == 2 and level < 8 else FLOOR_HEIGHTS[i]
-			var inner: float = FLOOR_RADII[floors[k + 1]] if k + 1 < floors.size() else STOREY_RADIUS
+			var inner: float = floor_radii[floors[k + 1]] if k + 1 < floors.size() else storey_radius
 			match i:
 				0:
 					_rooms(m, gold, radius, inner)
@@ -223,27 +256,29 @@ static func build_command_center(p: Parts, level: int) -> void:
 			y += height
 		dome_base = y
 		if level >= 10:
-			_core_band(m, dome_base)
+			_core_band(m, dome_base, storey_radius)
 			dome_base += CORE_BAND
 		var storeys: Array = TOWER_STOREYS[level - 6]
 		for k: int in storeys.size():
 			var height: float = storeys[k]
-			_storey(m, dome_base, height, STOREY_RADIUS, STOREY_RADIUS - 0.08, k == 1, level, p.tier)
+			_storey(m, dome_base, height, storey_radius, storey_radius - 0.08, k == 1, level, p.tier)
 			dome_base += height
 		if level >= 7:
-			# Cyan conduits up the tower from the top floor's roof into the dome's gold ring.
+			# Cyan conduits up the tower from the top floor's roof to its top storey's lip.
+			var conduit := storey_radius + 0.11
 			for degrees: float in PILASTERS:
-				Parts.pipe(m, Parts.around(1.09, degrees, y - 0.04), Parts.around(1.09, degrees, dome_base - 0.02),
+				Parts.pipe(m, Parts.around(conduit, degrees, y - 0.04), Parts.around(conduit, degrees, dome_base - 0.02),
 					0.04, CONDUIT, 8, false)
 	var scale: float = DOME_SCALES[level - 1]
 	var dome_radius := DOME_RADIUS * scale
 	var dome_height := DOME_HEIGHT * (1.0 + DOME_RISE * (scale - 1.0))
-	Parts.torus(m, dome_radius + 0.02, 0.08 * scale, 24, 10, Vector3(0, dome_base - 0.06 * scale, 0), Parts.GOLD_ROUND)
+	Parts.torus(m, dome_radius + GOLD_RING_GAP, GOLD_RING_SECTION * scale, 24, 10, Vector3(0, dome_base - 0.06 * scale, 0),
+		Parts.GOLD_ROUND)
 	m.dome(dome_radius, dome_height, 16, 7, Vector3(0, dome_base, 0), Parts.GLASS)
 	var apex := dome_base + dome_height
 	m.prism(0.2, 0.16, 0.08, 16, Vector3(0, apex - 0.03, 0), Parts.GOLD_ROUND if gold else Parts.HULL_MID_ROUND)
 
-	_hangar_door(m, gold)
+	_hangar_door(m, gold, wide)
 	if level >= 2:
 		for degrees: float in WINGS:
 			_wing(m, degrees, level, p.tier)
@@ -252,8 +287,9 @@ static func build_command_center(p: Parts, level: int) -> void:
 	if level >= 4:
 		# The antimatter containment ring round the drum's upper half (from L6 round floor C, on the
 		# roof below it), clamped to the pilasters, a glowing node on each clamp.
-		var ring_radius := ring_core + (0.2 if level < 6 else 0.1)
-		Parts.torus(m, ring_radius, 0.1, 24, 6, Vector3(0, ring_y - 0.1, 0), CONTAINMENT)
+		var ring_radius := ring_core + (0.2 if level < 6 else (0.06 if wide else 0.1))
+		var ring_section := 0.08 if wide else 0.1
+		Parts.torus(m, ring_radius, ring_section, 24, 6, Vector3(0, ring_y - ring_section, 0), CONTAINMENT)
 		for degrees: float in PILASTERS:
 			var yaw := Vector3(0, 90.0 - degrees, 0)
 			m.box_chamfered(Vector3(0.16, 0.24, 0.3), 0.03, Parts.around(ring_radius - 0.04, degrees, ring_y - 0.12), Parts.HULL_DARK, yaw)
@@ -262,8 +298,8 @@ static func build_command_center(p: Parts, level: int) -> void:
 	if level >= 9:
 		# A second containment ring over the first, round floor D, its current running the other
 		# way, clamped between the first's clamps.
-		var upper_radius := upper_core + 0.13
-		Parts.torus(m, upper_radius, 0.1, 24, 6, Vector3(0, upper_y, 0), CONTAINMENT.phased(0.25))
+		var upper_radius := upper_core + 0.06
+		Parts.torus(m, upper_radius, 0.08, 24, 6, Vector3(0, upper_y, 0), CONTAINMENT.phased(0.25))
 		for k: int in 4:
 			var degrees := 45.0 + 90.0 * k
 			var yaw := Vector3(0, 90.0 - degrees, 0)
@@ -289,7 +325,7 @@ static func build_command_center(p: Parts, level: int) -> void:
 		var foot := Parts.around(MAST_FOOT, degrees, DECK)
 		if level >= 6:
 			# On the ledge, LEDGE out along the axis the mast stands nearest.
-			var out := LEDGE / maxf(absf(cos(deg_to_rad(degrees))), absf(sin(deg_to_rad(degrees))))
+			var out := ledge / maxf(absf(cos(deg_to_rad(degrees))), absf(sin(deg_to_rad(degrees))))
 			foot = Parts.around(out, degrees, LOWER_TOP)
 		Parts.tapered_mast(m, foot, top - foot.y, Parts.HULL_LIGHT_ROUND, 0.08, lamp)
 	var pylon_height := DRUM_HEIGHT + 0.2
@@ -301,22 +337,25 @@ static func build_command_center(p: Parts, level: int) -> void:
 		m.box_chamfered(Vector3(0.2, 0.16, 0.2), 0.05, foot, Parts.HULL_DARK, Vector3(0, 90.0 - DISH_CORNER, 0))
 		m.prism(0.1, 0.08, DECK + pylon_height - foot.y, 16, foot + Vector3(0, 0.16, 0), Parts.HULL_MID_ROUND)
 	else:
-		# A single chamfered chrome column from the pad up to the dish.
-		var column := Parts.around(PYLON_RADIUS, DISH_CORNER, Parts.PAD_HEIGHT)
-		pylon = Parts.around(PYLON_RADIUS, DISH_CORNER, DECK)
-		m.box_chamfered(Vector3(0.2, DECK + 0.16 + pylon_height + lift - column.y, 0.2), 0.05, column, Parts.CHROME,
-			Vector3(0, 90.0 - DISH_CORNER, 0))
+		# A single chamfered chrome column from the pad (from WIDE_LEVEL the lower step) up to the dish.
+		var out := WIDE_PYLON_RADIUS if wide else PYLON_RADIUS
+		var column := Parts.around(out, DISH_CORNER, LOWER_TOP if wide else Parts.PAD_HEIGHT)
+		pylon = Parts.around(out, DISH_CORNER, DECK)
+		var width := Parts.STRUCTURAL_MIN if wide else 0.2
+		m.box_chamfered(Vector3(width, DECK + 0.16 + pylon_height + lift - column.y, width), 0.05, column, Parts.CHROME,
+			Vector3.ZERO if wide else Vector3(0, 90.0 - DISH_CORNER, 0))
 	_comms_dish(p.moving(pylon + Vector3(0, 0.16 + pylon_height + lift, 0), Motion.spin(Vector3.UP, Parts.DISH_RATE)), gold)
 	if level >= 6:
-		_wing_dish(p, gold)
+		_wing_dish(p, gold, wide)
 	if level >= 8:
 		# An obsidian ring hovering over the dome's gold ring, bobbing, veins running across its top
 		# and a violet rim glowing round it.
 		var hover := Vector3(0, dome_base + 0.14, 0)
-		var r := dome_radius
-		m.ring(r + 0.16, r + 0.3, 0.05, 24, hover, HOVER_RING)
-		m.lathe(PackedVector2Array([Vector2(r + 0.28, 0.052), Vector2(r + 0.18, 0.052)]), 24, hover, HOVER_VEINS)
-		m.lathe(PackedVector2Array([Vector2(r + 0.305, 0.008), Vector2(r + 0.305, 0.042)]), 24, hover, HOVER_RIM)
+		var inner := _gold_ring_outer(level) + HOVER_GAP
+		var outer := inner + HOVER_WIDTH
+		m.ring(inner, outer, 0.05, 24, hover, HOVER_RING)
+		m.lathe(PackedVector2Array([Vector2(outer - 0.015, 0.052), Vector2(inner + 0.015, 0.052)]), 24, hover, HOVER_VEINS)
+		m.lathe(PackedVector2Array([Vector2(outer, 0.008), Vector2(outer, 0.042)]), 24, hover, HOVER_RIM)
 	if level >= 9:
 		# Violet arcs crackling from the spire down to the dome's gold ring, which stays still
 		# under the bobbing hovering ring.
@@ -325,15 +364,36 @@ static func build_command_center(p: Parts, level: int) -> void:
 			Parts.arc(m, Parts.around(0.08, degrees, apex + ARC_FROM), Parts.around(dome_radius + 0.06, degrees, dome_base + 0.18),
 				6, 0.06, ARC.phased(k / 4.0))
 	if level >= 10:
-		Parts.escort_guard(p, GUARD_RADIUS, GUARD_LOW, 0.5)
-		Parts.escort_guard(p, GUARD_RADIUS, GUARD_HIGH, -0.4)
+		Parts.escort_guard(p, GUARD_RADIUS, GUARD_LOW, 0.5, Vector3.ZERO, GUARD_SCALE)
+		Parts.escort_guard(p, GUARD_RADIUS, GUARD_HIGH, -0.4, Vector3.ZERO, GUARD_SCALE)
+
+
+## The radius of the tower's storeys at `level` (from L6; WIDE_STOREY_RADIUS from WIDE_LEVEL).
+static func _storey_radius(level: int) -> float:
+	return WIDE_STOREY_RADIUS if level >= WIDE_LEVEL else STOREY_RADIUS
+
+
+## The outer radius of the dome's gold ring at `level`.
+static func _gold_ring_outer(level: int) -> float:
+	var scale: float = DOME_SCALES[level - 1]
+	return DOME_RADIUS * scale + GOLD_RING_GAP + GOLD_RING_SECTION * scale
+
+
+## How the dome sits on what it rides at `level`: x the dome's outer radius with its gold ring, y
+## the L8 hovering ring's outer radius (0 below L8), z the outer radius of the storey under them (to
+## L5 the drum's lip, from L6 the top storey's gold lip). The dome caps the tower: neither x nor y
+## passes z (the model_gallery scenario checks it).
+static func dome_fit(level: int) -> Vector3:
+	var hover := _gold_ring_outer(level) + HOVER_GAP + HOVER_WIDTH if level >= 8 else 0.0
+	var under := DRUM_RADIUS + 0.05 if level < 6 else _storey_radius(level) + STOREY_LIP
+	return Vector3(_gold_ring_outer(level), hover, under)
 
 
 ## The hangar door facing the camera: a block off the drum with a roll-up door framed in
 ## hazard stripes, and a hazard-striped apron in the deck's corner before it.
-static func _hangar_door(m: LowPolyMesh, gold: bool) -> void:
+static func _hangar_door(m: LowPolyMesh, gold: bool, wide: bool) -> void:
 	var yaw := Vector3(0, 90.0 - DOOR_FACING, 0)
-	var block := Parts.around(1.1, DOOR_FACING, DECK)
+	var block := Parts.around(1.3 if wide else 1.1, DOOR_FACING, DECK)
 	m.box_chamfered(Vector3(0.8, 0.75, 0.7), 0.06, block, Parts.HULL_LIGHT, yaw)
 	m.box_chamfered(Vector3(0.86, 0.06, 0.76), 0.03, block + Vector3(0, 0.75, 0), Parts.GOLD_TRIM if gold else Parts.HULL_MID, yaw)
 	var front := block + LowPolyMesh.turn(Vector3(0, 0, 0.35), yaw)
@@ -345,7 +405,7 @@ static func _hangar_door(m: LowPolyMesh, gold: bool) -> void:
 	for k: int in 4:
 		m.box(Vector3(0.09, 0.06, 0.05), front + LowPolyMesh.turn(Vector3(-0.24 + 0.16 * k, 0.62, 0.0), yaw),
 			DOOR_LAMP.phased(k / 4.0), yaw)
-	var corner := UPPER_STEP * 0.5
+	var corner := (WIDE_UPPER_STEP if wide else UPPER_STEP) * 0.5
 	m.box(Vector3(0.3, 0.012, 0.3), Vector3(corner - 0.15, DECK + 0.01, corner - 0.15), Parts.HAZARD)
 
 
@@ -377,7 +437,7 @@ static func _hologram(p: Parts, m: LowPolyMesh, apex: float, level: int) -> void
 ## The beacon spire from L5: a tapered mast 1.0 above the dome's apex, gold from the Gold tier, a
 ## collar at its foot (a chunkier chrome one from L7), a pulsing orb clear of the hologram's globe;
 ## it runs up through the globe as its axis. From L8 it grows on an obsidian shaft whose upper
-## half is veins, a gold ring at the joint, its beacon at 5.64 (L8) and 6.48 (L9); at L10 it ends in
+## half is veins, a gold ring at the joint, its beacon at 5.53 (L8) and 6.34 (L9); at L10 it ends in
 ## a gold crown of six prongs round a glowing antimatter orb, a hologram beam rising from it.
 static func _spire(m: LowPolyMesh, apex: float, level: int, tier: int) -> void:
 	var spire := Parts.GOLD_ROUND if tier >= Parts.Tier.GOLD else Parts.HULL_MID_ROUND
@@ -444,7 +504,7 @@ static func _storey(m: LowPolyMesh, y: float, height: float, radius: float, inne
 	m.lathe(PackedVector2Array([Vector2(r + 0.04, 0), Vector2(r, 0.06), Vector2(r, height - 0.14)]), 24, Vector3(0, y, 0),
 		_armour(tier, true))
 	m.lathe(PackedVector2Array([
-		Vector2(r, height - 0.14), Vector2(r + 0.06, height - 0.12), Vector2(r + 0.06, height), Vector2(inner, height),
+		Vector2(r, height - 0.14), Vector2(r + STOREY_LIP, height - 0.12), Vector2(r + STOREY_LIP, height), Vector2(inner, height),
 	]), 24, Vector3(0, y, 0), Parts.GOLD_ROUND if tier >= Parts.Tier.GOLD else Parts.HULL_MID_ROUND)
 	var middle := y + (height - 0.08) * 0.5
 	if level >= 8:
@@ -467,16 +527,16 @@ static func _storey(m: LowPolyMesh, y: float, height: float, radius: float, inne
 
 ## The antimatter core's band at the tower's foot (L10), CORE_BAND tall on `y`: the core glowing
 ## violet and pulsing behind a hologram glass band, between gold rims, with eight gold mullions.
-static func _core_band(m: LowPolyMesh, y: float) -> void:
+static func _core_band(m: LowPolyMesh, y: float, r: float) -> void:
 	var at := Vector3(0, y, 0)
-	m.prism(0.92, 0.92, CORE_BAND, 24, at, Parts.CORE_GLOW)
-	m.lathe(PackedVector2Array([Vector2(0.99, 0.04), Vector2(0.99, CORE_BAND - 0.04)]), 24, at, CORE_GLASS_BAND)
+	m.prism(r - 0.06, r - 0.06, CORE_BAND, 24, at, Parts.CORE_GLOW)
+	m.lathe(PackedVector2Array([Vector2(r + 0.01, 0.04), Vector2(r + 0.01, CORE_BAND - 0.04)]), 24, at, CORE_GLASS_BAND)
 	for rim: float in [0.0, CORE_BAND - 0.05]:
-		m.lathe(PackedVector2Array([Vector2(1.02, 0), Vector2(1.02, 0.05), Vector2(0.92, 0.05)]), 24, at + Vector3(0, rim, 0),
+		m.lathe(PackedVector2Array([Vector2(r + 0.04, 0), Vector2(r + 0.04, 0.05), Vector2(r - 0.06, 0.05)]), 24, at + Vector3(0, rim, 0),
 			Parts.GOLD_ROUND)
 	for k: int in 8:
 		var degrees := 45.0 * k
-		m.box(Vector3(0.07, CORE_BAND, 0.07), Parts.around(0.99, degrees, y), Parts.GOLD_TRIM, Vector3(0, 90.0 - degrees, 0))
+		m.box(Vector3(0.07, CORE_BAND, 0.07), Parts.around(r + 0.01, degrees, y), Parts.GOLD_TRIM, Vector3(0, 90.0 - degrees, 0))
 
 
 ## The tower's and the wing caps' armour by tier: obsidian from the Obsidian tier, chrome at the
@@ -501,7 +561,8 @@ static func _strip(tier: int) -> Surf:
 static func _wing(m: LowPolyMesh, degrees: float, level: int, tier: int) -> void:
 	var gold := tier >= Parts.Tier.GOLD
 	var yaw := Vector3(0, 90.0 - DOOR_FACING, 0)
-	var block := Parts.around(1.1, degrees, DECK)
+	var wide := level >= WIDE_LEVEL
+	var block := Parts.around(1.25 if wide else 1.1, degrees, DECK)
 	m.box_chamfered(Vector3(0.96, 0.8, 0.62), 0.07, block, Parts.HULL_LIGHT, yaw)
 	m.box(Vector3(0.74, 0.12, 0.04), block + LowPolyMesh.turn(Vector3(0, 0.46, 0.31), yaw), WINDOW, yaw)
 	m.box(Vector3(0.74, 0.06, 0.04), block + LowPolyMesh.turn(Vector3(0, 0.22, 0.31), yaw), SCREENS, yaw)
@@ -510,7 +571,7 @@ static func _wing(m: LowPolyMesh, degrees: float, level: int, tier: int) -> void
 		m.box_chamfered(Vector3(1.0, 0.1, 0.66), 0.03, block + Vector3(0, 0.72, 0), Parts.GOLD_TRIM, yaw)
 	m.box_chamfered(Vector3(0.44, 0.08, 0.36), 0.02, roof, ROOF_VENT, yaw)
 	if level >= 4:
-		var foot := Parts.around(1.45, degrees, roof.y)
+		var foot := Parts.around(1.6 if wide else 1.45, degrees, roof.y)
 		var height := MAST_TOP_CROWN - foot.y if level >= 10 else 1.1
 		Parts.tapered_mast(m, foot, height, Parts.HULL_LIGHT_ROUND, 0.07,
 			(GOLD_MAST_LAMP if gold else MAST_LAMP).phased(fposmod(0.25 + degrees / 360.0, 1.0)))
@@ -552,10 +613,10 @@ static func _wing_cap(m: LowPolyMesh, block: Vector3, degrees: float, yaw: Vecto
 ## behind its mast, its turntable at 2.1, under the grown dome's gold ring, turning the other way;
 ## at L10, where the security bots take the moving parts, built into the body and aimed at the
 ## camera: its top (about 2.5) stays under the low bot's skirt (2.825 at rest).
-static func _wing_dish(p: Parts, gold: bool) -> void:
+static func _wing_dish(p: Parts, gold: bool, wide: bool) -> void:
 	var m := p.body
 	var yaw := Vector3(0, 90.0 - DOOR_FACING, 0)
-	var foot := Parts.around(1.5, WING_DISH, DECK + 0.9) + LowPolyMesh.turn(Vector3(0, 0, -0.22), yaw)
+	var foot := Parts.around(1.65 if wide else 1.5, WING_DISH, DECK + 0.9) + LowPolyMesh.turn(Vector3(0, 0, -0.22), yaw)
 	var turntable := Parts.dish_post(m, foot, 2.1 - foot.y, Parts.CHROME, yaw.y)
 	if p.tier >= Parts.Tier.CROWN:
 		_comms_dish(m, gold, 0.65, turntable, WING_DISH_AIM)
