@@ -74,6 +74,10 @@ static var HOVER_OBSIDIAN := Surf.make(MaterialKit.Layer.OBSIDIAN, Parts.OBSIDIA
 	0.7)
 ## The Obsidian fuse: the core lens's light violet, steady, so it never dims to grey.
 static var BRIGHT_FUSE := Surf.make(MaterialKit.Layer.GLOW, CORE_LIGHT, 1.0, Surf.UNLIT)
+## Below the Chrome tier, a trap's hazard rim band's height and its warning lamp's radius: big
+## enough that a placed trap is found at a glance in build mode.
+const RIM := 0.08
+const LAMP := 0.1
 ## The horizontal directions towards the camera (IsoCamera's yaw, 45 degrees round from +X):
 ## the vein panels go round them.
 const CAMERA_SIDE: Array[float] = [5.0, 45.0, 85.0]
@@ -89,7 +93,7 @@ static func build_proximity_mine(p: Parts, level: int) -> void:
 	if level >= 4:
 		_grown_proximity_mine(p, level)
 		return
-	m.ring(0.27, 0.33, 0.07, 16, base, HAZARD_FINE)
+	m.ring(0.26, 0.34, RIM, 16, base, HAZARD_FINE)
 	m.lathe(PackedVector2Array([
 		Vector2(0.29, 0), Vector2(0.29, 0.09), Vector2(0.24, 0.14), Vector2(0.1, 0.17), Vector2(0, 0.175),
 	]), 16, base, CASING)
@@ -100,9 +104,9 @@ static func build_proximity_mine(p: Parts, level: int) -> void:
 		var out := Parts.around(1.0, degrees, 0.0)
 		m.cone(0.035, 0.13, 8, Parts.around(0.18, degrees, 0.0) + base + Vector3(0, 0.14, 0),
 			CASING_MID, Parts.facing(out * 0.4 + Vector3.UP))
-	m.dome(0.07, 0.07, 16, 3, base + Vector3(0, 0.162, 0), RED_BLINK)
+	m.dome(LAMP, 0.08, 16, 3, base + Vector3(0, 0.162, 0), RED_BLINK)
 	if level >= 3:
-		m.ring(0.07, 0.1, 0.03, 16, base + Vector3(0, 0.152, 0), GOLD_ROUND if p.tier >= Parts.Tier.GOLD else CASING_MID)
+		m.ring(LAMP, LAMP + 0.03, 0.03, 16, base + Vector3(0, 0.152, 0), GOLD_ROUND if p.tier >= Parts.Tier.GOLD else CASING_MID)
 		m.dome(0.04, 0.04, 16, 3, Parts.around(0.31, 45, 0.07) + base, RED_BLINK.phased(0.5))
 
 
@@ -172,7 +176,8 @@ static func _grown_proximity_mine(p: Parts, level: int) -> void:
 		m.ring(radius + 0.1, radius + 0.16, 0.035, 24, base + Vector3(0, height * 0.6, 0), HOVER_GLOW)
 
 
-## A ring emitter round a dark funnel with a violet vortex at its bottom, coils on its rim. A
+## A ring emitter round a dark funnel with a violet vortex at its bottom, on a hazard rim, coils on
+## its rim, a red warning lamp on the coil towards the camera. A
 ## second ring hovering over it at 2, gold from the Gold tier. The emitter's lip and the hovering
 ## ring pulse; the
 ## vortex's glow streams inward down the funnel.
@@ -194,10 +199,14 @@ static func build_grav_trap(p: Parts, level: int) -> void:
 		var degrees := 120.0 * i
 		m.strut(Parts.around(0.19, degrees, 0.118) + base, Parts.around(0.1, degrees + 70.0, 0.058) + base,
 			0.025, SWIRL)
+	# The hazard rim: its outer wall and top only, as the casing fills it, to keep the trap in budget.
+	m.lathe(PackedVector2Array([Vector2(0.38, 0), Vector2(0.38, RIM), Vector2(0.32, RIM)]), 12, base, HAZARD_FINE)
 	for i: int in 3:
 		var degrees := 30.0 + 120.0 * i
 		m.box_chamfered(Vector3(0.1, 0.1, 0.12), 0.02, Parts.around(0.3, degrees, 0.08) + base,
 			HAZARD_FINE, Vector3(0, 90 - degrees, 0))
+	# A warning lamp on the coil towards the camera.
+	m.dome(LAMP, 0.08, 10, 2, Parts.around(0.3, 30.0, 0.18) + base, RED_BLINK)
 	if level >= 2:
 		var hover := base + Vector3(0, 0.3, 0)
 		for i: int in 3:
@@ -205,7 +214,8 @@ static func build_grav_trap(p: Parts, level: int) -> void:
 			m.strut(Parts.around(0.24, degrees, 0.12) + base, Parts.around(0.2, degrees, 0.0) + hover, 0.03,
 				Parts.ROD)
 		m.ring(0.15, 0.23, 0.05, 16, hover, GOLD_ROUND if p.tier >= Parts.Tier.GOLD else CASING_MID)
-		m.ring(0.13, 0.15, 0.03, 16, hover + Vector3(0, 0.01, 0), VIOLET_PULSE.phased(0.5))
+		# Its glowing inner lip: a band across the top, which is all the camera sees of it.
+		m.lathe(PackedVector2Array([Vector2(0.15, 0.04), Vector2(0.13, 0.04)]), 16, hover, VIOLET_PULSE.phased(0.5))
 
 
 ## Levels 3 to 5, the trap grown: a wider, taller emitter round a deeper funnel, six swirl
@@ -275,16 +285,16 @@ static func build_flak_mine(p: Parts, level: int) -> void:
 		_grown_flak_mine(p, level)
 		return
 	Parts.tank(m, 0.26, 0.2, base, CASING, 0.05)
-	m.ring(0.26, 0.275, 0.07, 16, base + Vector3(0, 0.05, 0), HAZARD_FINE)
+	m.ring(0.25, 0.29, RIM, 16, base + Vector3(0, 0.05, 0), HAZARD_FINE)
 	var top := base + Vector3(0, 0.2, 0)
 	var barrels := level + 1
 	for i: int in barrels:
 		var spot := Parts.around(0.15, 135.0 + 360.0 * i / barrels, 0.0) + top
 		m.prism(0.05, 0.05, 0.16, 12, spot, CASING_MID)
 		m.disc(0.032, 12, spot + Vector3(0, 0.161, 0), YELLOW_PULSE.phased(float(i) / barrels))
-	m.dome(0.075, 0.07, 16, 3, top, LENS)
+	m.dome(LAMP, 0.09, 16, 3, top, LENS)
 	if level >= 3:
-		m.ring(0.075, 0.1, 0.025, 16, top, GOLD_ROUND if p.tier >= Parts.Tier.GOLD else CASING_MID)
+		m.ring(LAMP, LAMP + 0.03, 0.025, 16, top, GOLD_ROUND if p.tier >= Parts.Tier.GOLD else CASING_MID)
 
 
 ## Levels 4 and 5, the mine grown: a wider, taller pod, a barrel more a level, a bigger sensor
@@ -355,7 +365,7 @@ static func build_mega_mine(p: Parts, level: int) -> void:
 			SEAM.phased(float(i) / lights))
 	var crown := base + Vector3(0, 0.06 + height - 0.02, 0)
 	m.prism(0.13, 0.11, 0.08, 16, crown, CASING_MID)
-	m.dome(0.07, 0.07, 16, 3, crown + Vector3(0, 0.08, 0), RED_PULSE)
+	m.dome(LAMP, 0.08, 16, 3, crown + Vector3(0, 0.08, 0), RED_PULSE)
 	for i: int in 3:
 		var degrees := 90.0 + 120.0 * i
 		var foot := Parts.around(0.1, degrees, 0.06) + crown
