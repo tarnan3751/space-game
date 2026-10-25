@@ -113,13 +113,19 @@ class Body:
 
 ## The rig stamps a rigged figure's segments carry (LowPolyMesh.rig, rig2; Rig.part), from walk_rig:
 ## each thigh turns about its hip, each shin and foot about its knee and then with the thigh about
-## the hip, the arms (upper arm, forearm, hand, both sides) as one group on `arms`, and the head and
-## the torso not at all. Pairs are [left, right].
+## the hip; each upper arm about its shoulder, each forearm and hand about its elbow and then with
+## the upper arm about the shoulder (the ranger's two arms on one stamp, so they move as a group);
+## the head and the torso on `body`, the whole figure's joint (a flying figure's bank), which is
+## also the parent of a segment with one joint of its own. A segment carries the first two of its
+## chain's stamps that are set (a shin: knee, hip, body), so `body` reaches only segments with at
+## most one joint of their own. Pairs are [left, right].
 class Rigging:
 	extends RefCounted
 	var hips: Array[Vector4] = [Vector4.ZERO, Vector4.ZERO]
 	var knees: Array[Vector4] = [Vector4.ZERO, Vector4.ZERO]
-	var arms := Vector4.ZERO
+	var shoulders: Array[Vector4] = [Vector4.ZERO, Vector4.ZERO]
+	var elbows: Array[Vector4] = [Vector4.ZERO, Vector4.ZERO]
+	var body := Vector4.ZERO
 
 
 ## A posed skeleton: a Transform3D per joint, in the mesh's space. Each pair is [left, right].
@@ -173,16 +179,27 @@ static func neutral() -> Pose:
 
 
 ## The walking rig of a figure posed as `j` (neutral(), joints()): the legs on the hip and knee
-## channels, and the arms on `arm_channel` (Rig.AIM for a gun held in both hands) about the
-## shoulders' midpoint, or not rigged at 0.
-static func walk_rig(j: Joints, arm_channel: int = 0) -> Rigging:
+## channels (`hip` and `knee`, the left's ids; the right's follow them), and the arms as one group
+## on `arm_channel` (Rig.AIM for a gun held in both hands) about the shoulders' midpoint, or not
+## rigged at 0.
+static func walk_rig(j: Joints, arm_channel: int = 0, hip: int = Rig.HIP_L, knee: int = Rig.KNEE_L) -> Rigging:
 	var rigging := Rigging.new()
 	for s: int in 2:
-		rigging.hips[s] = Rig.part(Rig.HIP_L if s == 0 else Rig.HIP_R, j.hips[s].origin)
-		rigging.knees[s] = Rig.part(Rig.KNEE_L if s == 0 else Rig.KNEE_R, j.knees[s].origin)
+		rigging.hips[s] = Rig.part(hip + s, j.hips[s].origin)
+		rigging.knees[s] = Rig.part(knee + s, j.knees[s].origin)
 	if arm_channel != 0:
-		rigging.arms = Rig.part(arm_channel, (j.shoulders[0].origin + j.shoulders[1].origin) * 0.5)
+		var arms := Rig.part(arm_channel, (j.shoulders[0].origin + j.shoulders[1].origin) * 0.5)
+		rigging.shoulders = [arms, arms]
 	return rigging
+
+
+## The swinging arms of a rigging (walk_rig) for a figure posed as `j`: each upper arm on its
+## SHOULDER channel and each forearm on its ELBOW channel, so they counter-swing as it walks (and
+## punch as it attacks: Rig).
+static func swing_arms(rigging: Rigging, j: Joints) -> void:
+	for s: int in 2:
+		rigging.shoulders[s] = Rig.part(Rig.SHOULDER_L + s, j.shoulders[s].origin)
+		rigging.elbows[s] = Rig.part(Rig.ELBOW_L + s, j.elbows[s].origin)
 
 
 ## Mid-stride: walking upright, the left leg reaching forward with its knee bent and its heel coming
@@ -233,11 +250,13 @@ static func colonist(m: LowPolyMesh, foot: Vector3, yaw: float, pose: Pose, head
 	var j := _skeleton(b, pose, foot, yaw)
 	var ink := m.ink
 	m.ink = FIGURE_INK
+	_rig_none(m, rigging)
 	_helmet(m, j.neck, b)
 	_suit_torso(m, j.waist, b)
 	for s: int in 2:
-		_rig_arm(m, rigging)
+		_rig_upper_arm(m, rigging, s)
 		_suit_upper_arm(m, j.shoulders[s], b)
+		_rig_forearm(m, rigging, s)
 		_suit_forearm(m, j.elbows[s], b)
 		_glove(m, j.wrists[s], b)
 		if legs:
@@ -261,11 +280,13 @@ static func automaton(m: LowPolyMesh, foot: Vector3, yaw: float, pose: Pose, hea
 	var j := _skeleton(b, pose, foot, yaw)
 	var ink := m.ink
 	m.ink = FIGURE_INK
+	_rig_none(m, rigging)
 	_sensor_head(m, j.neck, b)
 	_robot_torso(m, j.waist, b)
 	for s: int in 2:
-		_rig_arm(m, rigging)
+		_rig_upper_arm(m, rigging, s)
 		_robot_upper_arm(m, j.shoulders[s], b)
+		_rig_forearm(m, rigging, s)
 		_robot_forearm(m, j.elbows[s], b)
 		_robot_hand(m, j.wrists[s], b)
 		_rig_thigh(m, rigging, s)
@@ -287,28 +308,42 @@ static func joints(foot: Vector3, yaw: float, pose: Pose, heads: float = PRIMARY
 
 # --- The rig stamps (none without a Rigging) -----------------------------------------
 
-static func _rig_arm(m: LowPolyMesh, rigging: Rigging) -> void:
+static func _rig_upper_arm(m: LowPolyMesh, rigging: Rigging, s: int) -> void:
 	if rigging != null:
-		m.rig = rigging.arms
-		m.rig2 = Vector4.ZERO
+		stamp(m, [rigging.shoulders[s], rigging.body])
+
+
+static func _rig_forearm(m: LowPolyMesh, rigging: Rigging, s: int) -> void:
+	if rigging != null:
+		stamp(m, [rigging.elbows[s], rigging.shoulders[s], rigging.body])
 
 
 static func _rig_thigh(m: LowPolyMesh, rigging: Rigging, s: int) -> void:
 	if rigging != null:
-		m.rig = rigging.hips[s]
-		m.rig2 = Vector4.ZERO
+		stamp(m, [rigging.hips[s], rigging.body])
 
 
 static func _rig_shin(m: LowPolyMesh, rigging: Rigging, s: int) -> void:
 	if rigging != null:
-		m.rig = rigging.knees[s]
-		m.rig2 = rigging.hips[s]
+		stamp(m, [rigging.knees[s], rigging.hips[s], rigging.body])
 
 
 static func _rig_none(m: LowPolyMesh, rigging: Rigging) -> void:
 	if rigging != null:
-		m.rig = Vector4.ZERO
-		m.rig2 = Vector4.ZERO
+		stamp(m, [rigging.body])
+
+
+## Sets `m`'s rig and rig2 to the first two of `chain` (a segment's own joint first, then the ones
+## it hangs from) that are set, zero where there are fewer.
+static func stamp(m: LowPolyMesh, chain: Array[Vector4]) -> void:
+	var found: Array[Vector4] = [Vector4.ZERO, Vector4.ZERO]
+	var n := 0
+	for joint: Vector4 in chain:
+		if joint.w != 0.0 and n < 2:
+			found[n] = joint
+			n += 1
+	m.rig = found[0]
+	m.rig2 = found[1]
 
 
 # --- The skeleton ----------------------------------------------------------------

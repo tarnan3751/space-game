@@ -9,11 +9,13 @@ extends RefCounted
 ## UnitModels.hull); the suits keep the colonist's paint.
 
 ## The ranger's rifle, held at low ready: how far it reaches behind the grip hand and past the
-## fore hand, the way it points (forward and 30 degrees down, raised level when it aims: Rig.AIM)
-## and how far along it the fore hand holds it from the grip.
+## fore hand, the way it points (forward and 30 degrees down, raised level when it aims: Rig.AIM,
+## and carried 15 degrees across the body to its left, so the rifle shows beside the legs from the
+## front; BattleUnits turns the ranger by as much while it aims) and how far along it the fore hand
+## holds it from the grip.
 const STOCK_LENGTH := 0.1
 const BARREL_LENGTH := 0.15
-const LOW_READY := Vector3(0.0, -0.5, 0.866)
+const LOW_READY := Vector3(0.2241, -0.5, 0.8365)
 const FORE_SPAN := 0.07
 
 ## The breacher's colonist scale (0.85 tall) and the brawler's automaton scale (about 1.0 tall to
@@ -53,7 +55,7 @@ static func build_ranger(p: Parts) -> void:
 	var ink := m.ink
 	m.ink = Figures.FIGURE_INK
 	var grip := _hand(j, 1, 1.0)
-	m.rig = rigging.arms
+	m.rig = rigging.shoulders[1]
 	_rifle(m, grip, grip + LOW_READY.normalized() * FORE_SPAN, p.tier)
 	m.rig = rigging.hips[1]
 	_holster(m, j.hips[1], 1.0, -1.0, p.tier)
@@ -64,20 +66,24 @@ static func build_ranger(p: Parts) -> void:
 
 ## The breacher: the colonist in a bulkier suit, 0.85 tall: plated shoulders and belly, heavy boots,
 ## a hazard-banded charge held in both hands in front and a big charge pack on its back, its top
-## hazard-striped, its fuse blinking.
+## hazard-striped, its fuse blinking. Rigged (Figures.walk_rig): its legs walk, its arms and the
+## charge stay as they are.
 static func build_breacher(p: Parts) -> void:
 	var m := p.body
 	var pose := _carry()
 	var k := BREACHER_SCALE
-	Figures.colonist(m, Vector3.ZERO, 0.0, pose, Figures.PRIMARY_HEADS, k)
 	var j := Figures.joints(Vector3.ZERO, 0.0, pose, Figures.PRIMARY_HEADS, k)
+	var rigging := Figures.walk_rig(j)
+	Figures.colonist(m, Vector3.ZERO, 0.0, pose, Figures.PRIMARY_HEADS, k, true, rigging)
 	var ink := m.ink
 	m.ink = Figures.FIGURE_INK
 	var top := _torso_top(j, k)
 	_belly_plate(m, j.waist, top, k, p.tier)
 	for s: int in 2:
 		_pauldron(m, j.waist, j.shoulders[s].origin, k, Figures.SIDES[s], p.tier)
+		Figures.stamp(m, [rigging.knees[s], rigging.hips[s]])
 		_heavy_boot(m, j.ankles[s], k)
+		Figures.stamp(m, [])
 	_charge(m, _hand(j, 1, k), _hand(j, 0, k), j.waist, k)
 	_charge_pack(m, j.waist, top, k)
 	m.ink = ink
@@ -85,38 +91,56 @@ static func build_breacher(p: Parts) -> void:
 
 ## The jet trooper: the colonist flying, legs trailing, 0.5 over the ground, a carbine in its right
 ## hand, a jetpack on its back with two nozzles blowing flame cones and stub wings; every part bobs
-## together.
+## together. Rigged: the whole figure banks (Rig.BANK, about its waist), the right arm and the
+## carbine are raised to aim (Rig.AIM, about the right shoulder) from a low carry, and the flames
+## flicker and shorten as it hovers to fire (Rig.THRUST); the carbine's muzzle is its `muzzle`
+## socket, the nozzles' mouths `exhaust` and `exhaust_2`.
 static func build_jet_trooper(p: Parts) -> void:
 	var m := p.body
 	var pose := _flying()
 	var foot := Vector3(0, JET_HOVER, 0)
 	m.flags = Surf.BOB
-	Figures.colonist(m, foot, 0.0, pose)
 	var j := Figures.joints(foot, 0.0, pose)
+	var rigging := Figures.Rigging.new()
+	rigging.body = Rig.part(Rig.BANK, j.waist.origin)
+	rigging.shoulders[1] = Rig.part(Rig.AIM, j.shoulders[1].origin)
+	Figures.colonist(m, foot, 0.0, pose, Figures.PRIMARY_HEADS, 1.0, true, rigging)
 	var ink := m.ink
 	m.ink = Figures.FIGURE_INK
-	_jetpack(m, j.waist, _torso_top(j, 1.0), p.tier)
+	Figures.stamp(m, [rigging.body])
+	_jetpack(m, j.waist, _torso_top(j, 1.0), p.tier, rigging.body)
+	Figures.stamp(m, [rigging.shoulders[1], rigging.body])
 	_carbine(m, j.wrists[1], p.tier)
+	Figures.stamp(m, [])
 	m.ink = ink
 	m.flags = 0
 
 
 ## The brawler: the automaton made heavier, crouched low with its guard up: big fists, broad orange
 ## shoulder plates edged in the tier's trim and an armoured girdle of the tier's hull round its
-## middle.
+## middle. Rigged: its legs walk (Figures.walk_rig) and its arms counter-swing (Figures.swing_arms),
+## and as it attacks its fists punch in turn, the left on even blows (Rig.SHOULDER, ELBOW); the
+## fists' fronts are its `muzzle` (left) and `muzzle_2` (right) sockets, where its blows land.
 static func build_brawler(p: Parts) -> void:
 	var m := p.body
 	var pose := _guard()
 	var s := BRAWLER_SCALE
 	var k := s * Figures.AUTOMATON_HEIGHT / Figures.COLONIST_HEIGHT
-	Figures.automaton(m, Vector3.ZERO, 0.0, pose, Figures.PRIMARY_HEADS, s)
 	var j := Figures.joints(Vector3.ZERO, 0.0, pose, Figures.PRIMARY_HEADS, s, true)
+	var rigging := Figures.walk_rig(j)
+	Figures.swing_arms(rigging, j)
+	Figures.automaton(m, Vector3.ZERO, 0.0, pose, Figures.PRIMARY_HEADS, s, rigging)
 	var ink := m.ink
 	m.ink = Figures.FIGURE_INK
+	Figures.stamp(m, [])
 	_girdle(m, j.waist, _torso_top(j, k), k, p.tier)
 	for side: int in 2:
 		_shoulder_plate(m, j.waist, j.shoulders[side].origin, k, Figures.SIDES[side], p.tier)
+		Figures.stamp(m, [rigging.elbows[side], rigging.shoulders[side]])
 		_fist(m, j.wrists[side], k, p.tier)
+		m.socket("muzzle" if side == 0 else "muzzle_2", j.wrists[side] * (Vector3(0, -0.1, 0) * k),
+			-j.wrists[side].basis.y.normalized())
+		Figures.stamp(m, [])
 	m.ink = ink
 
 
@@ -133,9 +157,10 @@ static func _low_ready() -> Figures.Pose:
 	return pose
 
 
-## The stance with both hands forward at the belly, a little apart, holding the charge across.
+## Standing straight (Figures.neutral, the pose the rig walks from) with both hands forward at the
+## belly, a little apart, holding the charge across.
 static func _carry() -> Figures.Pose:
-	var pose := Figures.stance()
+	var pose := Figures.neutral()
 	pose.shoulder_swing = PackedFloat32Array([10.0, 0.0])
 	pose.shoulder_out = PackedFloat32Array([-10.0, 4.0])
 	pose.elbow = PackedFloat32Array([82.0, 92.0])
@@ -143,15 +168,15 @@ static func _carry() -> Figures.Pose:
 
 
 ## Flying: leaning into the flight, head up, the left arm a little back and out, the right reaching
-## forward and in a little with the carbine pointed ahead, nearly level, the legs trailing with the
-## knees bent and the toes pointed.
+## forward and in a little with the carbine carried low, pointing forward and down (Rig.AIM raises
+## it level), the legs trailing with the knees bent and the toes pointed.
 static func _flying() -> Figures.Pose:
 	var pose := Figures.Pose.new()
 	pose.torso = Vector3(16, 4, 0)
 	pose.head = Vector3(-14, -6, 0)
 	pose.shoulder_swing = PackedFloat32Array([-12.0, 45.0])
 	pose.shoulder_out = PackedFloat32Array([26.0, -10.0])
-	pose.elbow = PackedFloat32Array([24.0, 55.0])
+	pose.elbow = PackedFloat32Array([24.0, 28.0])
 	pose.hip_swing = PackedFloat32Array([-14.0, -4.0])
 	pose.hip_out = PackedFloat32Array([5.0, 6.0])
 	pose.knee = PackedFloat32Array([38.0, 24.0])
@@ -159,7 +184,8 @@ static func _flying() -> Figures.Pose:
 	return pose
 
 
-## The brawler's guard: crouched, feet wide, leaning in, both fists up in front of the chest.
+## The brawler's guard: crouched, feet wide, leaning in, both fists up in front of the chest; the
+## legs alike, so they walk alike.
 static func _guard() -> Figures.Pose:
 	var pose := Figures.Pose.new()
 	pose.torso = Vector3(12, 8, 0)
@@ -167,9 +193,9 @@ static func _guard() -> Figures.Pose:
 	pose.shoulder_swing = PackedFloat32Array([40.0, 30.0])
 	pose.shoulder_out = PackedFloat32Array([30.0, 26.0])
 	pose.elbow = PackedFloat32Array([82.0, 92.0])
-	pose.hip_swing = PackedFloat32Array([18.0, 4.0])
-	pose.hip_out = PackedFloat32Array([16.0, 14.0])
-	pose.knee = PackedFloat32Array([36.0, 22.0])
+	pose.hip_swing = PackedFloat32Array([11.0, 11.0])
+	pose.hip_out = PackedFloat32Array([15.0, 15.0])
+	pose.knee = PackedFloat32Array([29.0, 29.0])
 	pose.foot_pitch = PackedFloat32Array([0.0, 0.0])
 	return pose
 
@@ -326,7 +352,7 @@ static func _carbine(m: LowPolyMesh, wrist: Transform3D, tier: int) -> void:
 ## The jetpack on the waist `xf`'s back: a pack over the suit's backpack (orange to Gold, the tier's
 ## hull from Chrome), two gunmetal nozzles under its outer corners blowing pulsing flames down past
 ## the legs, and two orange stub wings out of its sides, swept back.
-static func _jetpack(m: LowPolyMesh, xf: Transform3D, top: float, tier: int) -> void:
+static func _jetpack(m: LowPolyMesh, xf: Transform3D, top: float, tier: int, body: Vector4) -> void:
 	var pack := Vector3(0, top * 0.22, -0.165)
 	var ink := m.ink
 	m.ink = Figures.FIGURE_INK_MASS
@@ -334,19 +360,23 @@ static func _jetpack(m: LowPolyMesh, xf: Transform3D, top: float, tier: int) -> 
 	m.ink = ink
 	for side: float in Figures.SIDES:
 		_nozzle(m, xf * Transform3D(Basis.from_euler(Vector3(deg_to_rad(-20), 0, deg_to_rad(side * 14))),
-			pack + Vector3(side * 0.105, 0.01, -0.01)))
+			pack + Vector3(side * 0.105, 0.01, -0.01)), body, "exhaust" if side > 0.0 else "exhaust_2")
 		_stub_wing(m, xf * Transform3D(Basis.IDENTITY, pack + Vector3(side * 0.11, 0.17, 0)), side)
 
 
-## A nozzle hanging from `xf` along its -Y: a gunmetal bell and a fat flame out of its mouth, 0.075
-## across at its base and 0.3 long, the same at every tier: its first third white-hot (FLAME_CORE),
-## the rest a cyan cone (FLAME).
-static func _nozzle(m: LowPolyMesh, xf: Transform3D) -> void:
+## A nozzle hanging from `xf` along its -Y, on the figure's `body` joint: a gunmetal bell and a fat
+## flame out of its mouth, 0.075 across at its base and 0.3 long, the same at every tier: its first
+## third white-hot (FLAME_CORE), the rest a cyan cone (FLAME), both on Rig.THRUST about the mouth,
+## the socket `exhaust`.
+static func _nozzle(m: LowPolyMesh, xf: Transform3D, body: Vector4, exhaust: String) -> void:
 	var down := UnitModels.euler(xf, Vector3(180, 0, 0))
 	m.lathe(PackedVector2Array([Vector2(0.036, 0.0), Vector2(0.07, 0.08)]), 10, xf.origin, Parts.GUNMETAL, down)
-	m.lathe(PackedVector2Array([Vector2(0.075, 0.0), Vector2(0.062, 0.09)]), 10, xf * Vector3(0, -0.075, 0), FLAME_CORE,
-		down)
+	var mouth := xf * Vector3(0, -0.075, 0)
+	Figures.stamp(m, [Rig.part(Rig.THRUST, mouth), body])
+	m.lathe(PackedVector2Array([Vector2(0.075, 0.0), Vector2(0.062, 0.09)]), 10, mouth, FLAME_CORE, down)
 	m.cone(0.062, 0.21, 10, xf * Vector3(0, -0.165, 0), FLAME, down)
+	m.socket(exhaust, mouth, xf.basis * Vector3.DOWN)
+	Figures.stamp(m, [body])
 
 
 ## A stub wing from `xf` out along its X to side `side`: an orange plate swept back 25 degrees and
