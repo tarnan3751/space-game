@@ -50,6 +50,11 @@ const DUST := Color("c9c2e0")
 const TRACER_CYAN := Color("b8ffe8")
 
 const DEFENCE_MUZZLES: Array[String] = ["muzzle", "muzzle_2", "muzzle_3", "muzzle_4"]
+## The missile battery's tubes, as many as its biggest launcher has (twenty at L7): its shots leave
+## them in turn along the tip lamps' chase, as many as the model has.
+const MISSILE_TUBES: Array[String] = ["muzzle", "muzzle_2", "muzzle_3", "muzzle_4", "muzzle_5", "muzzle_6", "muzzle_7",
+	"muzzle_8", "muzzle_9", "muzzle_10", "muzzle_11", "muzzle_12", "muzzle_13", "muzzle_14", "muzzle_15", "muzzle_16",
+	"muzzle_17", "muzzle_18", "muzzle_19", "muzzle_20"]
 const TWIN: Array[String] = ["muzzle", "muzzle_2"]
 const ONE: Array[String] = ["muzzle"]
 
@@ -66,7 +71,7 @@ const TABLE := {
 		"flash": 0.24, "sockets": DEFENCE_MUZZLES, "impact": Impact.SPARKS, "impact_size": 0.45, "light": 0.5,
 		"recoil": 0.04},
 	"missile_battery": {"kind": Kind.MISSILE, "color": FLAME_ORANGE, "width": 1.8, "speed": 9.0, "arc": 0.25,
-		"trail": Trail.SMOKE, "flash": 0.18, "sockets": DEFENCE_MUZZLES, "impact": Impact.BLAST_M,
+		"trail": Trail.SMOKE, "flash": 0.18, "sockets": MISSILE_TUBES, "impact": Impact.BLAST_M,
 		"impact_size": 1.0, "light": 0.9, "recoil": 0.03},
 	"plasma_mortar": {"kind": Kind.PLASMA, "color": PLASMA_VIOLET, "width": 0.4, "length": 0.5, "arc": 0.35,
 		"trail": Trail.GLOW, "flash": 0.35, "flash_shape": Flash.RING, "sockets": ONE, "impact": Impact.SPLASH,

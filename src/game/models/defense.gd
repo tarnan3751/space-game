@@ -505,8 +505,9 @@ static func build_missile_battery(p: Parts, level: int) -> void:
 			for k: int in 3:
 				launcher.box(Vector3(0.02, 0.1, 0.24), LowPolyMesh.turn(Vector3(side * (edge + 0.185), 0.2 + 0.24 * k, 0), heading),
 					(CORE_BLINK if p.tier >= Parts.Tier.OBSIDIAN else ION_BLINK).phased(Parts.chase(k, 3)), heading)
+	var tubes := 0
 	for pod: Vector3 in pods:
-		_pod(launcher, trunnion, aim, pod.x, int(pod.y), int(pod.z), spacing, level, p.tier)
+		tubes = _pod(launcher, trunnion, aim, pod.x, int(pod.y), int(pod.z), spacing, level, p.tier, tubes)
 	if level >= 2:
 		_lamp_post(m, Parts.around(0.95, 225.0, top), 0.7, LASER_PULSE)
 	if level >= 5:
@@ -556,9 +557,11 @@ static func build_missile_battery(p: Parts, level: int) -> void:
 ## whose tips blink in a chase snaking along the rows (violet crystals from L8); from L2 a hazard
 ## striped plate on its top, from L5 a gold plate
 ## on its back, from L8 a glowing violet vein panel across its face and on its side the camera
-## sees. From L6 the tubes take fewer sides.
+## sees. From L6 the tubes take fewer sides. Each tube's mouth is a muzzle socket, `muzzle`,
+## `muzzle_2`, ... in the tip lamps' chase, numbered on from the `first` sockets the launcher has
+## already; returns the launcher's tubes so far.
 static func _pod(s: LowPolyMesh, trunnion: Vector3, aim: Vector3, x: float, columns: int, rows: int, spacing: float,
-		level: int, tier: int) -> void:
+		level: int, tier: int, first: int) -> int:
 	var k := spacing / 0.34
 	var width := columns * spacing + 0.2
 	var height := rows * spacing + 0.2
@@ -579,6 +582,9 @@ static func _pod(s: LowPolyMesh, trunnion: Vector3, aim: Vector3, x: float, colu
 			s.tube(0.1 * k, 0.14 * k, 0.1, sides, mouth, Parts.GUNMETAL, tube_aim)
 			s.cone(0.085 * k, 0.2 * k, sides, mouth, tip.phased(Parts.chase(row * columns + turn_order, rows * columns)),
 				tube_aim)
+			var out := LowPolyMesh.turn(Vector3.UP, tube_aim)
+			var tube := first + row * columns + turn_order
+			s.socket("muzzle" if tube == 0 else "muzzle_%d" % (tube + 1), mouth + out * 0.1, out)
 	if level >= 2:
 		s.box_chamfered(Vector3(width * 0.8, 0.05, depth * 0.45), 0.02,
 			_at(trunnion, Vector3(x, height * 0.5, -0.12), aim), HAZARD_FINE, aim)
@@ -594,6 +600,7 @@ static func _pod(s: LowPolyMesh, trunnion: Vector3, aim: Vector3, x: float, colu
 			if LowPolyMesh.turn(Vector3(side, 0, 0), aim).dot(TOWARD_CAMERA) > 0.2:
 				s.box(Vector3(0.02, height - 0.24, depth - 0.3),
 					_at(trunnion, Vector3(x + side * (width * 0.5 + 0.01), -(height - 0.24) * 0.5, -0.05), aim), VEIN_PANEL, aim)
+	return first + rows * columns
 
 
 ## The chamber is a ball of boiling plasma at every level: the glowing core, tongues licking out of
@@ -604,8 +611,8 @@ static func _pod(s: LowPolyMesh, trunnion: Vector3, aim: Vector3, x: float, colu
 ## as tall as the bowl's rise, its boom swinging a plasma canister over the bowl. L7 (Obsidian): a
 ## taller plinth with glowing violet vein panels on its faces the camera sees, the pedestal, bowl
 ## and barrel obsidian veined violet, the coils violet, a violet plasma pool glowing on the bowl
-## round the chamber, and a glowing charge ring hovering well past the muzzle, turning about the
-## barrel. L8 (Crown): gold filigree round the plinth and the pedestal, the pool the antimatter core
+## round the chamber, and a glowing charge ring hovering well past the muzzle, carried by the
+## barrel. The barrel and its cheeks turn over the chamber: they scan, and aim in battle. L8 (Crown): gold filigree round the plinth and the pedestal, the pool the antimatter core
 ## with a core ring round the chamber's foot, a gold crown round the bowl's rim, and an ammunition
 ## rack on the near corner: an obsidian octagonal pedestal, gold-topped, where the loader arm
 ## stands, three upright plasma canisters banded gold in a gunmetal cradle beside it.
