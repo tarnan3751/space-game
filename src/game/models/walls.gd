@@ -12,11 +12,12 @@ extends RefCounted
 ## (x, z): PLUS_X the cell at x + 1, MINUS_X at x - 1, PLUS_Z at y + 1 (world +z), MINUS_Z at
 ## y - 1. NEIGHBOURS lists the offsets in bit order: bit i is the cell at NEIGHBOURS[i].
 ##
-## The look (docs/reference/art-style.md, **Walls**): a slim hull post on a concrete footing,
+## The look (docs/reference/art-style.md, **Walls**): a slim hull-light post on a concrete footing,
 ## and slate segments 0.4 of the cell thick and 0.85 of the post's height on a concrete curb
 ## that runs on from one wall to the next, so a run reads as one thick slab with the posts
-## standing just proud as joints. Each level adds to the same wall: L1 slate plates on a squat
-## post; L2 riveted armour with a band, and a taller post with a gunmetal cap; L3 ribbed
+## standing just proud as joints. Each level adds to the same wall: L1 slate plates under a
+## hull-light cap course; L2 riveted armour with a band under the cap course, and a taller post
+## with a gunmetal cap; L3 ribbed
 ## segments with an energy strip along the top, and a ribbed post; L4 a chamfered pylon post and
 ## double-plated segments with a brighter strip; L5 a crown on the cap and an energy field
 ## above a low plated base. Levels 6 to 10 are the same wall in the higher tiers (surfaces follow
@@ -62,11 +63,11 @@ const SLAB_SHARE := 0.4
 ## Per level: [post width, body top, post chamfer, cap width (0 for none), cap height]. A post
 ## is at most 0.46 of the cell and its cap never wider than it.
 const POSTS := [
-	[0.42, 0.55, 0.05, 0.0, 0.0],
-	[0.44, 0.6, 0.05, 0.4, 0.04],
-	[0.45, 0.67, 0.05, 0.41, 0.05],
-	[0.46, 0.76, 0.08, 0.42, 0.05],
-	[0.46, 0.76, 0.06, 0.42, 0.04],
+	[0.42, 0.71, 0.05, 0.0, 0.0],
+	[0.44, 0.71, 0.05, 0.4, 0.04],
+	[0.45, 0.75, 0.05, 0.41, 0.05],
+	[0.46, 0.82, 0.08, 0.42, 0.05],
+	[0.46, 0.78, 0.06, 0.42, 0.04],
 	[0.46, 0.88, 0.06, 0.44, 0.08],
 	[0.46, 0.95, 0.06, 0.44, 0.07],
 	[0.46, 1.0, 0.07, 0.44, 0.08],
@@ -79,9 +80,13 @@ const LAMP_BANDS: Array[float] = [0.05, 0.06, 0.08, 0.08, 0.0]
 const CROWN := Vector2(0.34, 0.1)
 
 static var CONCRETE := Parts.CONCRETE_PAD
-static var POST := Parts.HULL_MID
-static var POST_RIBBED := Surf.make(MaterialKit.Layer.PIPE, MaterialKit.HULL_MID, 2.0)
-static var POST_PLATED := Surf.make(MaterialKit.Layer.PLATE, MaterialKit.HULL_MID, 2.0)
+static var POST := Parts.HULL_LIGHT
+static var POST_RIBBED := Surf.make(MaterialKit.Layer.PIPE, MaterialKit.HULL_LIGHT, 2.0)
+static var POST_PLATED := Surf.make(MaterialKit.Layer.PLATE, MaterialKit.HULL_LIGHT, 2.0)
+## Levels 1 and 2's cap course along the top of the slate segment, so a run reads as a wall on
+## the violet ground: its surface and height.
+static var CAP_COURSE := Parts.HULL_LIGHT
+const CAP_COURSE_HEIGHT := 0.1
 static var CAP := Surf.make(MaterialKit.Layer.FLAT, MaterialKit.GUNMETAL)
 static var GOLD := Parts.GOLD_TRIM
 static var SLATE := Surf.make(MaterialKit.Layer.PLATE, MaterialKit.WALL, 1.5)
@@ -266,12 +271,15 @@ static func _segments(m: LowPolyMesh, level: int, tier: int, bit: int, step: boo
 	var top := SEGMENT_SHARE * _post_height(level)
 	var height := top - base
 	match level:
-		1:
-			_sweep(m, bit, _chamfered(SEGMENT_HALF, height, 0.04), base, SLATE, step)
-		2:
-			_sweep(m, bit, _chamfered(SEGMENT_HALF, height, 0.04), base, SLATE_RIVETED, step)
-			var band := Vector2(SEGMENT_HALF + 0.02, 0.25 * height)
-			_sweep(m, bit, _trapezoid(Vector2(band.x, 0.0), band), base + 0.35 * height, SLATE, step)
+		1, 2:
+			# The slate body under a hull-light cap course; level 2's riveted, with a band.
+			var body := height - CAP_COURSE_HEIGHT
+			_sweep(m, bit, _trapezoid(Vector2(SEGMENT_HALF, 0.0), Vector2(SEGMENT_HALF, body)), base,
+				SLATE if level == 1 else SLATE_RIVETED, step)
+			_sweep(m, bit, _chamfered(SEGMENT_HALF, CAP_COURSE_HEIGHT, 0.04), base + body, CAP_COURSE, step)
+			if level == 2:
+				var band := Vector2(SEGMENT_HALF + 0.02, 0.25 * height)
+				_sweep(m, bit, _trapezoid(Vector2(band.x, 0.0), band), base + 0.3 * height, SLATE, step)
 		3:
 			_sweep(m, bit, _chamfered(SEGMENT_HALF, height, 0.04), base, SLATE_RIBBED, step)
 			_strip(m, bit, 0.1, top, ENERGY)
