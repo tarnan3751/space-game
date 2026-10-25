@@ -232,13 +232,20 @@ const SENTRY_RING_OUTER := 1.08
 const SENTRY_RING_LIFT := 0.2
 const SENTRY_MANTLET := Vector3(0.66, 0.08, 0.36)
 const SENTRY_CROWN_BACK := 0.3
+## The gravity well: how high its core floats over the well to L3 (higher from L4 by WELL_LIFTS),
+## the core's radius to L3, the gyro rings' thickness, and the rotor's height over the core,
+## clear of the rings' tumble.
+const WELL_FLOAT := 1.0
+const WELL_CORE := 0.22
+const WELL_GYRO := 0.05
+const WELL_ROTOR := 0.68
 ## The gravity well from L4, by level from L4: the plinth's height, how much higher the core
 ## floats over the well (the pillars growing with it) and the core's radius (bobbing at L4, so
 ## held at L1's size to clear the inner gyro ring over its bob; bigger and steady from L5); the L5 gyro ring's
 ## radii and its height under the core.
 const WELL_PLINTHS := [0.3, 0.44, 0.48]
 const WELL_LIFTS := [0.3, 0.55, 0.85]
-const WELL_CORES := [0.17, 0.21, 0.23]
+const WELL_CORES := [0.22, 0.27, 0.3]
 const WELL_RING_INNER := 0.9
 const WELL_RING_OUTER := 1.03
 const WELL_RING_DROP := 0.6
@@ -1202,7 +1209,8 @@ static func build_cloaked_sentry(p: Parts, level: int) -> void:
 			Vector3(0, Parts.PAD_HEIGHT + rise - 0.14, 0), Parts.FILIGREE)
 
 
-## From L4 the core floats higher over the well every level, the pillars growing with it and a
+## A red-rimmed well with its violet core floating high over it in fat gyro rings. From L4 the core
+## floats higher over the well every level, the pillars growing with it and a
 ## housing ring joining them low over the well. L4 (Chrome): chrome plinth, well, pillars and
 ## housing, cyan strips up the pillars, a red armour band round the housing, the first gyro ring
 ## glowing cyan and the rotor chrome. L5 (Obsidian): a taller plinth with glowing violet vein
@@ -1218,10 +1226,11 @@ static func build_gravity_well(p: Parts, level: int) -> void:
 	var obsidian := p.tier >= Parts.Tier.OBSIDIAN
 	var crown := p.tier >= Parts.Tier.CROWN
 	var top := _plinth(m, 2, 0.8, plinth, ARMOUR, _by_tier(p.tier, Parts.GUNMETAL, Parts.CHROME_ROUND, Parts.OBSIDIAN_ROUND))
-	Parts.torus(m, 0.5, 0.08, 16, 10, Vector3(0, top, 0), _by_tier(p.tier, SHELL_MID, Parts.CHROME_ROUND, Parts.OBSIDIAN_ROUND))
+	# The well's rim, a fat red ring at every tier.
+	Parts.torus(m, 0.5, 0.08, 16, 10, Vector3(0, top, 0), ARMOUR_ROUND)
 	m.disc(0.44, 20, Vector3(0, top + 0.01, 0), SWIRL)
-	var core := Vector3(0, top + 0.7 + lift, 0)
-	var pillar := 0.82 + lift
+	var core := Vector3(0, top + WELL_FLOAT + lift, 0)
+	var pillar := WELL_FLOAT + 0.12 + lift
 	var pillar_surf := _by_tier(p.tier, SHELL_MID, Parts.CHROME, Parts.OBSIDIAN)
 	for k: int in 3:
 		var degrees := 30.0 + 120.0 * k
@@ -1234,7 +1243,7 @@ static func build_gravity_well(p: Parts, level: int) -> void:
 			m.box(Vector3(0.07, pillar - 0.36, 0.02), Parts.around(0.755, degrees, top + 0.08),
 				Parts.CORE_GLOW if obsidian else Parts.CYAN_STRIP, Vector3(0, 90.0 - degrees, 0))
 	var core_surf := CORE
-	var core_radius := 0.17
+	var core_radius := WELL_CORE
 	if level >= 4:
 		core_radius = WELL_CORES[level - 4]
 		core_surf = BRIGHT_CORE if crown else (CRYSTAL_CORE if obsidian else CORE)
@@ -1252,10 +1261,10 @@ static func build_gravity_well(p: Parts, level: int) -> void:
 		var first := SHELL
 		if level >= 4:
 			first = GOLD if crown else Parts.CYAN_STRIP
-		_gyro(p.moving(core, Motion.spin(Vector3.RIGHT, 1.3)), Vector3.ZERO, 0.38, 0.04, Vector3(62, 0, 0), first)
+		_gyro(p.moving(core, Motion.spin(Vector3.RIGHT, 1.3)), Vector3.ZERO, 0.49, WELL_GYRO, Vector3(62, 0, 0), first)
 	if level >= 3:
-		_gyro(p.moving(core, Motion.spin(Vector3.BACK, -0.9)), Vector3.ZERO, 0.29, 0.035, Vector3(0, 0, -35), gold)
-	var rotor := p.moving(core + Vector3(0, 0.5, 0), Motion.spin(Vector3.UP, 1.5))
+		_gyro(p.moving(core, Motion.spin(Vector3.BACK, -0.9)), Vector3.ZERO, 0.37, WELL_GYRO, Vector3(0, 0, -35), gold)
+	var rotor := p.moving(core + Vector3(0, WELL_ROTOR, 0), Motion.spin(Vector3.UP, 1.5))
 	var rotor_surf := SHELL
 	if level >= 4:
 		rotor_surf = GOLD if crown else _by_tier(p.tier, SHELL, Parts.CHROME_ROUND, Parts.OBSIDIAN_ROUND)
@@ -1271,7 +1280,7 @@ static func build_gravity_well(p: Parts, level: int) -> void:
 	_plinth_panels(m, 0.8, plinth)
 	m.ring(0.6, 0.72, 0.012, 8, Vector3(0, top, 0), Parts.VEINS, Parts.OCTAGON)
 	# The gyro ring hovering round the pillars at their middle, turning with the rotor.
-	var ring_y := -0.5 - WELL_RING_DROP
+	var ring_y := -WELL_ROTOR - WELL_RING_DROP
 	rotor.ring(WELL_RING_INNER, WELL_RING_OUTER, 0.07, 24, Vector3(0, ring_y, 0), HOVER)
 	rotor.lathe(PackedVector2Array([Vector2(WELL_RING_OUTER - 0.02, 0.072), Vector2(WELL_RING_INNER + 0.02, 0.072)]), 24,
 		Vector3(0, ring_y, 0), HOVER_RIM)
