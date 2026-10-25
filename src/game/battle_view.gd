@@ -725,10 +725,11 @@ func _death(unit: int) -> void:
 
 ## The dying units' effects, where each is drawn now (its `muzzle` socket as drawn,
 ## BattleUnits.socket_point, which turns with the body as it rolls or spirals; once its fall is
-## over, where the fall left it), no lower than its standing middle: a wreck's fireball
-## and glow WRECK_BLAST of the way through its death, then at its end a scorch where it came to
-## rest and dark smoke; a crash's blast, glow and scorch where it comes to rest; a small blast at
-## the end of the rest.
+## over, where the fall left it), at the height of its model's middle as built
+## (BattleUnits.rest_point, without an aircraft's flight lift), which sizes them too: a wreck's
+## fireball and glow WRECK_BLAST of the way through its death, then at its end a scorch where it
+## came to rest and dark smoke; a crash's blast, glow and scorch where it comes to rest; a small
+## blast at the end of the rest.
 func _finish_deaths() -> void:
 	if _dying.is_empty():
 		return
@@ -737,7 +738,7 @@ func _finish_deaths() -> void:
 		var weapon := Weapons.of(sim.unit_type(unit))
 		var seconds := units.death_seconds(unit)
 		var since := _clock - _dying[unit]
-		var middle := units.aim_point(unit)
+		var middle := units.rest_point(unit)
 		var at := units.socket_point(unit, DEATH_SOCKET)
 		at.y = middle.y
 		var ground := Vector3(at.x, 0.0, at.z)

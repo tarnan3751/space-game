@@ -220,6 +220,13 @@ moving part (`UnitModels.MAX_MOVING` is 0); the gunship's rotors are spun by the
   recoil). `socket_point(id, name)` gives any of a unit's sockets (`muzzle`, `muzzle_2`, `bay`,
   `exhaust`, `exhaust_2`, `eye`) in the world as last drawn, and `has_socket(id, name)` whether its
   model has one.
+- **Flight**: an air unit flies higher than its model is built, its middle `FLIGHT_MIDDLE` over
+  the ground (the jet trooper 1.5, the skimmer 2.0, the gunship 3.0, the bomber 3.5), over the walls
+  and most roofs: a lift on its instance's transform (`_altitude`, the target less the model's own
+  middle), so its sockets (`socket_point`), its aim point, its bar, its shadow, its bank and its
+  shots go with it; `rest_point(id)` is its middle as built, unlifted, where its death's effects go. It appears at that height and its death spirals down from it to the ground over
+  the same 0.6 s. Ground units, the hover tank included, keep their built height; outside a battle
+  (the gallery, the cards) nothing is lifted. The sim is 2D and untouched.
 - **Throws**: a unit a grav trap throws flies from where it stood to where it landed on an arc
   `THROW_HEIGHT` high over `THROW_SECONDS`.
 - **Health bars**: a damaged unit carries a cyan bar over its head, its fill easing towards the
@@ -354,7 +361,8 @@ timed by `BattleUnits.death_seconds`), `hold` (a beam's).
 
 Deaths, timed by the body's fall (`BattleUnits.death_seconds`) and drawn where the body is drawn
 (its `muzzle` socket as last drawn, `BattleUnits.socket_point`, which turns with the body as it
-rolls; where its fall left it once it is over), at its standing middle's height: a
+rolls; where its fall left it once it is over), at its model's middle's height as built, an air
+unit's flight lift left out (`BattleUnits.rest_point`), which sizes them too: a
 **wreck** is a fireball and a glow `WRECK_BLAST` (0.3) of the way through, then dark smoke and a
 scorch where it came to rest; a **crash** trails smoke from the aircraft as it spirals down (a puff
 every `CRASH_STEP`, 60 ms, at the first of `CRASH_SOCKETS` its model has, as last drawn: its

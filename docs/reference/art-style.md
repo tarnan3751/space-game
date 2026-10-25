@@ -842,7 +842,9 @@ sockets (**Sockets**), which the battle fires its shots from.
   layer, whose fine stripes blend to khaki at camera size 24.
 - **Hovering.** A hovering unit (the jet trooper, the skimmer, the hover tank, the gunship and the
   bomber) sets `LowPolyMesh.flags` to `Surf.BOB` for its whole build, figures and rotors included,
-  every part on phase 0 (the figures' surfaces are), so nothing comes apart as it bobs. Flames,
+  every part on phase 0 (the figures' surfaces are), so nothing comes apart as it bobs. The
+  heights in the table are the models' as built (the gallery and the cards); in battle an air unit
+  flies higher, its middle at `BattleUnits.FLIGHT_MIDDLE` (`battle-view.md`, **Units**). Flames,
   lamps and hover glows are surface flags (PULSE, BLINK), never moving parts. The gunship's rotor
   blades are plain boxes too thin to outline (0.012 tall, 0.065 wide, `outline` off), as the escort
   drone's arms are; round their tips a thin ring glows in the tier's glow (PULSE, `ROTOR_RING`

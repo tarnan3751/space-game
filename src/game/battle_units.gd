@@ -43,6 +43,11 @@ extends Node3D
 ## through it, and a falling aircraft comes to rest on it. A thrown unit (a grav trap) flies to where it
 ## landed on an arc.
 ## Damaged units show a health bar (BattleEffects.bar), its fill eased towards the hull left.
+## An air unit is drawn FLIGHT_MIDDLE high in battle (its model's middle that far over the ground,
+## higher than it is built, so it flies over the walls and the roofs): the lift is on its instance's
+## transform, so its sockets, its bar, its shadow, its bank and its fall go with it; it appears at
+## that height and its death spirals down from it to the ground. Its aim point is its lifted middle;
+## rest_point() is its middle as built, where its death's effects go.
 ##
 ## From FAR_ZOOM out the MultiMeshes draw each type's far version (UnitModels.meshes, far: fewer
 ## sides), where a unit is a few dozen pixels tall: a full army in its near version would take the
@@ -96,6 +101,9 @@ const DEPLOY_YAW := PI * 0.25
 ## A thrown unit's flight.
 const THROW_SECONDS := 0.45
 const THROW_HEIGHT := 1.6
+## How high an air unit's middle flies in battle (world units over the ground), per type; its
+## model's own height over its origin is made up to it by a lift on the instance.
+const FLIGHT_MIDDLE := {"jet_trooper": 1.5, "skimmer": 2.0, "gunship": 3.0, "bomber": 3.5}
 ## How fast a health bar's fill follows the hull, and how high over a unit's top it floats.
 const BAR_EASE := 10.0
 const BAR_OVER := 0.25
@@ -115,7 +123,8 @@ var _centres: Dictionary[int, Vector2] = {}
 
 ## Per unit type in the battle (its index in the sim's list of types): the MultiMeshes, the
 ## buffer they share, how many are drawn this frame, the gait's share while it walks, a step's
-## length, the model's top and its middle's height (where shots hit and leave).
+## length, the lift an air unit flies at over its model's height (FLIGHT_MIDDLE), the model's top
+## and its middle's height as drawn (where shots hit and leave), the lift included.
 var _types := PackedStringArray()
 var _type_of_name: Dictionary[String, int] = {}
 var _bodies: Array[MultiMesh] = []
@@ -128,6 +137,7 @@ var _buffers: Array[BattleEffects.Instances] = []
 var _drawn := PackedInt32Array()
 var _hop := PackedFloat32Array()
 var _stride := PackedFloat32Array()
+var _altitude := PackedFloat32Array()
 var _top := PackedFloat32Array()
 var _middle := PackedFloat32Array()
 ## Per type: whether it aims (its mesh carries a channel of Rig.AIMING), whether it hovers (its
@@ -227,8 +237,12 @@ func setup(sim: BattleSim, catalog: Catalog, army: Dictionary, levels: Dictionar
 		var ground := catalog.unit_class(unit) == "ground"
 		_bank_max.append(BANK_MAX_GROUND if ground else BANK_MAX)
 		_hop.append(0.0 if hovers or not ground else float(WHEELED.get(unit, 1.0)))
-		_top.append(box.end.y)
-		_middle.append(box.get_center().y)
+		var altitude := 0.0
+		if not ground:
+			altitude = float(FLIGHT_MIDDLE.get(unit, box.get_center().y)) - box.get_center().y
+		_altitude.append(altitude)
+		_top.append(box.end.y + altitude)
+		_middle.append(box.get_center().y + altitude)
 		_stride.append(float(WHEEL_STRIDE.get(unit, STRIDE * box.size.y)))
 		var fall := Fall.MACHINE
 		if not ground:
@@ -251,6 +265,16 @@ func aim_point(id: int) -> Vector3:
 		return Vector3.ZERO
 	var at := _cur[u]
 	return Vector3(at.x, _middle[_type[u]], at.y)
+
+
+## Unit `id`'s middle as its model is built, without an air unit's flight lift (FLIGHT_MIDDLE): the
+## height a death's effects are set at and sized by, since its fall brings it down from the flight.
+func rest_point(id: int) -> Vector3:
+	var u := id - 1
+	if u < 0 or u >= _count:
+		return Vector3.ZERO
+	var at := _cur[u]
+	return Vector3(at.x, _middle[_type[u]] - _altitude[_type[u]], at.y)
 
 
 ## Unit `id`'s instance state as last drawn (INSTANCE_CUSTOM: Rig), zeros for an unknown id.
@@ -417,7 +441,8 @@ func draw(alpha: float, now: float, delta: float, effects: BattleEffects, far: b
 		if _flash_at[u] >= 0.0:
 			var since := now - _flash_at[u]
 			flash = 1.0 - since / HIT_SECONDS if since >= 0.0 and since < HIT_SECONDS else 0.0
-		var placed := Transform3D(Basis(Vector3.UP, _yaw[u] + _aim_yaw[t] * _aim[u]), Vector3(at.x, lift, at.y))
+		var placed := Transform3D(Basis(Vector3.UP, _yaw[u] + _aim_yaw[t] * _aim[u]),
+			Vector3(at.x, lift + _altitude[t], at.y))
 		if dying:
 			placed = placed * _fallen(u, t, fade)
 		var basis := placed.basis
@@ -464,8 +489,9 @@ func drawn() -> int:
 
 
 ## Unit `u` of type `t` `fade` of the way through its death, in its model's space: fallen as its
-## class falls (Fall), shrunk away at the end, a hovering or flying one brought down to the ground,
-## and lifted so the lowest of its extreme points (_hull) is never below the ground.
+## class falls (Fall), shrunk away at the end, a hovering or flying one brought down to the ground
+## (from its flight's lift, _altitude, too), and lifted so the lowest of its extreme points (_hull)
+## is never below the ground.
 func _fallen(u: int, t: int, fade: float) -> Transform3D:
 	var fall := minf(fade / FALL_SHARE, 1.0)
 	fall *= fall
@@ -496,7 +522,8 @@ func _fallen(u: int, t: int, fade: float) -> Transform3D:
 	var lowest := INF
 	for point: Vector3 in _hull[t]:
 		lowest = minf(lowest, (fallen * point).y)
-	fallen.origin.y += maxf(-drop, GROUND_MARGIN * fall - lowest)
+	var altitude := _altitude[t]
+	fallen.origin.y += maxf(-drop - altitude * fall, GROUND_MARGIN * fall - lowest - altitude)
 	return fallen
 
 
