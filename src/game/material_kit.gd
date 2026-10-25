@@ -73,6 +73,10 @@ const HIT_FLASH_MIX := 0.6
 ## how much of it.
 const DISABLED_GREY := Color("6e6c80")
 const DISABLED_MIX := 0.5
+## A cloaked defence fading in as it is revealed in battle (reveal): the shimmer's tint its body
+## takes at each step of the fade, thinning out.
+const REVEAL_TINT := Color("b4f4ff")
+const REVEAL_MIXES: Array[float] = [0.8, 0.55, 0.3]
 
 const TOON_SHADER := preload("res://src/game/toon.gdshader")
 const INK_SHADER := preload("res://src/game/ink.gdshader")
@@ -94,6 +98,8 @@ static var _disabled: ShaderMaterial
 static var _rival: ShaderMaterial
 static var _hit_flash_rival: ShaderMaterial
 static var _disabled_rival: ShaderMaterial
+## reveal()'s materials, the plain then the rival ones, made on first use.
+static var _reveal: Array[ShaderMaterial] = []
 static var _terrain: ShaderMaterial
 
 
@@ -186,6 +192,20 @@ static func hit_flash_rival() -> ShaderMaterial:
 		_hit_flash_rival = _toon_material(Color(Color.WHITE, HIT_FLASH_MIX))
 		_hit_flash_rival.set_shader_parameter("rival", 1.0)
 	return _hit_flash_rival
+
+
+## The body of a cloaked defence at `step` (0 to REVEAL_MIXES' size - 1) of its fade in as it is
+## revealed in battle, `rival_tint` for a rival colony's (BuildingView.set_reveal): REVEAL_TINT
+## mixed in by the step's share.
+static func reveal(step: int, rival_tint: bool) -> ShaderMaterial:
+	if _reveal.is_empty():
+		for rival_one: bool in [false, true]:
+			for mix: float in REVEAL_MIXES:
+				var material := _toon_material(Color(REVEAL_TINT, mix))
+				if rival_one:
+					material.set_shader_parameter("rival", 1.0)
+				_reveal.append(material)
+	return _reveal[step + (REVEAL_MIXES.size() if rival_tint else 0)]
 
 
 ## A rival colony's building while an EMP burst has it disabled: the faction tint, dimmed grey

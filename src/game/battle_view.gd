@@ -67,6 +67,8 @@ const SPEEDS: Array[int] = [1, 2]
 const MASK_STRENGTH := 0.32
 const MASK_FLASH := 0.75
 const MASK_FLASH_SECONDS := 0.5
+## How long a revealed defence takes to fade in (BuildingView.set_reveal).
+const REVEAL_SECONDS := 0.3
 ## A hit's flash and shake on a building, and how far it shakes.
 const FLASH_SECONDS := 0.08
 const SHAKE_SECONDS := 0.18
@@ -192,6 +194,8 @@ var _flash_until: Dictionary[int, float] = {}
 var _shake_until: Dictionary[int, float] = {}
 var _bar_until: Dictionary[int, float] = {}
 var _bars: Dictionary[int, float] = {}
+## Per hidden defence revealed lately, when it was: it fades in over REVEAL_SECONDS.
+var _reveal_at: Dictionary[int, float] = {}
 var _done := PackedInt32Array()
 ## The shield generators.
 var _shields := PackedInt32Array()
@@ -522,7 +526,7 @@ func _step() -> void:
 	_wake_defences()
 
 
-## The defences an EMP burst disabled whose time is up lose their grey.
+## The defences an EMP burst disabled whose time is up wake (_woke).
 func _wake_defences() -> void:
 	if _disabled.is_empty():
 		return
@@ -533,12 +537,13 @@ func _wake_defences() -> void:
 	for id: int in _woken:
 		_disabled.erase(id)
 		if _views.has(id):
-			_views[id].set_disabled(false)
-			_wake_flash(id)
+			_woke(id)
 
 
-## Defence `id` woke from an EMP burst: a flash of energy over it, a ring and a glow.
-func _wake_flash(id: int) -> void:
+## Drawn defence `id` wakes from an EMP burst: it loses its grey and its moving parts snap back to
+## the clock (BuildingView.set_disabled), with a flash of energy over it, a ring and a glow.
+func _woke(id: int) -> void:
+	_views[id].set_disabled(false)
 	var centre := _centres[id]
 	var top := Vector3(centre.x, _muzzles[id], centre.y)
 	var size := 0.4 + 0.2 * _sizes[id]
@@ -581,6 +586,7 @@ func _read_events() -> void:
 			BattleEvents.REVEAL:
 				if _views.has(source):
 					_views[source].visible = true
+					_reveal(source)
 					_decloak(source)
 			BattleEvents.FALL:
 				_fall(source)
@@ -807,6 +813,7 @@ func _fall(id: int) -> void:
 		_collapsing[id] = _views[id]
 		_collapse_at[id] = _clock
 		_views.erase(id)
+	_reveal_at.erase(id)
 	_flash_until.erase(id)
 	_shake_until.erase(id)
 	_bar_until.erase(id)
@@ -1036,9 +1043,23 @@ func _in_reach(id: int, range_cells: float) -> PackedInt32Array:
 	return _found
 
 
-## The flashes, shakes and bars of the buildings hit lately; `shown` seconds of battle after the
-## last frame.
+## Hidden defence `id`, just revealed, fades in (BuildingView.set_reveal) over REVEAL_SECONDS.
+func _reveal(id: int) -> void:
+	_reveal_at[id] = _clock
+	_views[id].set_reveal(0.0)
+
+
+## The reveals' fades, and the flashes, shakes and bars of the buildings hit lately; `shown` seconds
+## of battle after the last frame.
 func _draw_buildings(shown: float) -> void:
+	_done.clear()
+	for id: int in _reveal_at:
+		var share := (_clock - _reveal_at[id]) / REVEAL_SECONDS
+		_views[id].set_reveal(share)
+		if share >= 1.0:
+			_done.append(id)
+	for id: int in _done:
+		_reveal_at.erase(id)
 	_done.clear()
 	for id: int in _flash_until:
 		var on := _clock < _flash_until[id]

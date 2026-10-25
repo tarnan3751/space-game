@@ -23,7 +23,9 @@ extends Node3D
 ## along its muzzle (fired, RECOIL): the head's pose is its aim's yaw, then its idle Motion, then
 ## the kick. A moving part that rides another (Parts.riding) is carried by it. A defence whose
 ## muzzle is on its body, or that has none, never aims. socket_point() and socket_direction() give
-## a socket where it is now, in the world.
+## a socket where it is now, in the world. While an EMP burst has the building disabled
+## (set_disabled) every moving part holds its pose, and on waking snaps back to the clock's; a
+## cloaked defence fades in when it is revealed (set_reveal).
 ##
 ## While the building is busy a ConstructionDrone works over it, driven from _process; when the
 ## work ends the drone leaves, and if the view is freed first (a finished level replaces it)
@@ -57,6 +59,9 @@ const RECOIL := {
 }
 const RECOIL_DEFAULT := 0.125
 const RECOIL_SECONDS := 0.25
+## A revealed defence's fade in (set_reveal): MaterialKit.reveal's steps, its outlines showing from
+## the second.
+const REVEAL_STEPS := 3
 
 enum Aim { IDLE, AIMING, RETURNING }
 
@@ -120,6 +125,8 @@ var _aim_turns: bool = true
 var _muzzle_direction := Vector3.FORWARD
 var _now: float = 0.0
 var _fired_at: float = -INF
+## The step of the reveal's fade the bodies show (set_reveal), -1 for none.
+var _reveal_step: int = -1
 
 
 ## Call once, before adding to the tree. `level` picks the model (level 1's while it is 0),
@@ -252,7 +259,8 @@ func set_flash(on: bool) -> void:
 
 
 ## Dims the bodies grey (MaterialKit.disabled) while an EMP burst has the building disabled in
-## battle, or clears it; a hit's flash shows over it.
+## battle, or clears it; a hit's flash shows over it. While it is disabled its moving parts hold
+## their pose; cleared, they snap back to the clock's.
 func set_disabled(on: bool) -> void:
 	if on == _disabled or _ghost_tint != null:
 		return
@@ -264,6 +272,25 @@ func set_disabled(on: bool) -> void:
 func is_disabled() -> bool:
 	return _disabled
 
+
+## A revealed defence fading in, `share` of the way (0 to 1): its bodies take MaterialKit.reveal's
+## steps, a bright tint thinning out, its outlines hidden for the first; at 1 it is itself again.
+## A hit's flash shows over it.
+func set_reveal(share: float) -> void:
+	var step := -1 if share >= 1.0 else clampi(floori(share * REVEAL_STEPS), 0, REVEAL_STEPS - 1)
+	if step == _reveal_step or _ghost_tint != null:
+		return
+	_reveal_step = step
+	for outline: MeshInstance3D in _outlines:
+		outline.visible = step != 0
+	_apply_tint()
+
+
+## The step of the reveal's fade the bodies show (set_reveal), -1 for none.
+func reveal_step() -> int:
+	return _reveal_step
+
+
 ## Gives the bodies a rival colony's faction tint (MaterialKit.rival), or takes it off; the
 ## outlines stay plain ink. For a battle's defender (BattleView), never a ghost.
 func set_rival(on: bool) -> void:
@@ -273,12 +300,15 @@ func set_rival(on: bool) -> void:
 	_apply_tint()
 
 
-## The bodies' material for the flash, the grey and the faction tint: the flash over the grey over
-## the plain body, each in its rival version on a rival building, whose plain body is rival().
+## The bodies' material for the flash, the reveal, the grey and the faction tint: the flash over the
+## reveal over the grey over the plain body, each in its rival version on a rival building, whose
+## plain body is rival().
 func _apply_tint() -> void:
 	var material: Material = MaterialKit.rival() if _rival else null
 	if _flashed:
 		material = MaterialKit.hit_flash_rival() if _rival else MaterialKit.hit_flash()
+	elif _reveal_step >= 0:
+		material = MaterialKit.reveal(_reveal_step, _rival)
 	elif _disabled:
 		material = MaterialKit.disabled_rival() if _rival else MaterialKit.disabled()
 	for body: MeshInstance3D in _bodies:
@@ -313,7 +343,7 @@ func _process(delta: float) -> void:
 	if _drone != null and not _drone.advance(delta):
 		_drone = null
 		set_process(not _movers.is_empty())
-	if not _animate:
+	if not _animate or _disabled:
 		return
 	var time := Motion.clock()
 	for i: int in _movers.size():
@@ -405,7 +435,7 @@ func _aim_wanted(point: Vector3) -> float:
 ## The aiming head fired at `now` on the battle's clock: it kicks back along its muzzle by its
 ## type's RECOIL over RECOIL_SECONDS. BattleView calls it as a shot leaves a muzzle (_muzzle).
 func fired(now: float) -> void:
-	if _aim_index < 0:
+	if _aim_index < 0 or _disabled:
 		return
 	_now = now
 	_fired_at = now
