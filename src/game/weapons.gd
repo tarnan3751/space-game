@@ -88,7 +88,7 @@ const TABLE := {
 	"cloaked_sentry": {"kind": Kind.LASER, "color": MaterialKit.DEFENCE, "width": 0.08, "length": 0.6,
 		"speed": 40.0, "flash": 0.12, "sockets": TWIN, "impact": Impact.SPARKS, "impact_size": 0.3, "light": 0.3,
 		"recoil": 0.1},
-	"gravity_well": {"kind": Kind.VORTEX, "color": MaterialKit.ANTIMATTER, "width": 0.18, "sockets": ONE},
+	"gravity_well": {"kind": Kind.VORTEX, "color": MaterialKit.ANTIMATTER, "width": 0.8, "sockets": ONE},
 	"emp_tower": {"kind": Kind.PULSE, "color": MaterialKit.HAZARD, "width": 0.5, "speed": 14.0, "flash": 0.3,
 		"flash_shape": Flash.RING, "sockets": ONE, "impact": Impact.EMP, "impact_size": 0.35, "light": 0.5},
 	"railgun": {"kind": Kind.STREAK, "color": MaterialKit.ENERGY, "width": 0.12, "flash": 0.3, "sockets": ONE,

@@ -147,6 +147,8 @@ const RUBBLE_POP := 0.15
 const SMOKE_COLUMN_SECONDS := 4.0
 ## A stunned unit's crackle, its size.
 const STUN_SIZE := 0.4
+## A gravity well's glow round its plinth while it holds: its radius, a share of the footprint.
+const WELL_RIM := 0.8
 ## A crashing aircraft's smoke trail: a puff this often, this big, from the first of these sockets
 ## its model has (its middle with none).
 const CRASH_STEP := 0.06
@@ -620,6 +622,7 @@ func _read_events() -> void:
 			BattleEvents.DEATH:
 				units.die(target, _clock)
 				_death(target)
+				effects.end_vortices(0, target, _clock)
 			BattleEvents.ABILITY:
 				_ability_used(source, events.to_x[i], events.to_y[i], events.land_tick[i])
 			BattleEvents.STRIKE_LAND:
@@ -828,6 +831,7 @@ func _on_arrived(building: int, unit: int) -> void:
 ## column of smoke.
 func _fall(id: int) -> void:
 	_falls += 1
+	effects.end_vortices(id, 0, _clock)
 	var cell: Vector2i = _cells.get(id, Vector2i.ZERO)
 	var size: int = _sizes.get(id, 1)
 	var at := field.cell_to_world(cell, size)
@@ -1059,14 +1063,17 @@ func _fire_defence(id: int, target: int) -> void:
 
 
 ## A gravity well `id` at `at` pulled: a violet ring round it, and its vortex from its top to every
-## unit it holds (the units of its targets' class in its reach), held as long as they are.
+## unit it holds (the units of its targets' class in its reach), held as long as they are, its
+## glow round the plinth (WELL_RIM of its footprint across) while it holds any
+## (BattleEffects.vortex); a held unit that dies or a well that falls ends its vortices.
 func _hold(id: int, at: Vector3) -> void:
 	var range_cells := float(_stat(id, "range_cells"))
 	effects.impact(at, range_cells * 0.5, WELL_PULL, _clock)
 	var hold := float(_stat(id, "hold_ms")) / 1000.0
 	var from := _muzzle(id)
+	var rim := _sizes[id] * WELL_RIM
 	for unit: int in _in_reach(id, range_cells):
-		effects.fire(_weapons[id], from, units.aim_point(unit), 0, 0, 0.0, _clock, false, hold)
+		effects.vortex(_weapons[id], id, unit, from, units.aim_point(unit), rim, _clock, hold)
 
 
 ## The cloaked sentry `id` shown: a shimmer round it as it decloaks, rings of energy and pale wisps.

@@ -35,6 +35,9 @@ const MAX_BOMBS := 32
 const MAX_PULSES := 32
 const MAX_BEAMS := 64
 const MAX_RINGS := 64
+## Gravity well vortices at once: one a held unit (a well reaching 12 cells holds every air unit
+## in it; a full air raid is about a dozen in one well's reach), two instances each.
+const MAX_VORTICES := 24
 const MAX_SPARKS := 96
 const MAX_DEBRIS := 192
 const MAX_PUFFS := 384
@@ -84,6 +87,59 @@ const DEBRIS_GRAVITY := 12.0
 const SURFACE := 0.35
 ## How long a scorch mark lasts.
 const SCORCH_SECONDS := 20.0
+## A vortex: its strands' turns along the beam, how fast they turn (radians a second: their bands
+## scroll towards the well), its fade in and out, its sheath's pulse (a second) and how far it
+## swells, and how often its ends emit: a ring tightening round the held unit (its life, its size
+## there), a ring sliding down the beam to the well (how long it takes, its size against the beam's
+## width, how much it narrows on the way); and the well's own while it holds anything: a glow round
+## its plinth, pulsing, and a swirl ring at its mouth.
+const VORTEX_TURNS := 3
+const VORTEX_SPIN := 6.0
+const VORTEX_FADE_IN := 0.15
+const VORTEX_FADE_OUT := 0.3
+const VORTEX_PULSE := 1.5
+const VORTEX_SWELL := 0.15
+const VORTEX_RING_SECONDS := 0.5
+const VORTEX_RING_SIZE := 0.55
+const VORTEX_SLIDE_STEP := 0.3
+const VORTEX_SLIDE_SECONDS := 0.7
+const VORTEX_SLIDE_SIZE := 1.8
+const VORTEX_SLIDE_NARROW := 0.55
+const VORTEX_GLOW_STEP := 0.3
+const VORTEX_SWIRL_STEP := 0.6
+const VORTEX_SWIRL_SIZE := 0.75
+const MAX_WELLS := 16
+## A vortex's rings at once: the tightening one and the sliding ones (VORTEX_SLIDE_SECONDS over
+## VORTEX_SLIDE_STEP, rounded up).
+const VORTEX_RINGS := 4
+## A strand's bands a turn (lilac and violet in turn).
+const VORTEX_BANDS := 4
+## The vortex's shader: unshaded, alpha-blended, both sides; it draws the mesh's part (UV.x) the
+## instance's custom data x names and collapses the other to a point in vertex() (no fragments);
+## the sheath's alpha falls from its colour's at the core's edge to nothing at its rim, by how
+## square on its normal faces the view.
+const VORTEX_SHADER := """shader_type spatial;
+render_mode unshaded, blend_mix, depth_draw_never, cull_disabled;
+varying float sheath;
+void vertex() {
+	if (abs(UV.x - INSTANCE_CUSTOM.x) > 0.5) {
+		VERTEX = vec3(0.0);
+	}
+	sheath = 1.0 - UV.x;
+}
+void fragment() {
+	float edge = mix(1.0, pow(abs(dot(normalize(NORMAL), VIEW)), 1.6), sheath);
+	ALBEDO = COLOR.rgb;
+	ALPHA = COLOR.a * edge;
+}
+"""
+## The vortex's colours: its pale core, its strands' bands, its sheath (its alpha at the core's
+## edge, falling to nothing at the rim), the sliding rings, the well's glow.
+const VORTEX_CORE := Color("fff6ff")
+const VORTEX_BAND := Color("e4b8ff")
+const VORTEX_DEEP := Color("9b5cff")
+const VORTEX_HAZE := Color(0.82, 0.55, 1.0, 0.5)
+const VORTEX_GLOW := Color("f0d0ff")
 ## A smoke column's puffs: one this often, each lasting this long and rising this far.
 const SMOKE_COLUMN_STEP := 0.25
 const SMOKE_COLUMN_PUFF := 1.6
@@ -465,6 +521,63 @@ class Beams:
 		_empty = count == 0
 
 
+## Gravity well vortices from one MultiMesh, each from a well's core (`from`) to the unit it holds
+## (`to`), from its start for its seconds or until it is ended (end_vortices): two instances of one
+## mesh (_vortex_mesh), its sheath (a soft violet tube, its alpha falling from the core's edge to
+## its rim, pulsing) and its strands (a double helix of two strands the same way round a pale
+## core, VORTEX_TURNS turns along the beam, banded lilac and violet, the bands wider than their
+## gaps, turning so the bands scroll from the unit to the well), the instance's custom data x
+## picking which part it draws (0 the sheath, 1 the strands). Every sheath is drawn before every
+## strand: the sheaths take the low instances, the strands the ones after. Each keeps the well and
+## the unit it is for. Its rings (a ring tightening round the unit, rings sliding down the beam)
+## are worked out from its own clock each frame into _vortex_rings, so they end with it.
+class Vortices:
+	var multimesh: MultiMesh
+	var buffer: Instances
+	var count := 0
+	var from := PackedVector3Array()
+	var to := PackedVector3Array()
+	var start := PackedFloat32Array()
+	var seconds := PackedFloat32Array()
+	var width := PackedFloat32Array()
+	var well := PackedInt32Array()
+	var unit := PackedInt32Array()
+	var _empty := false
+
+	func _init(mesh: MultiMesh, capacity: int) -> void:
+		multimesh = mesh
+		buffer = Instances.new(capacity * 2)
+		from.resize(capacity)
+		to.resize(capacity)
+		start.resize(capacity)
+		seconds.resize(capacity)
+		width.resize(capacity)
+		well.resize(capacity)
+		unit.resize(capacity)
+
+	func add(a: Vector3, b: Vector3, now: float, length: float, across: float, by: int, held: int) -> void:
+		if count == from.size() or a.distance_squared_to(b) < 0.0001:
+			return
+		from[count] = a
+		to[count] = b
+		start[count] = now
+		seconds[count] = maxf(length, 0.001)
+		width[count] = across
+		well[count] = by
+		unit[count] = held
+		count += 1
+
+	func remove(i: int) -> void:
+		count -= 1
+		from[i] = from[count]
+		to[i] = to[count]
+		start[i] = start[count]
+		seconds[i] = seconds[count]
+		width[i] = width[count]
+		well[i] = well[count]
+		unit[i] = unit[count]
+
+
 ## Chunks thrown from a point, each with its velocity and spin: they fly under DEBRIS_GRAVITY, settle
 ## where they hit the ground and shrink away over the last quarter of their life.
 class Debris:
@@ -584,6 +697,19 @@ var _missiles: Flights
 var _bombs: Flights
 var _pulses: Flights
 var _beams: Beams
+var _vortices: Vortices
+## The vortices' rings, written each frame from the vortices (VORTEX_RINGS a vortex), and their
+## buffer.
+var _vortex_rings: MultiMesh
+var _vortex_ring_buffer: Instances
+## The wells holding anything: their ids, their core, their plinth's rim radius, until when they
+## hold (the latest of their vortices' ends), and when they next glow and swirl.
+var _wells := PackedInt32Array()
+var _well_core := PackedVector3Array()
+var _well_rim := PackedFloat32Array()
+var _well_until := PackedFloat32Array()
+var _well_glow := PackedFloat32Array()
+var _well_swirl := PackedFloat32Array()
 var _debris: Debris
 
 var _impacts: MultiMesh
@@ -689,6 +815,19 @@ func setup(walls: int, area: AABB) -> void:
 	var rod := LowPolyMesh.new()
 	Parts.pipe(rod, Vector3.ZERO, Vector3(0, 0, 1), 0.5, BEAM, 6, false)
 	_beams = Beams.new(_multimesh(rod.to_mesh(), MAX_BEAMS, area, false), MAX_BEAMS)
+	# A vortex: two banded strands twisting round a pale core, a unit across and long along +Z.
+	_vortices = Vortices.new(_multimesh(_vortex_mesh(), MAX_VORTICES * 2, area, false), MAX_VORTICES)
+	# The vortices' rings: a unit-wide ring standing across +Z, as the pulses' (its own list, so it
+	# never takes the EMP's places).
+	_vortex_rings = _multimesh(pulse.to_mesh(), MAX_VORTICES * VORTEX_RINGS, area, false)
+	_vortex_ring_buffer = Instances.new(MAX_VORTICES * VORTEX_RINGS)
+	_wells.resize(MAX_WELLS)
+	_well_core.resize(MAX_WELLS)
+	_well_rim.resize(MAX_WELLS)
+	_well_until.resize(MAX_WELLS)
+	_well_glow.resize(MAX_WELLS)
+	_well_swirl.resize(MAX_WELLS)
+	_wells.fill(0)
 
 	# A debris chunk: a chamfered block a unit across, with a wedge broken off it.
 	var chunk := LowPolyMesh.new()
@@ -873,12 +1012,10 @@ func fire(weapon: Weapons.Weapon, from: Vector3, to: Vector3, building: int, uni
 		Weapons.Kind.PULSE:
 			_pulses.add(from, to, now, maxf(BOLT_MIN_SECONDS, distance / weapon.speed), 0.0, weapon.width,
 				weapon.width, weapon.color, impact, weapon, building, unit)
-		Weapons.Kind.STREAK, Weapons.Kind.BEAM, Weapons.Kind.VORTEX:
+		Weapons.Kind.STREAK, Weapons.Kind.BEAM:
 			var streak := weapon.kind == Weapons.Kind.STREAK
 			var hold := STREAK_SECONDS if streak else (seconds if seconds > 0.0 else weapon.hold)
 			_beams.add(from, to, now, hold, weapon.width, 1.0 if streak else 6.0, weapon.color)
-			if weapon.kind == Weapons.Kind.VORTEX:
-				impact_at(to, 0.5, weapon.color, now, hold)
 			_arrive(weapon, from, to, impact, building, unit, now)
 		Weapons.Kind.LIGHTNING:
 			_strike(from, to, now)
@@ -1010,6 +1147,49 @@ func stun(at: Vector3, radius: float, color: Color, now: float, seconds: float) 
 	_stuns.add(Vector3(at.x, maxf(at.y - radius * 0.5, 0.0), at.z), radius, now, seconds, color)
 
 
+## Gravity well `well` (its `weapon` record), its core at `from`, its plinth `rim` across, holds
+## unit `unit` at `to` from `now` for `seconds`: a vortex the record's width across between them
+## (Vortices), and the well's own glow and swirl while it holds anything, once a well however many
+## it holds.
+func vortex(weapon: Weapons.Weapon, well: int, unit: int, from: Vector3, to: Vector3, rim: float, now: float,
+		seconds: float) -> void:
+	_count_shot(from, weapon.color)
+	_vortices.add(from, to, now, seconds, weapon.width, well, unit)
+	var k := _wells.find(well)
+	if k < 0:
+		k = _wells.find(0)
+		if k < 0:
+			return
+		_wells[k] = well
+		_well_glow[k] = now
+		_well_swirl[k] = now
+		_well_until[k] = now
+	_well_core[k] = from
+	_well_rim[k] = rim
+	_well_until[k] = maxf(_well_until[k], now + seconds)
+
+
+## Ends now (over VORTEX_FADE_OUT) every vortex of well `well` (0 for any) holding unit `unit` (0
+## for any): a held unit died, or the well fell.
+func end_vortices(well: int, unit: int, now: float) -> void:
+	for i: int in _vortices.count:
+		if (well == 0 or _vortices.well[i] == well) and (unit == 0 or _vortices.unit[i] == unit):
+			var ends := now + VORTEX_FADE_OUT
+			if _vortices.start[i] + _vortices.seconds[i] > ends:
+				_vortices.seconds[i] = maxf(ends - _vortices.start[i], 0.001)
+	for k: int in MAX_WELLS:
+		if _wells[k] == 0:
+			continue
+		if well != 0:
+			if _wells[k] == well:
+				_well_until[k] = 0.0
+			continue
+		# A unit's end: the well holds on while any of its other vortices does.
+		_well_until[k] = 0.0
+		for i: int in _vortices.count:
+			if _vortices.well[i] == _wells[k]:
+				_well_until[k] = maxf(_well_until[k], _vortices.start[i] + _vortices.seconds[i])
+
 ## A stretched glow from `from` to `to`, `width` across, in `color`, from `now` for `seconds`,
 ## thinning by its share of its life raised to `power`.
 func beam(from: Vector3, to: Vector3, width: float, color: Color, now: float, seconds: float, power: float) -> void:
@@ -1040,11 +1220,6 @@ func impact(at: Vector3, radius: float, color: Color, now: float, seconds: float
 	_impact_radius[i] = radius
 	_impact_color[i] = color
 	_impact_seconds[i] = seconds
-
-
-## The same as impact(), named for a ring held on a point (a vortex's hold on a unit).
-func impact_at(at: Vector3, radius: float, color: Color, now: float, seconds: float) -> void:
-	impact(at, radius, color, now, seconds)
 
 
 ## A lightning arc from `from` to `to`, from `now`, `width` times a branch's thickness.
@@ -1148,6 +1323,7 @@ func draw(now: float) -> void:
 	_draw_flights(_bombs, now)
 	_draw_flights(_pulses, now)
 	_beams.draw(now)
+	_draw_vortices(now)
 	_debris.draw(now)
 	_draw_impacts(now)
 	_draw_arcs(now)
@@ -1290,6 +1466,72 @@ func _strike(from: Vector3, to: Vector3, now: float) -> void:
 			+ Vector3.DOWN * reach * 0.2, now)
 
 
+## The vortices at `now`: each one's sheath (the low instances) and strands (after), its sheath
+## pulsing, its strands turning, faded in over VORTEX_FADE_IN and out over VORTEX_FADE_OUT; while
+## it holds (not fading out), its rings from its own clock: a ring tightening round the unit, one
+## every VORTEX_RING_SECONDS, and a ring sliding down the beam to the well, one every
+## VORTEX_SLIDE_STEP, VORTEX_SLIDE_SECONDS on the way; they stop the moment it fades. Each
+## well holding anything glows round its plinth (a pulsing decal every VORTEX_GLOW_STEP) and swirls
+## at its mouth (a ring every VORTEX_SWIRL_STEP), once a well.
+func _draw_vortices(now: float) -> void:
+	var list := _vortices
+	if list.count == 0 and list._empty:
+		return
+	var i := 0
+	while i < list.count:
+		if now - list.start[i] >= list.seconds[i]:
+			list.remove(i)
+			continue
+		i += 1
+	var n := list.count
+	for v: int in n:
+		var t := now - list.start[v]
+		var left := list.seconds[v] - t
+		var fade := clampf(t / VORTEX_FADE_IN, 0.0, 1.0) * clampf(left / VORTEX_FADE_OUT, 0.0, 1.0)
+		var from := list.from[v]
+		var to := list.to[v]
+		var line := to - from
+		var forward := line.normalized()
+		var w := list.width[v]
+		var tint := Color(1, 1, 1, fade)
+		var sheath := w * (1.0 + VORTEX_SWELL * sin(TAU * VORTEX_PULSE * t))
+		list.buffer.put(v, along(forward, sheath, line.length()), from, tint, Color(0, 0, 0, 0))
+		list.buffer.put(n + v, Basis(forward, VORTEX_SPIN * t) * along(forward, w, line.length()), from, tint,
+			Color(1, 0, 0, 0))
+		# Its rings, none once it fades: the tightening ring, then the sliding ones.
+		var r := v * VORTEX_RINGS
+		var holding := left > VORTEX_FADE_OUT
+		var u := fmod(t, VORTEX_RING_SECONDS) / VORTEX_RING_SECONDS
+		var across := 2.0 * VORTEX_RING_SIZE * (1.5 - 0.5 * u) if holding else 0.0
+		_vortex_ring_buffer.put(r, _rings.facing.scaled(Vector3.ONE * across), to, VORTEX_BAND, Color(0, 0, 0, 0))
+		var newest := floorf(t / VORTEX_SLIDE_STEP)
+		for k: int in VORTEX_RINGS - 1:
+			var slid := (t - (newest - k) * VORTEX_SLIDE_STEP) / VORTEX_SLIDE_SECONDS
+			var size := w * VORTEX_SLIDE_SIZE * (1.0 - VORTEX_SLIDE_NARROW * slid)
+			if not holding or newest - k < 0.0 or slid >= 1.0:
+				size = 0.0
+			_vortex_ring_buffer.put(r + 1 + k, along(-forward, size, size), to.lerp(from, minf(slid, 1.0)), VORTEX_DEEP,
+				Color(0, 0, 0, 0))
+	list.multimesh.buffer = list.buffer.data
+	list.multimesh.visible_instance_count = n * 2
+	_vortex_rings.buffer = _vortex_ring_buffer.data
+	_vortex_rings.visible_instance_count = n * VORTEX_RINGS
+	list._empty = n == 0
+	for k: int in MAX_WELLS:
+		if _wells[k] == 0:
+			continue
+		if now >= _well_until[k] - VORTEX_FADE_OUT:
+			_wells[k] = 0
+			continue
+		var core := _well_core[k]
+		if now >= _well_glow[k]:
+			_well_glow[k] = now + VORTEX_GLOW_STEP
+			glow(Vector3(core.x, 0.0, core.z), _well_rim[k], VORTEX_GLOW, now, VORTEX_GLOW_STEP * 1.5)
+		if now >= _well_swirl[k]:
+			_well_swirl[k] = now + VORTEX_SWIRL_STEP
+			_rings.add(core, VORTEX_SWIRL_SIZE, now, VORTEX_SWIRL_STEP, VORTEX_BAND)
+
+
 func _draw_flights(list: Flights, now: float) -> void:
 	if list.count == 0 and list._empty:
 		return
@@ -1414,6 +1656,78 @@ static func _glow_mesh() -> ArrayMesh:
 	material.cull_mode = BaseMaterial3D.CULL_DISABLED
 	mesh.surface_set_material(0, material)
 	return mesh
+
+
+## The vortex's mesh, a unit across and a unit long along +Z, in two parts its UV.x tells apart
+## (VORTEX_SHADER draws the one the instance's custom data x names): the sheath (0), a sixteen-sided
+## tube of radius 0.5 in VORTEX_HAZE, its normals out, so the shader fades it from the core's edge
+## to its rim; and the strands (1): a pale core rod on the axis and a double helix of two strands
+## (opposite each other, the same way round) winding VORTEX_TURNS turns round it, each band of a
+## strand VORTEX_BANDS of a turn, lilac and violet in turn, two thirds of each band drawn and the
+## rest a gap.
+static func _vortex_mesh() -> ArrayMesh:
+	var vertices := PackedVector3Array()
+	var normals := PackedVector3Array()
+	var colors := PackedColorArray()
+	var uvs := PackedVector2Array()
+	var sides := 16
+	for k: int in sides:
+		var a := Vector3(cos(TAU * k / sides), sin(TAU * k / sides), 0.0)
+		var b := Vector3(cos(TAU * (k + 1) / sides), sin(TAU * (k + 1) / sides), 0.0)
+		for corner: Vector3 in [a, b, b + Vector3.BACK * 2.0, a, b + Vector3.BACK * 2.0, a + Vector3.BACK * 2.0]:
+			var ring := Vector3(corner.x, corner.y, 0.0)
+			vertices.append(ring * 0.5 + Vector3(0, 0, corner.z * 0.5))
+			normals.append(ring)
+			colors.append(VORTEX_HAZE)
+			uvs.append(Vector2(0, 0))
+	var start := vertices.size()
+	_vortex_tube(vertices, colors, Vector3(0, 0, 0), Vector3(0, 0, 1), 0.05, VORTEX_CORE)
+	var steps_per_band := 4
+	var bands := VORTEX_TURNS * VORTEX_BANDS
+	for strand: int in 2:
+		for band: int in bands:
+			var tint := VORTEX_BAND if band % 2 == 0 else VORTEX_DEEP
+			var last := Vector3.ZERO
+			for k: int in steps_per_band + 1:
+				# Two thirds of the band drawn, the rest its gap.
+				var t := (band + (2.0 / 3.0) * k / steps_per_band) / bands
+				var angle := TAU * VORTEX_TURNS * t + PI * strand
+				var at := Vector3(cos(angle) * 0.34, sin(angle) * 0.34, t)
+				if k > 0:
+					_vortex_tube(vertices, colors, last, at, 0.085, tint)
+				last = at
+	for k: int in vertices.size() - start:
+		normals.append(Vector3.UP)
+		uvs.append(Vector2(1, 0))
+	var arrays := []
+	arrays.resize(Mesh.ARRAY_MAX)
+	arrays[Mesh.ARRAY_VERTEX] = vertices
+	arrays[Mesh.ARRAY_NORMAL] = normals
+	arrays[Mesh.ARRAY_COLOR] = colors
+	arrays[Mesh.ARRAY_TEX_UV] = uvs
+	var mesh := ArrayMesh.new()
+	mesh.add_surface_from_arrays(Mesh.PRIMITIVE_TRIANGLES, arrays)
+	var shader := Shader.new()
+	shader.code = VORTEX_SHADER
+	var material := ShaderMaterial.new()
+	material.shader = shader
+	mesh.surface_set_material(0, material)
+	return mesh
+
+
+## A square tube `radius` across from `a` to `b` in `color` into the arrays, its four faces.
+static func _vortex_tube(vertices: PackedVector3Array, colors: PackedColorArray, a: Vector3, b: Vector3,
+		radius: float, color: Color) -> void:
+	var axis := (b - a).normalized()
+	var side := axis.cross(Vector3.UP if absf(axis.y) < 0.9 else Vector3.RIGHT).normalized() * radius
+	var up := axis.cross(side).normalized() * radius
+	var ring: Array[Vector3] = [side, up, -side, -up]
+	for k: int in 4:
+		var p := ring[k]
+		var q := ring[(k + 1) % 4]
+		for corner: Vector3 in [a + p, b + p, b + q, a + p, b + q, a + q]:
+			vertices.append(corner)
+			colors.append(color)
 
 
 ## The smoke puff's mesh: a flat disc of unit radius, its face up (CLOUD turns it to the camera),
