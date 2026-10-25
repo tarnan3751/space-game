@@ -211,6 +211,9 @@ const SHIELD_LIFTS := [0.5, 0.8, 1.05, 1.3]
 const SHIELD_FIELD := 0.42
 const SHIELD_RING := 0.5
 const SHIELD_RING_DROP := 0.32
+## The pylons' width, and the red collars' round them.
+const SHIELD_PYLON := 0.2
+const SHIELD_COLLAR := 0.3
 ## The arc tower from L5, by level from L5: the plinth's height, the coil's and the twin coils';
 ## the L7 discharge ring's distance out from the sphere.
 const ARC_PLINTHS := [0.36, 0.4, 0.56, 0.6]
@@ -767,8 +770,9 @@ static func _loader_arm(p: Parts, foot: Vector3, reach: Vector3, tier: int, shou
 	Parts.torus(arm, 0.13, 0.03, 12, 6, tip - Vector3(0, 0.29, 0), plate)
 
 
-## From L5 the orb floats higher every level and the arms' lower runs stand as tall emitter
-## pylons, growing with it. L5 (Chrome): chrome plinth, drum, dome and pylons, a cyan strip up each
+## Each arm is a chamfered pylon 0.2 across, collared in red at its foot, and a glowing conduit
+## up to its tip by the orb. From L5 the orb floats higher every level and the pylons stand
+## taller, growing with it. L5 (Chrome): chrome plinth, drum, dome and pylons, a cyan strip up each
 ## pylon's outer face over a red armour collar, a bigger orb and a cyan field ring round it. L6
 ## (Obsidian): a taller plinth with glowing violet vein panels on its faces the camera sees, the
 ## dome, drum and pylons obsidian, veins round the deck, up the dome and the pylons, crystal
@@ -798,11 +802,13 @@ static func build_shield_generator(p: Parts, level: int) -> void:
 		# The tip stands off the orb, its cone's point 0.12 short of it, for an arc to jump.
 		var toward := (Parts.around(0.44, degrees, orb.y - orb_radius * 0.75) - orb).normalized()
 		var tip := orb + toward * (orb_radius + 0.3)
-		# Two straight runs meeting under the knuckle, which hides the bend; current runs up the
-		# second to the tip.
-		Parts.pipe_run(m, PackedVector3Array([root, elbow]), 0.09 if level < 5 else 0.11, pylon)
+		# A chamfered pylon and a glowing conduit meeting under the knuckle, which hides the bend;
+		# current runs up the conduit to the tip. A red armour collar round the pylon's foot.
+		var up := Parts.facing(elbow - root)
+		Parts.beam(m, root, elbow, SHIELD_PYLON, pylon, 0.04)
 		Parts.pipe_run(m, PackedVector3Array([elbow, tip]), 0.09, VIOLET_CURRENT if obsidian else ION_CURRENT)
 		m.orb(0.15, 12, 5, elbow, knuckle)
+		m.box_chamfered(Vector3(SHIELD_COLLAR, 0.15, SHIELD_COLLAR), 0.03, root.lerp(elbow, 0.08), ARMOUR, up)
 		m.cone(0.11, 0.18, 16, tip, FOCUS.phased(k / 3.0) if obsidian else ION, Parts.facing(orb - tip))
 		Parts.arc(m, orb + toward * (orb_radius + 0.12), orb + toward * (orb_radius - 0.02), 3, 0.03,
 			(VIOLET_ARC if obsidian else ION_ARC).phased(k / 3.0))
@@ -812,21 +818,19 @@ static func build_shield_generator(p: Parts, level: int) -> void:
 			var short_degrees := degrees + 60.0
 			var short_root := Parts.around(0.62, short_degrees, foot + 0.3)
 			var short_tip := Parts.around(0.84, short_degrees, foot + 0.72)
-			Parts.pipe_run(m, PackedVector3Array([short_root, short_tip]), 0.08, pylon)
+			Parts.beam(m, short_root, short_tip, 0.16, pylon, 0.03)
 			m.orb(0.11, 12, 5, short_tip, knuckle)
 		if level >= 5:
-			# A glowing strip up the pylon's outer face (cyan, violet from the Obsidian tier) over a
-			# red armour collar round its foot; a second collar under the knuckle from L7.
-			var up := Parts.facing(elbow - root)
+			# A glowing strip up the pylon's outer face (cyan, violet from the Obsidian tier); a
+			# second collar under the knuckle from L7.
 			var out := Parts.around(1.0, degrees, 0.0)
-			Parts.beam(m, root.lerp(elbow, 0.2) + out * 0.1, elbow.lerp(root, 0.12) + out * 0.1, 0.05,
+			Parts.beam(m, root.lerp(elbow, 0.2) + out * 0.11, elbow.lerp(root, 0.12) + out * 0.11, 0.05,
 				Parts.CORE_GLOW if obsidian else Parts.CYAN_STRIP, 0.01)
-			m.tube(0.1, 0.145, 0.14, 16, root.lerp(elbow, 0.08), ARMOUR_ROUND, up)
 			if level >= 7:
-				m.tube(0.1, 0.145, 0.12, 16, elbow.lerp(root, 0.2), ARMOUR_ROUND, up)
+				m.box_chamfered(Vector3(SHIELD_COLLAR, 0.15, SHIELD_COLLAR), 0.03, elbow.lerp(root, 0.2), ARMOUR, up)
 			if level >= 8:
-				for at: float in [0.45, 0.6]:
-					m.tube(0.1, 0.13, 0.06, 16, root.lerp(elbow, at), Parts.FILIGREE, up)
+				m.box_chamfered(Vector3(SHIELD_COLLAR - 0.04, 0.1, SHIELD_COLLAR - 0.04), 0.02, root.lerp(elbow, 0.5), Parts.FILIGREE,
+					up)
 	var core_surf := ION_ORB
 	if level >= 8:
 		core_surf = BRIGHT_FLOAT
