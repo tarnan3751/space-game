@@ -60,6 +60,10 @@ const VEIN_TINT := Color("c9a2ff")
 static var VEINS := Surf.make(MaterialKit.Layer.VEINS, VEIN_TINT, 1.0, Surf.UNLIT)
 static var VEINS_ROUND := Surf.make(MaterialKit.Layer.VEINS, VEIN_TINT, 1.0, Surf.UNLIT, true)
 
+## How far a pilot's helmet shows over its windscreen's top edge, in helmet radii (seat_under()):
+## a little over one, so the visor shows whole past the glass in front of it.
+const SEAT_SHOW := 1.25
+
 static var _cache: Dictionary[String, BuildingModels.Meshes] = {}
 static var _glows: Dictionary[String, Surf] = {}
 static var _warned: Dictionary[String, bool] = {}
@@ -208,6 +212,7 @@ static func pivot(pos: Vector3, degrees: Vector3 = Vector3.ZERO) -> Transform3D:
 ## A colonist seated at the controls (Figures.seated), its pelvis on `seat`, facing +Z turned
 ## `yaw`, `scale` times the colonist's size; without `legs` its legs are left out, hidden in the
 ## hull. Its own ink, as every figure's. Returns its joints, for the controls in its hands.
+## seat_under() gives the seat's height that sinks it into its machine.
 static func pilot(m: LowPolyMesh, seat: Vector3, yaw: float, scale: float, legs: bool = false) -> Figures.Joints:
 	var pose := Figures.seated()
 	var foot := seat - Figures.joints(Vector3.ZERO, yaw, pose, Figures.PRIMARY_HEADS, scale).pelvis.origin
@@ -215,12 +220,29 @@ static func pilot(m: LowPolyMesh, seat: Vector3, yaw: float, scale: float, legs:
 	return Figures.joints(foot, yaw, pose, Figures.PRIMARY_HEADS, scale)
 
 
+## The height of the seat that sits a pilot of `scale` (pilot()) in its machine: its helmet's top
+## SEAT_SHOW helmet radii over `top`, the top edge of its windscreen (canopy()), so the helmet and
+## its visor show over the glass and the rest of the pilot is in the hull.
+static func seat_under(top: float, scale: float) -> float:
+	var j := Figures.joints(Vector3.ZERO, 0.0, Figures.seated(), Figures.PRIMARY_HEADS, scale)
+	var head := Figures.COLONIST_HEIGHT * scale / Figures.PRIMARY_HEADS
+	var crown := (j.neck * Vector3(0, head * 0.925, 0)).y - j.pelvis.origin.y
+	return top + head * 0.5 * SEAT_SHOW - crown
+
+
+## The height of the top edge of a canopy() of `radius` rising `rise` degrees, over its pivot.
+static func canopy_top(radius: float, rise: float) -> float:
+	return radius * sin(deg_to_rad(rise))
+
+
 ## A canopy on the pivot `xf`: a curved glass windscreen of `radius` and `depth` thick wrapping
 ## the pivot's front (its +Z), rising `rise` degrees from its foot, swept from `from_deg` to
-## `to_deg` round its +Y (90 dead ahead), on a trim lip of `tier`. Open above and behind, so the
-## pilot seated in it (pilot()) shows over it: the glass is opaque.
+## `to_deg` round its +Y (90 dead ahead), in a gunmetal frame: a lip at its foot and a rim along its
+## top edge. Open above and behind, so the pilot seated in it (pilot(), seat_under()) shows over it:
+## the glass is opaque. The frame is gunmetal at every tier, so `_tier` is unused: the tier shows
+## on the machine's own trim instead.
 static func canopy(m: LowPolyMesh, xf: Transform3D, radius: float, depth: float, rise: float, from_deg: float,
-		to_deg: float, tier: int, sides: int = 24) -> void:
+		to_deg: float, _tier: int, sides: int = 24) -> void:
 	const STEPS := 3
 	var profile := PackedVector2Array()
 	for i: int in STEPS + 1:
@@ -230,5 +252,15 @@ static func canopy(m: LowPolyMesh, xf: Transform3D, radius: float, depth: float,
 		var e := deg_to_rad(rise * i / STEPS)
 		profile.append(Vector2((radius - depth) * cos(e), (radius - depth) * sin(e)))
 	m.lathe(profile, sides, xf.origin, Parts.GLASS, euler(xf), from_deg, to_deg)
-	m.ring(radius - depth * 1.5, radius + depth * 0.6, depth * 1.2, sides, xf.origin, trim(tier, true), euler(xf),
-		from_deg - 4.0, to_deg + 4.0)
+	# The frame's lip and rim: an outer wall and a top each, their inner walls hidden by the glass.
+	var lip := depth * 1.2
+	m.lathe(PackedVector2Array([
+		Vector2(radius + depth * 0.6, 0), Vector2(radius + depth * 0.6, lip), Vector2(radius - depth * 1.5, lip),
+	]), sides, xf.origin, Parts.GUNMETAL, euler(xf), from_deg - 4.0, to_deg + 4.0)
+	var top := deg_to_rad(rise)
+	var edge := (radius - depth * 0.5) * cos(top)
+	var height := radius * sin(top)
+	m.lathe(PackedVector2Array([
+		Vector2(edge + depth, height - depth), Vector2(edge + depth, height + depth * 0.8),
+		Vector2(edge - depth, height + depth * 0.8),
+	]), sides, xf.origin, Parts.GUNMETAL, euler(xf), from_deg - 2.0, to_deg + 2.0)

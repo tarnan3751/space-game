@@ -59,8 +59,8 @@ static func _eye(m: LowPolyMesh, xf: Transform3D, tier: int) -> void:
 
 # --- The gunship ----------------------------------------------------------------------
 
-## The gunship: a rotor-pod aircraft. A tier-hull chamfered fuselage and nose, a colonist pilot behind
-## the glass windscreen on the nose, a chin gun, stub wings carrying a nacelle at each tip with a
+## The gunship: a rotor-pod aircraft. A tier-hull chamfered fuselage and nose, a colonist pilot sunk
+## behind the glass windscreen on the nose, a chin gun, stub wings carrying a nacelle at each tip with a
 ## band of the tier's glow, the two rotors spinning on them (parts of the body tagged with
 ## LowPolyMesh.spin, which the shaders turn), and a tail boom with orange fins; hovering and bobbing.
 static func build_gunship(p: Parts) -> void:
@@ -74,8 +74,9 @@ static func build_gunship(p: Parts) -> void:
 	m.box_chamfered(Vector3(0.04, 0.22, 0.16), 0.015, Vector3(0, bottom + 0.22, -0.54), ORANGE, Vector3(-12, 0, 0))
 	m.box_chamfered(Vector3(0.36, 0.035, 0.12), 0.012, Vector3(0, bottom + 0.2, -0.54), ORANGE)
 	m.box_chamfered(Vector3(0.86, 0.06, 0.2), 0.025, Vector3(0, bottom + 0.16, -0.02), UnitModels.panel(tier))
-	UnitModels.pilot(m, Vector3(0, bottom + 0.24, 0.39), 0.0, 0.4)
-	UnitModels.canopy(m, UnitModels.pivot(Vector3(0, bottom + 0.24, 0.39)), 0.14, 0.018, 50.0, 20.0, 160.0, tier, 16)
+	var seat := UnitModels.seat_under(bottom + 0.24 + UnitModels.canopy_top(0.14, 60.0), 0.4)
+	UnitModels.pilot(m, Vector3(0, seat, 0.38), 0.0, 0.4)
+	UnitModels.canopy(m, UnitModels.pivot(Vector3(0, bottom + 0.24, 0.39)), 0.14, 0.018, 60.0, 10.0, 170.0, tier, 16)
 	_chin_gun(m, UnitModels.pivot(Vector3(0, bottom, 0.45)), tier)
 	for side: float in [1.0, -1.0]:
 		var hub := Vector3(side * 0.48, bottom + 0.06, -0.02)
@@ -123,7 +124,7 @@ static func _rotor(m: LowPolyMesh, xf: Transform3D) -> void:
 
 ## The bomber: a broad flying wing, a tier-hull centre body with two swept wings edged in the tier's
 ## trim and orange winglets, two engines on the wing roots glowing at their tails, a bomb bay with
-## a row of orange bombs underneath and a small windscreen with the pilot; hovering and bobbing.
+## a row of orange bombs underneath and the pilot sunk behind a small windscreen; hovering and bobbing.
 static func build_bomber(p: Parts) -> void:
 	var m := p.body
 	var tier := p.tier
@@ -134,8 +135,9 @@ static func build_bomber(p: Parts) -> void:
 		_wing(m, UnitModels.pivot(Vector3(side * 0.2, bottom + 0.02, 0.08), Vector3(0, side * 34.0, 0)), side, tier)
 		_engine(m, UnitModels.pivot(Vector3(side * 0.3, bottom + 0.16, 0.12), Vector3(-90, 0, 0)), tier)
 	_bomb_bay(m, UnitModels.pivot(Vector3(0, bottom, -0.02)))
-	UnitModels.pilot(m, Vector3(0, bottom + 0.2, 0.26), 0.0, 0.36)
-	UnitModels.canopy(m, UnitModels.pivot(Vector3(0, bottom + 0.2, 0.26)), 0.12, 0.016, 50.0, 20.0, 160.0, tier, 16)
+	var seat := UnitModels.seat_under(bottom + 0.2 + UnitModels.canopy_top(0.14, 60.0), 0.44)
+	UnitModels.pilot(m, Vector3(0, seat, 0.25), 0.0, 0.44)
+	UnitModels.canopy(m, UnitModels.pivot(Vector3(0, bottom + 0.2, 0.26)), 0.14, 0.016, 60.0, 10.0, 170.0, tier, 16)
 	m.flags = 0
 
 

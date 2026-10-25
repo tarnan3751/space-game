@@ -73,8 +73,8 @@ static func _roll_cage(m: LowPolyMesh, tier: int) -> void:
 
 ## The siege walker: an armoured biped, a tier-hull chamfered hull on two thick digitigrade legs with
 ## orange hip caps, knee joints and broad feet, a gun arm on each side with twin gunmetal barrels,
-## a colonist pilot on top behind a glass windscreen, and a short mast with a lamp of the tier's
-## glow.
+## a colonist pilot sunk in the top behind a glass windscreen and a dark dashboard, and a short mast
+## with a lamp of the tier's glow.
 static func build_siege_walker(p: Parts) -> void:
 	var m := p.body
 	var tier := p.tier
@@ -84,8 +84,10 @@ static func build_siege_walker(p: Parts) -> void:
 	for side: float in [1.0, -1.0]:
 		_walker_leg(m, UnitModels.pivot(Vector3(side * 0.31, 0.86, -0.02)), side, tier)
 		_gun_arm(m, UnitModels.pivot(Vector3(side * 0.25, 1.04, 0.04)), side, tier)
-	UnitModels.pilot(m, Vector3(0, 1.14, 0.05), 0.0, 0.55)
-	UnitModels.canopy(m, UnitModels.pivot(Vector3(0, 1.14, 0.04)), 0.2, 0.02, 46.0, 15.0, 165.0, tier)
+	var canopy := UnitModels.pivot(Vector3(0, 1.14, 0.04))
+	m.box_chamfered(Vector3(0.26, 0.08, 0.07), 0.02, Vector3(0, 1.14, 0.13), Parts.GUNMETAL)
+	UnitModels.pilot(m, Vector3(0, UnitModels.seat_under(1.14 + UnitModels.canopy_top(0.22, 60.0), 0.55), 0.03), 0.0, 0.55)
+	UnitModels.canopy(m, canopy, 0.22, 0.02, 60.0, 0.0, 180.0, tier, 16)
 	Parts.mast(m, Vector3(-0.16, 1.26, -0.2), 0.2, 0.035, UnitModels.glow(tier, Surf.BLINK))
 
 
@@ -167,20 +169,22 @@ static func _turret(m: LowPolyMesh, xf: Transform3D, tier: int) -> void:
 	_hatch(m, xf * UnitModels.pivot(Vector3(0.08, 0.17, -0.08)), tier)
 
 
-## The hatch on the pivot `xf` (the turret's top): a ring of the tier's trim, the pilot seated
-## below it so the helmet and shoulders show, and a small windscreen before them.
+## The hatch on the pivot `xf` (the turret's top): a ring of the tier's trim, the pilot sunk in it
+## (UnitModels.seat_under) so the helmet and shoulders show, and a small windscreen before them.
 static func _hatch(m: LowPolyMesh, xf: Transform3D, tier: int) -> void:
-	m.ring(0.085, 0.11, 0.03, 16, xf.origin, UnitModels.trim(tier, true), UnitModels.euler(xf))
-	UnitModels.pilot(m, xf * Vector3(0, -0.11, 0), 0.0, 0.42)
-	UnitModels.canopy(m, xf * UnitModels.pivot(Vector3(0, 0.02, 0)), 0.1, 0.015, 50.0, 30.0, 150.0, tier, 16)
+	const RADIUS := 0.13
+	m.ring(0.1, RADIUS, 0.03, 12, xf.origin, UnitModels.trim(tier, true), UnitModels.euler(xf))
+	var seat := UnitModels.seat_under(UnitModels.canopy_top(RADIUS, 60.0), 0.5)
+	UnitModels.pilot(m, xf * Vector3(0, seat, 0), 0.0, 0.5)
+	UnitModels.canopy(m, xf, RADIUS, 0.015, 60.0, 0.0, 180.0, tier, 16)
 
 
 # --- The titan ---------------------------------------------------------------------
 
 ## The titan: a giant biped walker, the loudest unit. Massive legs with orange plates, knee joints
 ## and big feet under a crewed bridge: a tier-hull hull with an orange rear block, two colonists seated
-## on seats behind a wide glass windscreen, two huge cannon arms glowing at their muzzles and an antenna mast
-## with a blinking lamp.
+## on seats (UnitModels.seat_under) behind a wide glass windscreen and a dark dashboard, two huge
+## cannon arms glowing at their muzzles and an antenna mast with a blinking lamp.
 static func build_titan(p: Parts) -> void:
 	var m := p.body
 	var tier := p.tier
@@ -190,11 +194,13 @@ static func build_titan(p: Parts) -> void:
 	m.box_chamfered(Vector3(1.04, 0.42, 0.86), 0.09, Vector3(0, 1.3, 0), UnitModels.hull(tier))
 	m.box_chamfered(Vector3(1.04, 0.32, 0.36), 0.08, Vector3(0, 1.72, -0.25), ORANGE)
 	m.box_chamfered(Vector3(0.9, 0.05, 0.3), 0.02, Vector3(0, 2.04, -0.25), UnitModels.trim(tier))
+	var seat := UnitModels.seat_under(1.72 + UnitModels.canopy_top(0.54, 34.0), 0.42)
 	for side: float in [1.0, -1.0]:
-		m.box_chamfered(Vector3(0.16, 0.06, 0.16), 0.025, Vector3(side * 0.2, 1.72, 0.04), Parts.HULL_DARK)
-		UnitModels.pilot(m, Vector3(side * 0.2, 1.78, 0.06), 0.0, 0.42)
+		m.box_chamfered(Vector3(0.16, seat - 1.72, 0.16), 0.025, Vector3(side * 0.2, 1.72, 0.04), Parts.HULL_DARK)
+		UnitModels.pilot(m, Vector3(side * 0.2, seat, 0.06), 0.0, 0.42)
 		_cannon_arm(m, UnitModels.pivot(Vector3(side * 0.5, 1.62, 0.0)), side, tier)
-	UnitModels.canopy(m, UnitModels.pivot(Vector3(0, 1.72, -0.14)), 0.54, 0.03, 22.0, 32.0, 148.0, tier)
+	m.box_chamfered(Vector3(0.64, 0.08, 0.1), 0.025, Vector3(0, 1.72, 0.2), Parts.GUNMETAL)
+	UnitModels.canopy(m, UnitModels.pivot(Vector3(0, 1.72, -0.14)), 0.54, 0.03, 34.0, 28.0, 152.0, tier)
 	Parts.mast(m, Vector3(0.32, 2.09, -0.33), 0.32, 0.05, UnitModels.glow(tier, Surf.BLINK))
 
 
