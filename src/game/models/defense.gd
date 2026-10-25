@@ -150,6 +150,12 @@ const PLINTH_FACES := [0.0, 45.0, 90.0]
 ## The Crown's filigree band round a plinth's foot: tall enough for its pattern to read.
 const PLINTH_FILIGREE := 0.1
 
+## The laser turret to L5: its dome's radius and height, its barrels' radius and length, and
+## their red emitter caps' radius.
+const LASER_DOME := Vector2(0.68, 0.36)
+const LASER_BORE := 0.09
+const LASER_LENGTH := 0.8
+const LASER_CAP := 0.14
 ## The laser turret from L6, by level from L6: the plinth's height, and how far the mount lifts
 ## the head above the turret ring.
 const LASER_PLINTHS := [0.5, 0.5, 0.58, 0.58, 0.64]
@@ -268,8 +274,9 @@ const ORBITAL_BEAM := 1.3
 const TOWARD_LENS := Vector3(0.5792, 0.5736, 0.5792)
 
 
-## From L6 the head rides a mount that lifts it a little more each level, on a taller plinth.
-## L6 (Chrome): chrome plinth, mount, head and barrels, cyan strips along the barrels and cyan
+## To L5 a big red dome on a cream drum (gold at L5) heads the turret, its twin barrels long and
+## fat with red emitter caps. From L6 the head rides a mount that lifts it a little more each
+## level, on a taller plinth. L6 (Chrome): chrome plinth, mount, head and barrels, cyan strips along the barrels and cyan
 ## capacitor rings round their breeches, the cheeks chrome armour and bigger. L7 a much taller
 ## mount with a broad glowing band under the head, and a second pair of barrels over the first on
 ## a mantlet. L8 (Obsidian): the plinth, mount and head obsidian, glowing violet vein panels on the
@@ -321,11 +328,20 @@ static func build_laser_turret(p: Parts, level: int) -> void:
 	var heading := Vector3(0, SCREEN_RIGHT - 25.0, 0)
 	var along := Vector3(90, SCREEN_RIGHT - 25.0, 0)
 	var shell := _by_tier(p.tier, SHELL, Parts.CHROME_ROUND, Parts.OBSIDIAN_ROUND)
-	Parts.drum(head, 0.62, 0.32, 0.05, 20, Vector3.ZERO, shell)
-	head.dome(0.57, 0.3, 20, 6, Vector3(0, 0.32, 0), shell)
+	# To L5 the head is a big red dome on a cream drum (a gold one at L5), its barrels long and fat
+	# with red emitter caps, so the turret reads red from across the base.
+	var low := level < 6
+	var drum := shell
+	if level == 5:
+		drum = Parts.GOLD_ROUND
+	Parts.drum(head, LASER_DOME.x if low else 0.62, 0.32, 0.05, 20, Vector3.ZERO, drum)
+	if low:
+		head.dome(LASER_DOME.x, LASER_DOME.y, 20, 6, Vector3(0, 0.32, 0), ARMOUR_ROUND)
+	else:
+		head.dome(0.57, 0.3, 20, 6, Vector3(0, 0.32, 0), shell)
 	head.box_chamfered(Vector3(0.72, 0.38, 0.3), 0.06, LowPolyMesh.turn(Vector3(0, 0.1, 0.5), heading), DENSE, heading)
-	var bore := 0.07 + 0.012 * mini(level, 5)
-	var length := 0.5 + 0.04 * mini(level, 5)
+	var bore := LASER_BORE if low else 0.07 + 0.012 * mini(level, 5)
+	var length := LASER_LENGTH if low else 0.5 + 0.04 * mini(level, 5)
 	var barrel := BARREL if p.tier < Parts.Tier.CHROME else Parts.CHROME_ROUND
 	var pairs: Array[Vector3] = [Vector3(0.18, 0.29, 0.5)]
 	if level >= 7:
@@ -341,12 +357,17 @@ static func build_laser_turret(p: Parts, level: int) -> void:
 		for k: int in 2:
 			var root := LowPolyMesh.turn(Vector3((2 * k - 1) * pairs[pair].x, pairs[pair].y, pairs[pair].z), heading)
 			head.prism(thick, thick, long, sides, root, barrel, along)
-			head.tube(thick * 0.5, thick + 0.035, 0.12, sides, _at(root, Vector3(0, long - 0.1, 0), along),
-				GOLD if p.tier >= Parts.Tier.GOLD else Parts.GUNMETAL, along)
-			# The muzzle sockets, the shots leaving them in turn: the lower pair's, then the upper's.
+			if low:
+				# A red emitter cap round the muzzle.
+				head.tube(thick * 0.5, LASER_CAP, 0.14, sides, _at(root, Vector3(0, long - 0.12, 0), along), ARMOUR_ROUND, along)
+			else:
+				head.tube(thick * 0.5, thick + 0.035, 0.12, sides, _at(root, Vector3(0, long - 0.1, 0), along),
+					GOLD if p.tier >= Parts.Tier.GOLD else Parts.GUNMETAL, along)
+			# The muzzle sockets, the shots leaving them in turn: the lower pair's, then the upper's. To L5
+			# each sits at its red cap's end.
 			var barrel_index := pair * 2 + k
 			head.socket("muzzle" if barrel_index == 0 else "muzzle_%d" % (barrel_index + 1),
-				_at(root, Vector3(0, long + 0.03, 0), along), LowPolyMesh.turn(Vector3.UP, along))
+				_at(root, Vector3(0, long + (0.02 if low else 0.03), 0), along), LowPolyMesh.turn(Vector3.UP, along))
 			if level < 8:
 				head.orb(thick * 0.85, sides if pair == 0 else 10, 8 if pair == 0 else 4, _at(root, Vector3(0, long + 0.03, 0), along),
 					LASER_PULSE.phased(0.5 * k))
@@ -363,9 +384,10 @@ static func build_laser_turret(p: Parts, level: int) -> void:
 						Parts.torus(head, thick + 0.012, 0.026, 12, 6, _at(root, Vector3(0, ring, 0), along), glow, along)
 	if level >= 2:
 		var cheek := Vector3(0.14, 0.34, 0.62) if level < 6 else Vector3(0.16, 0.44, 0.72)
-		var cheek_surf := _by_tier(p.tier, ARMOUR, Parts.CHROME, Parts.OBSIDIAN)
+		# To L5 the cheeks are cream, so they part from the red dome and deck.
+		var cheek_surf := _by_tier(p.tier, SHELL, Parts.CHROME, Parts.OBSIDIAN)
 		for side: float in [-1.0, 1.0]:
-			var out := 0.62 if level < 6 else 0.64
+			var out := 0.72 if level < 6 else 0.64
 			head.box_chamfered(cheek, 0.04, LowPolyMesh.turn(Vector3(side * out, 0.04, 0.02), heading), cheek_surf, heading)
 			if level >= 8 and LowPolyMesh.turn(Vector3(side, 0, 0), heading).dot(TOWARD_CAMERA) > 0.2:
 				head.box(Vector3(0.02, cheek.y - 0.14, cheek.z - 0.16),
@@ -375,9 +397,9 @@ static func build_laser_turret(p: Parts, level: int) -> void:
 		head.box(Vector3(0.42, 0.05, 0.02), LowPolyMesh.turn(Vector3(0, 0.33, 0.655), heading), LASER, heading)
 	if level >= 4:
 		head.box_chamfered(Vector3(0.62, 0.36, 0.34), 0.06, LowPolyMesh.turn(Vector3(0, 0.12, -0.62), heading), DENSE, heading)
-		Parts.mast(head, LowPolyMesh.turn(Vector3(-0.28, 0.5, -0.25), heading), 0.4, 0.05, LASER_BLINK)
-	if level >= 5:
-		Parts.torus(head, 0.63, 0.035, 24, 10, Vector3(0, 0.27, 0), GOLD if p.tier >= Parts.Tier.GOLD else SHELL_MID)
+		_lamp_post(head, LowPolyMesh.turn(Vector3(-0.28, 0.5, -0.25), heading), 0.4, LASER_BLINK)
+	if level >= 6:
+		Parts.torus(head, 0.63, 0.035, 24, 10, Vector3(0, 0.27, 0), GOLD)
 	if level >= 8:
 		# Veins round the head's drum and up its dome.
 		head.ring(0.615, 0.64, 0.12, 20, Vector3(0, 0.08, 0), VEIN_PANEL)
@@ -1691,6 +1713,14 @@ static func _plinth_panels(m: LowPolyMesh, radius: float, height: float) -> void
 ## A broad gold filigree band round a plinth's foot (_plinth), under its vein panels.
 static func _plinth_filigree(m: LowPolyMesh, radius: float) -> void:
 	m.ring(radius - 0.03, radius + 0.025, PLINTH_FILIGREE, 8, Vector3(0, Parts.PAD_HEIGHT, 0), Parts.FILIGREE, Parts.OCTAGON)
+
+
+## A lamp post standing on `foot`, `height` tall: a gunmetal post 0.1 across at its foot, tapering,
+## thick enough to read as a post rather than an ink line, and a bulb 0.12 across of `bulb` on its
+## top.
+static func _lamp_post(m: LowPolyMesh, foot: Vector3, height: float, bulb: Surf) -> void:
+	m.prism(0.05, 0.04, height, 10, foot, Parts.GUNMETAL)
+	m.orb(0.06, 12, 5, foot + Vector3(0, height, 0), bulb)
 
 
 ## A gold crown standing on `pos`: a band `radius` round with `points` spikes `spike` tall on it.
