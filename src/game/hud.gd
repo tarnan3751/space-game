@@ -177,6 +177,8 @@ const RESEARCH_CARD_SIZE := Vector2(200, 164)
 ## The training header's housing line: the army's figure in front of it and the bar at its end.
 const HOUSING_ICON := Vector2(20, 20)
 const HOUSING_BAR_SIZE := Vector2(120, 14)
+## The training header's and a producer's info panel's line while the base has no Hangar.
+const NO_HANGAR := "No Hangar: build one to house units"
 ## The bar's fill while any unit is housed, however few, in pixels.
 const HOUSING_MIN_FILL := 2.0
 
@@ -953,7 +955,7 @@ func _refresh_housing(state: BaseState) -> void:
 	_housing_bar.visible = capacity > 0
 	if capacity == 0:
 		_housing_label.theme_type_variation = &"CardCount"
-		_housing_label.text = "No Hangar: build one to house units"
+		_housing_label.text = NO_HANGAR
 		return
 	var used := state.housing_used()
 	_housing_label.theme_type_variation = &"HousingText"
@@ -1259,6 +1261,12 @@ func _refresh_info(state: BaseState, building: BuildingState) -> void:
 		lines.append("Capacity %s" % _level_stat(stats, next, "capacity"))
 	if type == _catalog.housing_type:
 		lines.append("Army housed %s / %s" % [Format.amount(state.housing_used()), Format.amount(state.housing_capacity())])
+	if _producers.has(type):
+		# With no Hangar, what the training header says.
+		if state.housing_capacity() == 0:
+			lines.append(NO_HANGAR)
+		else:
+			lines.append("Housing %s / %s" % [Format.amount(state.housing_used()), Format.amount(state.housing_capacity())])
 	if type == _catalog.foundry_type:
 		lines.append("Stock %d / %d" % [state.stock_total(), state.foundry_capacity()])
 	var combat := PackedStringArray()

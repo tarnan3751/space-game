@@ -46,6 +46,8 @@ func run(main: MainScript) -> void:
 	_world_taps = 0
 	check(hud.action_button().is_visible_in_tree() and hud.action_button().text == "Train",
 		"its info panel offers Train")
+	var housing_line := "Housing %s / %s" % [Format.amount(state.housing_used()), Format.amount(capacity)]
+	check(housing_line in hud.info_detail().split("\n"), "its info panel reads %s" % housing_line)
 	await screenshot("info-train")
 	hud.action_button().pressed.emit()
 	await _wait(main, Hud.MENU_OPEN_SECONDS)
@@ -173,7 +175,22 @@ func run(main: MainScript) -> void:
 		check(not hud.is_research_open() and not hud.army_panel().visible, "and closed the research panel")
 		await screenshot("selected-outside")
 
+	await _hangar_info(main)
 	await _fresh_academy(main)
+
+
+## A Hangar selected by a tap: its info panel keeps the army housed.
+func _hangar_info(main: MainScript) -> void:
+	var state: BaseState = main.state
+	var hangar := _first(state, state.catalog.housing_type)
+	_focus(main, hangar)
+	await frames(4)
+	tap_cell(main, hangar.cell + Vector2i.ONE)
+	await frames(2)
+	check(main.placement.selected_id == hangar.id, "a tap selected a Hangar (id %d)" % hangar.id)
+	var line := "Army housed %s / %s" % [Format.amount(state.housing_used()), Format.amount(state.housing_capacity())]
+	check(line in main.hud.info_detail().split("\n"), "its info panel reads %s" % line)
+	await screenshot("info-hangar")
 
 
 ## The second part: a level 1 Cadet Academy on a fresh base, with no Hangar.
@@ -194,6 +211,7 @@ func _fresh_academy(main: MainScript) -> void:
 	await frames(2)
 	check(academy.level == 1 and not academy.is_busy(), "it is finished at level 1")
 	check(hud.action_button().is_visible_in_tree(), "its info panel offers Train")
+	check(Hud.NO_HANGAR in hud.info_detail().split("\n"), "with no Hangar its info panel reads: %s" % Hud.NO_HANGAR)
 	hud.action_button().pressed.emit()
 	await _wait(main, Hud.MENU_OPEN_SECONDS)
 	check(hud.is_training_open(), "Train opened the training panel")
