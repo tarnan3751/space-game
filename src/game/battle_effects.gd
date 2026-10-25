@@ -84,6 +84,10 @@ const DEBRIS_GRAVITY := 12.0
 const SURFACE := 0.35
 ## How long a scorch mark lasts.
 const SCORCH_SECONDS := 20.0
+## A smoke column's puffs: one this often, each lasting this long and rising this far.
+const SMOKE_COLUMN_STEP := 0.25
+const SMOKE_COLUMN_PUFF := 1.6
+const SMOKE_COLUMN_RISE := 2.2
 ## An impact's life and how far it grows from its start.
 const IMPACT_SECONDS := 0.32
 const IMPACT_START := 0.25
@@ -964,6 +968,16 @@ func sparks(at: Vector3, radius: float, color: Color, now: float) -> void:
 ## (world units) as it swells and fades.
 func puff(at: Vector3, radius: float, color: Color, now: float, seconds: float, rise: float) -> void:
 	_puffs.add(at, radius, now, seconds, color, rise)
+
+
+## A column of dark smoke rising from `at` for `seconds` from `now`, its puffs about `radius`
+## across, one every SMOKE_COLUMN_STEP, each rising SMOKE_COLUMN_RISE as it swells and fades.
+func smoke_column(at: Vector3, radius: float, now: float, seconds: float) -> void:
+	var puffs := int(seconds / SMOKE_COLUMN_STEP)
+	for k: int in puffs:
+		var drift := Parts.around(radius * 0.4 * _noise(9), 360.0 * _noise(10), 0.15)
+		puff(at + drift, radius * (0.8 + 0.4 * _noise(11)), Weapons.SMOKE.lerp(Weapons.DARK_SMOKE, 0.4),
+			now + k * SMOKE_COLUMN_STEP, SMOKE_COLUMN_PUFF, SMOKE_COLUMN_RISE)
 
 
 ## A glow decal on the ground at `at`, `radius` across, in `color`, from `now`, fading over

@@ -101,6 +101,15 @@ const DEFENCE_IMPACT := 0.3
 const MINE_BLAST := MaterialKit.HAZARD
 const WELL_PULL := MaterialKit.ANTIMATTER
 const FALL_DUST := Color("c9c2e0")
+## A falling building's collapse: how long it takes, how far it sinks (a share of its height) and
+## tilts (degrees); its rubble's pop from a share of its size, how long that takes, and how long its
+## smoke column rises.
+const COLLAPSE_SECONDS := 0.35
+const COLLAPSE_SINK := 0.6
+const COLLAPSE_TILT := 12.0
+const RUBBLE_FROM := 0.6
+const RUBBLE_POP := 0.15
+const SMOKE_COLUMN_SECONDS := 4.0
 ## A sprung trap: how long its model takes to pop up before it goes off, how long a grav trap's
 ## funnel spins and how fast, and how long it takes to sink away after.
 const TRAP_POP := 0.15
@@ -176,6 +185,12 @@ var _shields := PackedInt32Array()
 ## step, reused.
 var _disabled: Dictionary[int, bool] = {}
 var _woken := PackedInt32Array()
+## The buildings collapsing (their views, out of _views) and when each fell; the rubble popping up
+## and when each began.
+var _collapsing: Dictionary[int, BuildingView] = {}
+var _collapse_at: Dictionary[int, float] = {}
+var _rubble_pop: Dictionary[int, Node3D] = {}
+var _rubble_at: Dictionary[int, float] = {}
 ## The traps, each a hidden view shown while it springs, and when each sprang.
 var _traps: Dictionary[int, BuildingView] = {}
 var _sprung: Dictionary[int, float] = {}
@@ -397,6 +412,7 @@ func _process(delta: float) -> void:
 	_aim_defences(shown)
 	_draw_buildings(shown)
 	_draw_traps()
+	_draw_collapses()
 	_shake_camera()
 	effects.end_bars()
 	effects.draw(_clock)
@@ -655,8 +671,10 @@ func _on_arrived(building: int, unit: int) -> void:
 			_bars[building] = 1.0
 
 
-## Building `id` fell: a wall leaves the merged mesh for its strip, a trap is gone, any other
-## building is replaced by its rubble with a burst of dust.
+## Building `id` fell: a wall leaves the merged mesh for its strip with chunks and dust, a trap is
+## gone, any other building collapses (COLLAPSE_SECONDS: it sinks, tilts and shakes in a ring of
+## dust, _draw_collapses) and is then replaced by its rubble, popping up with debris thrown out and a
+## column of smoke.
 func _fall(id: int) -> void:
 	_falls += 1
 	var cell: Vector2i = _cells.get(id, Vector2i.ZERO)
@@ -668,24 +686,84 @@ func _fall(id: int) -> void:
 			_walls_changed = true
 			effects.wall_rubble(at)
 			effects.impact(at + Vector3(0, 0.2, 0), 0.5, FALL_DUST, _clock)
+			effects.debris(at + Vector3(0, 0.3, 0), 3, 0.3, 0.1, _clock, MaterialKit.WALL, MaterialKit.HULL_DARK)
+			for k: int in 2:
+				effects.puff(at + Parts.around(0.25, 180.0 * k + 45.0, 0.1), 0.25, Weapons.DUST, _clock, 0.8, 0.4)
 			return
 		Catalog.CLASS_TRAP:
 			return
 	if _held_shots.has(id):
 		_release_shot(id)
 	if _views.has(id):
-		_views[id].queue_free()
+		_collapsing[id] = _views[id]
+		_collapse_at[id] = _clock
 		_views.erase(id)
 	_flash_until.erase(id)
 	_shake_until.erase(id)
 	_bar_until.erase(id)
 	_bars.erase(id)
-	var rubble := BuildingModels.create_rubble(size)
-	rubble.position = at
-	add_child(rubble)
-	effects.impact(at + Vector3(0, 0.3, 0), size * 0.7, FALL_DUST, _clock)
+	effects.impact(at + Vector3(0, 0.1, 0), size * 0.75, FALL_DUST, _clock, COLLAPSE_SECONDS + 0.2)
+	for k: int in 4 + size:
+		effects.puff(at + Parts.around(size * 0.45, 360.0 * k / (4 + size), 0.1), 0.2 + 0.08 * size, Weapons.DUST,
+			_clock + 0.04 * k, 0.9, 0.35)
 	if _shields.has(id):
 		effects.set_shield(id, 0, _clock)
+
+
+## The collapsing buildings: each sinks COLLAPSE_SINK of its height and tilts COLLAPSE_TILT about a
+## level axis of its own (from its id) while it shakes, over COLLAPSE_SECONDS; then its view is
+## freed and its rubble (BuildingModels.create_rubble) pops up from RUBBLE_FROM of its size over
+## RUBBLE_POP, with debris thrown out and its smoke column (BattleEffects.smoke_column).
+func _draw_collapses() -> void:
+	if not _collapsing.is_empty():
+		_done.clear()
+		for id: int in _collapsing:
+			var view := _collapsing[id]
+			var centre := _centres[id]
+			var t := clampf((_clock - _collapse_at[id]) / COLLAPSE_SECONDS, 0.0, 1.0)
+			if t >= 1.0:
+				_done.append(id)
+				continue
+			var height: float = _muzzles.get(id, 1.0) / MUZZLE_SHARE
+			var shake := SHAKE * 1.5 * (1.0 - t)
+			view.position = Vector3(centre.x + shake * sin(_clock * 97.0), -COLLAPSE_SINK * height * t * t,
+				centre.y + shake * cos(_clock * 83.0))
+			var axis := Vector3(cos(id * 2.4), 0.0, sin(id * 2.4))
+			view.basis = Basis(axis, deg_to_rad(COLLAPSE_TILT) * t * t)
+		for id: int in _done:
+			_settle(id)
+	if not _rubble_pop.is_empty():
+		_done.clear()
+		for id: int in _rubble_pop:
+			var t := clampf((_clock - _rubble_at[id]) / RUBBLE_POP, 0.0, 1.0)
+			var size := lerpf(RUBBLE_FROM, 1.0, t) + 0.12 * sin(PI * t)
+			_rubble_pop[id].scale = Vector3.ONE * size
+			if t >= 1.0:
+				_rubble_pop[id].scale = Vector3.ONE
+				_done.append(id)
+		for id: int in _done:
+			_rubble_pop.erase(id)
+			_rubble_at.erase(id)
+
+
+## Collapsing building `id` is down: its view goes, its rubble pops up in its place with debris
+## thrown out and a column of smoke.
+func _settle(id: int) -> void:
+	_collapsing[id].queue_free()
+	_collapsing.erase(id)
+	_collapse_at.erase(id)
+	var size: int = _sizes.get(id, 1)
+	var at := field.cell_to_world(_cells.get(id, Vector2i.ZERO), size)
+	var rubble := BuildingModels.create_rubble(size)
+	rubble.position = at
+	rubble.scale = Vector3.ONE * RUBBLE_FROM
+	add_child(rubble)
+	_rubble_pop[id] = rubble
+	_rubble_at[id] = _clock
+	effects.debris(at + Vector3.UP * 0.3, mini(4 + size, 6), 0.35 * size, 0.1 + 0.03 * size, _clock,
+		MaterialKit.HULL_DARK, MaterialKit.ARMY)
+	effects.impact(at + Vector3(0, 0.1, 0), size * 0.6, FALL_DUST, _clock)
+	effects.smoke_column(at, 0.3 + 0.1 * size, _clock, SMOKE_COLUMN_SECONDS)
 
 
 ## Trap `id` sprang at `at`: its model pops up out of the ground (TRAP_POP), then goes off by its
