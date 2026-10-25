@@ -13,10 +13,7 @@ extends HarnessScenario
 ## high; "<unit>-fire" (FIRE_FRAMES at FIRE_STEP_MS), framed with frame_span on the unit and its
 ## target's middle (FIRE_MARGIN, at least FIRE_MIN; cropped for the infantry), starting
 ## FIRE_LEAD_MS before its second shot (the breacher, which blows itself up on its first, as it
-## closes in). Then "<unit>-death" for an
-## infantry and a vehicle (DEATHS): the unit walks on a Laser Turret (DEATH_TURRET_LEVEL) and is
-## shot down; the strip (DEATH_FRAMES at FIRE_STEP_MS, framed as a fire strip) starts just before the turret's last shot,
-## and the ticks it ran over are logged beside the tick the unit died on.
+## closes in).
 ##
 ## Close strips, cropped, at CLOSE_ZOOM times the model's height (camera size 3 to 6), for the
 ## limbs: "<unit>-close-bank" for a hovering type (BANKERS), from its deploy, where it turns about
@@ -32,8 +29,17 @@ extends HarnessScenario
 ## which blows itself up on its first blow, has neither: its fire strip, as long as a close death
 ## strip (DEATH_CLOSE_FRAMES at DEATH_CLOSE_STEP_MS), holds its blast and its death.
 ##
+## Then the effects lane's block, for every unit type: "<unit>-impact" (IMPACT_FRAMES at
+## IMPACT_STEP_MS), a close strip (IMPACT_VIEW across, cropped) on the near side of the target as
+## the unit's second shot leaves and lands (its projectile, its impact; the brawler's punch, the
+## breacher's charge); and "<unit>-death" (DEATH_FRAMES at DEATH_STEP_MS): the unit walks or flies
+## on two Railguns (DEATH_TURRET at DEATH_TURRET_LEVEL, which hit ground and air) and is shot down,
+## the battle run at WAIT_SPEED until one shot is left in it; the strip, close on the unit
+## (DEATH_VIEW, cropped), starts then, and the ticks it ran over are logged beside the tick the
+## unit died on: the sim's death, so its effects (BattleView, the weapon record's) show.
+##
 ## Checks: each battle opens, the unit moves in its move strip, fires (its target's hull drops, or
-## the breacher is gone) and each death strip's unit is shot down; a hovering type banks as it
+## the breacher is gone), hits in its impact strip and each death strip's unit is shot down; a hovering type banks as it
 ## turns, a twin-weaponed walker's or brawler's blows alternate sides (its drawn state's parity), and a staged death
 ## is no longer drawn after its death's seconds. Headless the strips are skipped and the checks
 ## still run. Each battle is ended (surrender) and left before the next.
@@ -63,11 +69,20 @@ const FIRE_MARGIN := 1.5
 const FIRE_MIN := 4.5
 ## How close the self-destructing unit is to its reach when its fire strip starts, field units.
 const CLOSING_UNITS := 400
-## The unit types shot dying, an infantry and a vehicle, and their killer.
-const DEATHS: Array[String] = ["ranger", "dune_runner"]
-const DEATH_TURRET := "laser_turret"
-const DEATH_TURRET_LEVEL := 1
-const DEATH_FRAMES := 12
+## The death strips' killer (it hits ground and air, hard enough to end a titan inside WAIT_TICKS),
+## their frames and the least view, and the speed the battle runs at while a strip waits.
+const DEATH_TURRET := "railgun"
+const DEATH_TURRET_LEVEL := 7
+const DEATH_FRAMES := 16
+const DEATH_STEP_MS := 80
+const DEATH_VIEW := 3.5
+const WAIT_SPEED := 2
+## The impact strips: frames, step and the least view.
+const IMPACT_FRAMES := 14
+const IMPACT_STEP_MS := 70
+const IMPACT_VIEW := 3.0
+## How close the self-destructing unit is to its reach when its impact strip starts, field units.
+const CHARGE_UNITS := 120
 ## The close strips: the camera's size per unit of the model's height (cropped to its centre
 ## half), and its least and most; the frames and their steps.
 const CLOSE_ZOOM := 2.4
@@ -102,7 +117,9 @@ func run(main: MainScript) -> void:
 	check(types.size() == 11, "the catalog has eleven unit types (%d)" % types.size())
 	for unit: String in types:
 		await _move_and_fire(main, unit)
-	for unit: String in DEATHS:
+	for unit: String in types:
+		await _impact(main, unit)
+	for unit: String in types:
 		await _death(main, unit)
 
 
@@ -215,25 +232,61 @@ func _close_fire_and_death(main: MainScript, unit: String, close: float) -> void
 		% [unit, view.units.death_seconds(1), view.units.drawn(), shown])
 
 
-## One `unit` walking on a Laser Turret, shot down: its death strip.
+# --- The effects' strips -----------------------------------------------------------
+
+## One `unit` against the target, from close by: its impact strip, close on the side of the target
+## it hits, from just before its second shot.
+func _impact(main: MainScript, unit: String) -> void:
+	var size := _catalog.size_of(TARGET)
+	var target := {"id": 1, "type": TARGET, "level": TARGET_LEVEL, "cell": [TARGET_CELL.x, TARGET_CELL.y]}
+	if not _open(main, [target], unit):
+		return
+	var view: BattleView = main.battle
+	var reach := int(_catalog.unit_level_stats(unit, LEVEL).get("range_units", 0))
+	check(view.deploy(unit, _start_cell(reach + 1000, size)) == "", "%s deployed by the %s" % [unit, TARGET])
+	var hull := view.sim.building_hp(1)
+	view.speed = WAIT_SPEED
+	if _catalog.unit_self_destructs(unit):
+		var rect := Rect2i(TARGET_CELL * 1000, Vector2i.ONE * size * 1000)
+		await _until(view, func() -> bool: return view.sim.unit_state(1) == BattleArmy.WALKING)
+		await _until(view, func() -> bool:
+			return _gap(view.sim.unit_position(1), rect) <= reach + CHARGE_UNITS or view.sim.unit_state(1) != BattleArmy.WALKING)
+	else:
+		await _until(view, func() -> bool: return view.sim.unit_state(1) == BattleArmy.ATTACKING)
+		hull = view.sim.building_hp(1)
+		await _until(view, func() -> bool: return view.sim.army.cooldown[0] > FIRE_LEAD_MS)
+		await _until(view, func() -> bool: return view.sim.army.cooldown[0] <= FIRE_LEAD_MS * 2)
+	view.speed = 1
+	var at := view.units.aim_point(1)
+	var centre := view.building_centre(1) + Vector3(0.0, 0.6, 0.0)
+	var side := centre + (Vector3(at.x, centre.y, at.z) - centre).normalized() * size * 0.5
+	frame_span(main, side, side, FIRE_MARGIN, IMPACT_VIEW, true)
+	await strip("%s-impact" % unit, IMPACT_FRAMES, IMPACT_STEP_MS, true)
+	await _until(view, func() -> bool: return view.sim.building_hp(1) < hull)
+	check(view.sim.building_hp(1) < hull, "%s hit the %s in its impact strip (hull %d of %d)" % [unit, TARGET,
+		view.sim.building_hp(1), hull])
+	await _leave(main)
+
+
+## One `unit` walking or flying on the Railgun, shot down: its death strip.
 func _death(main: MainScript, unit: String) -> void:
 	var size := _catalog.size_of(DEATH_TURRET)
 	var turret := {"id": 1, "type": DEATH_TURRET, "level": DEATH_TURRET_LEVEL, "cell": [TARGET_CELL.x, TARGET_CELL.y]}
-	if not _open(main, [turret], unit):
+	var second := {"id": 2, "type": DEATH_TURRET, "level": DEATH_TURRET_LEVEL,
+		"cell": [TARGET_CELL.x - size - 1, TARGET_CELL.y + size + 1]}
+	if not _open(main, [turret, second], unit):
 		return
 	var view: BattleView = main.battle
 	var reach := int(_catalog.unit_level_stats(unit, LEVEL).get("range_units", 0))
 	var damage := int(_catalog.level_stats(DEATH_TURRET, DEATH_TURRET_LEVEL).get("damage", 0))
 	check(view.deploy(unit, _start_cell(reach + 1000, size)) == "", "%s deployed in the turret's range" % unit)
-	await _until(view, func() -> bool: return view.sim.unit_hp(1) <= damage * 2)
-	await _until(view, func() -> bool:
-		return view.sim.unit_hp(1) <= damage and view.sim.combat.cooldown[0] <= FIRE_LEAD_MS)
+	view.speed = WAIT_SPEED
+	await _until(view, func() -> bool: return view.sim.unit_hp(1) <= damage)
+	view.speed = 1
 	var at := view.units.aim_point(1)
-	var turret_top := view.building_centre(1) + Vector3(0.0, 1.0, 0.0)
-	var crop := INFANTRY.has(unit)
-	frame_span(main, at, turret_top, FIRE_MARGIN, FIRE_MIN, crop)
+	frame_span(main, Vector3(at.x, at.y * 0.5, at.z), Vector3(at.x, at.y * 0.5, at.z), FIRE_MARGIN, DEATH_VIEW, true)
 	var started := view.sim.tick
-	await strip("%s-death" % unit, DEATH_FRAMES, FIRE_STEP_MS, crop)
+	await strip("%s-death" % unit, DEATH_FRAMES, DEATH_STEP_MS, true)
 	var ended := view.sim.tick
 	await _until(view, func() -> bool: return view.sim.unit_state(1) == BattleArmy.DEAD)
 	check(view.sim.unit_state(1) == BattleArmy.DEAD, "the %s was shot down by tick %d (the strip ran from tick %d to %d)"

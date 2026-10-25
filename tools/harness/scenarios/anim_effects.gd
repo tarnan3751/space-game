@@ -8,7 +8,8 @@ extends HarnessScenario
 ## silo from beside it inside the turret's range, one of each ability brought. "swarm-dome"
 ## (SWARM_FRAMES at SWARM_STEP_MS) from a Repair Swarm cast on the tanks; "emp-ring" (8 at 50 ms)
 ## from an EMP Burst cast on the turret, then "emp-grey" (EMP_FRAMES at EMP_STEP_MS) over its
-## stun and its waking; "strike-marker" (8 at 100 ms) from an Orbital Strike cast on the silo,
+## stun and its waking, and "emp-wake" (WAKE_FRAMES at 50 ms, close) from just before it wakes from
+## a second burst: its wake flash; "strike-marker" (8 at 100 ms) from an Orbital Strike cast on the silo,
 ## "strike-land" (LAND_FRAMES at 50 ms) from LAND_LEAD_TICKS before it lands, the bolt, the
 ## fireball and the rings, and "strike-smoke" (8 at 150 ms) after it.
 ##
@@ -34,6 +35,11 @@ const SWARM_FRAMES := 8
 const SWARM_STEP_MS := 250
 const EMP_FRAMES := 8
 const EMP_STEP_MS := 500
+## The close strip of the turret waking from a second EMP burst: its view, how many ticks before
+## the wake it starts, its frames.
+const WAKE_ZOOM := 4.0
+const WAKE_LEAD_TICKS := 2
+const WAKE_FRAMES := 8
 const LAND_FRAMES := 16
 const LAND_LEAD_TICKS := 12
 const SHIELD := "shield_generator"
@@ -63,7 +69,7 @@ func _abilities(main: MainScript) -> void:
 	]
 	var stock := {}
 	for ability: String in _catalog.ability_types():
-		stock[ability] = 1
+		stock[ability] = 2 if ability == "emp_burst" else 1
 	if not _open(main, buildings, {UNIT: 3}, stock):
 		return
 	var view: BattleView = main.battle
@@ -87,7 +93,21 @@ func _abilities(main: MainScript) -> void:
 	await strip("emp-ring", 8, 50)
 	await _until(view, func() -> bool: return view.is_shown_disabled(2))
 	check(view.is_shown_disabled(2), "the turret is shown disabled")
+	var wakes := view.sim.combat.disabled_until[view.sim.layout.index_of(2)]
 	await strip("emp-grey", EMP_FRAMES, EMP_STEP_MS)
+
+	# The EMP again, and the turret waking from it close up: its flash.
+	await _until(view, func() -> bool: return view.sim.tick > wakes + 2)
+	frame_world(main, WAKE_ZOOM, turret + Vector3(0.0, 0.6, 0.0))
+	await frames(2)
+	check(view.cast("emp_burst", TURRET_CELL + Vector2i.ONE) == "", "the EMP burst is cast on the turret again")
+	await _until(view, func() -> bool: return view.is_shown_disabled(2))
+	wakes = view.sim.combat.disabled_until[view.sim.layout.index_of(2)]
+	await _until(view, func() -> bool: return view.sim.tick >= wakes - WAKE_LEAD_TICKS)
+	await strip("emp-wake", WAKE_FRAMES, 50)
+	var ended := view.sim.tick
+	await _until(view, func() -> bool: return not view.is_shown_disabled(2))
+	check(not view.is_shown_disabled(2), "the turret woke on tick %d (the emp-wake strip ended on tick %d)" % [wakes, ended])
 
 	# The strike, on the silo: the marker, the landing, the smoke.
 	var silo := view.building_centre(1)

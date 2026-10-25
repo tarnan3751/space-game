@@ -13,8 +13,13 @@ extends HarnessScenario
 ## "<defence>-fire" (FIRE_FRAMES at FIRE_STEP_MS, or STEPS's for the slow ones: the shells, the
 ## well's pull, the grav trap's throw) starts DEPLOY_DELAY_TICKS before the deploy (sent through
 ## BattleView.script_commands), so it holds the empty field, the unit's arrival and the defence's
-## first shot. Checks: the defence acted on the unit (its hull dropped, it was held, or the trap
-## went off).
+## first shot. Then, for a defence, "<defence>-impact": a close strip (IMPACT_VIEW across, cropped)
+## on the unit from its next shot (BattleEffects.bolts_fired moving with the defence's colour
+## last), IMPACT_FRAMES at
+## IMPACT_STEP_MS or IMPACT_STEPS's for the slow ones, so its projectile's arrival and its impact
+## show large. Checks: every type with a weapon in the catalog (a defence or trap that targets,
+## holds, throws or shields; every unit) has a weapon record of its own (Weapons.has); the defence
+## acted on the unit (its hull dropped, it was held, or the trap went off).
 ##
 ## Then "building-fall": a Hover Tank on a Drone Bay, the strip (FALL_FRAMES at FALL_STEP_MS)
 ## started FALL_LEAD_MS before the shot that fells it: the flash, the fall, the dust and the rubble. And
@@ -46,6 +51,16 @@ const STEPS := {
 ## shows (frame_span).
 const MARGIN := 1.5
 const MIN_VIEW := 4.5
+## The close impact strips: the least view, the frames and their step, and the slow ones'.
+const IMPACT_VIEW := 3.0
+const IMPACT_FRAMES := 8
+const IMPACT_STEP_MS := 50
+const IMPACT_STEPS := {
+	"plasma_mortar": [10, 120],
+	"orbital_cannon": [12, 200],
+	"gravity_well": [8, 150],
+	"missile_battery": [10, 60],
+}
 ## The fall and the wall's break.
 const FALL_TARGET := "drone_bay"
 const FALL_CELL := Vector2i(24, 24)
@@ -69,6 +84,7 @@ var _catalog: Catalog
 
 func run(main: MainScript) -> void:
 	_catalog = main.catalog
+	_check_weapons()
 	var shot := 0
 	for type: String in _catalog.types():
 		if _catalog.targets_of(type) == "":
@@ -110,7 +126,37 @@ func _fire(main: MainScript, type: String) -> void:
 	await _until(view, acted)
 	check(acted.call(), "the %s acted on the %s (hull %d of %d)" % [type, unit, view.sim.unit_hp(1),
 		view.sim.unit_max_hp(1)])
+	if not trap and not view.sim.is_over():
+		var target := view.units.aim_point(1)
+		frame_span(main, target, target, MARGIN, IMPACT_VIEW, true)
+		var seen := view.effects.bolts_fired
+		var colour := Weapons.of(type).color
+		await _until(view, func() -> bool:
+			return view.effects.bolts_fired > seen and view.effects.last_bolt_color == colour)
+		var close: Array = IMPACT_STEPS.get(type, [IMPACT_FRAMES, IMPACT_STEP_MS])
+		await strip("%s-impact" % type, int(close[0]), int(close[1]), true)
 	await _leave(main)
+
+
+## Every building type that targets, holds, throws or shields, and every unit type, has a weapon
+## record of its own.
+func _check_weapons() -> void:
+	var missing := PackedStringArray()
+	var listed := 0
+	for type: String in _catalog.types():
+		var stats := _catalog.level_stats(type, 1)
+		var armed := _catalog.targets_of(type) not in ["", "none"] or int(stats.get("hold_ms", 0)) > 0 \
+			or int(stats.get("throw_cells", 0)) > 0 or int(stats.get("shield_hp", 0)) > 0
+		if armed:
+			listed += 1
+			if not Weapons.has(type):
+				missing.append(type)
+	for unit: String in _catalog.unit_types():
+		listed += 1
+		if not Weapons.has(unit):
+			missing.append(unit)
+	check(missing.is_empty(), "every one of %d armed types and units has a weapon record (missing: %s)" % [listed,
+		", ".join(missing)])
 
 
 ## A Hover Tank fells a Drone Bay.
