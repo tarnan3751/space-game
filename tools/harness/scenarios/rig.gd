@@ -11,6 +11,15 @@ extends HarnessScenario
 ## no point dips below the ground; the muzzle socket points LOW_READY (30 degrees down) as built,
 ## within AIM_SLACK of level fully aimed, and kicked up by a shot.
 ##
+## Part 1b, the roster: every unit type's model drawn as built at a zero state (outside a battle,
+## every row at rest, a flame's flicker too), and posed through Rig at ROSTER_STATES (walking at
+## both extremes but for a hovering type, aimed at the kick on either side's turn, punching,
+## banked either way as far as BattleUnits banks its class). Checks: a ground type's posed points
+## stay above the ground but for its rolling wheels' and stepping feet's slack (GROUND_SLACK,
+## STEP_SLACK), and every socket stays on its part: its posed point within SOCKET_REACH of a
+## posed vertex carrying the same rig stamps, and on a SLIDE part moved back by the kick, on the
+## side whose turn it is.
+##
 ## Part 2, a battle: a laser turret and the Command Center against rangers deployed by script,
 ## framed on the turret. Checks: the turret's head turns to within AIM_TOLERANCE of its target
 ## while it fires; each of its bolts leaves one of its muzzle sockets, alternating; a ranger's
@@ -42,6 +51,13 @@ const AIM_TOLERANCE := 10.0
 ## How far a turret's bolt may start from the muzzle socket it left: the shake of a hit
 ## (BattleView.SHAKE) moves the turret after its shot, either way.
 const SOCKET_SLACK := 0.12
+## The roster's states (Rig: x, y; with y 0, x the share of the class's bank; a hovering type, whose
+## x is its bank, is not posed walking), a stepping walker's foot's slack below the ground, and how
+## far a socket may be from its part's nearest vertex.
+const ROSTER_STATES: Array[Vector2] = [Vector2(0.5, 1.0), Vector2(1.5, 1.0), Vector2(0.0, -1.0), Vector2(2.0, -1.0),
+	Vector2(0.1, -1.0), Vector2(2.1, -1.0), Vector2(1.0, 0.0), Vector2(-1.0, 0.0)]
+const STEP_SLACK := 0.06
+const SOCKET_REACH := 0.12
 const SETTLE_SECONDS := 0.5
 const SETTLE_FRAMES := 10
 ## The battle: the turret's id and level, the rangers deployed, the tick the walk is shot at, and
@@ -61,8 +77,68 @@ var _last_shooter := 0
 
 
 func run(main: MainScript) -> void:
+	_roster(main)
 	await _poses(main)
 	await _battle(main)
+
+
+func _roster(main: MainScript) -> void:
+	for unit: String in main.catalog.unit_types():
+		var meshes := UnitModels.meshes(unit, Parts.Tier.BASE)
+		var arrays := meshes.body.surface_get_arrays(0)
+		var vertices: PackedVector3Array = arrays[Mesh.ARRAY_VERTEX]
+		if arrays[Mesh.ARRAY_CUSTOM1] == null:
+			check(false, "%s is rigged" % unit)
+			continue
+		var inner: PackedFloat32Array = arrays[Mesh.ARRAY_CUSTOM1]
+		var outer: PackedFloat32Array = arrays[Mesh.ARRAY_CUSTOM2]
+		var ground := main.catalog.unit_class(unit) == "ground"
+		var lowest := INF
+		var astray := PackedStringArray()
+		var bank := BattleUnits.BANK_MAX_GROUND if ground else BattleUnits.BANK_MAX
+		var hovers := false
+		for i: int in range(3, inner.size(), 4):
+			hovers = hovers or roundi(inner[i]) == Rig.BANK or roundi(outer[i]) == Rig.BANK
+		var off_rest := 0.0
+		for i: int in vertices.size():
+			var rig := Vector4(inner[i * 4], inner[i * 4 + 1], inner[i * 4 + 2], inner[i * 4 + 3])
+			var rig2 := Vector4(outer[i * 4], outer[i * 4 + 1], outer[i * 4 + 2], outer[i * 4 + 3])
+			off_rest = maxf(off_rest, Rig.posed(vertices[i], rig, rig2, Color(0, 0, 0, 0)).distance_to(vertices[i]))
+		check(off_rest < 0.00001, "%s: drawn as built at a zero state (%.6f moved at most)" % [unit, off_rest])
+		for xy: Vector2 in ROSTER_STATES:
+			if hovers and xy.y > 0.0:
+				continue
+			var state := Color(xy.x, xy.y, 0, 0)
+			if xy.y == 0.0:
+				state.r = Rig.BANK_BASE + xy.x * bank if hovers else xy.x
+			var posed := PackedVector3Array()
+			posed.resize(vertices.size())
+			for i: int in vertices.size():
+				var rig := Vector4(inner[i * 4], inner[i * 4 + 1], inner[i * 4 + 2], inner[i * 4 + 3])
+				var rig2 := Vector4(outer[i * 4], outer[i * 4 + 1], outer[i * 4 + 2], outer[i * 4 + 3])
+				posed[i] = Rig.posed(vertices[i], rig, rig2, state)
+				lowest = minf(lowest, posed[i].y)
+			for name: String in meshes.sockets:
+				var socket: LowPolyMesh.Socket = meshes.sockets[name]
+				var at := Rig.posed(socket.position, socket.rig, socket.rig2, state)
+				var near := INF
+				for i: int in vertices.size():
+					if Vector4(inner[i * 4], inner[i * 4 + 1], inner[i * 4 + 2], inner[i * 4 + 3]) == socket.rig \
+							and Vector4(outer[i * 4], outer[i * 4 + 1], outer[i * 4 + 2], outer[i * 4 + 3]) == socket.rig2:
+						near = minf(near, posed[i].distance_to(at))
+				if near > SOCKET_REACH:
+					astray.append("%s at %s (%.3f)" % [name, xy, near])
+				var slide := roundi(socket.rig.w)
+				if xy.y == -1.0 and (xy.x == 0.0 or xy.x == 2.0) and slide in [Rig.SLIDE, Rig.SLIDE_L, Rig.SLIDE_R]:
+					var turn := slide == Rig.SLIDE or (slide == Rig.SLIDE_L) == (xy.x == 0.0)
+					var kick := Vector3(socket.rig.x, socket.rig.y, socket.rig.z) if turn else Vector3.ZERO
+					var moved := at - Rig.posed(socket.position, Vector4.ZERO, socket.rig2, state)
+					if not moved.is_equal_approx(kick):
+						astray.append("%s kicked %s at %s, not %s" % [name, moved, xy, kick])
+		say("%s: lowest posed point %.3f; sockets %s" % [unit, lowest, ", ".join(meshes.sockets.keys())])
+		if ground:
+			check(lowest >= -STEP_SLACK, "%s: no posed point far below the ground (%.3f)" % [unit, lowest])
+		check(astray.is_empty(), "%s: every socket stays on its part (%s)" % [unit, "; ".join(astray)])
 
 
 func _poses(main: MainScript) -> void:

@@ -252,6 +252,13 @@ func aim_point(id: int) -> Vector3:
 	return Vector3(at.x, _middle[_type[u]], at.y)
 
 
+## Unit `id`'s instance state as last drawn (INSTANCE_CUSTOM: Rig), zeros for an unknown id.
+func drawn_state(id: int) -> Color:
+	if id < 1 or id > _count:
+		return Color(0, 0, 0, 0)
+	return _state[id - 1]
+
+
 ## Unit `id`'s socket `name` in the world as last drawn (Rig.posed, as the shaders pose the part it
 ## is on), or its middle where its model has no such socket.
 func socket_point(id: int, name: String) -> Vector3:

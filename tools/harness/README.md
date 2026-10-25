@@ -399,7 +399,11 @@ standing, walking at three phases, aiming half and fully raised, and a shot's ki
 in profile. In both modes it poses every vertex of the ranger's mesh on the CPU through `Rig`
 (the shaders' mirror) and checks that the forward leg is the one each walking phase says, that no
 point dips below the ground, and that the muzzle socket points 30 degrees down as built, level
-when aimed and up at a kick. Then a battle (`main.open_battle`, practice): a level 3 laser turret
+when aimed and up at a kick. It also poses every unit type's model through `Rig` at walking (but
+for a hovering type, whose x is its bank), aimed, kicked on either side's turn, punching and banked
+states, and checks that a ground type stays above the ground (within a stepping foot's slack) and
+that every socket stays on its part, a slide's socket kicked back on its own side's turn only.
+Then a battle (`main.open_battle`, practice): a level 3 laser turret
 and the Command Center against six rangers deployed by script. At the start of each frame it reads
 the bolt started last frame (`BattleEffects.bolts_fired`, `last_bolt_from`, `last_bolt_color`) and
 checks that a turret's starts at one of its muzzle sockets (within the hit shake), alternating
@@ -611,13 +615,25 @@ through `BattleView.deploy` and `cast` or `script_commands`, never a touch; each
 unit more than the scenario deploys, so a battle never ends and opens its result panel during a
 strip. Each battle is surrendered and left before the next.
 
-- `scenarios/anim_units.gd`: every unit type at level 1 against a Metal Silo, deployed beyond
-  its reach on the screen's right: `<unit>-move` (8 frames, 100 ms) framed close on the unit
-  (camera size 4 to 7 by its size; the four infantry cropped at size 5), `<unit>-fire` (8,
-  50 ms) framed with `frame_span` on the unit and the level 1 silo (cropped for the infantry),
-  from just before its second shot (the breacher's first, as it closes in); then
-  `ranger-death` and `dune_runner-death` (12, 50 ms) from just before a Laser Turret's last
-  shot at it, the ticks the strip ran over logged beside the tick it died by.
+- `scenarios/anim_units.gd`: every unit type at level 1 against a level 10 Metal Silo (its
+  sturdiest, so it stands through every strip), deployed beyond its reach on the screen's right
+  (the brawler, which closes in, on the lit side to the screen's left, out of the silo's shadow):
+  `<unit>-move` (8 frames, 100 ms) framed close on the unit (camera size 4 to 7 by its size; the
+  four infantry cropped at size 5), `<unit>-fire` (8, 50 ms) framed with `frame_span` on the unit
+  and the silo (cropped for the infantry), from just before its second shot (the breacher's first,
+  as it closes in, 12 frames at 70 ms, holding its blast and its death); then `ranger-death` and
+  `dune_runner-death` (12, 50 ms) from just before a Laser Turret's last shot at it, the ticks the
+  strip ran over logged beside the tick it died by. The close strips, cropped, at 2.4 times the
+  model's height (camera size 3 to 6), for the limbs: `<unit>-close-bank` for a hovering type (12,
+  60 ms) from its deploy, turning about 90 degrees onto its course; `<unit>-close-move` (12, 60
+  ms) before the wide move strip; `<unit>-close-fire` (16 frames over two shots, 320 ms a frame at
+  most; for the ranger, the siege walker, the hover tank and the titan, whose guns kick, 12 at 70
+  ms over one shot, so the kick and the return show) after the wide fire strip; and
+  `<unit>-close-death` (12, 70 ms), staged on the unit attacking in place through
+  `BattleUnits.die`, framed lower and wider by its model's lowest point so a falling aircraft
+  stays in the tile (none for the breacher). It checks that each hovering type banks into its
+  turn, that the brawler's, the siege walker's and the titan's blows alternate sides (their drawn
+  state's parity), and that a staged death plays out in `death_seconds`.
 - `scenarios/anim_defences.gd`: every type with a targets class (the guns and the traps) at
   level 1 beside a level 1 Metal Silo, a Hover Tank (a Gunship for an air defence) deployed by
   the silo, two cells from the defence, three ticks into `<type>-fire` (8, 50 ms; the plasma mortar 10 at 150 ms, the orbital cannon

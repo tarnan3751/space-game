@@ -2,7 +2,8 @@ extends HarnessScenario
 ## The units' animation as frame strips (docs/reference/battle-view.md, **Units**), for the
 ## animation audit: every unit type in the catalog's order, each in a battle of its own opened
 ## through main.open_battle (a practice battle: nothing applied), one unit at LEVEL against one
-## target, a Metal Silo at TARGET_LEVEL on TARGET_CELL. The unit is deployed through
+## target, a Metal Silo at TARGET_LEVEL (its sturdiest, so it stands through every strip) on
+## TARGET_CELL. The unit is deployed through
 ## BattleView.deploy (no touch) on the cell up and to the screen's right of the target, WALK_UNITS
 ## beyond its reach, so it walks or flies across the screen before it fires.
 ##
@@ -17,14 +18,30 @@ extends HarnessScenario
 ## shot down; the strip (DEATH_FRAMES at FIRE_STEP_MS, framed as a fire strip) starts just before the turret's last shot,
 ## and the ticks it ran over are logged beside the tick the unit died on.
 ##
+## Close strips, cropped, at CLOSE_ZOOM times the model's height (camera size 3 to 6), for the
+## limbs: "<unit>-close-bank" for a hovering type (BANKERS), from its deploy, where it turns about
+## 90 degrees onto its course (CLOSE_FRAMES at CLOSE_STEP_MS); "<unit>-close-move" after the
+## settle, framed on the middle of its path (CLOSE_FRAMES at CLOSE_STEP_MS), before the wide move
+## strip; "<unit>-close-fire" after the wide fire strip, from just before a shot, over two shots
+## (CLOSE_FIRE_FRAMES, the step two shots' time over them, CLOSE_FIRE_STEP_MS at most), but for a
+## recoiling type (KICKERS), whose kick and return a slow step would miss, one shot at
+## DEATH_CLOSE_FRAMES and DEATH_CLOSE_STEP_MS; and
+## "<unit>-close-death" (DEATH_CLOSE_FRAMES at DEATH_CLOSE_STEP_MS), staged on the unit attacking
+## in place (framed lower and wider by its model's lowest point, so a falling aircraft stays in the
+## tile) through BattleUnits.die (the view's death; the sim's unit lives on, unseen). The breacher,
+## which blows itself up on its first blow, has neither: its fire strip, as long as a close death
+## strip (DEATH_CLOSE_FRAMES at DEATH_CLOSE_STEP_MS), holds its blast and its death.
+##
 ## Checks: each battle opens, the unit moves in its move strip, fires (its target's hull drops, or
-## the breacher is gone) and each death strip's unit is shot down. Headless the strips are
-## skipped and the checks still run. Each battle is ended (surrender) and left before the next.
+## the breacher is gone) and each death strip's unit is shot down; a hovering type banks as it
+## turns, a twin-weaponed walker's or brawler's blows alternate sides (its drawn state's parity), and a staged death
+## is no longer drawn after its death's seconds. Headless the strips are skipped and the checks
+## still run. Each battle is ended (surrender) and left before the next.
 
 const LEVEL := 1
 const SEED := 20261024
 const TARGET := "metal_silo"
-const TARGET_LEVEL := 1
+const TARGET_LEVEL := 10
 const TARGET_CELL := Vector2i(22, 22)
 ## Field units beyond its reach the unit starts, so it moves for over a second.
 const WALK_UNITS := 4000
@@ -51,6 +68,28 @@ const DEATHS: Array[String] = ["ranger", "dune_runner"]
 const DEATH_TURRET := "laser_turret"
 const DEATH_TURRET_LEVEL := 1
 const DEATH_FRAMES := 12
+## The close strips: the camera's size per unit of the model's height (cropped to its centre
+## half), and its least and most; the frames and their steps.
+const CLOSE_ZOOM := 2.4
+const CLOSE_MIN := 3.0
+const CLOSE_MAX := 6.0
+const CLOSE_FRAMES := 12
+const CLOSE_STEP_MS := 60
+const CLOSE_FIRE_FRAMES := 16
+const CLOSE_FIRE_STEP_MS := 320
+## The types whose shots kick a gun back (Rig.AIM's kick, the slides).
+const KICKERS: Array[String] = ["ranger", "siege_walker", "hover_tank", "titan"]
+const DEATH_CLOSE_FRAMES := 12
+const DEATH_CLOSE_STEP_MS := 70
+## The hovering types, which bank, and the least bank (radians) a turn onto its course must show.
+const BANKERS: Array[String] = ["jet_trooper", "skimmer", "hover_tank", "gunship", "bomber"]
+const BANK_SEEN := 0.1
+## The types with a weapon on each side whose rig takes turns (the brawler's punches, the walkers'
+## recoils), by the parity in their drawn state.
+const TWINS: Array[String] = ["brawler", "siege_walker", "titan"]
+## The types that close in to attack, whose close fire strip would stand in the silo's shadow on
+## the screen's right: deployed on its lit side instead.
+const LIT_SIDE: Array[String] = ["brawler"]
 ## The longest wait for any one moment, in ticks (a minute of battle).
 const WAIT_TICKS := 1200
 
@@ -75,10 +114,31 @@ func _move_and_fire(main: MainScript, unit: String) -> void:
 		return
 	var view: BattleView = main.battle
 	var reach := int(_catalog.unit_level_stats(unit, LEVEL).get("range_units", 0))
-	var cell := _start_cell(reach + WALK_UNITS, size)
+	var cell := _start_cell(reach + WALK_UNITS, size, LIT_SIDE.has(unit))
 	check(view.deploy(unit, cell) == "", "%s deployed on %s" % [unit, cell])
+	var close := clampf(CLOSE_ZOOM * UnitModels.meshes(unit, Parts.Tier.BASE).body.get_aabb().size.y, CLOSE_MIN, CLOSE_MAX)
+	if BANKERS.has(unit):
+		await _until(view, func() -> bool: return view.units.drawn() > 0)
+		var start := view.units.aim_point(1)
+		var aim := view.building_centre(1)
+		var course := Vector3(aim.x - start.x, 0.0, aim.z - start.z).normalized()
+		frame_world(main, close, start + course * _catalog.unit_speed(unit) / 1000.0 * CLOSE_FRAMES * CLOSE_STEP_MS / 2000.0)
+		var banked := [0.0]
+		var watch := func() -> void: banked[0] = maxf(banked[0], absf(view.units.drawn_state(1).r - Rig.BANK_BASE))
+		main.get_tree().process_frame.connect(watch)
+		var until := view.clock() + CLOSE_FRAMES * CLOSE_STEP_MS / 1000.0
+		await strip("%s-close-bank" % unit, CLOSE_FRAMES, CLOSE_STEP_MS, true)
+		await _until(view, func() -> bool: return view.clock() >= until)
+		main.get_tree().process_frame.disconnect(watch)
+		check(banked[0] >= BANK_SEEN, "%s banked into its turn (%.2f radians at most)" % [unit, banked[0]])
 	await _until(view, func() -> bool: return view.sim.tick >= SETTLE_TICKS)
 	var crop := INFANTRY.has(unit)
+	var close_from := view.units.aim_point(1)
+	var close_goal := view.building_centre(1)
+	var close_heading := Vector3(close_goal.x - close_from.x, 0.0, close_goal.z - close_from.z).normalized()
+	var close_travel := _catalog.unit_speed(unit) / 1000.0 * CLOSE_FRAMES * CLOSE_STEP_MS / 1000.0
+	frame_world(main, close, close_from + close_heading * close_travel * 0.5)
+	await strip("%s-close-move" % unit, CLOSE_FRAMES, CLOSE_STEP_MS, true)
 	var zoom: float = INFANTRY_VIEW * 2.0 if crop else MOVE_ZOOM.get(unit, UNIT_ZOOM)
 	var at := view.units.aim_point(1)
 	var goal := view.building_centre(1)
@@ -107,10 +167,52 @@ func _move_and_fire(main: MainScript, unit: String) -> void:
 	at = view.units.aim_point(1)
 	goal = view.building_centre(1) + Vector3(0.0, 0.6, 0.0)
 	frame_span(main, at, goal, FIRE_MARGIN, FIRE_MIN, crop)
-	await strip("%s-fire" % unit, FIRE_FRAMES, FIRE_STEP_MS, crop)
+	if self_destructs:
+		await strip("%s-fire" % unit, DEATH_CLOSE_FRAMES, DEATH_CLOSE_STEP_MS, crop)
+	else:
+		await strip("%s-fire" % unit, FIRE_FRAMES, FIRE_STEP_MS, crop)
 	await _until(view, func() -> bool: return view.sim.building_hp(1) < hull)
 	check(view.sim.building_hp(1) < hull, "%s hit the %s (hull %d of %d)" % [unit, TARGET, view.sim.building_hp(1), hull])
+	if not self_destructs:
+		await _close_fire_and_death(main, unit, close)
 	await _leave(main)
+
+
+## The close fire strip of `unit` attacking in place, over two shots, then its staged death, both
+## framed at `close` on the unit.
+func _close_fire_and_death(main: MainScript, unit: String, close: float) -> void:
+	var view: BattleView = main.battle
+	var fire_ms := int(_catalog.unit_level_stats(unit, LEVEL).get("fire_ms", 1000))
+	var step := clampi(fire_ms * 2 / CLOSE_FIRE_FRAMES, CLOSE_STEP_MS, CLOSE_FIRE_STEP_MS)
+	await _until(view, func() -> bool: return view.sim.army.cooldown[0] > FIRE_LEAD_MS)
+	await _until(view, func() -> bool: return view.sim.army.cooldown[0] <= FIRE_LEAD_MS)
+	frame_world(main, close, view.units.aim_point(1))
+	var sides := [false, false]
+	var watch := func() -> void:
+		var state := view.units.drawn_state(1)
+		if state.g < 0.0:
+			sides[1 if state.r >= 2.0 else 0] = true
+	main.get_tree().process_frame.connect(watch)
+	if KICKERS.has(unit):
+		await strip("%s-close-fire" % unit, DEATH_CLOSE_FRAMES, DEATH_CLOSE_STEP_MS, true)
+	else:
+		await strip("%s-close-fire" % unit, CLOSE_FIRE_FRAMES, step, true)
+	if TWINS.has(unit):
+		await _until(view, func() -> bool: return sides[0] and sides[1])
+	main.get_tree().process_frame.disconnect(watch)
+	if TWINS.has(unit):
+		check(sides[0] and sides[1], "%s's shots alternate sides (left %s, right %s)" % [unit, sides[0], sides[1]])
+	var at := view.units.aim_point(1)
+	var low := UnitModels.meshes(unit, Parts.Tier.BASE).body.get_aabb().position.y
+	frame_world(main, close + low, at - Vector3(0.0, low * 0.5, 0.0))
+	view.units.die(1, view.clock())
+	var shown := view.units.drawn()
+	await strip("%s-close-death" % unit, DEATH_CLOSE_FRAMES, DEATH_CLOSE_STEP_MS, true)
+	var until := view.clock() + view.units.death_seconds(1)
+	await _until(view, func() -> bool: return view.clock() >= until)
+	await frames(2)
+	check(view.units.drawn() == shown - 1, "%s's staged death played out in %.2f s (%d drawn, %d before)"
+		% [unit, view.units.death_seconds(1), view.units.drawn(), shown])
 
 
 ## One `unit` walking on a Laser Turret, shot down: its death strip.
@@ -169,10 +271,13 @@ func _leave(main: MainScript) -> void:
 	check(main.battle == null, "the battle was left")
 
 
-## The deploy cell up and to the screen's right of the footprint at TARGET_CELL of `size`, at
-## least `distance` field units from its nearest corner, and outside the deploy zone.
-func _start_cell(distance: int, size: int) -> Vector2i:
+## The deploy cell up and to the screen's right of the footprint at TARGET_CELL of `size`, or with
+## `lit` down and to its left, on the side the sun lights, at least `distance` field units from its
+## nearest corner, and outside the deploy zone.
+func _start_cell(distance: int, size: int, lit: bool = false) -> Vector2i:
 	var steps := maxi(1, ceili((distance / sqrt(2.0) - 500.0) / 1000.0))
+	if lit:
+		return Vector2i(TARGET_CELL.x - 1 - steps, TARGET_CELL.y + size + steps)
 	return Vector2i(TARGET_CELL.x + size + steps, TARGET_CELL.y - 1 - steps)
 
 
