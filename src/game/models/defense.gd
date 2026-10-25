@@ -273,6 +273,9 @@ const RAIL_LIFTS := [0.55, 0.7, 0.9, 1.1]
 const RAIL_CAN := 0.5
 const RAIL_ROW := 0.98
 const RAIL_RING_LIFT := 1.05
+## The ion beam's lens housing's radius, and from L3 its cowl's.
+const ION_HOUSING := 0.39
+const ION_COWL := 0.47
 ## The ion beam from L3, by level from L3: the plinth's height and how much higher the emitter
 ## stands; the L3 power cell's distance out on the near corner; the L5 focus ring's distance up
 ## the beam from the lens.
@@ -1494,7 +1497,8 @@ static func build_railgun(p: Parts, level: int) -> void:
 	_crown(m, _at(root, Vector3(0, 0.26, length - 0.1), aim), 0.2, 5, 0.18)
 
 
-## From L3 the emitter stands higher each level on a taller tripod. L3 (Chrome): chrome plinth,
+## A big crystal lens in a fat housing banded in red (gold at the Gold tier) on a tripod of
+## glowing conduits. From L3 the emitter stands higher each level on a taller tripod. L3 (Chrome): chrome plinth,
 ## feet, housing and focusing rings, a chrome cowl behind the housing banded in cyan, the lens
 ## glowing cyan, the conduits brighter, and a ribbed chrome power cell on the near corner. L4
 ## (Obsidian): a taller plinth with glowing violet vein panels on its faces the camera sees, the
@@ -1516,13 +1520,16 @@ static func build_ion_beam(p: Parts, level: int) -> void:
 		var foot := Parts.around(0.6, degrees, top)
 		m.box_chamfered(Vector3(0.18, 0.08, 0.18), 0.03, foot, _by_tier(p.tier, Parts.GUNMETAL, Parts.CHROME, Parts.OBSIDIAN),
 			Vector3(0, -degrees, 0))
-		Parts.pipe_run(m, PackedVector3Array([foot, Parts.around(0.18, degrees, head.y - 0.12)]), 0.05, conduit)
+		Parts.pipe_run(m, PackedVector3Array([foot, Parts.around(0.18, degrees, head.y - 0.12)]), 0.08, conduit)
 		if level >= 4:
 			m.prism(0.06, 0.06, 0.04, 4, foot + Vector3(0, 0.08, 0), INLAY.phased(k / 3.0), Vector3(0, 45.0 - degrees, 0))
 	var aim := Vector3(40, 100, 0)
 	var housing := head - LowPolyMesh.turn(Vector3(0, 0.2, 0), aim)
-	Parts.drum(m, 0.3, 0.34, 0.05, 20, housing, _by_tier(p.tier, SHELL, Parts.CHROME_ROUND, Parts.OBSIDIAN_ROUND), aim)
-	m.tube(0.26, 0.34, 0.06, 20, _at(housing, Vector3(0, 0.08, 0), aim), ARMOUR_ROUND, aim)
+	# The housing behind the lens: gold at the Gold tier, a part of gold rather than a line.
+	var shell := Parts.GOLD_ROUND if p.tier == Parts.Tier.GOLD else _by_tier(p.tier, SHELL, Parts.CHROME_ROUND,
+		Parts.OBSIDIAN_ROUND)
+	Parts.drum(m, ION_HOUSING, 0.34, 0.05, 20, housing, shell, aim)
+	m.tube(ION_HOUSING - 0.05, ION_HOUSING + 0.05, 0.08, 20, _at(housing, Vector3(0, 0.08, 0), aim), ARMOUR_ROUND, aim)
 	var lens := _at(housing, Vector3(0, 0.3, 0), aim)
 	var lens_surf := LENS_PULSE
 	if p.tier >= Parts.Tier.CROWN:
@@ -1561,13 +1568,13 @@ static func build_ion_beam(p: Parts, level: int) -> void:
 		return
 	# A cowl behind the housing banded in the tier's glow, and a power cell on the near corner.
 	var glow := Parts.CORE_GLOW if p.tier >= Parts.Tier.OBSIDIAN else Parts.CYAN_STRIP
-	Parts.drum(m, 0.36, 0.14, 0.04, 20, _at(housing, Vector3(0, -0.12, 0), aim),
+	Parts.drum(m, ION_COWL, 0.14, 0.04, 20, _at(housing, Vector3(0, -0.12, 0), aim),
 		Parts.FILIGREE if p.tier >= Parts.Tier.CROWN else _by_tier(p.tier, SHELL, Parts.CHROME_ROUND, Parts.OBSIDIAN_ROUND), aim)
 	# At the Crown the band is the antimatter core, broad and glowing light violet where it shows.
 	if p.tier >= Parts.Tier.CROWN:
-		m.ring(0.355, 0.395, 0.18, 20, _at(housing, Vector3(0, -0.14, 0), aim), BRIGHT_CORE, aim)
+		m.ring(ION_COWL - 0.005, ION_COWL + 0.035, 0.18, 20, _at(housing, Vector3(0, -0.14, 0), aim), BRIGHT_CORE, aim)
 	else:
-		m.ring(0.355, 0.375, 0.06, 20, _at(housing, Vector3(0, -0.08, 0), aim), glow, aim)
+		m.ring(ION_COWL - 0.005, ION_COWL + 0.015, 0.06, 20, _at(housing, Vector3(0, -0.08, 0), aim), glow, aim)
 	var cell := Parts.around(ION_CELL, 45.0, Parts.PAD_HEIGHT)
 	Parts.drum(m, 0.13, 0.42, 0.03, 16, cell, _by_tier(p.tier, RIBBED, CHROME_RIBBED, OBSIDIAN_RIBBED))
 	m.ring(0.125, 0.145, 0.06, 16, cell + Vector3(0, 0.26, 0), glow)
