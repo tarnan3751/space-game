@@ -1,26 +1,47 @@
 class_name BattleEffects
 extends Node3D
 ## The battle's effects (docs/reference/battle-view.md), each kind batched into one MultiMesh so a
-## battle's worth of them costs a fixed handful of draws: the bolts in flight (defences' red,
-## units' cyan, shells on an arc), the muzzle flashes (a comic star facing the camera at a
-## muzzle socket, shrinking away in FLASH_SECONDS), the impacts (expanding hologram discs that fade), the arc
-## tower's lightning (the LIGHTNING surface on a kinked strip), the scorch marks mines leave, the
-## strips fallen walls leave, the health bars, and the abilities' (a repair swarm's dome, an
-## orbital strike's crosshair until it lands and its smoke after; each a Timed list). A shield generator's pool draws as a faint
-## hologram dome of its own while it is up, flickering when it absorbs.
+## battle's worth of them costs a fixed handful of draws. A weapon's shot (fire(), by its Weapons
+## record) flies as its own projectile: a glowing bolt of its size (lasers, rifle bolts, tracers,
+## plasma, the orbital cannon's ball, shells; straight or on an arc, leaving smoke or glowing wisps
+## behind), a missile on a lofted arc with its flame, a bomb falling from its bay, an EMP pulse ring
+## travelling to its target, or a stretched glow between the ends (a railgun's instant streak, a
+## held beam, the gravity well's vortex), or the arc tower's lightning with its branches. It
+## leaves its muzzle with a flash (a comic star facing the camera, or a swelling ring) and lands
+## by its record's impact (land()): sparks, a ring, a blast (a fireball, rings, smoke, a scorch,
+## debris), a burst in the air, a plasma splash, a burn or EMP arcs, with a glow decal under it
+## for its light (an additive disc on the ground: no light node). Under them: the impacts
+## (expanding hologram discs that fade), the smoke puffs (trails, dust, smoke columns), the
+## sparks, the debris (chunks thrown on arcs that settle and shrink away), the stun crackle on a
+## stunned unit, the scorch marks, the strips fallen walls leave, the health bars, and the
+## abilities' (a repair swarm's dome, an orbital strike's crosshair until it lands and its smoke
+## after; each a Timed list). A shield generator's pool draws as a faint hologram dome of its own
+## while it is up, flickering when it absorbs.
 ##
-## BattleView feeds it from the sim's events and its own clock (seconds of battle shown, which a
-## faster speed runs faster); nothing here reads the sim. Each list is a fixed-size set of packed
-## arrays with a live count, an ended entry swapped with the last, so a frame allocates nothing.
-## A bolt that arrives calls `arrived` with the building and the unit it was aimed at (0 for
-## none), for BattleView's hit flashes.
+## BattleView and BattleUnits feed it from the sim's events and the view's clock (seconds of
+## battle shown, which a faster speed runs faster); nothing here reads the sim. Each list is a
+## fixed-size set of packed arrays with a live count, an ended entry swapped with the last, so a
+## frame allocates nothing, and an entry may start later than it is added (a burst's later bolts,
+## a death's blast), drawn at no size until then. A projectile that arrives calls `arrived` with
+## the building and the unit it was aimed at (0 for none), for BattleView's hit flashes; an
+## instant one (a streak, a beam, lightning) calls it at once.
 
 ## Floats per instance in a buffer: a 3D transform (three rows of four), a colour and custom data.
 const FLOATS := 20
 ## How many of each can be on screen at once; more are dropped (the oldest stays).
 const MAX_BOLTS := 384
+const MAX_MISSILES := 64
+const MAX_BOMBS := 32
+const MAX_PULSES := 32
+const MAX_BEAMS := 64
+const MAX_RINGS := 64
+const MAX_SPARKS := 96
+const MAX_DEBRIS := 192
+const MAX_PUFFS := 384
+const MAX_GLOWS := 128
+const MAX_STUNS := 64
 const MAX_IMPACTS := 256
-const MAX_ARCS := 48
+const MAX_ARCS := 96
 const MAX_SCORCH := 64
 const MAX_BARS := 768
 ## The abilities' effects at once: swarm domes, strike markers, strike smoke.
@@ -39,19 +60,45 @@ const HOVER_OVER := 0.9
 const HOVER_SIZE := 0.8
 ## The fireball's radius as a share of the strike's.
 const FIREBALL_SHARE := 0.75
-## A bolt's speed in world units a second, its shortest flight, its look (length and thickness)
-## and a shell's arc: its peak over the straight line, as a share of the distance.
+## A plain bolt's (bolt()) speed in world units a second, any bolt's shortest flight, a plain
+## bolt's look (length and thickness), and a plain shell's arc (its peak over the straight line,
+## as a share of the distance) and size.
 const BOLT_SPEED := 22.0
 const BOLT_MIN_SECONDS := 0.06
 const BOLT_LENGTH := 0.55
 const BOLT_WIDTH := 0.13
 const SHELL_ARC := 0.35
 const SHELL_SIZE := 2.2
+## A missile's shortest flight and least loft (world units); a bomb's fall (world units a second
+## squared) and its shortest and longest drop.
+const MISSILE_MIN_SECONDS := 0.25
+const MISSILE_MIN_LOFT := 0.6
+const BOMB_GRAVITY := 14.0
+const BOMB_MIN_SECONDS := 0.3
+const BOMB_MAX_SECONDS := 0.8
+## How often a projectile with a trail leaves a puff (seconds of battle).
+const TRAIL_STEP := 0.04
+## A streak's life, a ring flash's, a burst of sparks', a glow decal's, a blast's fireball's (per
+## size, small to big), a debris chunk's, and how fast debris falls.
+const STREAK_SECONDS := 0.12
+const RING_SECONDS := 0.22
+const SPARK_SECONDS := 0.16
+const GLOW_SECONDS := 0.28
+const BLAST_SECONDS: Array[float] = [0.3, 0.36, 0.48]
+const DEBRIS_SECONDS := 2.2
+const DEBRIS_GRAVITY := 12.0
+## How far short of the point it was aimed at a shot's impact lands at least (world units).
+const SURFACE := 0.35
+## How long a scorch mark lasts.
+const SCORCH_SECONDS := 20.0
 ## An impact's life and how far it grows from its start.
 const IMPACT_SECONDS := 0.32
 const IMPACT_START := 0.25
-## A lightning arc's life.
+## A lightning arc's life, and its main strike's thickness against a branch's.
 const ARC_SECONDS := 0.28
+const ARC_MAIN := 1.3
+## The arcs' tint over their pale surface: the arc tower's blue, lightened.
+const ARC_TINT := Color(0.62, 0.78, 1.0)
 ## A health bar's size in world units (the fill inside the ink back) and its ink border.
 const BAR_SIZE := Vector2(0.7, 0.09)
 const BAR_BORDER := 0.03
@@ -63,8 +110,8 @@ const SHIELD_FLICKER_RATE := 20.0
 
 ## Called with (building id, unit id) when a bolt aimed at either arrives.
 var arrived: Callable
-## Harness hooks, read by no game code: bolts started so far, and where the last one started and its
-## colour (the rig scenario's checks).
+## Harness hooks, read by no game code: projectiles started so far, and where the last one started
+## and its colour (the rig scenario's checks).
 var bolts_fired: int = 0
 var last_bolt_from := Vector3.ZERO
 var last_bolt_color := Color.WHITE
@@ -77,13 +124,19 @@ class Timed:
 	## How an entry is placed: on the ground scaled by its radius (GROUND), the same turned to
 	## face the camera (FACING: a flat mesh stood up in the view's plane), a column falling from
 	## SKY onto its point over its life (FALLING: the mesh one unit tall, its radius the
-	## column's width), or rising and swelling from its point (RISING).
+	## column's width), or rising its `lift` and swelling from its point (RISING).
 	## POP: swells to its radius and back to nothing over its life (an opaque flash, which
 	## cannot fade). FLASH: faces the camera as FACING does, at its radius at once, shrinking to
-	## nothing over its life (a muzzle flash, which shows on the frame it is fired).
-	enum Mode { GROUND, FACING, FALLING, RISING, POP, FLASH }
+	## nothing over its life (a muzzle flash, which shows on the frame it is fired). SWELL: faces
+	## the camera, growing to its radius (a ring flash). BURST: faces the camera, flying out past
+	## its radius and gone by the end (sparks). GLOW: on the ground at its radius, its colour
+	## fading to nothing (an additive glow decal, which fades by its colour). CLOUD: faces the camera,
+	## rising its `lift` and swelling as RISING does, its colour's alpha fading by its share of its
+	## life raised to `fade_power` (a smoke puff, on a material that fades by its colour). MARK: on
+	## the ground at its radius, shrinking away over the last MARK_SHRINK of its life (a scorch).
+	enum Mode { GROUND, FACING, FALLING, RISING, POP, FLASH, SWELL, BURST, GLOW, CLOUD, MARK }
 	var mode: Mode = Mode.GROUND
-	## The camera's plane, for FACING: its right, its up, towards it.
+	## The camera's plane, for the modes facing it: its right, its up, towards it.
 	var facing := Basis()
 	var multimesh: MultiMesh
 	var buffer: Instances
@@ -93,6 +146,9 @@ class Timed:
 	var start := PackedFloat32Array()
 	var seconds := PackedFloat32Array()
 	var color := PackedColorArray()
+	var lift := PackedFloat32Array()
+	## Whether the buffer was last handed over with nothing in it.
+	var _empty := false
 
 	func _init(mesh: MultiMesh, capacity: int, how: Mode = Mode.GROUND) -> void:
 		mode = how
@@ -103,15 +159,17 @@ class Timed:
 		start.resize(capacity)
 		seconds.resize(capacity)
 		color.resize(capacity)
+		lift.resize(capacity)
 
-	func add(point: Vector3, size: float, now: float, length: float, tint: Color) -> void:
-		if count == at.size():
+	func add(point: Vector3, size: float, now: float, length: float, tint: Color, rise: float = RISE) -> void:
+		if count == at.size() or size <= 0.0:
 			return
 		at[count] = point
 		radius[count] = size
 		start[count] = now
-		seconds[count] = length
+		seconds[count] = maxf(length, 0.001)
 		color[count] = tint
+		lift[count] = rise
 		count += 1
 
 	## Ends now every entry at `point`'s ground spot (x and z), so it is dropped on the next draw.
@@ -127,12 +185,15 @@ class Timed:
 		start[i] = start[count]
 		seconds[i] = seconds[count]
 		color[i] = color[count]
+		lift[i] = lift[count]
 
 	## Drops the entries ended by `now` and writes the rest by `mode` (scaled by their radius, its
 	## height `height` times it on the ground, faded by their share of their life raised to
 	## `fade_power`, 0 for none); an entry whose start is still to come is written at no size. Hands
-	## the buffer to the MultiMesh.
+	## the buffer to the MultiMesh, unless it was empty and still is.
 	func draw(now: float, height: float, fade_power: float) -> void:
+		if count == 0 and _empty:
+			return
 		var i := 0
 		while i < count:
 			var t := (now - start[i]) / seconds[i]
@@ -141,36 +202,59 @@ class Timed:
 				continue
 			var fade := pow(clampf(t, 0.0, 1.0), fade_power) if fade_power > 0.0 else 0.0
 			var r := radius[i] if t >= 0.0 else 0.0
+			var k := clampf(t, 0.0, 1.0)
 			var basis := Basis.from_scale(Vector3(r, r * height, r))
 			var origin := at[i]
+			var tint := color[i]
 			match mode:
 				Mode.FACING:
 					# The mesh's up to the view's towards, its z to the view's down: a turn, not a mirror,
 					# so the faces keep their winding.
 					basis = Basis(facing.x * r, facing.z * r, -facing.y * r)
 				Mode.FLASH:
-					var left := r * (1.0 - clampf(t, 0.0, 1.0))
+					var left := r * (1.0 - k)
 					basis = Basis(facing.x * left, facing.z * left, -facing.y * left)
+				Mode.SWELL:
+					var grown := r * (0.35 + 0.65 * sqrt(k))
+					basis = Basis(facing.x * grown, facing.z * grown, -facing.y * grown)
+				Mode.BURST:
+					var out := r * (0.6 + 0.6 * k) * (1.0 - k * k * k)
+					basis = Basis(facing.x * out, facing.z * out, -facing.y * out)
 				Mode.FALLING:
-					var fallen := clampf(t, 0.0, 1.0)
-					var length := SKY * fallen
+					var length := SKY * k
 					basis = Basis.from_scale(Vector3(r, maxf(length, 0.001), r))
 					origin = at[i] + Vector3.UP * (SKY - length)
 				Mode.POP:
-					var pop := r * sin(PI * clampf(t, 0.0, 1.0))
+					var pop := r * sin(PI * pow(k, POP_EASE))
 					basis = Basis.from_scale(Vector3(pop, pop * height, pop))
 				Mode.RISING:
-					var k := clampf(t, 0.0, 1.0)
 					var grow := r * (0.6 + 0.8 * k)
 					basis = Basis.from_scale(Vector3(grow, grow, grow))
-					origin = at[i] + Vector3.UP * (RISE * k)
-			buffer.put(i, basis, origin, color[i], Color(0, 0, 0, fade))
+					origin = at[i] + Vector3.UP * (lift[i] * k)
+				Mode.GLOW:
+					tint = tint * (1.0 - k)
+				Mode.CLOUD:
+					var swell := r * (0.6 + 0.8 * k)
+					basis = Basis(facing.x * swell, facing.z * swell, -facing.y * swell)
+					origin = at[i] + Vector3.UP * (lift[i] * k)
+					tint.a *= 1.0 - fade
+				Mode.MARK:
+					var left := r * clampf((1.0 - k) / MARK_SHRINK, 0.0, 1.0)
+					basis = Basis.from_scale(Vector3(left, 1.0, left))
+			buffer.put(i, basis, origin, tint, Color(0, 0, 0, fade))
 			i += 1
 		multimesh.buffer = buffer.data
 		multimesh.visible_instance_count = count
+		_empty = count == 0
 
 
-## Where a falling column starts, and how far a rising entry climbs over its life (world units).
+## A POP entry's swell: its life's share raised to this, so it is near its full size a third of the
+## way in and shrinks slowly after.
+const POP_EASE := 0.55
+## The share of a MARK's life over which it shrinks away.
+const MARK_SHRINK := 0.25
+## Where a falling column starts, and how far a rising entry climbs over its life by default
+## (world units).
 const SKY := 8.0
 const RISE := 1.6
 
@@ -207,7 +291,265 @@ class Instances:
 		data[k + 18] = custom.b
 		data[k + 19] = custom.a
 
+
+## Projectiles in flight from one MultiMesh, each from a start to an end over its seconds: on an
+## arc `arc` high over the straight line (0 for straight), or falling (a bomb: carried along at
+## its speed, dropping under gravity); its mesh along +Z, `width` across and `length` along (a
+## pulse grows across as it flies). Each keeps what it was aimed at, its impact's size (0 for
+## none) and its record (null for a plain bolt, which lands as a plain impact), and when its trail
+## leaves its next puff.
+class Flights:
+	var multimesh: MultiMesh
+	var buffer: Instances
+	var count := 0
+	var grows := false
+	var from := PackedVector3Array()
+	var to := PackedVector3Array()
+	var start := PackedFloat32Array()
+	var seconds := PackedFloat32Array()
+	var arc := PackedFloat32Array()
+	var width := PackedFloat32Array()
+	var length := PackedFloat32Array()
+	var impact := PackedFloat32Array()
+	var trail_at := PackedFloat32Array()
+	var falls := PackedByteArray()
+	var color := PackedColorArray()
+	var building := PackedInt32Array()
+	var unit := PackedInt32Array()
+	var weapon: Array[Weapons.Weapon] = []
+	var _empty := false
+
+	func _init(mesh: MultiMesh, capacity: int, grow: bool = false) -> void:
+		multimesh = mesh
+		grows = grow
+		buffer = Instances.new(capacity)
+		from.resize(capacity)
+		to.resize(capacity)
+		start.resize(capacity)
+		seconds.resize(capacity)
+		arc.resize(capacity)
+		width.resize(capacity)
+		length.resize(capacity)
+		impact.resize(capacity)
+		trail_at.resize(capacity)
+		falls.resize(capacity)
+		color.resize(capacity)
+		building.resize(capacity)
+		unit.resize(capacity)
+		weapon.resize(capacity)
+
+	func add(a: Vector3, b: Vector3, now: float, flight: float, peak: float, across: float, along: float,
+			tint: Color, size: float, record: Weapons.Weapon, aimed_building: int, aimed_unit: int,
+			fall: bool = false) -> void:
+		if count == from.size():
+			return
+		var i := count
+		count += 1
+		from[i] = a
+		to[i] = b
+		start[i] = now
+		seconds[i] = maxf(flight, 0.001)
+		arc[i] = peak
+		width[i] = across
+		length[i] = along
+		color[i] = tint
+		impact[i] = size
+		weapon[i] = record
+		building[i] = aimed_building
+		unit[i] = aimed_unit
+		falls[i] = 1 if fall else 0
+		trail_at[i] = now
+
+	func remove(i: int) -> void:
+		count -= 1
+		var last := count
+		from[i] = from[last]
+		to[i] = to[last]
+		start[i] = start[last]
+		seconds[i] = seconds[last]
+		arc[i] = arc[last]
+		width[i] = width[last]
+		length[i] = length[last]
+		impact[i] = impact[last]
+		trail_at[i] = trail_at[last]
+		falls[i] = falls[last]
+		color[i] = color[last]
+		building[i] = building[last]
+		unit[i] = unit[last]
+		weapon[i] = weapon[last]
+		weapon[last] = null
+
+	## Where entry `i` is at `t` of its flight.
+	func point(i: int, t: float) -> Vector3:
+		if falls[i] == 1:
+			var along := from[i].lerp(to[i], t)
+			return Vector3(along.x, lerpf(from[i].y, to[i].y, t * t), along.z)
+		return from[i].lerp(to[i], t) + Vector3.UP * (arc[i] * 4.0 * t * (1.0 - t))
+
+	## The way entry `i` is heading at `t` of its flight.
+	func heading(i: int, t: float) -> Vector3:
+		var line := to[i] - from[i]
+		if falls[i] == 1:
+			return Vector3(line.x, line.y * 2.0 * t, line.z)
+		return line + Vector3.UP * (arc[i] * 4.0 * (1.0 - 2.0 * t))
+
+
+## Stretched glows from one MultiMesh, each from a start to an end (a unit-long mesh along +Z,
+## scaled to the distance), `width` across, thinning to nothing over its seconds by its share of
+## its life raised to `power` (1: a streak fading at once; higher: a beam held, then gone).
+class Beams:
+	var multimesh: MultiMesh
+	var buffer: Instances
+	var count := 0
+	var from := PackedVector3Array()
+	var to := PackedVector3Array()
+	var start := PackedFloat32Array()
+	var seconds := PackedFloat32Array()
+	var width := PackedFloat32Array()
+	var power := PackedFloat32Array()
+	var color := PackedColorArray()
+	var _empty := false
+
+	func _init(mesh: MultiMesh, capacity: int) -> void:
+		multimesh = mesh
+		buffer = Instances.new(capacity)
+		from.resize(capacity)
+		to.resize(capacity)
+		start.resize(capacity)
+		seconds.resize(capacity)
+		width.resize(capacity)
+		power.resize(capacity)
+		color.resize(capacity)
+
+	func add(a: Vector3, b: Vector3, now: float, length: float, across: float, thinning: float, tint: Color) -> void:
+		if count == from.size() or a.distance_squared_to(b) < 0.0001:
+			return
+		from[count] = a
+		to[count] = b
+		start[count] = now
+		seconds[count] = maxf(length, 0.001)
+		width[count] = across
+		power[count] = thinning
+		color[count] = tint
+		count += 1
+
+	func remove(i: int) -> void:
+		count -= 1
+		from[i] = from[count]
+		to[i] = to[count]
+		start[i] = start[count]
+		seconds[i] = seconds[count]
+		width[i] = width[count]
+		power[i] = power[count]
+		color[i] = color[count]
+
+	func draw(now: float) -> void:
+		if count == 0 and _empty:
+			return
+		var i := 0
+		while i < count:
+			var t := (now - start[i]) / seconds[i]
+			if t >= 1.0:
+				remove(i)
+				continue
+			var across := width[i] * (1.0 - pow(maxf(t, 0.0), power[i])) if t >= 0.0 else 0.0
+			var line := to[i] - from[i]
+			buffer.put(i, BattleEffects.along(line.normalized(), across, line.length()), from[i], color[i],
+				Color(0, 0, 0, 0))
+			i += 1
+		multimesh.buffer = buffer.data
+		multimesh.visible_instance_count = count
+		_empty = count == 0
+
+
+## Chunks thrown from a point, each with its velocity and spin: they fly under DEBRIS_GRAVITY, settle
+## where they hit the ground and shrink away over the last quarter of their life.
+class Debris:
+	var multimesh: MultiMesh
+	var buffer: Instances
+	var count := 0
+	var at := PackedVector3Array()
+	var velocity := PackedVector3Array()
+	var axis := PackedVector3Array()
+	var start := PackedFloat32Array()
+	var seconds := PackedFloat32Array()
+	var size := PackedFloat32Array()
+	var spin := PackedFloat32Array()
+	var color := PackedColorArray()
+	var _empty := false
+
+	func _init(mesh: MultiMesh, capacity: int) -> void:
+		multimesh = mesh
+		buffer = Instances.new(capacity)
+		at.resize(capacity)
+		velocity.resize(capacity)
+		axis.resize(capacity)
+		start.resize(capacity)
+		seconds.resize(capacity)
+		size.resize(capacity)
+		spin.resize(capacity)
+		color.resize(capacity)
+
+	func add(point: Vector3, speed: Vector3, turn: Vector3, rate: float, now: float, length: float, across: float,
+			tint: Color) -> void:
+		if count == at.size():
+			return
+		at[count] = point
+		velocity[count] = speed
+		axis[count] = turn
+		spin[count] = rate
+		start[count] = now
+		seconds[count] = length
+		size[count] = across
+		color[count] = tint
+		count += 1
+
+	func remove(i: int) -> void:
+		count -= 1
+		at[i] = at[count]
+		velocity[i] = velocity[count]
+		axis[i] = axis[count]
+		spin[i] = spin[count]
+		start[i] = start[count]
+		seconds[i] = seconds[count]
+		size[i] = size[count]
+		color[i] = color[count]
+
+	func draw(now: float) -> void:
+		if count == 0 and _empty:
+			return
+		var i := 0
+		while i < count:
+			var t := now - start[i]
+			if t >= seconds[i]:
+				remove(i)
+				continue
+			var s := size[i]
+			if t < 0.0:
+				buffer.put(i, Basis.from_scale(Vector3.ZERO), at[i], color[i], Color(0, 0, 0, 0))
+				i += 1
+				continue
+			# Flying until it reaches the ground (its half size over it), then resting there.
+			var rest := s * 0.35
+			var v := velocity[i]
+			var p := at[i]
+			var g := DEBRIS_GRAVITY * 0.5
+			var lands := (v.y + sqrt(maxf(0.0, v.y * v.y + 4.0 * g * (p.y - rest)))) / (2.0 * g)
+			var flown := minf(t, lands)
+			var where := p + v * flown + Vector3.DOWN * (g * flown * flown)
+			where.y = maxf(where.y, rest)
+			var shrink := clampf((seconds[i] - t) / (seconds[i] * 0.25), 0.0, 1.0)
+			var basis := Basis(axis[i], spin[i] * flown).scaled(Vector3.ONE * s * shrink)
+			buffer.put(i, basis, where, color[i], Color(0, 0, 0, 0))
+			i += 1
+		multimesh.buffer = buffer.data
+		multimesh.visible_instance_count = count
+		_empty = count == 0
+
+
 static var BOLT := Surf.make(MaterialKit.Layer.GLOW, Color.WHITE, 1.0, Surf.UNLIT, true, false)
+## A bolt's soft edge: a hologram sheath round its bright core.
+static var BOLT_SHEATH := Surf.make(MaterialKit.Layer.GLOW, Color.WHITE, 1.0, Surf.HOLO, true)
 static var IMPACT := Surf.make(MaterialKit.Layer.GLOW, Color.WHITE, 1.0, Surf.HOLO, true)
 static var ARC := Surf.make(MaterialKit.Layer.GLOW, Color("cfe9ff"), 1.0, Surf.UNLIT | Surf.JITTER | Surf.LIGHTNING)
 static var SCORCH := Surf.make(MaterialKit.Layer.ROCK, Color("2c2838"), 1.0, Surf.LIT, false, false)
@@ -221,22 +563,25 @@ static var STRIKE_SMOKE := Surf.make(MaterialKit.Layer.GLOW, Color("c9c2e0"), 1.
 static var FIREBALL := Surf.make(MaterialKit.Layer.GLOW, Color.WHITE, 1.0, Surf.UNLIT, true, false)
 ## The strike's bolt from the sky: a bright unlit column the instance colour tints.
 static var SKY_BOLT := Surf.make(MaterialKit.Layer.GLOW, Color.WHITE, 1.0, Surf.UNLIT, true, false)
+## A beam: an unlit glow whose texture flows along it.
+static var BEAM := Surf.make(MaterialKit.Layer.GLOW, Color.WHITE, 1.0, Surf.UNLIT | Surf.FLOW, true, false)
+## A debris chunk: lit plate the instance colour tints.
+static var CHUNK := Surf.make(MaterialKit.Layer.PLATE, Color.WHITE, 1.0, Surf.LIT, false, false)
+## The missile's: its hull, nose, fins and flame; the bomb's casing and fins.
+static var MISSILE_HULL := Surf.make(MaterialKit.Layer.PLATE, MaterialKit.HULL_LIGHT, 1.0, Surf.LIT, true, false)
+static var MISSILE_NOSE := Surf.make(MaterialKit.Layer.PLATE, MaterialKit.DEFENCE, 1.0, Surf.LIT, true, false)
+static var FINS := Surf.make(MaterialKit.Layer.HULL, MaterialKit.GUNMETAL, 1.0, Surf.LIT, false, false)
+static var FLAME := Surf.make(MaterialKit.Layer.GLOW, Weapons.FLAME_ORANGE, 1.0, Surf.UNLIT, true, false)
+static var FLAME_CORE := Surf.make(MaterialKit.Layer.GLOW, MaterialKit.HAZARD, 1.0, Surf.UNLIT, true, false)
+static var BOMB_CASING := Surf.make(MaterialKit.Layer.PLATE, MaterialKit.ARMY, 1.0, Surf.LIT, true, false)
+static var BOMB_BAND := Surf.make(MaterialKit.Layer.GLOW, MaterialKit.HAZARD, 1.0, Surf.UNLIT, true, false)
 
-var _bolts: MultiMesh
-var _bolt_buffer: Instances
-var _bolt_count := 0
-var _bolt_from := PackedVector3Array()
-var _bolt_to := PackedVector3Array()
-var _bolt_start := PackedFloat32Array()
-var _bolt_seconds := PackedFloat32Array()
-## The arc's peak height, 0 for a straight bolt; its size; what it was aimed at; its impact's
-## radius (0 for none) and colour.
-var _bolt_arc := PackedFloat32Array()
-var _bolt_size := PackedFloat32Array()
-var _bolt_building := PackedInt32Array()
-var _bolt_unit := PackedInt32Array()
-var _bolt_impact := PackedFloat32Array()
-var _bolt_color := PackedColorArray()
+var _bolts: Flights
+var _missiles: Flights
+var _bombs: Flights
+var _pulses: Flights
+var _beams: Beams
+var _debris: Debris
 
 var _impacts: MultiMesh
 var _impact_buffer: Instances
@@ -253,10 +598,10 @@ var _arc_count := 0
 var _arc_from := PackedVector3Array()
 var _arc_to := PackedVector3Array()
 var _arc_start := PackedFloat32Array()
+var _arc_width := PackedFloat32Array()
 
-var _scorch: MultiMesh
-var _scorch_buffer: Instances
-var _scorch_count := 0
+## The scorch marks, each from its start for SCORCH_SECONDS (a Timed list, MARK).
+var _scorches: Timed
 
 var _wall_rubble: MultiMesh
 var _wall_rubble_outline: MultiMesh
@@ -270,7 +615,9 @@ var _bar_count := 0
 var _across := Vector3.RIGHT
 var _up := Vector3.UP
 
-## The swarms' domes, the strikes' markers and their smoke: each a Timed list over its MultiMesh.
+## The swarms' domes, the strikes' markers and their smoke, the muzzle flashes, the ring flashes,
+## the sparks, the smoke puffs, the glow decals and the stun crackles: each a Timed list over its
+## MultiMesh.
 var _domes: Timed
 var _markers: Timed
 var _hover_markers: Timed
@@ -278,6 +625,13 @@ var _sky_bolts: Timed
 var _fireballs: Timed
 var _flashes: Timed
 var _smoke: Timed
+var _rings: Timed
+var _sparks: Timed
+var _puffs: Timed
+var _glows: Timed
+var _stuns: Timed
+## A counter the scattering of debris and puffs is drawn from, so it is the same every run.
+var _scatter := 0
 
 var _shields: Dictionary[int, MeshInstance3D] = {}
 var _shield_pool: Dictionary[int, int] = {}
@@ -287,20 +641,50 @@ var _shield_flicker: Dictionary[int, float] = {}
 ## Call once, before adding to the tree. `walls` is how many walls could fall, `area` the field's
 ## AABB (every instance stays in it).
 func setup(walls: int, area: AABB) -> void:
-	var bolt := LowPolyMesh.new()
-	bolt.orb(0.5, 8, 4, Vector3.ZERO, BOLT)
-	_bolts = _multimesh(bolt.to_mesh(), MAX_BOLTS, area, false)
-	_bolt_buffer = Instances.new(MAX_BOLTS)
-	_bolt_start.resize(MAX_BOLTS)
-	_bolt_seconds.resize(MAX_BOLTS)
-	_bolt_arc.resize(MAX_BOLTS)
-	_bolt_size.resize(MAX_BOLTS)
-	_bolt_impact.resize(MAX_BOLTS)
-	_bolt_from.resize(MAX_BOLTS)
-	_bolt_to.resize(MAX_BOLTS)
-	_bolt_building.resize(MAX_BOLTS)
-	_bolt_unit.resize(MAX_BOLTS)
-	_bolt_color.resize(MAX_BOLTS)
+	# A bolt: a bright core in a soft sheath, a unit across, stretched along its flight.
+	var bolt_mesh := LowPolyMesh.new()
+	bolt_mesh.orb(0.28, 8, 4, Vector3.ZERO, BOLT)
+	bolt_mesh.orb(0.5, 8, 4, Vector3.ZERO, BOLT_SHEATH)
+	_bolts = Flights.new(_multimesh(bolt_mesh.to_mesh(), MAX_BOLTS, area, false), MAX_BOLTS)
+
+	# A missile along +Z, its nose forward: a white hull, a red nose, four gunmetal fins at the
+	# tail and an orange flame behind with a hot core.
+	var missile := LowPolyMesh.new()
+	Parts.pipe(missile, Vector3(0, 0, -0.15), Vector3(0, 0, 0.1), 0.045, MISSILE_HULL, 8, false)
+	missile.cone(0.045, 0.09, 8, Vector3(0, 0, 0.1), MISSILE_NOSE, Parts.facing(Vector3.BACK))
+	for k: int in 4:
+		var out := Basis(Vector3.BACK, PI * 0.5 * k) * Vector3(0.06, 0, 0)
+		missile.box(Vector3(0.012, 0.07, 0.07), out + Vector3(0, 0, -0.12), FINS, Vector3(0, 0, 90.0 * k + 90.0))
+	missile.cone(0.04, 0.2, 8, Vector3(0, 0, -0.15), FLAME, Parts.facing(Vector3.FORWARD))
+	missile.cone(0.022, 0.12, 6, Vector3(0, 0, -0.15), FLAME_CORE, Parts.facing(Vector3.FORWARD))
+	_missiles = Flights.new(_multimesh(missile.to_mesh(), MAX_MISSILES, area, false), MAX_MISSILES)
+
+	# A bomb along +Z, its nose forward: an orange casing, a hazard band, gunmetal fins.
+	var bomb := LowPolyMesh.new()
+	Parts.pipe(bomb, Vector3(0, 0, -0.08), Vector3(0, 0, 0.06), 0.065, BOMB_CASING, 10, false)
+	bomb.dome(0.065, 0.07, 10, 3, Vector3(0, 0, 0.06), BOMB_CASING, Parts.facing(Vector3.BACK))
+	bomb.cone(0.065, 0.06, 10, Vector3(0, 0, -0.08), BOMB_CASING, Parts.facing(Vector3.FORWARD))
+	Parts.pipe(bomb, Vector3(0, 0, 0.0), Vector3(0, 0, 0.025), 0.068, BOMB_BAND, 10, false)
+	for k: int in 4:
+		var out := Basis(Vector3.BACK, PI * 0.5 * k) * Vector3(0.06, 0, 0)
+		bomb.box(Vector3(0.01, 0.06, 0.06), out + Vector3(0, 0, -0.13), FINS, Vector3(0, 0, 90.0 * k + 90.0))
+	_bombs = Flights.new(_multimesh(bomb.to_mesh(), MAX_BOMBS, area, false), MAX_BOMBS)
+
+	# An EMP pulse: a unit-wide ring standing across its flight (+Z), growing as it goes.
+	var pulse := LowPolyMesh.new()
+	pulse.ring(0.36, 0.5, 0.1, 20, Vector3(0, 0, -0.05), BOLT, Vector3(90, 0, 0))
+	_pulses = Flights.new(_multimesh(pulse.to_mesh(), MAX_PULSES, area, false), MAX_PULSES, true)
+
+	# A beam: a six-sided rod a unit across and a unit long along +Z.
+	var rod := LowPolyMesh.new()
+	Parts.pipe(rod, Vector3.ZERO, Vector3(0, 0, 1), 0.5, BEAM, 6, false)
+	_beams = Beams.new(_multimesh(rod.to_mesh(), MAX_BEAMS, area, false), MAX_BEAMS)
+
+	# A debris chunk: a chamfered block a unit across, with a wedge broken off it.
+	var chunk := LowPolyMesh.new()
+	chunk.box_chamfered(Vector3(1.0, 0.7, 0.85), 0.12, Vector3(0, -0.35, 0), CHUNK)
+	chunk.wedge(Vector3(0.6, 0.35, 0.5), Vector3(0.1, 0.35, 0), CHUNK)
+	_debris = Debris.new(_multimesh(chunk.to_mesh(), MAX_DEBRIS, area, false), MAX_DEBRIS)
 
 	var disc := LowPolyMesh.new()
 	disc.ring(0.32, 0.5, 0.05, 20, Vector3.ZERO, IMPACT)
@@ -325,11 +709,11 @@ func setup(walls: int, area: AABB) -> void:
 	_arc_from.resize(MAX_ARCS)
 	_arc_to.resize(MAX_ARCS)
 	_arc_start.resize(MAX_ARCS)
+	_arc_width.resize(MAX_ARCS)
 
 	var scorch := LowPolyMesh.new()
 	scorch.disc(0.5, 12, Vector3.ZERO, SCORCH)
-	_scorch = _multimesh(scorch.to_mesh(), MAX_SCORCH, area, false)
-	_scorch_buffer = Instances.new(MAX_SCORCH)
+	_scorches = Timed.new(_multimesh(scorch.to_mesh(), MAX_SCORCH, area, false), MAX_SCORCH, Timed.Mode.MARK)
 
 	var strip := BuildingModels.wall_rubble()
 	_wall_rubble = _multimesh(strip.body, maxi(walls, 1), area, true)
@@ -380,11 +764,11 @@ func setup(walls: int, area: AABB) -> void:
 	column.prism(0.5, 0.5, 1.0, 10, Vector3.ZERO, SKY_BOLT)
 	_sky_bolts = Timed.new(_multimesh(column.to_mesh(), MAX_ABILITY_EFFECTS, area, false), MAX_ABILITY_EFFECTS,
 		Timed.Mode.FALLING)
-	# A strike's fireball: a dome of unit radius, popping.
+	# A fireball (a strike's, a blast's): a dome of unit radius, popping.
 	var fireball := LowPolyMesh.new()
 	fireball.dome(1.0, 1.0, 16, 4, Vector3.ZERO, FIREBALL)
-	_fireballs = Timed.new(_multimesh(fireball.to_mesh(), MAX_ABILITY_EFFECTS, area, false), MAX_ABILITY_EFFECTS,
-		Timed.Mode.POP)
+	_fireballs = Timed.new(_multimesh(fireball.to_mesh(), MAX_ABILITY_EFFECTS * 2, area, false),
+		MAX_ABILITY_EFFECTS * 2, Timed.Mode.POP)
 	# A strike's smoke: puffs over the ground, a unit across, scaled to its radius, rising and
 	# swelling from the landing.
 	var smoke := LowPolyMesh.new()
@@ -401,48 +785,235 @@ func setup(walls: int, area: AABB) -> void:
 		star.triangle(Vector3.ZERO, b, a, BOLT)
 	_flashes = Timed.new(_multimesh(star.to_mesh(), MAX_FLASHES, area, false), MAX_FLASHES, Timed.Mode.FLASH)
 	_flashes.facing = view
+	# A ring flash: a flat ring of unit radius, its face up, swelling towards the camera.
+	var ring := LowPolyMesh.new()
+	for k: int in 24:
+		var a_in := Parts.around(0.78, 15.0 * k, 0.0)
+		var b_in := Parts.around(0.78, 15.0 * (k + 1), 0.0)
+		var a_out := Parts.around(1.0, 15.0 * k, 0.0)
+		var b_out := Parts.around(1.0, 15.0 * (k + 1), 0.0)
+		_both_faces(ring, a_in, b_out, a_out)
+		_both_faces(ring, a_in, b_in, b_out)
+	_rings = Timed.new(_multimesh(ring.to_mesh(), MAX_RINGS, area, false), MAX_RINGS, Timed.Mode.SWELL)
+	_rings.facing = view
+	# Sparks: ten thin rays of unit reach round a gap, flat, their face up (BURST turns them to the
+	# camera).
+	var rays := LowPolyMesh.new()
+	for k: int in 10:
+		var angle := 36.0 * k + (9.0 if k % 2 == 0 else -6.0)
+		var reach := 1.0 if k % 2 == 0 else 0.7
+		var tip := Parts.around(reach, angle, 0.0)
+		var left := Parts.around(0.3, angle - 6.0, 0.0)
+		var right := Parts.around(0.3, angle + 6.0, 0.0)
+		_both_faces(rays, left, tip, right)
+	_sparks = Timed.new(_multimesh(rays.to_mesh(), MAX_SPARKS, area, false), MAX_SPARKS, Timed.Mode.BURST)
+	_sparks.facing = view
+	# A smoke puff: a soft disc of unit radius facing the camera, rising, swelling and fading.
+	_puffs = Timed.new(_multimesh(_cloud_mesh(), MAX_PUFFS, area, false), MAX_PUFFS, Timed.Mode.CLOUD)
+	_puffs.facing = view
+	# A glow decal: a unit-radius disc on the ground, an additive radial glow.
+	_glows = Timed.new(_multimesh(_glow_mesh(), MAX_GLOWS, area, false), MAX_GLOWS, Timed.Mode.GLOW)
+	# A stun crackle: three jittering zigzag arcs round a unit ring, a unit tall.
+	var crackle := LowPolyMesh.new()
+	for k: int in 3:
+		var from := Parts.around(1.0, 120.0 * k, 0.0)
+		for s: int in 4:
+			var to := Parts.around(1.0 if s % 2 == 1 else 0.7, 120.0 * k + 25.0 * (s + 1), 0.25 * (s + 1))
+			Parts.pipe(crackle, from, to, 0.05, ARC, 3, false)
+			from = to
+	_stuns = Timed.new(_multimesh(crackle.to_mesh(), MAX_STUNS, area, false), MAX_STUNS)
 
 
 # --- Adding ----------------------------------------------------------------------
 
-## A bolt from `from` to `to`, `color`, starting at `now`: straight at BOLT_SPEED, or on an arc
-## landing `seconds` later when `seconds` is over 0 (a shell). On arrival it makes an impact of
-## `impact` radius (none at 0) and calls `arrived` with `building` and `unit`.
+## A plain bolt from `from` to `to`, `color`, starting at `now`: straight at BOLT_SPEED, or on an
+## arc landing `seconds` later when `seconds` is over 0 (a shell). On arrival it makes an impact
+## of `impact` radius (none at 0) and calls `arrived` with `building` and `unit`.
 func bolt(from: Vector3, to: Vector3, color: Color, now: float, seconds: float = 0.0, impact: float = 0.35,
 		building: int = 0, unit: int = 0) -> void:
-	if _bolt_count == MAX_BOLTS:
-		return
-	var i := _bolt_count
-	_bolt_count += 1
-	bolts_fired += 1
-	last_bolt_from = from
-	last_bolt_color = color
-	_bolt_from[i] = from
-	_bolt_to[i] = to
-	_bolt_start[i] = now
+	_count_shot(from, color)
 	var shell := seconds > 0.0
-	_bolt_seconds[i] = seconds if shell else maxf(BOLT_MIN_SECONDS, from.distance_to(to) / BOLT_SPEED)
-	_bolt_arc[i] = from.distance_to(to) * SHELL_ARC if shell else 0.0
-	_bolt_size[i] = SHELL_SIZE if shell else 1.0
-	_bolt_impact[i] = impact
-	_bolt_color[i] = color
-	_bolt_building[i] = building
-	_bolt_unit[i] = unit
+	var size := SHELL_SIZE if shell else 1.0
+	_bolts.add(from, to, now, seconds if shell else maxf(BOLT_MIN_SECONDS, from.distance_to(to) / BOLT_SPEED),
+		from.distance_to(to) * SHELL_ARC if shell else 0.0, BOLT_WIDTH * size, BOLT_LENGTH * size, color, impact,
+		null, building, unit)
 
 
-## `weapon` (a Weapons record) fired from `from` at `to`, from `now`: its projectile, making an
-## impact of `impact` radius on arrival and calling `arrived` with `building` and `unit`, with its
-## muzzle flash at `from` when `flash_on`.
+## `weapon` (a Weapons record) fired from `from` at `to`, from `now`: its projectile by its kind,
+## landing by its impact (land()) of `impact` radius at least (none at 0) and calling `arrived`
+## with `building` and `unit`, with its muzzle flash at `from` when `flash_on`. `seconds` is a
+## flight the sim timed (a shell's, landing then); 0 flies at the record's speed. A burst draws
+## its later shots `burst_gap` apart, each with its flash; only the first calls `arrived`.
 func fire(weapon: Weapons.Weapon, from: Vector3, to: Vector3, building: int, unit: int, impact: float, now: float,
-		flash_on: bool = true) -> void:
-	bolt(from, to, weapon.color, now, 0.0, impact, building, unit)
-	if flash_on and weapon.flash > 0.0:
-		flash(from, weapon.flash, weapon.color, now)
+		flash_on: bool = true, seconds: float = 0.0) -> void:
+	_count_shot(from, weapon.color)
+	var distance := from.distance_to(to)
+	match weapon.kind:
+		Weapons.Kind.BOLT, Weapons.Kind.LASER, Weapons.Kind.TRACER, Weapons.Kind.PLASMA, Weapons.Kind.BALL, Weapons.Kind.SHELL:
+			var flight := seconds if seconds > 0.0 else maxf(BOLT_MIN_SECONDS, distance / weapon.speed)
+			for k: int in weapon.burst:
+				var at := now + k * weapon.burst_gap
+				_bolts.add(from, to, at, flight, distance * weapon.arc, weapon.width, weapon.length, weapon.color,
+					impact, weapon, building if k == 0 else 0, unit if k == 0 else 0)
+				if flash_on:
+					_muzzle(weapon, from, at)
+			return
+		Weapons.Kind.MISSILE:
+			var flight := seconds if seconds > 0.0 else maxf(MISSILE_MIN_SECONDS, distance / weapon.speed)
+			_missiles.add(from, to, now, flight, maxf(MISSILE_MIN_LOFT, distance * weapon.arc), weapon.width,
+				weapon.width, Color.WHITE, impact, weapon, building, unit)
+			puff(from, 0.12, Weapons.SMOKE, now, 0.6, 0.25)
+		Weapons.Kind.BOMB:
+			var drop := maxf(from.y - to.y, 0.1)
+			var flight := clampf(sqrt(2.0 * drop / BOMB_GRAVITY), BOMB_MIN_SECONDS, BOMB_MAX_SECONDS)
+			_bombs.add(from, to, now, flight, 0.0, weapon.width, weapon.width, Color.WHITE, impact, weapon, building,
+				unit, true)
+		Weapons.Kind.PULSE:
+			_pulses.add(from, to, now, maxf(BOLT_MIN_SECONDS, distance / weapon.speed), 0.0, weapon.width,
+				weapon.width, weapon.color, impact, weapon, building, unit)
+		Weapons.Kind.STREAK, Weapons.Kind.BEAM, Weapons.Kind.VORTEX:
+			var streak := weapon.kind == Weapons.Kind.STREAK
+			var hold := STREAK_SECONDS if streak else (seconds if seconds > 0.0 else weapon.hold)
+			_beams.add(from, to, now, hold, weapon.width, 1.0 if streak else 6.0, weapon.color)
+			if weapon.kind == Weapons.Kind.VORTEX:
+				impact_at(to, 0.5, weapon.color, now, hold)
+			_arrive(weapon, from, to, impact, building, unit, now)
+		Weapons.Kind.LIGHTNING:
+			_strike(from, to, now)
+			_arrive(weapon, from, to, impact, building, unit, now)
+		_:
+			_arrive(weapon, from, to, impact, building, unit, now)
+	if flash_on:
+		_muzzle(weapon, from, now)
+
+
+## Where `weapon` lands at `at`, `size` across at least, from `now`: its record's impact and the
+## glow decal of its light on the ground under it.
+func land(weapon: Weapons.Weapon, at: Vector3, size: float, now: float) -> void:
+	var r := maxf(size, weapon.impact_size)
+	var c := weapon.color
+	var ground := Vector3(at.x, 0.0, at.z)
+	match weapon.impact:
+		Weapons.Impact.SPARKS:
+			sparks(at, r, c.lerp(Color.WHITE, 0.45), now)
+			impact(at, r * 0.8, c, now, IMPACT_SECONDS * 0.7)
+		Weapons.Impact.RING:
+			impact(at, r, c, now)
+		Weapons.Impact.BLAST_S:
+			blast(at, r, 0, now)
+		Weapons.Impact.BLAST_M:
+			blast(at, r, 1, now)
+		Weapons.Impact.BLAST_L:
+			blast(at, r, 2, now)
+		Weapons.Impact.AIR_BURST:
+			air_burst(at, r, c, now)
+		Weapons.Impact.SPLASH:
+			impact(ground, r, c, now, IMPACT_SECONDS * 1.4)
+			impact(ground + Vector3.UP * 0.1, r * 0.55, c.lerp(Color.WHITE, 0.4), now, IMPACT_SECONDS)
+			sparks(at + Vector3.UP * 0.2, r * 0.7, c.lerp(Color.WHITE, 0.3), now)
+			for k: int in 4:
+				puff(ground + Parts.around(r * 0.5, 90.0 * k + 45.0, 0.15), r * 0.22, c, now + 0.03 * k, 0.6, 0.4)
+		Weapons.Impact.BURN:
+			impact(at, r, c, now, IMPACT_SECONDS * 1.2)
+			sparks(at, r * 0.8, c.lerp(Color.WHITE, 0.5), now)
+		Weapons.Impact.EMP:
+			impact(at, r, c, now)
+			stun(at, r, c, now, 0.3)
+	if weapon.light > 0.0:
+		glow(ground, weapon.light, c.lerp(Weapons.BLAST_CORE, 0.3), now)
+
+
+## A blast at `at`, `radius` across, from `now`; `size` 0, 1 or 2 (small, medium, big): a star
+## flash and a white-hot fireball popping, cooling to a smaller orange one as it shrinks (opaque
+## domes, so the orange starts inside the white and shows as it goes), an orange ring on the ground
+## and sparks; from medium smoke; a big one a second ring, debris and a scorch (any one when
+## `scorched`: a mine's, a wreck's).
+func blast(at: Vector3, radius: float, size: int, now: float, scorched: bool = false) -> void:
+	var ground := Vector3(at.x, 0.0, at.z)
+	var seconds: float = BLAST_SECONDS[size]
+	var ball := blast_ball(radius, size)
+	flash(at, ball * 1.6, Weapons.BLAST_CORE, now)
+	_fireballs.add(at, ball, now, seconds, Weapons.BLAST_CORE)
+	_fireballs.add(at, ball * 0.85, now + seconds * 0.45, seconds * 0.8, Weapons.BLAST_RIM)
+	impact(ground, radius * 1.1, Weapons.BLAST_RIM, now, seconds * 1.3)
+	sparks(at, radius * 0.9, Weapons.BLAST_CORE, now)
+	if size >= 2 or scorched:
+		scorch(ground, radius * 0.45, now)
+	if size >= 1:
+		for k: int in 2 + size:
+			puff(ground + Parts.around(radius * 0.3, 120.0 * k + 30.0 * size, 0.2), radius * 0.3, Weapons.SMOKE,
+				now + 0.08 + 0.05 * k, 1.2 + 0.3 * size, 0.8)
+	if size >= 2:
+		impact(ground + Vector3.UP * 0.1, radius * 1.6, Weapons.BLAST_RIM.lerp(Weapons.BLAST_CORE, 0.4), now + 0.05,
+			seconds * 1.5)
+		debris(ground + Vector3.UP * 0.2, 4, radius, 0.12, now, MaterialKit.HULL_DARK, MaterialKit.GUNMETAL)
+
+
+## A blast of `radius` and `size`'s fireball's radius: how far its centre stands off what it hits.
+static func blast_ball(radius: float, size: int) -> float:
+	return radius * (0.45 + 0.06 * size)
+
+
+## A burst in the air at `at`, `radius` across, in `color`, from `now`: a flash, sparks and dark
+## puffs hanging where it went off.
+func air_burst(at: Vector3, radius: float, color: Color, now: float) -> void:
+	flash(at, radius, color.lerp(Color.WHITE, 0.4), now)
+	_flashes.add(at, radius * 0.7, now + FLASH_SECONDS, FLASH_SECONDS, color)
+	_fireballs.add(at, radius * 0.35, now, 0.22, color.lerp(Color.WHITE, 0.5))
+	sparks(at, radius, color, now)
+	for k: int in 4:
+		puff(at + Parts.around(radius * 0.3, 90.0 * k, 0.05 * k), radius * 0.5, Weapons.DARK_SMOKE,
+			now + 0.02 * k, 1.0, 0.15)
 
 
 ## A muzzle flash at `at`, `radius` across, in `color`, from `now`, for FLASH_SECONDS.
 func flash(at: Vector3, radius: float, color: Color, now: float) -> void:
 	_flashes.add(at, radius, now, FLASH_SECONDS, color)
+
+
+## A ring flash at `at` swelling to `radius`, in `color`, from `now`, for RING_SECONDS.
+func ring_flash(at: Vector3, radius: float, color: Color, now: float, seconds: float = RING_SECONDS) -> void:
+	_rings.add(at, radius, now, seconds, color)
+
+
+## A burst of sparks at `at` flying out to about `radius`, in `color`, from `now`.
+func sparks(at: Vector3, radius: float, color: Color, now: float) -> void:
+	_sparks.add(at, radius, now, SPARK_SECONDS, color)
+
+
+## A puff of smoke at `at`, `radius` across, in `color`, from `now` for `seconds`, rising `rise`
+## (world units) as it swells and fades.
+func puff(at: Vector3, radius: float, color: Color, now: float, seconds: float, rise: float) -> void:
+	_puffs.add(at, radius, now, seconds, color, rise)
+
+
+## A glow decal on the ground at `at`, `radius` across, in `color`, from `now`, fading over
+## `seconds`: the fake light under a flash or a blast.
+func glow(at: Vector3, radius: float, color: Color, now: float, seconds: float = GLOW_SECONDS) -> void:
+	_glows.add(Vector3(at.x, 0.03, at.z), radius, now, seconds, color)
+
+
+## The crackle of a stun round `at`, `radius` across, in `color`, from `now` for `seconds`.
+func stun(at: Vector3, radius: float, color: Color, now: float, seconds: float) -> void:
+	_stuns.add(Vector3(at.x, maxf(at.y - radius * 0.5, 0.0), at.z), radius, now, seconds, color)
+
+
+## A stretched glow from `from` to `to`, `width` across, in `color`, from `now` for `seconds`,
+## thinning by its share of its life raised to `power`.
+func beam(from: Vector3, to: Vector3, width: float, color: Color, now: float, seconds: float, power: float) -> void:
+	_beams.add(from, to, now, seconds, width, power, color)
+
+
+## `count` debris chunks thrown from `at`, about `spread` far, each about `size` across, from
+## `now`, in `color_a` and `color_b` by turns.
+func debris(at: Vector3, count: int, spread: float, size: float, now: float, color_a: Color, color_b: Color) -> void:
+	for k: int in count:
+		var angle := TAU * (k + _noise(1)) / count
+		var out := Vector3(cos(angle), 0.0, sin(angle)) * (spread * (1.2 + 1.4 * _noise(2)))
+		var speed := out + Vector3.UP * (3.0 + 2.5 * _noise(3))
+		var turn := Vector3(_noise(4) - 0.5, 1.0, _noise(5) - 0.5).normalized()
+		_debris.add(at, speed, turn, 6.0 + 8.0 * _noise(6), now, DEBRIS_SECONDS * (0.8 + 0.4 * _noise(7)),
+			size * (0.7 + 0.6 * _noise(8)), color_a if k % 2 == 0 else color_b)
 
 
 ## An impact at `at`, growing to `radius` and fading, in `color`, from `now`.
@@ -459,8 +1030,13 @@ func impact(at: Vector3, radius: float, color: Color, now: float, seconds: float
 	_impact_seconds[i] = seconds
 
 
-## A lightning arc from `from` to `to`, from `now`.
-func lightning(from: Vector3, to: Vector3, now: float) -> void:
+## The same as impact(), named for a ring held on a point (a vortex's hold on a unit).
+func impact_at(at: Vector3, radius: float, color: Color, now: float, seconds: float) -> void:
+	impact(at, radius, color, now, seconds)
+
+
+## A lightning arc from `from` to `to`, from `now`, `width` times a branch's thickness.
+func lightning(from: Vector3, to: Vector3, now: float, width: float = 1.0) -> void:
 	if _arc_count == MAX_ARCS:
 		return
 	var i := _arc_count
@@ -468,17 +1044,13 @@ func lightning(from: Vector3, to: Vector3, now: float) -> void:
 	_arc_from[i] = from
 	_arc_to[i] = to
 	_arc_start[i] = now
+	_arc_width[i] = width
 
 
-## A scorch mark on the ground at `at`, `radius` across, for the rest of the battle.
-func scorch(at: Vector3, radius: float) -> void:
-	if _scorch_count == MAX_SCORCH:
-		return
-	_scorch_buffer.put(_scorch_count, Basis.from_scale(Vector3(radius, 1.0, radius) * 2.0),
-		Vector3(at.x, 0.012, at.z), Color.WHITE, Color(0, 0, 0, 0))
-	_scorch_count += 1
-	_scorch.buffer = _scorch_buffer.data
-	_scorch.visible_instance_count = _scorch_count
+## A scorch mark on the ground at `at`, `radius` across, from `start` (seconds of battle; at once
+## by default) for SCORCH_SECONDS, shrinking away at the end, so the field clears.
+func scorch(at: Vector3, radius: float, start: float = 0.0) -> void:
+	_scorches.add(Vector3(at.x, 0.012, at.z), radius * 2.0, start, SCORCH_SECONDS, Color.WHITE)
 
 
 ## The strip a fallen wall leaves, on the cell centred at `at`, for the rest of the battle.
@@ -516,13 +1088,13 @@ func strike_marker(at: Vector3, radius: float, ground: float, top: float, now: f
 ## that height, so it shows over what it hits, inside a wider ring of `blast` on the ground; pale
 ## smoke rises and swells from it for SMOKE_SECONDS and fades.
 func strike_landed(at: Vector3, radius: float, top: float, now: float, seconds: float, core: Color,
-		blast: Color) -> void:
+		blast_color: Color) -> void:
 	_markers.end_at(at, now)
 	_hover_markers.end_at(at, now)
 	_sky_bolts.end_at(at, now)
 	_fireballs.add(Vector3(at.x, top * 0.5, at.z), radius * FIREBALL_SHARE, now, seconds, core)
-	impact(at, radius * 1.6, blast, now, seconds)
-	impact(at + Vector3.UP * 0.1, radius * 0.9, blast.lerp(core, 0.5), now, seconds * 0.7)
+	impact(at, radius * 1.6, blast_color, now, seconds)
+	impact(at + Vector3.UP * 0.1, radius * 0.9, blast_color.lerp(core, 0.5), now, seconds * 0.7)
 	_smoke.add(Vector3(at.x, 0.0, at.z), radius * 0.9, now + seconds * 0.3, SMOKE_SECONDS, Color.WHITE)
 
 
@@ -554,7 +1126,12 @@ func set_shield(id: int, pool: int, now: float) -> void:
 
 ## Draws everything at `now`, the battle's clock, and drops what has ended.
 func draw(now: float) -> void:
-	_draw_bolts(now)
+	_draw_flights(_bolts, now)
+	_draw_flights(_missiles, now)
+	_draw_flights(_bombs, now)
+	_draw_flights(_pulses, now)
+	_beams.draw(now)
+	_debris.draw(now)
 	_draw_impacts(now)
 	_draw_arcs(now)
 	_domes.draw(now, DOME_HEIGHT, 1.0)
@@ -563,7 +1140,13 @@ func draw(now: float) -> void:
 	_sky_bolts.draw(now, 1.0, 0.0)
 	_fireballs.draw(now, 1.0, 0.0)
 	_flashes.draw(now, 1.0, 0.0)
+	_rings.draw(now, 1.0, 0.0)
+	_sparks.draw(now, 1.0, 0.0)
 	_smoke.draw(now, 1.0, 2.0)
+	_puffs.draw(now, 1.0, 1.5)
+	_glows.draw(now, 1.0, 0.0)
+	_stuns.draw(now, 1.0, 0.0)
+	_scorches.draw(now, 1.0, 0.0)
 	for id: int in _shields:
 		var since := now - _shield_flicker[id]
 		var flickering := _shield_flicker[id] >= 0.0 and since < SHIELD_FLICKER_SECONDS
@@ -593,50 +1176,122 @@ func end_bars() -> void:
 	_bars.visible_instance_count = _bar_count
 
 
-func _draw_bolts(now: float) -> void:
+## A basis turning a mesh built along +Z to `forward` (a unit vector), `width` across and `length`
+## along, right-handed so its faces keep their winding.
+static func along(forward: Vector3, width: float, length: float) -> Basis:
+	var side := forward.cross(Vector3.UP)
+	if side.length_squared() < 0.0001:
+		side = Vector3.RIGHT
+	side = side.normalized()
+	var up := forward.cross(side)
+	return Basis(side * width, up * width, forward * length)
+
+
+func _count_shot(from: Vector3, color: Color) -> void:
+	bolts_fired += 1
+	last_bolt_from = from
+	last_bolt_color = color
+
+
+## `weapon`'s muzzle flash at `from` at `now`, by its record's shape; none at size 0.
+func _muzzle(weapon: Weapons.Weapon, from: Vector3, now: float) -> void:
+	if weapon.flash <= 0.0:
+		return
+	match weapon.flash_shape:
+		Weapons.Flash.RING:
+			ring_flash(from, weapon.flash, weapon.color.lerp(Color.WHITE, 0.3), now)
+			flash(from, weapon.flash * 0.6, weapon.color, now)
+		_:
+			flash(from, weapon.flash, weapon.color, now)
+
+
+## An instant weapon from `from` reached `to` at `now`: it lands on the near side of its target (when `impact` is above 0) and its
+## target is told.
+func _arrive(weapon: Weapons.Weapon, from: Vector3, to: Vector3, impact: float, building: int, unit: int,
+		now: float) -> void:
+	if impact > 0.0:
+		land(weapon, _surface(from, to, stand_off(weapon, impact)), impact, now)
+	if arrived.is_valid() and (building != 0 or unit != 0):
+		arrived.call(building, unit)
+
+
+## How far short of the point it was aimed at `weapon`'s impact of `size` lands: SURFACE, or a
+## blast's fireball's radius when that is more, so the fireball stands clear of what it hits.
+static func stand_off(weapon: Weapons.Weapon, size: float) -> float:
+	var r := maxf(size, weapon.impact_size)
+	match weapon.impact:
+		Weapons.Impact.BLAST_S:
+			return maxf(SURFACE, blast_ball(r, 0))
+		Weapons.Impact.BLAST_M:
+			return maxf(SURFACE, blast_ball(r, 1))
+		Weapons.Impact.BLAST_L:
+			return maxf(SURFACE, blast_ball(r, 2))
+	return SURFACE
+
+
+## Where a shot from `from` at `to` (a target's middle, a building's near face) lands: `back` short
+## of it on the side it came from, and a little up, so its impact shows in front of what it hits
+## rather than inside it.
+func _surface(from: Vector3, to: Vector3, back: float) -> Vector3:
+	var line := to - from
+	line.y = 0.0
+	if line.length_squared() < 0.0001:
+		return to
+	return to - line.normalized() * back + Vector3.UP * (SURFACE * 0.3)
+
+
+## The arc tower's strike from `from` to `to` at `now`: a thick main arc and two branches forking
+## off it towards the target.
+func _strike(from: Vector3, to: Vector3, now: float) -> void:
+	lightning(from, to, now, ARC_MAIN)
+	var line := to - from
+	var side := line.cross(Vector3.UP)
+	side = side.normalized() if side.length_squared() > 0.0001 else Vector3.RIGHT
+	for k: int in 2:
+		var fork := from + line * (0.35 + 0.25 * k)
+		var reach := line.length() * 0.3
+		lightning(fork, fork + line.normalized() * reach * 0.6 + side * (reach * (0.6 if k == 0 else -0.6))
+			+ Vector3.DOWN * reach * 0.2, now)
+
+
+func _draw_flights(list: Flights, now: float) -> void:
+	if list.count == 0 and list._empty:
+		return
 	var i := 0
-	while i < _bolt_count:
-		var t := (now - _bolt_start[i]) / _bolt_seconds[i]
+	while i < list.count:
+		var t := (now - list.start[i]) / list.seconds[i]
 		if t >= 1.0:
-			var to := _bolt_to[i]
-			impact(to, _bolt_impact[i], _bolt_color[i], now)
-			if arrived.is_valid() and (_bolt_building[i] != 0 or _bolt_unit[i] != 0):
-				arrived.call(_bolt_building[i], _bolt_unit[i])
-			_remove_bolt(i)
+			var weapon := list.weapon[i]
+			var to := list.to[i]
+			if weapon == null:
+				impact(to, list.impact[i], list.color[i], now)
+			elif list.impact[i] > 0.0:
+				land(weapon, _surface(list.from[i], to, stand_off(weapon, list.impact[i])), list.impact[i], now)
+			if arrived.is_valid() and (list.building[i] != 0 or list.unit[i] != 0):
+				arrived.call(list.building[i], list.unit[i])
+			list.remove(i)
 			continue
-		t = maxf(t, 0.0)
-		var from := _bolt_from[i]
-		var to := _bolt_to[i]
-		var arc := _bolt_arc[i]
-		var at := from.lerp(to, t) + Vector3.UP * (arc * 4.0 * t * (1.0 - t))
-		var heading := (to - from) + Vector3.UP * (arc * 4.0 * (1.0 - 2.0 * t))
+		if t < 0.0:
+			list.buffer.put(i, Basis.from_scale(Vector3.ZERO), list.from[i], list.color[i], Color(0, 0, 0, 0))
+			i += 1
+			continue
+		var at := list.point(i, t)
+		var heading := list.heading(i, t)
 		var forward := heading.normalized() if heading.length_squared() > 0.000001 else Vector3.FORWARD
-		var side := forward.cross(Vector3.UP)
-		if side.length_squared() < 0.0001:
-			side = Vector3.RIGHT
-		side = side.normalized()
-		var up := side.cross(forward)
-		var size := _bolt_size[i]
-		var basis := Basis(side * BOLT_WIDTH * size, up * BOLT_WIDTH * size, forward * BOLT_LENGTH * size)
-		_bolt_buffer.put(i, basis, at, _bolt_color[i], Color(0, 0, 0, 0))
+		var across := list.width[i] * ((0.4 + 1.4 * t) if list.grows else 1.0)
+		list.buffer.put(i, along(forward, across, list.length[i] if not list.grows else across), at, list.color[i],
+			Color(0, 0, 0, 0))
+		var weapon := list.weapon[i]
+		if weapon != null and weapon.trail != Weapons.Trail.NONE and now >= list.trail_at[i]:
+			list.trail_at[i] = maxf(list.trail_at[i] + TRAIL_STEP, now)
+			if weapon.trail == Weapons.Trail.SMOKE:
+				puff(at - forward * 0.3 * list.width[i], 0.16, Weapons.SMOKE, now, 0.8, 0.25)
+			else:
+				puff(at - forward * list.length[i] * 0.4, list.width[i] * 0.45, weapon.color, now, 0.35, 0.05)
 		i += 1
-	_bolts.buffer = _bolt_buffer.data
-	_bolts.visible_instance_count = _bolt_count
-
-
-func _remove_bolt(i: int) -> void:
-	_bolt_count -= 1
-	var last := _bolt_count
-	_bolt_from[i] = _bolt_from[last]
-	_bolt_to[i] = _bolt_to[last]
-	_bolt_start[i] = _bolt_start[last]
-	_bolt_seconds[i] = _bolt_seconds[last]
-	_bolt_arc[i] = _bolt_arc[last]
-	_bolt_size[i] = _bolt_size[last]
-	_bolt_impact[i] = _bolt_impact[last]
-	_bolt_color[i] = _bolt_color[last]
-	_bolt_building[i] = _bolt_building[last]
-	_bolt_unit[i] = _bolt_unit[last]
+	list.multimesh.buffer = list.buffer.data
+	list.multimesh.visible_instance_count = list.count
+	list._empty = list.count == 0
 
 
 func _draw_impacts(now: float) -> void:
@@ -652,11 +1307,10 @@ func _draw_impacts(now: float) -> void:
 			_impact_color[i] = _impact_color[last]
 			_impact_seconds[i] = _impact_seconds[last]
 			continue
-		t = maxf(t, 0.0)
-		var grow := lerpf(IMPACT_START, 1.0, 1.0 - (1.0 - t) * (1.0 - t)) * _impact_radius[i] * 2.0
+		var grow := lerpf(IMPACT_START, 1.0, 1.0 - (1.0 - t) * (1.0 - t)) * _impact_radius[i] * 2.0 if t >= 0.0 else 0.0
 		var at := _impact_at[i]
 		_impact_buffer.put(i, Basis.from_scale(Vector3(grow, grow, grow)), Vector3(at.x, at.y + 0.05, at.z),
-			_impact_color[i], Color(0, 0, 0, t * t))
+			_impact_color[i], Color(0, 0, 0, maxf(t, 0.0) * maxf(t, 0.0)))
 		i += 1
 	_impacts.buffer = _impact_buffer.data
 	_impacts.visible_instance_count = _impact_count
@@ -671,18 +1325,101 @@ func _draw_arcs(now: float) -> void:
 			_arc_from[i] = _arc_from[last]
 			_arc_to[i] = _arc_to[last]
 			_arc_start[i] = _arc_start[last]
+			_arc_width[i] = _arc_width[last]
 			continue
 		var from := _arc_from[i]
-		var along := _arc_to[i] - from
-		var forward := along.normalized()
+		var along_arc := _arc_to[i] - from
+		var forward := along_arc.normalized()
 		var side := forward.cross(Vector3.UP)
 		if side.length_squared() < 0.0001:
 			side = Vector3.RIGHT
 		side = side.normalized()
-		_arc_buffer.put(i, Basis(side, side.cross(forward), along), from, Color.WHITE, Color(0, 0, 0, 0))
+		var w := _arc_width[i]
+		_arc_buffer.put(i, Basis(side * w, side.cross(forward) * w, along_arc), from, ARC_TINT, Color(0, 0, 0, 0))
 		i += 1
 	_arcs.buffer = _arc_buffer.data
 	_arcs.visible_instance_count = _arc_count
+
+
+## The triangle (a, b, c) of the unlit glow, facing both ways.
+static func _both_faces(m: LowPolyMesh, a: Vector3, b: Vector3, c: Vector3) -> void:
+	m.triangle(a, b, c, BOLT)
+	m.triangle(a, c, b, BOLT)
+
+
+## A number in [0, 1) from the scatter counter, a different one each call, the same every run.
+func _noise(salt: int) -> float:
+	_scatter += 1
+	var x := sin(float(_scatter * 31 + salt * 977) * 12.9898) * 43758.5453
+	return x - floorf(x)
+
+
+## The glow decal's mesh: a unit-radius disc on the ground, white in the middle fading to nothing
+## at its rim by its vertex colours, on an additive unshaded material; the instance colour tints
+## and fades it.
+static func _glow_mesh() -> ArrayMesh:
+	var vertices := PackedVector3Array()
+	var colors := PackedColorArray()
+	var sides := 24
+	for k: int in sides:
+		var a := TAU * k / sides
+		var b := TAU * (k + 1) / sides
+		for corner: Vector3 in [Vector3.ZERO, Vector3(cos(b), 0.0, sin(b)), Vector3(cos(a), 0.0, sin(a))]:
+			vertices.append(corner)
+			colors.append(Color.WHITE if corner == Vector3.ZERO else Color(0, 0, 0, 0))
+	var arrays := []
+	arrays.resize(Mesh.ARRAY_MAX)
+	arrays[Mesh.ARRAY_VERTEX] = vertices
+	arrays[Mesh.ARRAY_COLOR] = colors
+	var mesh := ArrayMesh.new()
+	mesh.add_surface_from_arrays(Mesh.PRIMITIVE_TRIANGLES, arrays)
+	var material := StandardMaterial3D.new()
+	material.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	material.blend_mode = BaseMaterial3D.BLEND_MODE_ADD
+	material.vertex_color_use_as_albedo = true
+	material.cull_mode = BaseMaterial3D.CULL_DISABLED
+	mesh.surface_set_material(0, material)
+	return mesh
+
+
+## The smoke puff's mesh: a flat disc of unit radius, its face up (CLOUD turns it to the camera),
+## opaque white in the middle, a little darker towards its edge and gone at its rim by its vertex
+## colours, on an unshaded alpha-blended material; the instance colour tints it and its alpha fades
+## it. No rim light, no scan bands: a soft comic puff.
+static func _cloud_mesh() -> ArrayMesh:
+	var vertices := PackedVector3Array()
+	var colors := PackedColorArray()
+	var sides := 16
+	var rings: Array[float] = [0.0, 0.55, 0.85, 1.0]
+	var shades: Array[Color] = [Color(1, 1, 1, 1), Color(0.93, 0.93, 0.93, 1), Color(0.86, 0.86, 0.86, 0.7),
+		Color(0.8, 0.8, 0.8, 0)]
+	for k: int in sides:
+		var a := TAU * k / sides
+		var b := TAU * (k + 1) / sides
+		for ring: int in range(1, rings.size()):
+			var inner := rings[ring - 1]
+			var outer := rings[ring]
+			var a_in := Vector3(cos(a), 0.0, sin(a)) * inner
+			var b_in := Vector3(cos(b), 0.0, sin(b)) * inner
+			var a_out := Vector3(cos(a), 0.0, sin(a)) * outer
+			var b_out := Vector3(cos(b), 0.0, sin(b)) * outer
+			for corner: Array in [[a_in, ring - 1], [b_out, ring], [a_out, ring], [a_in, ring - 1], [b_in, ring - 1],
+					[b_out, ring]]:
+				vertices.append(corner[0])
+				colors.append(shades[int(corner[1])])
+	var arrays := []
+	arrays.resize(Mesh.ARRAY_MAX)
+	arrays[Mesh.ARRAY_VERTEX] = vertices
+	arrays[Mesh.ARRAY_COLOR] = colors
+	var mesh := ArrayMesh.new()
+	mesh.add_surface_from_arrays(Mesh.PRIMITIVE_TRIANGLES, arrays)
+	var material := StandardMaterial3D.new()
+	material.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	material.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+	material.vertex_color_use_as_albedo = true
+	material.cull_mode = BaseMaterial3D.CULL_DISABLED
+	mesh.surface_set_material(0, material)
+	return mesh
 
 
 ## A MultiMesh of `mesh` for up to `count` instances with colours and custom data, none shown, its
