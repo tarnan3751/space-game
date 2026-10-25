@@ -635,8 +635,8 @@ strip. Each battle is surrendered and left before the next.
   most; for the ranger, the siege walker, the hover tank and the titan, whose guns kick, 12 at 70
   ms over one shot, so the kick and the return show) after the wide fire strip; and
   `<unit>-close-death` (12, 70 ms), staged on the unit attacking in place through
-  `BattleUnits.die`, framed lower and wider by its model's lowest point so a falling aircraft
-  stays in the tile (none for the breacher). It checks that each hovering type banks into its
+  `BattleUnits.die`, framed lower and wider by its lowest point's height as drawn so a falling
+  aircraft stays in the tile (none for the breacher). It checks that each hovering type banks into its
   turn, that the brawler's, the siege walker's and the titan's blows alternate sides (their drawn
   state's parity), and that a staged death plays out in `death_seconds`.
   Then, for every type, `<unit>-impact` (14, 70 ms), close (camera size 6, cropped) on the near

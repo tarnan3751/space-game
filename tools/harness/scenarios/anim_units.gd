@@ -24,8 +24,8 @@ extends HarnessScenario
 ## recoiling type (KICKERS), whose kick and return a slow step would miss, one shot at
 ## DEATH_CLOSE_FRAMES and DEATH_CLOSE_STEP_MS; and
 ## "<unit>-close-death" (DEATH_CLOSE_FRAMES at DEATH_CLOSE_STEP_MS), staged on the unit attacking
-## in place (framed lower and wider by its model's lowest point, so a falling aircraft stays in the
-## tile) through BattleUnits.die (the view's death; the sim's unit lives on, unseen). The breacher,
+## in place (framed lower and wider by its lowest point's height as drawn, so a falling aircraft
+## stays in the tile) through BattleUnits.die (the view's death; the sim's unit lives on, unseen). The breacher,
 ## which blows itself up on its first blow, has neither: its fire strip, as long as a close death
 ## strip (DEATH_CLOSE_FRAMES at DEATH_CLOSE_STEP_MS), holds its blast and its death.
 ##
@@ -220,7 +220,7 @@ func _close_fire_and_death(main: MainScript, unit: String, close: float) -> void
 	if TWINS.has(unit):
 		check(sides[0] and sides[1], "%s's shots alternate sides (left %s, right %s)" % [unit, sides[0], sides[1]])
 	var at := view.units.aim_point(1)
-	var low := UnitModels.meshes(unit, Parts.Tier.BASE).body.get_aabb().position.y
+	var low := at.y - UnitModels.meshes(unit, Parts.Tier.BASE).body.get_aabb().size.y * 0.5
 	frame_world(main, close + low, at - Vector3(0.0, low * 0.5, 0.0))
 	view.units.die(1, view.clock())
 	var shown := view.units.drawn()
