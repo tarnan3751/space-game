@@ -344,7 +344,8 @@ phase read back from the mesh decodes as the shaders do (0.5 exactly, every k/8 
 1/254 step), and that every moving part moves in ten frames. Rendered, it frames the rig at camera size 10, waits half
 a second and ten frames, screenshots it at 0.0, 0.3 and 0.9 seconds, and checks that each part's
 region of the screen (1.5 units square round it) changed between the first two shots, or between
-any two for the flickering parts, which can be off in two shots.
+any two for the flickering parts, which can be off in two shots, and for the PULSE orb, whose
+real-time 1.6 s pulse can read the same in two shots 0.3 s apart that straddle its peak.
 
 `scenarios/kit_swatches.gd` is the tiers' reference (`docs/reference/art-style.md`, **Tiers**): on
 the field, the base's own views hidden, a row of ten swatches across the screen, each a chamfered

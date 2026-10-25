@@ -17,7 +17,12 @@ extends HarnessScenario
 ## Headless it checks each part's surfaces and flags, the outline's channels, the instance
 ## counts and that the moving parts move. Rendered it frames the rig at the closest zoom and
 ## screenshots it 0.0, 0.3 and 0.9 seconds after a settle, and checks that every part's region
-## of the screen changes between the shots.
+## of the screen changes between the shots: between the first two, or between any two of the three
+## for the flickering parts, which can be off in both, and for the PULSE orb, whose real-time 1.6 s
+## pulse reads the same in two shots 0.3 s apart that straddle its peak.
+
+## The parts whose region needs to change only between some two of the shots (_check_regions).
+const ANY_PAIR: Array[String] = ["pulse", "flicker", "arc", "flicker_mover"]
 
 const SPACING := 1.75
 const ROW_GAP := 3.2
@@ -265,7 +270,7 @@ func _posts_triangles() -> int:
 
 
 ## Checks that each rig part's region of the screen changed between the shots: between the first
-## two for every part, or between any two for the flickering ones, which can be off in both.
+## two for every part, or between any two for ANY_PAIR's.
 func _check_regions(shots: Array[Image]) -> void:
 	var camera: IsoCamera = _main.camera
 	var unit := _main.get_viewport().get_visible_rect().size.y / camera.size
@@ -278,10 +283,10 @@ func _check_regions(shots: Array[Image]) -> void:
 		var first := _changed(shots[0], shots[1], region)
 		var any := maxi(first, maxi(_changed(shots[1], shots[2], region), _changed(shots[0], shots[2], region)))
 		var name: String = part["name"]
-		var flickers := name in ["flicker", "arc", "flicker_mover"]
-		var changed := any if flickers else first
+		var any_pair := name in ANY_PAIR
+		var changed := any if any_pair else first
 		check(changed >= CHANGED_PIXELS, "%s: %d pixels of its %dx%d region changed%s" % [name, changed,
-			region.size.x, region.size.y, " (any two shots)" if flickers else " (first two shots)"])
+			region.size.x, region.size.y, " (any two shots)" if any_pair else " (first two shots)"])
 
 
 func _changed(a: Image, b: Image, region: Rect2i) -> int:
