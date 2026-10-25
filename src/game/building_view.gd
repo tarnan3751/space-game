@@ -21,8 +21,13 @@ extends Node3D
 ## aim turns the head about +Y: an idle Motion that turns it about +Y too (a scan) gives way to the
 ## aim, any other (the orbital cannon's elevation) runs on under it. Each shot kicks the head back
 ## along its muzzle by its type's weapon record's `recoil` (fired, Weapons): the head's pose is its
-## aim's yaw, then its idle Motion, then the kick. A moving part that rides another (Parts.riding)
-## is carried by it. A defence whose muzzle is on its body, or that has none, never aims. socket_point() and socket_direction() give
+## aim's yaw, then its idle Motion, then the kick. A defence whose aiming part has a `trunnion`
+## socket also pitches its barrels towards the elevation BattleView asks for, about that point and
+## across its muzzle: the part with the `muzzle` itself when it turns (the missile battery's
+## launcher), or, when it rides the head (the laser turret's barrels), that rider, the head only
+## turning; the kick then slides the pitching part along its pitched muzzle. A moving part that
+## rides another (Parts.riding) is carried by it. A defence whose
+## muzzle is on its body, or that has none, never aims. socket_point() and socket_direction() give
 ## a socket where it is now, in the world. While an EMP burst has the building disabled
 ## (set_disabled) every moving part holds its pose, and on waking snaps back to the clock's; a
 ## cloaked defence fades in when it is revealed (set_reveal).
@@ -107,9 +112,10 @@ var _drone: ConstructionDrone = null
 ## part's node).
 var _sockets: Dictionary[String, LowPolyMesh.Socket] = {}
 var _socket_nodes: Dictionary[String, Node3D] = {}
-## The moving part whose `muzzle` it carries, -1 for none (the view never aims), the way its muzzle
-## faces as built (radians about +Y from +Z), whether it aims, follows its Motion or returns to it,
-## its yaw while it aims or returns, and the seconds since it last had a target.
+## The moving part that turns to aim, -1 for none (the view never aims): the one carrying the
+## `muzzle`, or the one that part rides; the way its muzzle faces as built (radians about +Y from
+## +Z), whether it aims, follows its Motion or returns to it, its yaw while it aims or returns, and
+## the seconds since it last had a target.
 var _aim_index: int = -1
 var _aim_heading: float = 0.0
 var _aim: Aim = Aim.IDLE
@@ -120,6 +126,15 @@ var _aim_wait: float = 0.0
 ## when the head last fired and how far that shot kicks it (fired).
 var _aim_turns: bool = true
 var _muzzle_direction := Vector3.FORWARD
+## The moving part that pitches (the one carrying the `muzzle`, when it has a `trunnion` socket),
+## -1 for none; its trunnion and the axis it pitches about (raising the muzzle), in its own space;
+## the muzzle's elevation as built (radians); and its pitch from that, now and wanted.
+var _pitch_index: int = -1
+var _trunnion := Vector3.ZERO
+var _pitch_axis := Vector3.RIGHT
+var _built_elevation: float = 0.0
+var _pitch: float = 0.0
+var _pitch_wanted: float = 0.0
 var _now: float = 0.0
 var _fired_at: float = -INF
 var _kick_reach: float = 0.0
@@ -353,7 +368,17 @@ func _process(delta: float) -> void:
 ## Poses moving part `i` at `time`: its Motion (the aiming head's aim, idle Motion and kick), carried
 ## by the part it rides as that part stands now.
 func _pose(i: int, time: float) -> void:
-	var pose := _aim_pose(time) if i == _aim_index else _motions[i].transform_at(time, _rests[i])
+	var pose: Transform3D
+	if i == _aim_index:
+		pose = _aim_pose(time)
+	elif i == _pitch_index:
+		# A rider that pitches follows its own idle Motion (an elevation swing) until it aims.
+		if _aim == Aim.IDLE:
+			pose = _motions[i].transform_at(time, _rests[i])
+		else:
+			pose = Transform3D(Basis.IDENTITY, _rests[i]) * _pitched()
+	else:
+		pose = _motions[i].transform_at(time, _rests[i])
 	var on := _rides[i]
 	if on >= 0:
 		pose = _movers[on].transform * Transform3D(Basis.IDENTITY, -_rests[on]) * pose
@@ -364,16 +389,44 @@ func _pose(i: int, time: float) -> void:
 ## Motion, then the kick of its last shot back along its muzzle.
 func _aim_pose(time: float) -> Transform3D:
 	var yaw := _aim_yaw if _aim != Aim.IDLE else _idle_yaw(time)
-	var turn := Basis(Vector3.UP, yaw)
-	var origin := _rests[_aim_index]
-	if not _aim_turns:
-		var idle := _motions[_aim_index].transform_at(time, Vector3.ZERO)
-		origin += turn * idle.origin
-		turn = turn * idle.basis
+	var pose := Transform3D(Basis(Vector3.UP, yaw), _rests[_aim_index])
+	if _pitch_index == _aim_index:
+		pose = pose * _pitched()
+	# An idle that is not a scan runs under the aim, but gives way to a pitch while it aims.
+	if not _aim_turns and (_pitch_index != _aim_index or _aim == Aim.IDLE):
+		pose = pose * _motions[_aim_index].transform_at(time, Vector3.ZERO)
+	if _pitch_index < 0:
+		pose = pose * _kicked()
+	return pose
+
+
+## The pitching part's own turn: its pitch about its trunnion, then the kick along its pitched
+## muzzle.
+func _pitched() -> Transform3D:
+	var pitch := Transform3D(Basis(_pitch_axis, _pitch), Vector3.ZERO)
+	pitch = Transform3D(Basis.IDENTITY, _trunnion) * pitch * Transform3D(Basis.IDENTITY, -_trunnion)
+	return pitch * _kicked()
+
+
+## The kick of the last shot, back along the muzzle as built (in the kicked part's own space).
+func _kicked() -> Transform3D:
 	var kick := recoil_share()
-	if kick > 0.0:
-		origin -= (turn * _muzzle_direction) * _kick_reach * kick
-	return Transform3D(turn, origin)
+	if kick <= 0.0:
+		return Transform3D.IDENTITY
+	return Transform3D(Basis.IDENTITY, -_muzzle_direction * _kick_reach * kick)
+
+
+## The pitch its idle Motion gives the barrels at `time`: an elevation swing's (a SWING of the
+## pitching part about the line it pitches about, through its trunnion: the orbital cannon's), so the
+## aim takes the barrels up from where the swing has them and hands them back to it; 0 for any other.
+func _idle_pitch(time: float) -> float:
+	if _pitch_index < 0:
+		return 0.0
+	var idle := _motions[_pitch_index]
+	var along := idle.axis.dot(_pitch_axis)
+	if idle.kind != Motion.Kind.SWING or absf(along) < 0.999 or not _trunnion.is_zero_approx():
+		return 0.0
+	return idle.angle_at(time) * signf(along)
 
 
 ## The aiming head's yaw its idle Motion gives at `time`: its scan's, 0 when it does not turn about +Y.
@@ -386,27 +439,51 @@ func can_aim() -> bool:
 	return _aim_index >= 0
 
 
-## Turns the aiming head towards the world point `point`, at `rate` (the share of the way a second,
-## as an exponential rate) for `step` seconds of battle, the battle's clock at `now`; from its idle
-## swing, it starts from where the swing has it.
-func aim_at(point: Vector3, now: float, step: float, rate: float) -> void:
+## Turns the aiming head towards the world point `point` at `rate` and pitches its barrels towards
+## `elevation` (radians over level, its muzzle's) at `pitch_rate` (each the share of the way a
+## second, as an exponential rate), for `step` seconds of battle, the battle's clock at `now`; from
+## its idle swing, it starts from where the swing has it.
+func aim_at(point: Vector3, elevation: float, now: float, step: float, rate: float, pitch_rate: float) -> void:
 	if _aim_index < 0:
 		return
 	_now = now
 	if _aim == Aim.IDLE:
 		_aim_yaw = _idle_yaw(Motion.clock())
+		_pitch = _idle_pitch(Motion.clock())
 	_aim = Aim.AIMING
 	_aim_wait = 0.0
 	_aim_yaw = lerp_angle(_aim_yaw, _aim_wanted(point), 1.0 - exp(-rate * step))
+	if _pitch_index >= 0:
+		_pitch_wanted = elevation - _built_elevation
+		_pitch = lerpf(_pitch, _pitch_wanted, 1.0 - exp(-pitch_rate * step))
 	_pose_aim()
 
 
-## How far (radians) the aiming head is from facing the world point `point`.
+## How far (radians) the aiming head is from facing the world point `point`, or its barrels from
+## the elevation last asked for (aim_at), whichever is more.
 func aim_error(point: Vector3) -> float:
 	if _aim_index < 0:
 		return 0.0
 	var yaw := _aim_yaw if _aim != Aim.IDLE else _idle_yaw(Motion.clock())
-	return absf(angle_difference(yaw, _aim_wanted(point)))
+	return maxf(absf(angle_difference(yaw, _aim_wanted(point))), absf(_pitch_wanted - _pitch))
+
+
+## Whether the view pitches its barrels (its aiming part has a `trunnion` socket).
+func can_pitch() -> bool:
+	return _pitch_index >= 0
+
+
+## The barrels' elevation now (radians over level, the muzzle's as built plus its pitch).
+func elevation() -> float:
+	return _built_elevation + _pitch
+
+
+## Where the barrels pitch about, in the world: the trunnion as it stands now (the view's origin
+## for a view that does not pitch).
+func pitch_origin() -> Vector3:
+	if _pitch_index < 0:
+		return global_position
+	return _movers[_pitch_index].global_transform * _trunnion
 
 
 ## The aiming head has no target for `step` seconds of battle, the battle's clock at `now`: it holds
@@ -420,9 +497,13 @@ func idle_aim(now: float, step: float, rate: float) -> void:
 				_aim = Aim.RETURNING
 		Aim.RETURNING:
 			var swing := _idle_yaw(Motion.clock())
+			var elevation := _idle_pitch(Motion.clock())
 			_aim_yaw = lerp_angle(_aim_yaw, swing, 1.0 - exp(-rate * step))
-			if absf(angle_difference(_aim_yaw, swing)) < AIM_SETTLED:
+			_pitch = lerpf(_pitch, elevation, 1.0 - exp(-rate * step))
+			_pitch_wanted = elevation
+			if absf(angle_difference(_aim_yaw, swing)) < AIM_SETTLED and absf(_pitch - elevation) < AIM_SETTLED:
 				_aim = Aim.IDLE
+				_pitch = 0.0
 			_pose_aim()
 
 
@@ -456,6 +537,8 @@ func recoil_share() -> float:
 ## Poses the aiming head at once, so its sockets are where it now faces (_process poses it too).
 func _pose_aim() -> void:
 	_pose(_aim_index, Motion.clock())
+	if _pitch_index > _aim_index:
+		_pose(_pitch_index, Motion.clock())
 
 
 ## Whether the model has the socket `name`.
@@ -520,18 +603,24 @@ func _collect_movers(node: Node) -> void:
 		_collect_movers(child)
 
 
-## The sockets of the model's root and of its moving parts; the moving part with a `muzzle` aims.
+## The sockets of the model's root and of its moving parts; the moving part with a `muzzle` aims,
+## turned by itself or by the part it rides, and pitches when it has a `trunnion`.
 func _collect_sockets(root: Node3D) -> void:
 	_add_sockets(root)
 	for i: int in _movers.size():
 		_add_sockets(_movers[i])
 		if _socket_nodes.get("muzzle") == _movers[i]:
-			_aim_index = i
-			var facing := _sockets["muzzle"].direction
+			_aim_index = i if _rides[i] < 0 else _rides[i]
+			var facing := _sockets["muzzle"].direction.normalized()
 			_aim_heading = atan2(facing.x, facing.z)
-			_muzzle_direction = facing.normalized()
-			var idle := _motions[i]
+			_muzzle_direction = facing
+			var idle := _motions[_aim_index]
 			_aim_turns = idle.kind != Motion.Kind.SLIDE and idle.axis.dot(Vector3.UP) > 0.999
+			if _socket_nodes.get("trunnion") == _movers[i]:
+				_pitch_index = i
+				_trunnion = _sockets["trunnion"].position
+				_built_elevation = asin(clampf(facing.y, -1.0, 1.0))
+				_pitch_axis = Vector3(facing.x, 0.0, facing.z).cross(Vector3.UP).normalized()
 
 
 func _add_sockets(node: Node3D) -> void:

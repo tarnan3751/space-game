@@ -992,7 +992,8 @@ func _aim_defences(shown: float) -> void:
 		if not sim.building_disabled(id):
 			var target := sim.building_target(id)
 			if target != 0 and sim.unit_state(target) != BattleArmy.DEAD:
-				view.aim_at(units.aim_point(target), _clock, shown, float(AIM_TURN.get(_types[id], AIM_TURN_DEFAULT)))
+				var turn := float(AIM_TURN.get(_types[id], AIM_TURN_DEFAULT))
+				view.aim_at(units.aim_point(target), view.elevation(), _clock, shown, turn, turn)
 			else:
 				view.idle_aim(_clock, shown, AIM_RETURN)
 		if _held_shots.has(id) and (view.aim_error(units.aim_point(_held_shots[id])) <= AIM_READY
