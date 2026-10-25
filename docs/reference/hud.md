@@ -68,7 +68,7 @@ the building view's timer label included, wider.
 | Warning `WARNING` | `FFB37A` | the info panel's note, a research card's lab level the lab lacks |
 | Resource colours | `rules.json`, `Catalog.resource_color` | costs, the meters' fills and icons |
 | Category stripes `CATEGORY_STRIPE` | `MaterialKit` roles: resources `ENERGY`, army `ARMY`, defense `DEFENCE`, traps `HAZARD` | the stripe along a card's top; a category not listed takes `ACCENT` |
-| Army accent | `MaterialKit.ARMY`, `FF7F11` | the army meter's fill and figure, the unit glyphs, the stripe along a unit card's top |
+| Army accent | `MaterialKit.ARMY`, `FF7F11` | the training header's housing bar and figure, the unit glyphs, the stripe along a unit card's top |
 
 **Shapes.** A `StyleBoxFlat` with a flat fill, a 3 px ink border (`BORDER`), round corners
 (12; tabs, the meters and the toast 10) and a flat shadow, the ink at 60 % offset 4 px down
@@ -88,7 +88,7 @@ so its parts — the Build button above all — draw over the panel.
 
 | Part | Where | Contents |
 | --- | --- | --- |
-| Top bar | top, `MARGIN` (16) in, a column across the width | First row, from the left: a meter per resource in catalog order, the army meter, then the drone ring (**Top bar**). |
+| Top bar | top, `MARGIN` (16) in, a column across the width | First row, from the left: a meter per resource in catalog order, then the drone ring (**Top bar**). The army's housing is not here: it shows in the training facilities' UI (**Info panel**, **Army panel**). |
 | Build button | bottom right, `MARGIN` from the safe area's corner, 128×64 | "BUILD" on gold; toggles the build panel (**Build panel**). Hidden while placing or painting. |
 | Expedition button | bottom left, `MARGIN` from the safe area's corner, 176×64 | "EXPEDITION" in Bangers 30 on the accent cyan, ink text, with a badge on its top right corner: the open fields' count in `BadgeText` (Lilita One 17, 2 px of ink) on a defence-red circle (`Badge`, 30×30), hidden at none. Emits `expedition_pressed`. Shown with Build, and hidden while the build panel or the army panel is open across its corner (`_show_expedition`). |
 | Build panel | bottom, the screen's full width | Slides up over the bottom of the screen (**Build panel**). |
@@ -124,13 +124,6 @@ resource's icon (a `HudIcon`, 40×40) sits over the trough's left end like a bad
 cheats on (`Hud.cheats`, set by `main.gd`) every meter shows, full, reading `∞` (Lilita One has
 no `∞`; the meters' fallback, the engine's font, draws it, **Theme**).
 
-**Army meter.** Right of the resource meters, a meter like theirs: its icon the army's figure
-and its fill the army accent, filled by `state.housing_used()` over `state.housing_capacity()`
-and reading `"used / capacity"` (`Format.short`). It is hidden while the housing capacity is 0,
-so it appears once a Hangar is finished, as a resource's meter appears once the base can store
-it; the dev cheats leave it as it is. Its glint follows the last resource's by `GLINT_STAGGER`;
-it never flashes.
-
 **The meters move.** The stripes are drawn through `meter.gdshader`, one `ShaderMaterial` per
 meter (its tint, its phase, the fill's width), all on the one animation clock, `anim_time`
 (`art-style.md`, **Animation**, "One clock"), so nothing animates them per frame in GDScript. The
@@ -162,9 +155,9 @@ lighter facet and an ink eye at its front. Its parts keep inside a circle of abo
 round the box's centre, so at the ring's 30 px about 2 px lie between the rotors and the
 sectors (on two diagonals the ring's and the icon's own shadows fall there) and they read as
 four rotors round a small body. Any other
-resource gets a plain cut gem. **army**, the army meter's, is a figure: a head over a pair of
-rounded shoulders, each with a lighter facet. `HudIcon.paint(pen, kind, rect, color, wing)` adds
-one to a `HudIcon.Pen`.
+resource gets a plain cut gem. **army**, in front of the training header's housing line (**Army
+panel**), is a figure: a head over a pair of rounded shoulders, each with a lighter facet.
+`HudIcon.paint(pen, kind, rect, color, wing)` adds one to a `HudIcon.Pen`.
 
 **Unit glyphs.** The queue entries show a unit by its crew (`catalog.unit_crew`), drawn the same
 way in the army accent (the army panel's cards show the unit's picture instead, **Pictures**): **human** a space helmet from the front, a dome over two cheek guards
@@ -220,8 +213,8 @@ The army panel belongs to the building it opened on: placing, a deselection or t
 another building closes it. The cards are refreshed only while the build panel is open (and when
 it opens), and only the selected tab's. The army panel's content is rebuilt on `BaseState.changed`,
 which the HUD connects to itself from the state `refresh` is given (`_watch`; `main.gd`'s handler,
-connected first, has refreshed by then), and when it opens: the cards, the queue (copied once by
-`queue_of` and kept until the next change) and the research line's words. A `refresh` while it is
+connected first, has refreshed by then), and when it opens: the housing line, the cards, the
+queue (copied once by `queue_of` and kept until the next change) and the research line's words. A `refresh` while it is
 open, the one-second tick's included, only counts down (`_tick_army`): it reads the head's
 `training_status` and `training_seconds_left`, or `research_seconds_left`, none of which copies
 anything, and sets the head's or the research line's text only when the value it shows changed. So
@@ -336,6 +329,7 @@ constructed), one line each, only when the level has the stat, in this order:
 | Houses 1 drone | `builders` above 0 |
 | Capacity 20 | `capacity` (army) |
 | Army housed 12 / 20 | the Hangar (`catalog.housing_type`): the base's `housing_used()` / `housing_capacity()` |
+| Housing 12 / 280 | a training facility (a type `catalog.units_of_producer` names: the Cadet Academy, the Drydock, the Fabricator, the Heavy Fabricator): the same, the army's housing where it is trained; with no Hangar (capacity 0) "No Hangar: build one to house units", as the training header says (`Hud.NO_HANGAR`) |
 | Stock 2 / 6 | the Nanite Foundry (`catalog.foundry_type`): the base's `stock_total()` / `foundry_capacity()` |
 | Damage 12   Range 7 | `damage` and `range_cells`; either alone when the level has only one |
 | Fires every 0.8 s | `fire_ms` |
@@ -374,6 +368,18 @@ research page about 290. A header, the building's `"Name   Lv N"` in Bangers 24 
 cards swapped for the ability cards) or research. The panel stops every touch on it; its layout
 containers take none. The close button slides it down and shows the building's info panel again,
 still selected. Hidden while closed.
+
+On the training page the header carries a second line under the title, the army's housing
+(`_refresh_housing`, rebuilt with the panel on every `BaseState.changed`): the army's figure
+(`HudIcon` "army", 20×20, the army accent), "Housing 12 / 280" (16 px, `HousingText`:
+`housing_used()` / `housing_capacity()`, `Format.amount`) and after it a bar 120×14
+(`HOUSING_BAR_SIZE`), a meter's trough and ink frame round a flat fill in the army accent with the
+meters' gloss, grown across its track by used over capacity, and at least 2 px
+(`HOUSING_MIN_FILL`) while any unit is housed. With no Hangar (capacity 0) the line
+reads "No Hangar: build one to house units" (`NO_HANGAR`) in the dim style (`CardCount`) and the
+bar hides. The
+making and research pages leave the line out. The title and the line together stand no taller
+than the close button, so the panel keeps its height.
 
 **Training panel.** A horizontal strip of unit cards (200×140), one per unit the producer's type
 trains, in `units.json` order (`catalog.unit_types()`; a card per unit is built up front and the
@@ -552,8 +558,9 @@ whose `free_count()` and `total_count()` are the counts it shows; `reset_button(
 Practice raid (null in a release build). `train_card_picture(unit)` is a training card's picture
 (null until rendered); `ui_theme()` and `preview()` hand the theme and the pictures to the battle's
 HUD.
-The army: `army_meter()`, `army_meter_text()` and `army_fill()` are the army meter, its text and
-its fill; `action_button()` is the info panel's Train, Make or Research and `info_detail()` its
+The army: `housing_text()`, `housing_bar()` and `housing_fill()` are the training header's
+housing line, its bar (hidden with no Hangar) and the bar's fill, whose parent is the track it
+grows across; `action_button()` is the info panel's Train, Make or Research and `info_detail()` its
 lines; `army_panel()` the army panel, `is_training_open()`, `is_making_open()` and
 `is_research_open()` which page it shows (open or opening),
 `army_close_button()` its close button and `army_title()` its header; `train_card(unit)` and
