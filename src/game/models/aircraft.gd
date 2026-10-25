@@ -12,15 +12,14 @@ const SKIMMER_HOVER := 0.62
 const GUNSHIP_HOVER := 1.24
 const BOMBER_HOVER := 1.6
 
-## The gunship's rotors: radians a second, counter-rotating, and the blur's radius.
+## The gunship's rotors: radians a second, counter-rotating, the blades' reach and the glow
+## ring's width at their tips.
 const ROTOR_RATE := 9.0
 const ROTOR_RADIUS := 0.32
+const ROTOR_RING := 0.08
 
 static var ORANGE := Parts.surf("orange")
 static var ORANGE_ROUND := Figures.ARMY_PLATE
-## The rotor blur: the screen layer's segments in ENERGY, unlit, as the escort drone's rotors, but
-## still and at phase 0, so it bobs with the body; the spin turns it.
-static var ROTOR_BLUR := Surf.make(MaterialKit.Layer.SCREEN, MaterialKit.ENERGY, 4.0, Surf.UNLIT)
 ## The rotor blades: dark hull, too thin for an outline.
 static var BLADE := Surf.make(MaterialKit.Layer.HULL, MaterialKit.HULL_DARK, 1.0, Surf.LIT, false, false)
 
@@ -90,18 +89,23 @@ static func _gun_pod(m: LowPolyMesh, xf: Transform3D, tier: int) -> void:
 
 # --- The gunship ----------------------------------------------------------------------
 
-## The gunship: a rotor-pod aircraft. A tier-hull chamfered fuselage and nose, a colonist pilot sunk
-## behind the glass windscreen on the nose, a chin gun, stub wings carrying a nacelle at each tip with a
-## band of the tier's glow, the two rotors spinning on them (parts of the body tagged with
-## LowPolyMesh.spin, which the shaders turn), and a tail boom with orange fins; hovering and bobbing.
+## The gunship: a rotor-pod aircraft. A tier-hull chamfered fuselage with a dark belly band and its
+## deck plate on the roof (UnitModels.deck), a nose with a colonist pilot sunk behind the glass
+## windscreen, a twin chin gun, stub wings of the tier's panels carrying a nacelle at each tip with a
+## band of the tier's glow and a cap of the tier's trim, the two rotors spinning on them (parts of
+## the body tagged with LowPolyMesh.spin, which the shaders turn), and a tail boom (the hull, the
+## trim from Obsidian) with orange fins; hovering and bobbing.
 static func build_gunship(p: Parts) -> void:
 	var m := p.body
 	var tier := p.tier
 	var bottom := GUNSHIP_HOVER + 0.06
 	m.flags = Surf.BOB
 	m.box_chamfered(Vector3(0.38, 0.32, 0.72), 0.08, Vector3(0, bottom, -0.02), UnitModels.hull(tier))
+	m.box_chamfered(Vector3(0.39, 0.08, 0.73), 0.02, Vector3(0, bottom - 0.002, -0.02), Parts.HULL_DARK)
+	UnitModels.deck(m, Vector3(0.22, 0.016, 0.56), Vector3(0, bottom + 0.32, -0.04), tier)
 	m.box_chamfered(Vector3(0.3, 0.24, 0.3), 0.07, Vector3(0, bottom, 0.4), UnitModels.hull(tier))
-	Parts.beam(m, Vector3(0, bottom + 0.18, -0.34), Vector3(0, bottom + 0.22, -0.6), 0.12, UnitModels.hull(tier), 0.035)
+	var boom := UnitModels.trim(tier) if tier >= Parts.Tier.OBSIDIAN else UnitModels.hull(tier)
+	Parts.beam(m, Vector3(0, bottom + 0.18, -0.34), Vector3(0, bottom + 0.22, -0.6), 0.12, boom, 0.035)
 	m.box_chamfered(Vector3(0.04, 0.22, 0.16), 0.015, Vector3(0, bottom + 0.22, -0.54), ORANGE, Vector3(-12, 0, 0))
 	m.box_chamfered(Vector3(0.36, 0.035, 0.12), 0.012, Vector3(0, bottom + 0.2, -0.54), ORANGE)
 	m.box_chamfered(Vector3(0.86, 0.06, 0.2), 0.025, Vector3(0, bottom + 0.16, -0.02), UnitModels.panel(tier))
@@ -114,19 +118,20 @@ static func build_gunship(p: Parts) -> void:
 		_nacelle(m, UnitModels.pivot(hub), tier)
 		var pivot := hub + Vector3(0, 0.34, 0)
 		m.spin = Vector4(pivot.x, pivot.y, pivot.z, side * ROTOR_RATE)
-		_rotor(m, UnitModels.pivot(pivot))
+		_rotor(m, UnitModels.pivot(pivot), tier)
 		m.spin = Vector4.ZERO
 	m.flags = 0
 
 
-## The chin gun on the pivot `xf` under the nose: a gunmetal ball turret and one barrel forward,
-## glowing at its muzzle.
+## The chin gun on the pivot `xf` under the nose: a gunmetal ball turret and two fat barrels
+## forward side by side, glowing at their muzzles.
 static func _chin_gun(m: LowPolyMesh, xf: Transform3D, tier: int) -> void:
-	m.orb(0.065, 12, 4, xf.origin, Parts.GUNMETAL)
-	var muzzle := xf * Vector3(0, -0.01, 0.17)
-	Parts.pipe(m, xf * Vector3(0, -0.01, 0.03), muzzle, 0.03, Parts.GUNMETAL, 10)
-	m.disc(0.018, 8, muzzle + xf.basis * Vector3(0, 0, 0.002), UnitModels.glow(tier, Surf.PULSE, false),
-		UnitModels.euler(xf, Vector3(90, 0, 0)))
+	m.orb(0.075, 12, 4, xf.origin, Parts.GUNMETAL)
+	for k: float in [-1.0, 1.0]:
+		var muzzle := xf * Vector3(k * 0.044, -0.015, 0.29)
+		Parts.pipe(m, xf * Vector3(k * 0.044, -0.015, 0.03), muzzle, 0.04, Parts.GUNMETAL, 10)
+		m.disc(0.028, 8, muzzle + xf.basis * Vector3(0, 0, 0.002), UnitModels.glow(tier, Surf.PULSE, false),
+			UnitModels.euler(xf, Vector3(90, 0, 0)))
 
 
 ## A nacelle standing on the pivot `xf` at a wing's tip: a tier-hull capsule with a band of the tier's
@@ -140,14 +145,17 @@ static func _nacelle(m: LowPolyMesh, xf: Transform3D, tier: int) -> void:
 	m.ring(0.04, 0.074, 0.03, 12, xf * Vector3(0, 0.275, 0), UnitModels.trim(tier, true), rot)
 
 
-## A rotor on the pivot `xf` on its nacelle's top: a gunmetal hub sunk in the nacelle, the blur disc
-## of ROTOR_RADIUS just above it and three dark blades over the blur.
-static func _rotor(m: LowPolyMesh, xf: Transform3D) -> void:
+## A rotor on the pivot `xf` on its nacelle's top: a gunmetal hub sunk in the nacelle under a cap
+## of the tier's trim, three dark blades and a thin ring glowing in the tier's glow (PULSE) round
+## their tips, so the body shows through the turning rotor.
+static func _rotor(m: LowPolyMesh, xf: Transform3D, tier: int) -> void:
 	Parts.drum(m, 0.045, 0.07, 0.02, 12, xf * Vector3(0, -0.05, 0), Parts.GUNMETAL, UnitModels.euler(xf))
-	m.disc(ROTOR_RADIUS, 16, xf * Vector3(0, 0.006, 0), ROTOR_BLUR, UnitModels.euler(xf))
+	m.dome(0.04, 0.03, 10, 2, xf * Vector3(0, 0.018, 0), UnitModels.trim(tier, true), UnitModels.euler(xf))
+	m.ring(ROTOR_RADIUS - ROTOR_RING, ROTOR_RADIUS, 0.012, 24, xf * Vector3(0, 0.004, 0), UnitModels.glow(tier, Surf.PULSE),
+		UnitModels.euler(xf))
 	for k: int in 3:
 		var degrees := 120.0 * k
-		m.box(Vector3(ROTOR_RADIUS - 0.04, 0.012, 0.045), xf * Parts.around(ROTOR_RADIUS * 0.5 + 0.01, degrees, 0.008), BLADE,
+		m.box(Vector3(ROTOR_RADIUS - 0.04, 0.012, 0.065), xf * Parts.around(ROTOR_RADIUS * 0.5 + 0.01, degrees, 0.008), BLADE,
 			UnitModels.euler(xf, Vector3(0, -degrees, 0)))
 
 
