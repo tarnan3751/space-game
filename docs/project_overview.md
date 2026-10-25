@@ -243,8 +243,9 @@ any of them can be reversed as a data or model change.
   requires);
   humans in machines are the colonist seated, under the figures' thin ink; hovering and flames are
   surface flags, with no moving part (the gunship's rotors are spun by the shaders, step 5); budgets are study values
-  until step 5. The glass stays opaque, so a pilot shows over a low windscreen rather than through
-  a see-through canopy, which would cost a draw a unit (the developer's call, for review).
+  until step 5. The glass stays opaque, so a pilot sits sunk behind its windscreen with its helmet
+  showing over it rather than behind a see-through canopy, which would cost a draw a unit (the
+  developer's call, for review; sunk by the vehicle model pass).
 
 - **The battle sim's rules** (the coordinator under the owner's mandate, 2026-10-24; the step 4
   plan; `docs/reference/battle.md`): a surrender command ends a battle on its tick and is logged

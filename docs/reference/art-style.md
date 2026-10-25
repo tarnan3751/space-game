@@ -726,7 +726,21 @@ the battle's per-instance data (**Surface effects**).
   are near-white violets above Chrome: a unit's glows are small and PULSE dims them to 0.55, so
   the buildings' violets (`ANTIMATTER`, the cores' `C9A2FF`) sank into the violet field and a
   muzzle's bore or a flame read as a hole; `DCC4FF` and `EAD6FF` stay glows against the field and
-  the obsidian. A flame adds PULSE, a lamp BLINK. The paint every tier keeps: hull dark,
+  the obsidian. A flame adds PULSE, a lamp BLINK.
+  **The deck rule:** every machine carries one camera-facing top plate,
+  `UnitModels.deck(m, size, pos, tier, rot)`, so no tier reads as a dark lump from the camera: a
+  thin plate of `veined(tier)` (the hull to Chrome, the veins from Obsidian) with, from Gold up, a
+  strip of `trim(tier)` down its middle (half its width, 0.9 of its length: gold, the cyan strip,
+  chrome on the veins, Crown's filigree), as the titan's deck cap is a trim face. The dune runner's
+  are a long fender along each side over the wheels and a rear deck round the engine block, where
+  the camera sees them past the bonnet and the driver; the hover tank's on its hull round the turret, the walker's
+  on the block behind its pilot, the gunship's on its roof and the bomber's along its body; the
+  skimmer's top is `veined` with a trim ring round its crown, and the titan keeps its trim cap.
+  The small army-orange plates on the machines (under 0.4 across: a bonnet, a mantlet, a pod's top
+  plate, a walker's chest band and thigh plates) are `ARMY` on the flat layer
+  (`VehicleModels.ORANGE_FINE`): a part's UVs start from its centre, so the plate layer's seams
+  cross its middle at any repeat; the titan's leg plates keep the plate layer at two repeats a
+  unit, where the seams read as panels. The paint every tier keeps: hull dark,
   `GUNMETAL` weapons and joints, `GLASS` windscreens, the army-orange `ARMY` accent on one or two
   surfaces (`Parts.surf("orange")`, `Figures.ARMY_PLATE`), and the crews' paint: the colonists'
   suits stay cream, and the brawler takes the tier's hull on its armour (its girdle; its shoulder
@@ -742,23 +756,28 @@ the battle's per-instance data (**Surface effects**).
 - **Crews.** A human in a machine is the colonist (`Figures.colonist`) scaled and seated
   (`UnitModels.pilot(m, seat, yaw, scale, legs = false)`: `Figures.seated()` with the pelvis on
   `seat`, its legs left out where the hull hides them, returning its joints for the controls in
-  its hands), never another human design. The glass is opaque, so a windscreen
-  (`UnitModels.canopy(m, xf, radius, depth, rise, from_deg, to_deg, tier, sides)`: a curved glass
-  shell round the pivot's front on a trim lip, open above and behind) stands lower than the
-  pilot's shoulders and the head and shoulders show over it; a see-through hologram canopy would
-  cost a draw a unit.
+  its hands), never another human design. The glass is opaque, so a pilot sits sunk in its
+  machine behind its windscreen (`UnitModels.canopy(m, xf, radius, depth, rise, from_deg, to_deg,
+  tier, sides)`: a curved glass shell round the pivot's front rising 60 degrees (the titan's wide
+  one 34), swept 0 to 180 degrees or near it, in a gunmetal frame of a lip at its foot and a rim
+  along its top edge at every tier, open above and behind): `UnitModels.seat_under(top, scale)`
+  puts the seat where the helmet's top stands `SEAT_SHOW` (1.25) helmet radii over the glass's top
+  edge (`canopy_top(radius, rise)` over the pivot), so the helmet and its visor show over the
+  glass and the rest of the pilot is in the hull. The titan and the siege walker have a gunmetal
+  dashboard under the arc. Pilots are 0.6 (the dune runner's open seat, not sunk), 0.55 (the
+  walker), 0.5 (the hover tank, in a hatch), 0.44 (the bomber), 0.42 (the titan's two) and 0.4
+  (the gunship) of the colonist. A see-through hologram canopy would cost a draw a unit.
 - **Ink.** Every figure, pilot included, carries the figures' thinner line (`FIGURE_INK`), and
   so does what an infantry unit wears and carries; a machine carries the full line.
 - **Hovering.** A hovering unit (the jet trooper, the skimmer, the hover tank, the gunship and the
   bomber) sets `LowPolyMesh.flags` to `Surf.BOB` for its whole build, figures and rotors included,
   every part on phase 0 (the figures' surfaces are), so nothing comes apart as it bobs. Flames,
   lamps and hover glows are surface flags (PULSE, BLINK), never moving parts. The gunship's rotor
-  blades are plain boxes too thin to outline (0.012 tall, 0.045 wide, `outline` off), as the escort
-  drone's arms are; the spin and the blur round them make them read. The gunship's rotor
-  blur is the escort drone's screen-layer disc but still and on phase 0, since a phase is shared
-  by every effect of a part and FLOW_U's speed would put it out of step with the body's BOB; the
-  spin turns it. The rotors are parts of the body tagged with `LowPolyMesh.spin` (each its hub's
-  pivot and ±9 radians a second), not moving parts.
+  blades are plain boxes too thin to outline (0.012 tall, 0.065 wide, `outline` off), as the escort
+  drone's arms are; round their tips a thin ring glows in the tier's glow (PULSE, `ROTOR_RING`
+  0.08 wide, 0.012 tall) in place of a blur disc, so the body shows through the turning rotor, and
+  a cap of the tier's trim covers the hub. The rotors are parts of the body tagged with
+  `LowPolyMesh.spin` (each its hub's pivot and ±9 radians a second), not moving parts.
 - **Budget** (a study value; step 5 fixes the real one after the phone measurement): the body
   and moving parts' triangles at most 1,800 for the infantry, 2,200 for the dune runner, the
   skimmer and the hover tank, 3,000 for the siege walker, 2,600 for the gunship and the bomber and
@@ -771,16 +790,17 @@ the battle's per-instance data (**Surface effects**).
 | `breacher` | the colonist at 0.85 tall in a bulkier suit: a belly plate and pauldrons of the tier's trim, heavy dark boot shells, a big dark charge pack on its back rising behind the helmet, hazard-banded, a gunmetal detonator block and a red fuse lamp blinking (red at every tier: the pack is live) | 0.90 tall | 1,778 |
 | `jet_trooper` | the colonist flying, leaning in with the legs trailing and the toes pointed, its lower sole 0.5 up; a jetpack (the tier's trim to Gold, its hull above) with two gunmetal nozzles blowing long flame cones of the tier's glow (unlit, PULSE, not inked) and short orange stub wings; every part bobs | 0.86 tall, flames to 0.46 up | 1,646 |
 | `brawler` | the automaton at 1.08 scale crouched with its guard up: big gunmetal fists with knuckle bands of the tier's trim, broad shoulder plates (orange to Gold, the tier's hull above), a thick girdle of the tier's hull round its middle | 1.06 tall | 1,732 |
-| `dune_runner` | an open buggy: a cream chamfered hull, an orange bonnet, a bumper of the tier's trim, a gunmetal engine block, four chunky dark tyres with hub caps of the tier's trim, the colonist driver seated behind the dash at a steering wheel, an orange roll cage with a lamp bar of two lamps in the tier's glow | 0.86 long, 0.65 wide, 0.67 tall | 2,192 |
-| `skimmer` | a lens-shaped saucer (`veined`: cream, chrome, then violet veins) with a rim of the tier's trim, a glass sensor dome, an orange dive fin, one glowing eye in a gunmetal socket and a glowing ring under it (PULSE), its lowest point 0.62 up, bobbing | 0.61 across | 598 |
-| `siege_walker` | a cream chamfered hull on two digitigrade legs (gunmetal hip joints under orange caps, hull-mid thighs, knee joints with caps of the tier's trim, cream shins with pistons, broad dark feet), two gun arms (a cream pod with an orange top plate, twin gunmetal barrels, muzzles in the tier's glow), the colonist pilot on top behind a glass windscreen, a mast with a lamp of the tier's glow blinking | 1.50 tall, 0.93 wide | 2,820 |
-| `hover_tank` | a low cream hull on orange chamfered skirts, the skirts' lower edges and the underside glowing in the tier's glow (PULSE), two rear thrusters; a turret on a ring of the tier's trim with a gunmetal mantlet, one fat barrel, a muzzle collar of the tier's trim and a glowing bore, and a hatch with the pilot's helmet and shoulders over a small windscreen; it bobs | 1.25 long, 0.90 wide, 0.70 tall | 1,992 |
-| `titan` | a giant biped: hull-mid thighs and cream shins under orange plates, gunmetal knee joints with caps of the tier's trim, big dark feet with toe caps of the tier's trim; a cream bridge with an orange rear block capped in the tier's trim, two colonists seated behind a wide glass windscreen, two huge cannon arms (cream housings with orange top plates, fat gunmetal barrels, collars of the tier's trim, glowing bores) and an antenna mast with a lamp of the tier's glow blinking | 2.46 tall, 1.82 wide | 4,286 |
-| `gunship` | a cream chamfered fuselage and nose, the pilot behind a glass windscreen on the nose, a gunmetal chin gun with a glowing muzzle, hull-mid stub wings carrying a cream nacelle at each tip with a band of the tier's glow and a cap of the tier's trim, a tail boom with orange fins; two counter-rotating rotors (`LowPolyMesh.spin`, 9 radians a second), each a sunk gunmetal hub, the blur disc and three dark blades; its lowest point 1.23 up, bobbing | 1.60 across the rotors, 1.28 long | 2,044 (each rotor 106) |
-| `bomber` | a cream centre body, two wings swept 34° (`veined`) with leading edges of the tier's trim and orange winglets, two cream engines on the wing roots with dark intakes and exhausts and flame cones in the tier's glow, a gunmetal rack across the body and the wing roots with a row of four orange bombs under it, the pilot behind a small windscreen; its lowest point 1.61 up, bobbing | 1.83 span, 0.93 long | 1,958 |
+| `dune_runner` | an open buggy: a cream chamfered hull, deck plates on a long fender along each side over the wheels and round the engine block, an orange bonnet, a bumper of the tier's trim, an engine block of the tier's panels with two glowing exhausts behind, four chunky dark tyres with broad hub caps of the tier's trim, the colonist driver seated behind the dash at a steering wheel, an orange roll cage carrying a pintle twin gun (a gunmetal receiver, two 0.035 barrels, muzzles in the tier's glow) between two lamps of the tier's glow | 0.86 long, 0.68 wide, 0.78 tall | 2,072 (2,102 from Gold) |
+| `skimmer` | a lens-shaped saucer 0.7 across, its underside the tier's hull and its top `veined`, a rim of the tier's trim and a second trim ring round its crown, four glow slots round a glass sensor dome with a dark iris and a glowing pupil, a tall orange heading fin, two gunmetal gun pods under the front rim with glowing tips, and a glowing ring under it (PULSE); its lowest point 0.62 up, bobbing | 0.70 across | 1,014 |
+| `siege_walker` | a cream chamfered hull with a chest band (orange to Gold, the tier's trim above) on two digitigrade legs (gunmetal hip joints under orange caps, thighs of the tier's panels with orange plates, knee joints with caps of the tier's trim, cream shins, hull-mid feet with toe caps of the tier's trim), two big gun arms (a cream pod with an orange top plate, twin 0.042 gunmetal barrels out of a shared shroud, muzzles in the tier's glow), the colonist pilot sunk behind a glass windscreen and a dashboard, a block behind it carrying the deck plate, a mast with a lamp of the tier's glow blinking | 1.50 tall, 0.98 wide | 2,882 (2,892 from Gold) |
+| `hover_tank` | a cream hull 0.8 by 1.2 floating 0.22 up over a glowing underside, its deck plate round the turret, orange skirts 0.14 tall flared 20° out with three glowing vents each (PULSE), their lowest edge 0.18 up, two gunmetal thrusters on the rear corners angled out with glowing mouths; a tall turret (a drum 0.25 tall) on a ring of the tier's trim with a cap of the tier's trim, an orange mantlet, one fat barrel (0.09) with collars of the tier's trim at its middle and muzzle and a glowing bore, and a hatch (0.13) with the pilot sunk behind a small windscreen of the same radius; it bobs | 1.42 long, 0.98 wide, 0.95 tall | 2,104 (2,114 from Gold) |
+| `titan` | a giant biped: hull-mid thighs and cream shins under orange plates (the plate layer at two repeats a unit), gunmetal knee joints with caps of the tier's trim, big dark feet with toe caps of the tier's trim; a cream bridge with an orange rear block capped in the tier's trim, two colonists seated behind a wide glass windscreen and a gunmetal dashboard, two huge cannon arms (cream housings with orange top plates, fat gunmetal barrels, collars of the tier's trim, glowing bores) and an antenna mast with a lamp of the tier's glow blinking | 2.46 tall, 1.82 wide | 4,340 |
+| `gunship` | a cream chamfered fuselage with a dark belly band and its deck plate on the roof, a nose with the pilot sunk behind a glass windscreen, a gunmetal twin chin gun (two 0.04 barrels, glowing muzzles), hull-mid stub wings carrying a cream nacelle at each tip with a band of the tier's glow and a cap of the tier's trim, a tail boom (the hull, the tier's trim from Obsidian) with orange fins; two counter-rotating rotors (`LowPolyMesh.spin`, 9 radians a second), each a sunk gunmetal hub under a trim cap, three dark blades and a glowing ring round their tips; its lowest point 1.22 up, bobbing | 1.60 across the rotors, 1.40 long | 2,466 (2,476 from Gold) |
+| `bomber` | a cream centre body with its deck plate along the top, two wings swept 34° (`veined`) with leading edges of the tier's trim and orange winglets, two cream engines sunk in the wing roots with intake rings of the tier's trim, dark intakes and exhausts and flame cones in the tier's glow; six orange bombs on show: two under a gunmetal rack in the bay, one under each wing outboard of its engine and one on a pylon under each wingtip; the pilot sunk behind a small windscreen; its lowest point 1.61 up, bobbing | 1.83 span, 0.93 long | 2,500 (2,510 from Gold) |
 
 "Cream" in the table is the tier's hull (`hull()`), "hull mid" its panels (`panel()`). The counts
-are the same at every tier, since a tier only swaps surfaces. The `unit_gallery` harness scenario
+are the same at every tier, since a tier only swaps surfaces, but for a deck plate's trim strip
+(ten more from Gold). The `unit_gallery` harness scenario
 renders every type at every tier, a row a tier, and checks each against the budget, the
 instances, the kit's layers, the size table above within 20%, the hover heights and the ground,
 and every shot for units under the HUD's buttons (`tools/harness/README.md`); its size-24 shot is
