@@ -155,6 +155,9 @@ const LASER_DOME := Vector2(0.68, 0.36)
 const LASER_BORE := 0.09
 const LASER_LENGTH := 0.8
 const LASER_CAP := 0.14
+## Where the laser turret's barrels pitch, in the head's space before its heading: through the
+## lower pair's roots.
+const LASER_TRUNNION := Vector3(0, 0.29, 0.45)
 ## The laser turret from L6, by level from L6: the plinth's height, and how far the mount lifts
 ## the head above the turret ring.
 const LASER_PLINTHS := [0.5, 0.5, 0.58, 0.58, 0.64]
@@ -209,6 +212,9 @@ const FLAK_BRAKE := 0.16
 ## deck.
 const FLAK_ROW := 0.22
 const FLAK_RING_LIFT := 1.95
+## Where the flak cannon's barrels pitch, in the head's space before its heading: through the
+## lower row's roots.
+const FLAK_TRUNNION := Vector3(0, 0.4, 0.05)
 ## The shield generator from L5, by level from L5: the plinth's height, and how much higher the orb
 ## floats, the pylons growing with it; the field ring's and the L7 hovering ring's distance out
 ## from the orb, and the hovering ring's drop under its centre.
@@ -236,8 +242,15 @@ const SENTRY_RISES := [0.15, 0.24, 0.38, 0.5]
 const SENTRY_RING_INNER := 0.96
 const SENTRY_RING_OUTER := 1.08
 const SENTRY_RING_LIFT := 0.2
-const SENTRY_MANTLET := Vector3(0.66, 0.08, 0.36)
+const SENTRY_MANTLET := Vector3(0.78, 0.08, 0.36)
+## The cheeks the mantlet stands on, at its ends either side of the gun heads: their thickness
+## across and their depth.
+const SENTRY_CHEEK := Vector3(0.05, 0.0, 0.3)
+## How high over the lid the mantlet's underside stands: clear of the gun heads as they pitch up.
+const SENTRY_MANTLET_LIFT := 0.32
 const SENTRY_CROWN_BACK := 0.3
+## How high over the lid the cloaked sentry's guns pitch: through their barrels' roots.
+const SENTRY_TRUNNION := 0.08
 ## The gravity well: how high its core floats over the well to L3 (higher from L4 by WELL_LIFTS),
 ## the core's radius to L3, the gyro rings' thickness, and the rotor's height over the core,
 ## clear of the rings' tumble.
@@ -268,7 +281,7 @@ const EMP_RING_DROP := 0.14
 ## The railgun to L3, by level: how far the mount lifts the gun (its housing clear of the cans'
 ## tops, so it turns over them in battle); the rails' width, the gap between them where the strip
 ## runs, and the spine under them.
-const RAIL_LIFTS_LOW := [0.58, 0.61, 0.63]
+const RAIL_LIFTS_LOW := [0.7, 0.71, 0.72]
 const RAIL_WIDE := 0.2
 const RAIL_GAP := 0.16
 const RAIL_SPINE := 0.3
@@ -276,10 +289,12 @@ const RAIL_SPINE := 0.3
 ## over the drum; the capacitor cans' height on the drum, and how far the rear row and the L5
 ## front bank stand out on the plinth. The L6 targeting ring's height over the gun's deck.
 const RAIL_PLINTHS := [0.34, 0.34, 0.46, 0.5]
-const RAIL_LIFTS := [0.65, 0.7, 0.9, 1.1]
+const RAIL_LIFTS := [0.73, 0.75, 0.9, 1.1]
 const RAIL_CAN := 0.5
 const RAIL_ROW := 0.98
-const RAIL_RING_LIFT := 1.05
+## How high over the mount's top the railgun's rail assembly pitches.
+const RAIL_TRUNNION := 0.2
+const RAIL_RING_LIFT := 1.35
 ## The ion beam's lens housing's radius, and from L3 its cowl's.
 const ION_HOUSING := 0.39
 const ION_COWL := 0.47
@@ -300,12 +315,15 @@ const ORBITAL_PITCHES := [35.0, 31.0, 28.0]
 const ORBITAL_BANDS := [0.08, 0.42, 0.84]
 const ORBITAL_RING_AT := 0.63
 ## The fire-control spire on the left corner: its tower's steps from the foot up, each [width,
-## height], its lens's height over the foot, the halo's radius round the lens and its vanes' reach
-## out from it, and from L4 the targeting beam's length up from the lens.
+## height], its lens's height over the foot, how far behind the gun's axis it stands on the
+## bunker, the halo's radius round the lens and its vanes' reach out from it (small enough that the
+## spire turning with the gun stays within the footprint), and from L4 the targeting beam's length
+## up from the lens.
 const ORBITAL_STEPS := [Vector2(0.34, 0.8), Vector2(0.27, 0.7), Vector2(0.2, 0.5)]
 const ORBITAL_SPIRE := 2.2
-const ORBITAL_HALO := 0.6
-const ORBITAL_VANE := 0.48
+const ORBITAL_SPIRE_AT := 1.15
+const ORBITAL_HALO := 0.45
+const ORBITAL_VANE := 0.2
 const ORBITAL_BEAM := 1.3
 ## The way the spire's lens faces: towards the camera, tilted up to meet its 35-degree look down.
 const TOWARD_LENS := Vector3(0.5792, 0.5736, 0.5792)
@@ -380,10 +398,15 @@ static func build_laser_turret(p: Parts, level: int) -> void:
 	var bore := LASER_BORE if low else 0.07 + 0.012 * mini(level, 5)
 	var length := LASER_LENGTH if low else 0.5 + 0.04 * mini(level, 5)
 	var barrel := BARREL if p.tier < Parts.Tier.CHROME else Parts.CHROME_ROUND
+	# The barrels pitch on their own part riding the head, about a trunnion through the lower pair's
+	# roots, so the dome stays level while they dip at a unit close in or rise at a far one.
+	var trunnion := LowPolyMesh.turn(LASER_TRUNNION, heading)
+	var guns := p.riding(head, pivot + trunnion, Motion.swing(Vector3.UP, 0.0, 1.0))
+	guns.socket("trunnion", Vector3.ZERO, Vector3.UP)
 	var pairs: Array[Vector3] = [Vector3(0.18, 0.29, 0.5)]
 	if level >= 7:
 		pairs.append(Vector3(0.15, 0.58, 0.5))
-		head.box_chamfered(Vector3(0.6, 0.2, 0.34), 0.04, LowPolyMesh.turn(Vector3(0, 0.45, 0.46), heading),
+		guns.box_chamfered(Vector3(0.6, 0.2, 0.34), 0.04, LowPolyMesh.turn(Vector3(0, 0.45, 0.46), heading) - trunnion,
 			_by_tier(p.tier, DENSE, Parts.CHROME, Parts.OBSIDIAN), heading)
 	for pair: int in pairs.size():
 		var scale := 1.0 if pair == 0 else 0.85
@@ -392,33 +415,33 @@ static func build_laser_turret(p: Parts, level: int) -> void:
 		# The upper pair is thinner, so it takes fewer sides.
 		var sides := 16 if pair == 0 else 12
 		for k: int in 2:
-			var root := LowPolyMesh.turn(Vector3((2 * k - 1) * pairs[pair].x, pairs[pair].y, pairs[pair].z), heading)
-			head.prism(thick, thick, long, sides, root, barrel, along)
+			var root := LowPolyMesh.turn(Vector3((2 * k - 1) * pairs[pair].x, pairs[pair].y, pairs[pair].z), heading) - trunnion
+			guns.prism(thick, thick, long, sides, root, barrel, along)
 			if low:
 				# A red emitter cap round the muzzle.
-				head.tube(thick * 0.5, LASER_CAP, 0.14, sides, _at(root, Vector3(0, long - 0.12, 0), along), ARMOUR_ROUND, along)
+				guns.tube(thick * 0.5, LASER_CAP, 0.14, sides, _at(root, Vector3(0, long - 0.12, 0), along), ARMOUR_ROUND, along)
 			else:
-				head.tube(thick * 0.5, thick + 0.035, 0.12, sides, _at(root, Vector3(0, long - 0.1, 0), along),
+				guns.tube(thick * 0.5, thick + 0.035, 0.12, sides, _at(root, Vector3(0, long - 0.1, 0), along),
 					GOLD if p.tier >= Parts.Tier.GOLD else Parts.GUNMETAL, along)
 			# The muzzle sockets, the shots leaving them in turn: the lower pair's, then the upper's. To L5
 			# each sits at its red cap's end.
 			var barrel_index := pair * 2 + k
-			head.socket("muzzle" if barrel_index == 0 else "muzzle_%d" % (barrel_index + 1),
+			guns.socket("muzzle" if barrel_index == 0 else "muzzle_%d" % (barrel_index + 1),
 				_at(root, Vector3(0, long + (0.02 if low else 0.03), 0), along), LowPolyMesh.turn(Vector3.UP, along))
 			if level < 8:
-				head.orb(thick * 0.85, sides if pair == 0 else 10, 8 if pair == 0 else 4, _at(root, Vector3(0, long + 0.03, 0), along),
+				guns.orb(thick * 0.85, sides if pair == 0 else 10, 8 if pair == 0 else 4, _at(root, Vector3(0, long + 0.03, 0), along),
 					LASER_PULSE.phased(0.5 * k))
 			else:
 				# A violet focusing crystal in the muzzle: a long point out, a short one back.
-				head.cone(thick * 0.8, 0.2 * scale, 8, _at(root, Vector3(0, long + 0.02, 0), along), FOCUS.phased(0.5 * k), along)
-				head.cone(thick * 0.8, 0.06, 8, _at(root, Vector3(0, long + 0.02, 0), along), FOCUS.phased(0.5 * k),
+				guns.cone(thick * 0.8, 0.2 * scale, 8, _at(root, Vector3(0, long + 0.02, 0), along), FOCUS.phased(0.5 * k), along)
+				guns.cone(thick * 0.8, 0.06, 8, _at(root, Vector3(0, long + 0.02, 0), along), FOCUS.phased(0.5 * k),
 					Vector3(-90, along.y, 0))
 			if level >= 6:
-				head.box(Vector3(0.04, 0.025, long * 0.5), _at(root, Vector3(0, thick - 0.012, long * 0.25), heading), glow,
+				guns.box(Vector3(0.04, 0.025, long * 0.5), _at(root, Vector3(0, thick - 0.012, long * 0.25), heading), glow,
 					heading)
 				if pair == 0:
 					for ring: float in [0.2, 0.32]:
-						Parts.torus(head, thick + 0.012, 0.026, 12, 6, _at(root, Vector3(0, ring, 0), along), glow, along)
+						Parts.torus(guns, thick + 0.012, 0.026, 12, 6, _at(root, Vector3(0, ring, 0), along), glow, along)
 	if level >= 2:
 		var cheek := Vector3(0.14, 0.34, 0.62) if level < 6 else Vector3(0.16, 0.44, 0.72)
 		# To L5 the cheeks are cream, so they part from the red dome and deck.
@@ -498,6 +521,8 @@ static func build_missile_battery(p: Parts, level: int) -> void:
 	# The launcher scans on the deck: its arms, the pods and their tubes, built about the deck's centre.
 	var launcher := p.moving(Vector3(0, deck, 0), Motion.swing(Vector3.UP, 15.0, 7.0))
 	var trunnion := Vector3(0, 0.62 if level < 6 else MISSILE_TRUNNION, 0)
+	# The launcher pitches as a whole about its trunnion, raising its tubes at an aircraft.
+	launcher.socket("trunnion", trunnion, Vector3.UP)
 	var trim := GOLD if p.tier >= Parts.Tier.GOLD else Parts.GUNMETAL
 	for side: float in [-1.0, 1.0]:
 		var edge := right if side > 0.0 else -left
@@ -713,6 +738,8 @@ static func build_plasma_mortar(p: Parts, level: int) -> void:
 	gun.disc(0.32, 20, _at(mouth, Vector3(0, muzzle - 0.3, 0), tilt), PLASMA_PULSE.phased(0.5), tilt)
 	gun.tube(0.44, 0.47, 0.12, 20, _at(mouth, Vector3(0, 0.22, 0), tilt), ARMOUR_ROUND, tilt)
 	gun.socket("muzzle", _at(mouth, Vector3(0, muzzle, 0), tilt), LowPolyMesh.turn(Vector3.UP, tilt))
+	# The barrel pitches about the chamber's centre, steeper for a closer target.
+	gun.socket("trunnion", breech, Vector3.UP)
 	if level < 5:
 		return
 	# Plasma coils round the breech: cyan, violet from the Obsidian tier.
@@ -966,23 +993,28 @@ static func build_flak_cannon(p: Parts, level: int) -> void:
 	var along := LowPolyMesh.turn(Vector3.UP, tilt)
 	var barrel := BARREL if p.tier < Parts.Tier.CHROME else Parts.CHROME_ROUND
 	var shell := LASER_BLINK if level < 7 else CRYSTAL_BLINK
+	# The barrels pitch on their own part riding the head, about a trunnion through their roots, so
+	# the carriage and the radar stay level while they rise at an aircraft.
+	var trunnion := LowPolyMesh.turn(FLAK_TRUNNION, heading)
+	var guns := p.riding(head, centre + trunnion, Motion.swing(Vector3.UP, 0.0, 1.0))
+	guns.socket("trunnion", Vector3.ZERO, Vector3.UP)
 	for side: float in [-1.0, 1.0]:
 		head.box_chamfered(Vector3(pack, 0.38 + FLAK_ROW * (rows - 1), 0.56), 0.04,
 			LowPolyMesh.turn(Vector3(side * (0.33 + pack * 0.5), 0.12, 0), heading), _by_tier(p.tier, SHELL, ARMOUR, ARMOUR), heading)
 		for k: int in per_side:
 			var root := LowPolyMesh.turn(Vector3(side * (first + spacing * (k % columns)), 0.4 + FLAK_ROW * (k / columns), 0.05),
-				heading)
+				heading) - trunnion
 			var length := 1.05
-			head.prism(bore, bore, length, 16, root, barrel, tilt)
+			guns.prism(bore, bore, length, 16, root, barrel, tilt)
 			# A muzzle brake: gunmetal, gold from the Gold tier.
 			var brake := GOLD if p.tier >= Parts.Tier.GOLD else Parts.GUNMETAL
 			if fat:
-				head.tube(bore * 0.5, FLAK_BRAKE, 0.2, 16, _at(root, Vector3(0, length - 0.16, 0), tilt), brake, tilt)
+				guns.tube(bore * 0.5, FLAK_BRAKE, 0.2, 16, _at(root, Vector3(0, length - 0.16, 0), tilt), brake, tilt)
 			else:
-				head.tube(0.04, 0.085, 0.16, 16, _at(root, Vector3(0, length - 0.12, 0), tilt), brake, tilt)
-			head.orb(bore * 0.85, 12, 6, _at(root, Vector3(0, length + 0.05, 0), tilt), shell)
+				guns.tube(0.04, 0.085, 0.16, 16, _at(root, Vector3(0, length - 0.12, 0), tilt), brake, tilt)
+			guns.orb(bore * 0.85, 12, 6, _at(root, Vector3(0, length + 0.05, 0), tilt), shell)
 			var muzzle := k * 2 + (0 if side < 0.0 else 1)
-			head.socket("muzzle" if muzzle == 0 else "muzzle_%d" % (muzzle + 1), _at(root, Vector3(0, length + 0.1, 0), tilt), along)
+			guns.socket("muzzle" if muzzle == 0 else "muzzle_%d" % (muzzle + 1), _at(root, Vector3(0, length + 0.1, 0), tilt), along)
 		if level >= 3:
 			head.prism(0.18, 0.18, 0.2, 16, LowPolyMesh.turn(Vector3(side * (0.33 + pack), 0.22, -0.12), heading),
 				SHELL_MID, heading + Vector3(0, 0, -90 * side))
@@ -1021,8 +1053,13 @@ static func build_flak_cannon(p: Parts, level: int) -> void:
 		var high := rise - 0.1
 		m.lathe(PackedVector2Array([Vector2(_neck(low, rise) + 0.012, low), Vector2(_neck(high, rise) + 0.012, high)]), 20,
 			Vector3(0, top, 0), VEIN_PANEL, Vector3.ZERO, -30.0, 120.0)
-		var ring := p.moving(Vector3(0, deck + FLAK_RING_LIFT, 0), Motion.spin(Vector3.UP, 0.7))
-		_hover_ring(ring, 0.36, 0.48, p.tier)
+		if p.tier >= Parts.Tier.CROWN:
+			var ring := p.moving(Vector3(0, deck + FLAK_RING_LIFT, 0), Motion.spin(Vector3.UP, 0.7))
+			_hover_ring(ring, 0.36, 0.48, p.tier)
+		else:
+			# Below the Crown the ring is built into the head, turning with it but not on its own, so
+			# the head, the radar and the barrels stay within the three moving parts.
+			_hover_ring(head, 0.36, 0.48, p.tier, Vector3(0, FLAK_RING_LIFT, 0))
 	if level >= 8:
 		_plinth_filigree(m, 1.15)
 		m.ring(0.6, 0.64, 0.1, 20, Vector3(0, top + 0.04, 0), Parts.FILIGREE)
@@ -1141,7 +1178,8 @@ static func build_arc_tower(p: Parts, level: int) -> void:
 ## level. L4 (Chrome): a chrome skirt
 ## banded in defence red, a chrome lid and gun heads with chrome barrels, cyan seams up the pod's
 ## corners the camera sees and round its shoulder, and a cyan cloak shimmering over the pod's
-## walls (a hologram). L5 a broad chrome mantlet bridging the gun heads, its front edge and a
+## walls (a hologram). L5 a broad chrome mantlet bridging the gun heads, raised over them so they
+## pitch up under it, its front edge and a
 ## sensor dome on it glowing cyan, and twin, longer barrels on each gun. L6 (Obsidian): an obsidian pod, skirt, lid, heads and
 ## mantlet, glowing violet vein panels on the shoulder and the skirt the camera sees, veins round
 ## the lid, violet crystal sights, the cloak and the mantlet's edge and dome violet, and a cloak ring
@@ -1183,19 +1221,33 @@ static func build_cloaked_sentry(p: Parts, level: int) -> void:
 	if level >= 2:
 		guns = [-0.17, 0.17]
 	var yaw := SCREEN_RIGHT - 30.0
+	# The gun heads pitch on their own part riding the lid, about a trunnion through them, so the pod
+	# and the mantlet stay while the guns dip at a unit close in.
+	# To L4 the lid is nothing but its guns, so the lid itself pitches.
+	var trunnion := Vector3(0, SENTRY_TRUNNION, 0)
+	var on_lid := level < 5
+	var heads := lid if on_lid else p.riding(lid, base + Vector3(0, top + 0.05, 0) + trunnion,
+		Motion.swing(Vector3.UP, 0.0, 1.0))
+	var shift := Vector3.ZERO if on_lid else trunnion
+	heads.socket("trunnion", trunnion - shift, Vector3.UP)
 	for k: int in guns.size():
-		_sentry_gun(lid, LowPolyMesh.turn(Vector3(guns[k], 0, 0), Vector3(0, yaw, 0)), yaw, level, p.tier, k, guns.size())
+		_sentry_gun(heads, LowPolyMesh.turn(Vector3(guns[k], 0, 0), Vector3(0, yaw, 0)) - shift, yaw, level, p.tier, k,
+			guns.size())
 	if level >= 5:
-		# A broad armoured mantlet bridging the two gun heads, its front edge and a sensor dome on it
-		# lit (cyan, violet from the Obsidian tier).
+		# A broad armoured mantlet bridging the two gun heads, standing on two cheeks either side of
+		# them, high enough that they pitch up under it; its front edge and a sensor dome on it lit
+		# (cyan, violet from the Obsidian tier).
 		var heading := Vector3(0, yaw, 0)
-		lid.box_chamfered(SENTRY_MANTLET, 0.03, Vector3(0, 0.17, 0), _by_tier(p.tier, SHELL_MID, Parts.CHROME, Parts.OBSIDIAN),
-			heading)
+		var plate := _by_tier(p.tier, SHELL_MID, Parts.CHROME, Parts.OBSIDIAN)
+		lid.box_chamfered(SENTRY_MANTLET, 0.03, Vector3(0, SENTRY_MANTLET_LIFT, 0), plate, heading)
+		for side: float in [-1.0, 1.0]:
+			lid.box_chamfered(Vector3(SENTRY_CHEEK.x, SENTRY_MANTLET_LIFT, SENTRY_CHEEK.z), 0.015,
+				LowPolyMesh.turn(Vector3(side * (SENTRY_MANTLET.x - SENTRY_CHEEK.x) * 0.5, 0, 0), heading), plate, heading)
 		var lit := Parts.CORE_GLOW if p.tier >= Parts.Tier.OBSIDIAN else Parts.CYAN_STRIP
-		lid.box(Vector3(SENTRY_MANTLET.x - 0.08, 0.04, 0.02), LowPolyMesh.turn(Vector3(0, 0.19, SENTRY_MANTLET.z * 0.5 + 0.005), heading),
+		lid.box(Vector3(SENTRY_MANTLET.x - 0.08, 0.04, 0.02), LowPolyMesh.turn(Vector3(0, SENTRY_MANTLET_LIFT + 0.02, SENTRY_MANTLET.z * 0.5 + 0.005), heading),
 			lit, heading)
 		# A glowing sensor dome on top, the step that reads from across the base.
-		lid.dome(0.13, 0.1, 16, 4, Vector3(0, 0.17 + SENTRY_MANTLET.y, 0), lit)
+		lid.dome(0.13, 0.1, 16, 4, Vector3(0, SENTRY_MANTLET_LIFT + SENTRY_MANTLET.y, 0), lit)
 	if level >= 7:
 		# One gold crown on a stem behind the guns, holding the antimatter core up where the camera
 		# sees it.
@@ -1482,6 +1534,8 @@ static func build_railgun(p: Parts, level: int) -> void:
 		RAIL_CURRENT, aim)
 	gun.box(Vector3(0.16, 0.18, 0.06), _at(root, Vector3(0, 0.03, length - 0.06), aim), ION_PULSE, aim)
 	gun.socket("muzzle", _at(root, Vector3(0, 0.03, length + 0.02), aim), LowPolyMesh.turn(Vector3.BACK, aim))
+	# The whole assembly pitches about the top of its mount.
+	gun.socket("trunnion", Vector3(0, deck_g.y + RAIL_TRUNNION, 0), Vector3.UP)
 	# Three bold collars along the barrel, wider round the wider barrel to L3.
 	var pitch := (length - 0.75) / 3.0 if low else 0.75
 	var collar := Parts.FILIGREE if p.tier >= Parts.Tier.CROWN else _by_tier(p.tier, Parts.GUNMETAL, Parts.CHROME, Parts.OBSIDIAN)
@@ -1582,6 +1636,8 @@ static func build_ion_beam(p: Parts, level: int) -> void:
 		Vector2(0, 0), Vector2(0.18, 0.04), Vector2(0.3, 0.1), Vector2(0.18, 0.17), Vector2(0, 0.21),
 	]), 20, lens, lens_surf, aim)
 	gun.socket("muzzle", _at(lens, Vector3(0, 0.22, 0), aim), LowPolyMesh.turn(Vector3.UP, aim))
+	# The emitter pitches as a whole about the tripod's head, its rings with it.
+	gun.socket("trunnion", head, Vector3.UP)
 	# The focusing rings turn about the beam, alternate rings the other way, each with two glowing
 	# studs that show it turning. The studs stand out from the ring's outer edge, beyond the
 	# spokes, which run inside the rings. They ride the emitter.
@@ -1640,10 +1696,11 @@ static func build_ion_beam(p: Parts, level: int) -> void:
 	_ion_crown(gun, _at(lens, Vector3(0, 0.02, 0), aim), 0.36, 5, 0.24, aim)
 
 
-## A fire-control spire stands on the bunker's left corner at every level: a tower of three square
-## steps with trim lips, the top one glowing, a big glowing targeting lens in a gold rim, in a
-## chunky housing on top facing the camera, and round the lens a halo of three big pointed red vanes
-## turning slowly. From L3 the barrel grows longer each level and stands steeper, so it climbs
+## A fire-control spire stands on the bunker behind the breech at every level, turning with the
+## gun as it aims so the barrel never faces it: a tower of three square steps with trim lips, the
+## top one glowing, a big glowing targeting lens in a gold rim, in a chunky housing on top facing
+## the camera (as built), and a halo of three short pointed red vanes round the lens, turning
+## slowly at the Crown. From L3 the barrel grows longer each level and stands steeper, so it climbs
 ## higher within the footprint, one clean mass with three bold accelerator rings in place of the
 ## coils. L3 (Chrome): chrome plinth, bunker, breech and barrel, the rings chrome banded in cyan,
 ## the pad's cells ribbed chrome. L4 (Obsidian): a taller plinth with glowing violet vein panels on
@@ -1667,16 +1724,20 @@ static func build_orbital_cannon(p: Parts, level: int) -> void:
 	var heading := Vector3(0, yaw, 0)
 	var aim := Vector3(47.0 if level < 3 else float(ORBITAL_PITCHES[level - 3]), yaw, 0)
 	var trunnion := Vector3(0, deck + 0.36, 0)
-	# The gun elevates slowly about its trunnion: the cheeks, the breech block, the barrel and what it
-	# carries; in battle it turns to aim (BuildingView) over its elevation, its muzzle socket at the
-	# bore. The block's foot sits 0.3 down in the deck and the elevation slides it a further 0.06
-	# through the deck's top, between the cheeks, which hide where it meets the deck: by construction.
-	var gun := p.moving(trunnion, Motion.swing(LowPolyMesh.turn(Vector3.RIGHT, heading), 4.0, 9.0))
+	# The mount turns on the bunker to aim in battle (BuildingView), holding still in the base: the
+	# cheeks and the trunnion caps, and riding it the gun and, behind the breech, the fire-control
+	# spire, so the barrel never faces the spire whichever way it turns.
+	var mount := p.moving(trunnion, Motion.swing(Vector3.UP, 0.0, 1.0))
 	for side: float in [-1.0, 1.0]:
 		var cheek := LowPolyMesh.turn(Vector3(side * 0.6, 0, 0), heading)
-		gun.box_chamfered(Vector3(0.2, 0.78, 1.15), 0.06, Vector3(cheek.x, deck - trunnion.y, cheek.z), ARMOUR, heading)
-		gun.prism(0.22, 0.22, 0.1, 20, LowPolyMesh.turn(Vector3(side * 0.7, 0, 0), heading),
+		mount.box_chamfered(Vector3(0.2, 0.78, 1.15), 0.06, Vector3(cheek.x, deck - trunnion.y, cheek.z), ARMOUR, heading)
+		mount.prism(0.22, 0.22, 0.1, 20, LowPolyMesh.turn(Vector3(side * 0.7, 0, 0), heading),
 			GOLD if p.tier >= Parts.Tier.GOLD else Parts.GUNMETAL, heading + Vector3(0, 0, -90 * side))
+	# The gun elevates slowly about its trunnion between the cheeks: the breech block, the barrel and
+	# what it carries; in battle it pitches by its target's range in place of that swing, its muzzle
+	# socket at the bore. The block's foot sits 0.3 down in the deck and the elevation slides it a
+	# further 0.06 through the deck's top, between the cheeks, which hide where it meets the deck.
+	var gun := p.riding(mount, trunnion, Motion.swing(LowPolyMesh.turn(Vector3.RIGHT, heading), 4.0, 9.0))
 	gun.box_chamfered(Vector3(0.96, 0.95, 0.96), 0.08, LowPolyMesh.turn(Vector3(0, -0.45, 0), aim),
 		_by_tier(p.tier, Parts.HULL_LIGHT, Parts.CHROME, Parts.OBSIDIAN), aim)
 	var length := 1.2 + 0.15 * level if level < 3 else float(ORBITAL_LENGTHS[level - 3])
@@ -1689,6 +1750,8 @@ static func build_orbital_cannon(p: Parts, level: int) -> void:
 	]), 24, _at(barrel, Vector3(0, length, 0), aim), _by_tier(p.tier, SHELL, Parts.CHROME_ROUND, Parts.OBSIDIAN_ROUND), aim)
 	gun.disc(0.22, 20, _at(barrel, Vector3(0, length + 0.3, 0), aim), BORE_ION, aim)
 	gun.socket("muzzle", _at(barrel, Vector3(0, length + 0.38, 0), aim), LowPolyMesh.turn(Vector3.UP, aim))
+	# In battle the gun pitches about its trunnion by its target's range, in place of its slow swing.
+	gun.socket("trunnion", Vector3.ZERO, Vector3.UP)
 	gun.tube(0.42, 0.44, 0.08, 24, _at(barrel, Vector3(0, length + 0.12, 0), aim), GOLD if p.tier >= Parts.Tier.GOLD else ARMOUR_ROUND,
 		aim)
 	gun.ring(0.5, 0.53, 0.1, 24, _at(barrel, Vector3(0, length + 0.44, 0), aim), ION_HOLO, aim)
@@ -1713,34 +1776,42 @@ static func build_orbital_cannon(p: Parts, level: int) -> void:
 		Parts.torus(m, 1.0, 0.04, 24, 6, Vector3(0, deck - 0.04, 0), GOLD if p.tier >= Parts.Tier.GOLD else SHELL_MID)
 	# The fire-control spire: a stepped tower, chrome from the Chrome tier up, a bright mark on the
 	# dark Obsidian and Crown bunkers, a trim lip at each step and a glowing one at its top; its lens
-	# and lip glow cyan, violet from the Obsidian tier.
-	var spire := Parts.around(1.3, 135.0, top + 0.24)
+	# and lip glow cyan, violet from the Obsidian tier. It stands on the bunker behind the breech and
+	# rides the mount (its own part, built about its foot), so it turns with the gun.
+	var foot := Parts.around(ORBITAL_SPIRE_AT, 135.0, top + 0.24)
+	var tower := p.riding(mount, foot, Motion.swing(Vector3.UP, 0.0, 1.0))
 	var lens_glow := _by_tier(p.tier, ION_PULSE, Parts.CYAN_STRIP, LENS_VIOLET)
 	var trim := GOLD if p.tier >= Parts.Tier.GOLD else Parts.GUNMETAL
 	var rise := 0.0
 	for k: int in ORBITAL_STEPS.size():
 		var step: Vector2 = ORBITAL_STEPS[k]
-		m.box_chamfered(Vector3(step.x, step.y, step.x), 0.04, spire + Vector3(0, rise, 0),
+		tower.box_chamfered(Vector3(step.x, step.y, step.x), 0.04, Vector3(0, rise, 0),
 			_by_tier(p.tier, Parts.GUNMETAL, Parts.CHROME, Parts.CHROME))
 		rise += step.y
 		if k < ORBITAL_STEPS.size() - 1:
-			m.box_chamfered(Vector3(step.x + 0.06, 0.06, step.x + 0.06), 0.02, spire + Vector3(0, rise - 0.06, 0),
+			tower.box_chamfered(Vector3(step.x + 0.06, 0.06, step.x + 0.06), 0.02, Vector3(0, rise - 0.06, 0),
 				lens_glow if k == ORBITAL_STEPS.size() - 2 else trim)
-	var lens := spire + Vector3(0, ORBITAL_SPIRE, 0)
+	var lens := Vector3(0, ORBITAL_SPIRE, 0)
 	var lens_aim := Parts.facing(TOWARD_LENS)
-	Parts.drum(m, 0.48, 0.2, 0.05, 16, lens - TOWARD_LENS * 0.14, _by_tier(p.tier, ARMOUR_ROUND, Parts.CHROME_ROUND,
+	Parts.drum(tower, 0.48, 0.2, 0.05, 16, lens - TOWARD_LENS * 0.14, _by_tier(p.tier, ARMOUR_ROUND, Parts.CHROME_ROUND,
 		Parts.CHROME_ROUND), lens_aim)
-	m.tube(0.4, 0.47, 0.05, 16, lens + TOWARD_LENS * 0.06, trim, lens_aim)
-	m.disc(0.4, 16, lens + TOWARD_LENS * 0.065, lens_glow, lens_aim)
-	# The halo turns slowly round the lens: a ring and three pointed vanes swept back from it.
-	var halo := p.moving(lens, Motion.spin(Vector3.UP, 0.4))
-	Parts.torus(halo, ORBITAL_HALO, 0.04, 16, 4, Vector3(0, -0.04, 0), trim)
+	tower.tube(0.4, 0.47, 0.05, 16, lens + TOWARD_LENS * 0.06, trim, lens_aim)
+	tower.disc(0.4, 16, lens + TOWARD_LENS * 0.065, lens_glow, lens_aim)
+	# The halo round the lens: a ring and three pointed vanes swept back from it. At the Crown it
+	# turns slowly on a part of its own riding the spire; below, the parts' budget holds it still on
+	# the spire.
+	var halo := tower
+	var halo_at := lens
+	if p.tier >= Parts.Tier.CROWN:
+		halo = p.riding(tower, foot + lens, Motion.spin(Vector3.UP, 0.4))
+		halo_at = Vector3.ZERO
+	Parts.torus(halo, ORBITAL_HALO, 0.04, 16, 4, halo_at + Vector3(0, -0.04, 0), trim)
 	for k: int in 3:
 		var degrees := 120.0 * k + 30.0
-		_vane(halo, Parts.around(ORBITAL_HALO, degrees, 0.0), Parts.around(ORBITAL_HALO + ORBITAL_VANE, degrees + 28.0, 0.2),
-			0.26, 0.1, ARMOUR)
+		_vane(halo, halo_at + Parts.around(ORBITAL_HALO, degrees, 0.0),
+			halo_at + Parts.around(ORBITAL_HALO + ORBITAL_VANE, degrees + 28.0, 0.2), 0.26, 0.1, ARMOUR)
 	if level >= 4:
-		m.prism(0.07, 0.03, ORBITAL_BEAM, 12, lens + TOWARD_LENS * 0.07, Parts.CORE_GLOW)
+		tower.prism(0.07, 0.03, ORBITAL_BEAM, 12, lens + TOWARD_LENS * 0.07, Parts.CORE_GLOW)
 	# Lights round the bunker's lower tier blink in a chase.
 	for k: int in 8:
 		m.orb(0.07, 8, 3, Parts.around(1.2, 22.5 + 45.0 * k, bunker + 0.01),
@@ -1771,11 +1842,9 @@ static func build_orbital_cannon(p: Parts, level: int) -> void:
 	for degrees: float in [-22.5, 22.5, 67.5, 112.5]:
 		m.prism(0.11, 0.11, 0.06, 4, Parts.around(1.58, degrees, top), INLAY.phased(fposmod(degrees, 90.0) / 90.0),
 			Vector3(90, 90.0 - degrees, 0))
-	var along := LowPolyMesh.turn(Vector3.UP, aim)
-	# The uplink ring hovers between the second and the third accelerator ring, riding the gun.
-	var uplink := p.riding(gun, trunnion + _at(barrel, Vector3(0, 0.5 + (length - 0.7) * ORBITAL_RING_AT, 0), aim),
-		Motion.spin(along, 0.5))
-	_ion_focus(uplink, 0.62, 0.78, aim, p.tier)
+	# The uplink ring hovers between the second and the third accelerator ring, built into the gun
+	# (the mount, the gun and the spire take the parts' budget).
+	_ion_focus(gun, 0.62, 0.78, aim, p.tier, _at(barrel, Vector3(0, 0.5 + (length - 0.7) * ORBITAL_RING_AT, 0), aim))
 	if level < 5:
 		return
 	_plinth_filigree(m, 1.78)
@@ -1850,17 +1919,18 @@ static func _crown(m: LowPolyMesh, pos: Vector3, radius: float, points: int, spi
 		m.cone(spike * 0.35, spike, 8, pos + Parts.around(radius - 0.0175, 360.0 * k / points + 90.0, 0.06), Parts.GOLD_ROUND)
 
 
-## A ring hovering over a weapon, built about its own centre on a moving part: obsidian between
+## A ring hovering over a weapon, built about its own centre on a moving part (or about `at` on
+## one it shares): obsidian between
 ## `inner` and `outer`, glowing violet across its top, veins round its rim (gold at the Crown) and
 ## four red sights pointing in, all bobbing together.
-static func _hover_ring(s: LowPolyMesh, inner: float, outer: float, tier: int) -> void:
-	s.ring(inner, outer, 0.07, 24, Vector3.ZERO, HOVER)
-	s.lathe(PackedVector2Array([Vector2(outer - 0.02, 0.072), Vector2(inner + 0.02, 0.072)]), 24, Vector3.ZERO, HOVER_RIM)
-	s.lathe(PackedVector2Array([Vector2(outer + 0.006, 0.006), Vector2(outer + 0.006, 0.064)]), 24, Vector3.ZERO,
+static func _hover_ring(s: LowPolyMesh, inner: float, outer: float, tier: int, at: Vector3 = Vector3.ZERO) -> void:
+	s.ring(inner, outer, 0.07, 24, at, HOVER)
+	s.lathe(PackedVector2Array([Vector2(outer - 0.02, 0.072), Vector2(inner + 0.02, 0.072)]), 24, at, HOVER_RIM)
+	s.lathe(PackedVector2Array([Vector2(outer + 0.006, 0.006), Vector2(outer + 0.006, 0.064)]), 24, at,
 		HOVER_GOLD if tier >= Parts.Tier.CROWN else HOVER_VEINS)
 	for k: int in 4:
 		var degrees := 90.0 * k
-		s.box(Vector3(0.06, 0.05, 0.16), Parts.around(inner - 0.05, degrees, 0.01), HOVER_SIGHT, Vector3(0, 90.0 - degrees, 0))
+		s.box(Vector3(0.06, 0.05, 0.16), at + Parts.around(inner - 0.05, degrees, 0.01), HOVER_SIGHT, Vector3(0, 90.0 - degrees, 0))
 
 
 ## A surface by tier: `base` below the Chrome tier, `chrome` at it, `obsidian` from the Obsidian
