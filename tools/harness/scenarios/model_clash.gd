@@ -29,6 +29,14 @@ extends HarnessScenario
 ##   colour), on the clock with the parts' poses, at least BOB_SAMPLES samples a BOB period over
 ##   at least one. Pairs fail on a crossing; the body's are counted.
 ##
+## - A moving part that rides another (BuildingModels.RIDES_META, Parts.riding) is posed on the clock
+##   carried by it, as BuildingView carries it; against the body its own poses are taken with the
+##   part it rides at rest, and so against the part it rides: counted as for the body ("on its
+##   carrier"), not paired, since a ring round a barrel is mounted on it.
+## - An aiming part (a moving part with a `muzzle` socket, which BuildingView turns towards its
+##   target in battle) is also turned through a whole turn about +Y through its pivot, every
+##   SPIN_STEP degrees, against the body: counted as its "aim sweep", never failed, for the review.
+##
 ## Each model with moving parts gets one line: its parts and motions, its pair crossings and its
 ## poses touching the body per part.
 
@@ -61,6 +69,10 @@ class Shape:
 	var box := AABB()
 	var motion: Motion
 	var pivot := Vector3.ZERO
+	## The part it rides (Parts.riding), null for none.
+	var carrier: Shape = null
+	## Whether it aims in battle (its node carries a `muzzle` socket).
+	var aims := false
 
 
 ## Where the last crossing _edges_cross found is, in the model's space.
@@ -98,6 +110,11 @@ func _check_model(label: String, model: Node3D) -> void:
 			var part := Shape.new()
 			part.motion = child.get_meta(BuildingModels.MOVE_META)
 			part.pivot = (child as Node3D).position
+			if child.has_meta(BuildingModels.RIDES_META):
+				part.carrier = parts[int(child.get_meta(BuildingModels.RIDES_META))]
+			if child.has_meta(BuildingModels.SOCKETS_META):
+				var sockets: Dictionary = child.get_meta(BuildingModels.SOCKETS_META)
+				part.aims = sockets.has("muzzle")
 			for grandchild: Node in child.get_children():
 				if grandchild is MeshInstance3D and not grandchild.has_meta(BuildingModels.OUTLINE_META):
 					_read((grandchild as MeshInstance3D).mesh, part)
@@ -112,6 +129,8 @@ func _check_model(label: String, model: Node3D) -> void:
 	var pair_hits := PackedStringArray()
 	for i: int in parts.size():
 		for j: int in range(i + 1, parts.size()):
+			if parts[j].carrier == parts[i] or parts[i].carrier == parts[j]:
+				continue
 			_pairs += 1
 			var at := _pair_crossing(parts[i], parts[j], 0.0)
 			var with_bob := ""
@@ -126,6 +145,10 @@ func _check_model(label: String, model: Node3D) -> void:
 	for i: int in parts.size():
 		motions.append("%d %s" % [i + 1, str(Motion.Kind.keys()[parts[i].motion.kind]).to_lower()])
 		touching.append("%d %s" % [i + 1, _body_contact(parts[i], body, lift)])
+		if parts[i].carrier != null:
+			touching.append("%d on its carrier %s" % [i + 1, _body_contact(parts[i], _at_rest(parts[i].carrier), lift)])
+		if parts[i].aims:
+			touching.append("%d's aim sweep %s" % [i + 1, _aim_sweep(parts[i], body)])
 	check(pair_hits.is_empty(), "%s: %d moving part(s) (%s), %s; against the body: %s" % [label, parts.size(),
 		", ".join(motions), "no pair crossing" if pair_hits.is_empty() else "pairs crossing: " + ", ".join(pair_hits),
 		", ".join(touching)])
@@ -205,6 +228,10 @@ func _before(a: Vector3, b: Vector3) -> bool:
 func _pair_crossing(a: Shape, b: Shape, lift: float) -> float:
 	var step := minf(_step(a.motion), _step(b.motion))
 	var window := maxf(_cycle(a.motion), _cycle(b.motion))
+	for carrier: Shape in [a.carrier, b.carrier]:
+		if carrier != null:
+			step = minf(step, _step(carrier.motion))
+			window = maxf(window, _cycle(carrier.motion))
 	if a.motion.kind == Motion.Kind.SPIN and b.motion.kind == Motion.Kind.SPIN \
 			and absf(a.motion.axis.dot(b.motion.axis)) > 0.999:
 		var relative := absf(a.motion.rate * a.motion.axis.dot(b.motion.axis) - b.motion.rate)
@@ -216,8 +243,8 @@ func _pair_crossing(a: Shape, b: Shape, lift: float) -> float:
 	window = minf(window, PAIR_WINDOW)
 	for k: int in ceili(window / step) + 1:
 		var t := k * step
-		var at_a := a.motion.transform_at(t, a.pivot)
-		var at_b := b.motion.transform_at(t, b.pivot)
+		var at_a := _pose_at(a, t)
+		var at_b := _pose_at(b, t)
 		var box_a := (at_a * a.box).grow(lift + SLACK)
 		var box_b := (at_b * b.box).grow(lift + SLACK)
 		if not box_a.intersects(box_b):
@@ -248,11 +275,49 @@ func _body_contact(part: Shape, body: Shape, lift: float) -> String:
 	var bobbing := 0
 	for k: int in count:
 		var t := k * step
-		var at := part.motion.transform_at(t, part.pivot)
+		var at := _pose_at(part, t)
 		if not near.edges.is_empty() and _crosses(_posed(part, at, t, lift), part.edges,
 				_posed(near, Transform3D.IDENTITY, t, lift), near.edges, (at * part.box).grow(lift + SLACK)):
 			bobbing += 1
 	return "%d of %d, %d of %d with BOB" % [rigid, poses.size(), bobbing, count]
+
+
+## A part's pose on the clock at `t`, carried by the part it rides as BuildingView carries it.
+func _pose_at(part: Shape, t: float) -> Transform3D:
+	var at := part.motion.transform_at(t, part.pivot)
+	if part.carrier != null:
+		at = _pose_at(part.carrier, t) * Transform3D(Basis.IDENTITY, -part.carrier.pivot) * at
+	return at
+
+
+## A moving part's shape at rest in the model's space, to count another's contacts against it.
+func _at_rest(part: Shape) -> Shape:
+	var rest := Shape.new()
+	for point: Vector3 in part.points:
+		rest.points.append(point + part.pivot)
+	rest.edges = part.edges
+	rest.bob = part.bob
+	rest.phases = part.phases
+	rest.box = AABB(part.box.position + part.pivot, part.box.size)
+	return rest
+
+
+## How many of an aiming part's poses through a whole turn about +Y (every SPIN_STEP degrees)
+## touch the static body: "a of n".
+func _aim_sweep(part: Shape, body: Shape) -> String:
+	var poses: Array[Transform3D] = []
+	for k: int in roundi(360.0 / SPIN_STEP):
+		poses.append(Transform3D(Basis(Vector3.UP, deg_to_rad(SPIN_STEP * k)), part.pivot))
+	var swept := AABB()
+	for k: int in poses.size():
+		swept = (poses[k] * part.box) if k == 0 else swept.merge(poses[k] * part.box)
+	var near := _within(body, swept.grow(SLACK))
+	var touching := 0
+	for at: Transform3D in poses:
+		if not near.edges.is_empty() and _crosses(_posed(part, at, 0.0, 0.0), part.edges, near.points, near.edges,
+				(at * part.box).grow(SLACK)):
+			touching += 1
+	return "%d of %d" % [touching, poses.size()]
 
 
 ## The body's triangles whose bounds meet `region`, as a shape of their own.
