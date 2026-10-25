@@ -191,10 +191,15 @@ const MORTAR_BALCONY_RADIUS := 0.56
 const MORTAR_RACK := 0.34
 const MORTAR_CANISTER := 0.13
 const MORTAR_CANISTER_HEIGHT := 0.52
-## The flak cannon: how much higher its radar stands from L6, and the L7 targeting ring's height
-## over the deck.
+## The flak cannon: the bell mount's height under the head before the 0.12 a level it grows, how
+## much higher than the head's top its radar stands, and to L6 its fat barrels' radius and their
+## muzzle brakes'.
+const FLAK_RISE := 0.65
 const FLAK_RADAR_RAISE := 0.25
-## From L7 the height between the two rows of barrels.
+const FLAK_BORE := 0.11
+const FLAK_BRAKE := 0.16
+## From L7 the height between the two rows of barrels, and the targeting ring's height over the
+## deck.
 const FLAK_ROW := 0.22
 const FLAK_RING_LIFT := 1.6
 ## The shield generator from L5, by level from L5: the plinth's height, and how much higher the orb
@@ -855,10 +860,13 @@ static func build_shield_generator(p: Parts, level: int) -> void:
 		Parts.torus(m, 0.3, 0.05, 20, 8, orb + Vector3(0, orb_radius + 0.1, 0), HALO_GOLD)
 
 
-## The mount keeps growing taller every level. L5 (Chrome): chrome plinth, mount, carriage and
-## barrels, and a glowing cyan ammo belt feeding the carriage from the crate. L6 a second crate on
-## the near corner with its belt into the near armour pack, and a bigger chrome radar raised over
-## the packs. L7 (Obsidian): a taller plinth with glowing violet vein panels on its faces the
+## The head stands high on a bell mount that keeps growing taller every level: to L6 a red
+## carriage (the tier's plate from L5) between armour packs, cream to the Gold tier and red above,
+## with fat barrels angled 50 degrees up, one a side and two a side from L3, each with a muzzle
+## brake (gold from the Gold tier), and a big radar on a fat mast beside it. L5 (Chrome): chrome
+## plinth, mount, carriage and barrels, and a glowing cyan ammo belt feeding the carriage from
+## the crate. L6 a second crate on the near corner with its belt into the near armour pack, and a
+## bigger chrome radar. L7 (Obsidian): a taller plinth with glowing violet vein panels on its faces the
 ## camera sees, the mount and carriage obsidian veined violet, four barrels a side in two rows of
 ## two tipped with violet crystal shells, the belts violet, and a targeting ring hovering over the
 ## guns, turning.
@@ -868,32 +876,39 @@ static func build_flak_cannon(p: Parts, level: int) -> void:
 	var m := p.body
 	var plinth := 0.35 if level < 7 else (0.55 if level < 8 else 0.6)
 	var top := _plinth(m, 3, 1.15, plinth, ARMOUR, _by_tier(p.tier, Parts.GUNMETAL, Parts.CHROME_ROUND, Parts.OBSIDIAN_ROUND))
-	var rise := 0.35 + 0.12 * level
+	var rise := FLAK_RISE + 0.12 * level
 	m.lathe(PackedVector2Array([
 		Vector2(0.62, 0), Vector2(0.62, 0.12), Vector2(0.4, 0.26), Vector2(0.3, rise), Vector2(0, rise),
-	]), 20, Vector3(0, top, 0), _by_tier(p.tier, SHELL_MID, Parts.CHROME_ROUND, Parts.OBSIDIAN_ROUND))
+	]), 20, Vector3(0, top, 0), _by_tier(p.tier, SHELL, Parts.CHROME_ROUND, Parts.OBSIDIAN_ROUND))
 	var deck := top + rise
 	if level >= 2:
 		for degrees: float in [45.0, 225.0, 315.0]:
 			Parts.pipe_run(m, PackedVector3Array([Parts.around(0.95, degrees, top), Parts.around(0.34, degrees, deck - 0.05)]),
-				0.045, Parts.GUNMETAL)
+				0.07, Parts.GUNMETAL)
 	_crate(m, Parts.around(1.42, 315.0, Parts.PAD_HEIGHT))
 	var yaw := 120.0
 	var heading := Vector3(0, yaw, 0)
-	var tilt := Vector3(38, yaw, 0)
+	# To L6 two fat barrels, or four, angled 50 degrees up; from L7 the quad's thinner barrels.
+	var fat := level < 7
+	var tilt := Vector3(40.0 if fat else 38.0, yaw, 0)
 	var centre := Vector3(0, deck, 0)
 	Parts.drum(m, 0.44, 0.1, 0.03, 20, centre, Parts.GUNMETAL)
-	m.box_chamfered(Vector3(0.66, 0.54, 0.8), 0.07, centre + Vector3(0, 0.1, 0), _by_tier(p.tier, SHELL, Parts.CHROME, Parts.OBSIDIAN),
+	# The carriage: red to the Gold tier, between cream armour packs; the tier's plate above, between
+	# red ones.
+	m.box_chamfered(Vector3(0.66, 0.54, 0.8), 0.07, centre + Vector3(0, 0.1, 0), _by_tier(p.tier, ARMOUR, Parts.CHROME, Parts.OBSIDIAN),
 		heading)
-	m.box(Vector3(0.36, 0.05, 0.02), _at(centre, Vector3(0, 0.5, 0.401), heading), LASER, heading)
+	m.box(Vector3(0.36, 0.05, 0.02), _at(centre, Vector3(0, 0.5, 0.401), heading), _by_tier(p.tier, ION, LASER, LASER), heading)
 	if level >= 4:
 		m.box_chamfered(Vector3(0.7, 0.07, 0.84), 0.02, centre + Vector3(0, 0.56, 0),
 			GOLD if p.tier >= Parts.Tier.GOLD else Parts.HULL_MID, heading)
-	var per_side := 2 if level < 3 else (3 if level < 7 else 4)
+	var per_side := 1 if level < 3 else (2 if level < 7 else 4)
 	# From L7 the four barrels a side stand in two rows of two, so the quad shows.
 	var columns := per_side if level < 7 else 2
 	var rows := 1 if level < 7 else 2
-	var pack := 0.08 + 0.13 * columns
+	var bore := FLAK_BORE if fat else 0.06
+	var spacing := 2.0 * FLAK_BRAKE + 0.02 if fat else 0.13
+	var pack := 0.08 + spacing * columns
+	var first := 0.37 + spacing * 0.5 if fat else 0.41
 	# The barrels recoil together, kicking back `kick` from where they rest and easing out again;
 	# their muzzles blink and flare. The recoil takes BLINK's period, 1.2 s, at phase 0, and both
 	# run on the one animation clock (Motion.clock(), the shaders' anim_time), so each muzzle
@@ -907,31 +922,39 @@ static func build_flak_cannon(p: Parts, level: int) -> void:
 	var shell := LASER_BLINK if level < 7 else CRYSTAL_BLINK
 	for side: float in [-1.0, 1.0]:
 		m.box_chamfered(Vector3(pack, 0.38 + FLAK_ROW * (rows - 1), 0.56), 0.04,
-			_at(centre, Vector3(side * (0.33 + pack * 0.5), 0.12, 0), heading), ARMOUR, heading)
+			_at(centre, Vector3(side * (0.33 + pack * 0.5), 0.12, 0), heading), _by_tier(p.tier, SHELL, ARMOUR, ARMOUR), heading)
 		for k: int in per_side:
-			var root := _at(breech, Vector3(side * (0.41 + 0.13 * (k % columns)), 0.4 + FLAK_ROW * (k / columns), 0.05), heading)
+			var root := _at(breech, Vector3(side * (first + spacing * (k % columns)), 0.4 + FLAK_ROW * (k / columns), 0.05),
+				heading)
 			var length := 1.05
-			guns.prism(0.06, 0.06, length, 16, root, barrel, tilt)
-			guns.tube(0.04, 0.085, 0.16, 16, _at(root, Vector3(0, length - 0.12, 0), tilt),
-				GOLD if p.tier >= Parts.Tier.GOLD else Parts.GUNMETAL, tilt)
-			guns.orb(0.05, 12, 6, _at(root, Vector3(0, length + 0.05, 0), tilt), shell)
-			guns.cone(0.06, 0.16, 8, _at(root, Vector3(0, length + 0.08, 0), tilt),
-				FLARE.phased(flare / (6.0 if per_side < 4 else 8.0)), tilt)
+			guns.prism(bore, bore, length, 16, root, barrel, tilt)
+			# A muzzle brake: gunmetal, gold from the Gold tier.
+			var brake := GOLD if p.tier >= Parts.Tier.GOLD else Parts.GUNMETAL
+			if fat:
+				guns.tube(bore * 0.5, FLAK_BRAKE, 0.2, 16, _at(root, Vector3(0, length - 0.16, 0), tilt), brake, tilt)
+			else:
+				guns.tube(0.04, 0.085, 0.16, 16, _at(root, Vector3(0, length - 0.12, 0), tilt), brake, tilt)
+			guns.orb(bore * 0.85, 12, 6, _at(root, Vector3(0, length + 0.05, 0), tilt), shell)
+			guns.cone(bore, bore * 2.6, 8, _at(root, Vector3(0, length + 0.08, 0), tilt),
+				FLARE.phased(flare / (2.0 * per_side)), tilt)
 			flare += 1
 		if level >= 3:
 			m.prism(0.18, 0.18, 0.2, 16, _at(centre, Vector3(side * (0.33 + pack), 0.22, -0.12), heading),
 				SHELL_MID, heading + Vector3(0, 0, -90 * side))
 	var mast_foot := Parts.around(0.92, 135.0, top)
-	var mast := deck + 0.45 - top + (0.0 if level < 6 else FLAK_RADAR_RAISE)
-	m.prism(0.06, 0.05, mast, 16, mast_foot, _by_tier(p.tier, Parts.GUNMETAL, Parts.CHROME_ROUND, Parts.CHROME_ROUND))
+	var mast := deck + 0.45 - top + FLAK_RADAR_RAISE
+	_mast(m, mast_foot, mast, _by_tier(p.tier, Parts.GUNMETAL, Parts.CHROME_ROUND, Parts.CHROME_ROUND))
 	var radar := p.moving(mast_foot + Vector3(0, mast, 0), Motion.spin(Vector3.UP, Parts.DISH_RATE))
 	var face := Vector3(70, 0, 0)
-	var dish := 1.0 if level < 6 else 1.3
+	var dish := 1.5 if level < 6 else 1.8
 	radar.lathe(PackedVector2Array([
 		Vector2(0.06, 0) * dish, Vector2(0.32, 0.1) * dish, Vector2(0.3, 0.13) * dish, Vector2(0, 0.04) * dish,
 	]), 24, Vector3(0, 0.12, -0.08), _by_tier(p.tier, SHELL, Parts.CHROME_ROUND, Parts.CHROME_ROUND), face)
 	radar.prism(0.05, 0.05, 0.14, 16, Vector3.ZERO, Parts.GUNMETAL)
-	radar.orb(0.05 * dish, 12, 6, Vector3(0, 0.12, 0) + LowPolyMesh.turn(Vector3(0, 0.25 * dish, 0), face), LASER_PULSE)
+	var feed := Vector3(0, 0.12, 0) + LowPolyMesh.turn(Vector3(0, 0.25 * dish, 0), face)
+	# A short gunmetal strut holds the feed out over the dish's face.
+	radar.strut(Vector3(0, 0.12, -0.08) + LowPolyMesh.turn(Vector3(0, 0.08 * dish, 0), face), feed, 0.04, Parts.GUNMETAL)
+	radar.orb(0.05 * dish, 12, 6, feed, LASER_PULSE)
 	if level < 5:
 		return
 	# Glowing ammo belts feeding the guns from the crates: cyan, violet from the Obsidian tier.
@@ -954,7 +977,7 @@ static func build_flak_cannon(p: Parts, level: int) -> void:
 		_hover_ring(ring, 0.36, 0.48, p.tier)
 	if level >= 8:
 		_plinth_filigree(m, 1.15)
-		m.ring(0.6, 0.64, 0.06, 20, Vector3(0, top + 0.04, 0), Parts.FILIGREE)
+		m.ring(0.6, 0.64, 0.1, 20, Vector3(0, top + 0.04, 0), Parts.FILIGREE)
 		# The antimatter core round the mount's foot and in a gold housing on its near side.
 		Parts.torus(m, 0.52, 0.06, 20, 8, Vector3(0, top + 0.12, 0), Parts.CORE_GLOW)
 		var housing := Parts.around(0.86, 15.0, top)
@@ -1713,6 +1736,14 @@ static func _plinth_panels(m: LowPolyMesh, radius: float, height: float) -> void
 ## A broad gold filigree band round a plinth's foot (_plinth), under its vein panels.
 static func _plinth_filigree(m: LowPolyMesh, radius: float) -> void:
 	m.ring(radius - 0.03, radius + 0.025, PLINTH_FILIGREE, 8, Vector3(0, Parts.PAD_HEIGHT, 0), Parts.FILIGREE, Parts.OCTAGON)
+
+
+## A mast standing on `foot`, `height` tall, of `surf`: a tapered round post 0.14 across at its
+## top on a fat flared foot, so it reads as a post at the overview, not a hair.
+static func _mast(m: LowPolyMesh, foot: Vector3, height: float, surf: Surf) -> void:
+	m.lathe(PackedVector2Array([
+		Vector2(0.14, 0), Vector2(0.14, 0.05), Vector2(0.095, 0.13), Vector2(0.07, height), Vector2(0, height),
+	]), 12, foot, surf)
 
 
 ## A lamp post standing on `foot`, `height` tall: a gunmetal post 0.1 across at its foot, tapering,
