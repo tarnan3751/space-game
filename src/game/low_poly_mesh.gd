@@ -85,6 +85,9 @@ var ink: float = 1.0
 ## caller sets Surf.BOB for a hovering unit's whole build, its figures' parts included, and puts
 ## it back after.
 var flags: int = 0
+## A tint the parts added from now on take in place of their own (Surf.tint), as `ink` is kept:
+## none (alpha 0), but where a caller paints a whole figure one colour, a hologram's.
+var tint := Color(0, 0, 0, 0)
 ## The spin given to the parts added from now on, as `ink` is kept: (pivot x, y, z, radians a
 ## second) about the mesh's +Y; a zero rate, the default, spins nothing.
 var spin: Vector4 = Vector4.ZERO
@@ -700,10 +703,10 @@ func _emit(a: Vector3, b: Vector3, c: Vector3, uv_a: Vector2, uv_b: Vector2, uv_
 	_uv2s.append(uv2)
 	# The phase in 254 steps, a quarter step up so the 8-bit store keeps the byte whether it
 	# rounds or truncates; surf_phase (effects.gdshaderinc) decodes it.
-	var tint := Color(surf.tint, (roundi(surf.phase * 254.0) + 0.25) / 255.0)
-	_colors.append(tint)
-	_colors.append(tint)
-	_colors.append(tint)
+	var colour := Color(surf.tint if tint.a == 0.0 else tint, (roundi(surf.phase * 254.0) + 0.25) / 255.0)
+	_colors.append(colour)
+	_colors.append(colour)
+	_colors.append(colour)
 	_face_normals.append(normal)
 	_outlined.append(1 if surf.outline and ((surf.flags | flags) & Surf.NO_OUTLINE) == 0 else 0)
 	_hard.append(1 if hard else 0)
