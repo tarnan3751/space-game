@@ -27,9 +27,10 @@ extends Node3D
 ## (set_disabled) every moving part holds its pose, and on waking snaps back to the clock's; a
 ## cloaked defence fades in when it is revealed (set_reveal).
 ##
-## While the building is busy a ConstructionDrone works over it, driven from _process; when the
-## work ends the drone leaves, and if the view is freed first (a finished level replaces it)
-## BaseView hands the leaving drone over (release_drone).
+## While the building is busy a ConstructionDrone works over it, driven from _process, and a moving
+## part whose figure marches on the clock (BuildingModels.MARCH_META) is hidden, since its legs
+## would step on while its round holds; when the work ends the drone leaves, and if the view is
+## freed first (a finished level replaces it) BaseView hands the leaving drone over (release_drone).
 
 enum Footprint { NONE, SELECTED, VALID, INVALID }
 
@@ -102,6 +103,8 @@ var _rests: PackedVector3Array = PackedVector3Array()
 ## rides one made before it, so posing in order poses the carrier first.
 var _rides := PackedInt32Array()
 var _animate: bool = true
+## The moving parts whose figures march on the clock (BuildingModels.MARCH_META), hidden while busy.
+var _marching: Array[Node3D] = []
 ## BaseView's merged wall mesh draws this building, so its own model is hidden (set_merged).
 var _merged: bool = false
 ## The builder drone over the site while the building is busy, and while it leaves.
@@ -186,6 +189,8 @@ func show_status(level: int, busy: bool, target_level: int, seconds_left: int) -
 	_model.visible = level >= 1 and not _merged
 	_scaffold.visible = level < 1
 	_animate = level >= 1 and not busy
+	for mover: Node3D in _marching:
+		mover.visible = not busy
 	_label.visible = busy
 	if busy and _drone == null:
 		_drone = ConstructionDrone.new()
@@ -513,6 +518,8 @@ func _collect_movers(node: Node) -> void:
 			_motions.append(mover.get_meta(BuildingModels.MOVE_META) as Motion)
 			_rests.append(mover.position)
 			_rides.append(int(mover.get_meta(BuildingModels.RIDES_META, -1)))
+			if mover.has_meta(BuildingModels.MARCH_META):
+				_marching.append(mover)
 		_collect_movers(child)
 
 

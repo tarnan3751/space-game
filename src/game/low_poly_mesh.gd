@@ -122,6 +122,14 @@ func socket(name: String, position: Vector3, direction: Vector3) -> void:
 	sockets[name] = s
 
 
+## Whether any part added carries the surface flag `flag` (Surf).
+func has_flag(flag: int) -> bool:
+	for uv2: Vector2 in _uv2s:
+		if (roundi(uv2.y) & flag) != 0:
+			return true
+	return false
+
+
 ## Triangles in the body mesh, both surfaces.
 func triangle_count() -> int:
 	return _vertices.size() / 3

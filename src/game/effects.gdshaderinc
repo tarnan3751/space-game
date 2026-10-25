@@ -26,6 +26,7 @@ const int FLAG_LIGHTNING = 1024;
 const int FLAG_RISE = 2048;
 const int FLAG_SPIN = 4096;
 const int FLAG_RIG = 8192;
+const int FLAG_MARCH = 16384;
 
 // PULSE: the colour swells between PULSE_LOW and 1 on a sine of PULSE_PERIOD seconds.
 const float PULSE_PERIOD = 1.6;
@@ -135,6 +136,11 @@ vec3 effect_gait(vec3 vertex, vec4 custom) {
 // is Rig's (src/game/rig.gd), which mirrors these functions for the CPU: change both together. A
 // normal is turned the same way about zero pivots, and neither moved nor scaled. A mesh with no
 // rigged part carries neither channel, so they are read only under the flag.
+//
+// MARCH (Surf.MARCH): a rigged part of a model that is not drawn in a battle's MultiMesh (a
+// building's figure), whose instance state is zero, walks on the clock instead: x the gait's
+// phase 2 fract(RIG_MARCH_RATE anim_time), two steps a cycle, and y 1, the full gait. Under any
+// other state (a battle's instance) the flag does nothing.
 const int RIG_HIP_L = 1;
 const int RIG_HIP_R = 2;
 const int RIG_KNEE_L = 3;
@@ -174,6 +180,7 @@ const float RIG_THRUST_FLUTTER = 0.2;
 const float RIG_THRUST_RATE = 9.0;
 const float RIG_THRUST_IDLE = 0.35;
 const float RIG_BANK_BASE = 4.0;
+const float RIG_MARCH_RATE = 0.6;
 
 // How far `channel` moves for `state`: radians for a turning channel, the share of the vector for
 // a slide, the scale for THRUST (whose pivot's x is `pivot_x`).
@@ -287,13 +294,18 @@ void rig_move(inout vec3 v, inout vec3 n, vec4 joint, vec4 state) {
 	n = n * c + cross(k, n) * s + k * dot(k, n) * (1.0 - c);
 }
 
-// A rigged vertex and its normal posed: by its own joint, then by its parent's.
+// A rigged vertex and its normal posed: by its own joint, then by its parent's (on the clock's
+// march under MARCH at a zero state).
 void effect_rig(int flags, vec4 joint, vec4 parent, vec4 state, inout vec3 v, inout vec3 n) {
 	if (!has_flag(flags, FLAG_RIG)) {
 		return;
 	}
-	rig_move(v, n, joint, state);
-	rig_move(v, n, parent, state);
+	vec4 posed = state;
+	if (has_flag(flags, FLAG_MARCH) && state.x == 0.0 && state.y == 0.0) {
+		posed.xy = vec2(2.0 * fract(RIG_MARCH_RATE * anim_time), 1.0);
+	}
+	rig_move(v, n, joint, posed);
+	rig_move(v, n, parent, posed);
 }
 
 // How far through its climb a RISE part is now, 0 to 1.

@@ -44,6 +44,10 @@ const SPIN := 4096
 ## The part turns with a rig channel (Rig), its pivots and channels carried per vertex in CUSTOM1
 ## and CUSTOM2: set through LowPolyMesh.rig, never by a Surf, since the pivots are the part's.
 const RIG := 8192
+## With RIG, on a model drawn outside a battle's MultiMeshes (a building's figure, whose instance
+## state is zero): the rig walks on the clock instead, two steps every 1 / Rig.MARCH_RATE seconds
+## at the full gait (Rig). Does nothing under a battle's instance state.
+const MARCH := 16384
 ## The flags whose parts are never outlined, whatever `outline` says.
 const NO_OUTLINE := FLICKER | JITTER | HOLO
 

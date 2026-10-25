@@ -17,7 +17,8 @@ extends RefCounted
 ## turret's head is on the head's node, so it turns with it. A moving part that rides another
 ## (Parts.riding: a ring round a barrel that aims) carries RIDES_META, the index of the one it
 ## rides; its node stands beside the others under the root, at its own pivot, and BuildingView
-## carries it with the part it rides.
+## carries it with the part it rides. A moving part with a figure marching on the clock (Surf.MARCH)
+## carries MARCH_META, so a busy view hides it rather than let it step in place.
 ##
 ## Each category shares a look: every building but a wall stands on the concrete foundation pad
 ## (Parts.foundation) in its category's accent colour (docs/reference/art-style.md), and walls
@@ -43,6 +44,8 @@ const SOCKETS_META := "sockets"
 ## Set on a moving part's node that rides another (Parts.riding): the index of the one it rides,
 ## among the model's moving parts in their order as nodes.
 const RIDES_META := "rides"
+## Set on a moving part's node when any of its parts carries Surf.MARCH.
+const MARCH_META := "march"
 
 const CoreModels := preload("res://src/game/models/core.gd")
 const ResourceModels := preload("res://src/game/models/resources.gd")
@@ -115,6 +118,8 @@ class Moving:
 	var sockets: Dictionary[String, LowPolyMesh.Socket] = {}
 	## The index in Meshes.moving of the part it rides (Parts.riding), -1 for none.
 	var rides: int = -1
+	## Whether any of its parts marches on the clock (Surf.MARCH).
+	var marches := false
 
 
 ## The Tier of the levels unlocked at Command Center `cc`: one mapping, used for every type.
@@ -285,6 +290,7 @@ static func _meshes(p: Parts) -> Meshes:
 		moving.motion = p.motions[i]
 		moving.sockets = p.movers[i].sockets
 		moving.rides = kept.get(p.rides[i], -1)
+		moving.marches = p.movers[i].has_flag(Surf.MARCH)
 		meshes.moving.append(moving)
 	return meshes
 
@@ -302,6 +308,8 @@ static func _add_parts(root: Node3D, meshes: Meshes) -> void:
 			node.set_meta(SOCKETS_META, moving.sockets)
 		if moving.rides >= 0:
 			node.set_meta(RIDES_META, moving.rides)
+		if moving.marches:
+			node.set_meta(MARCH_META, true)
 		root.add_child(node)
 		_add_instances(node, moving.body, moving.outline)
 

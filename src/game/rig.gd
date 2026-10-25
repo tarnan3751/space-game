@@ -52,6 +52,11 @@ extends RefCounted
 ##                             - THRUST_IDLE aim: a flame flickering in battle (still outside one, as
 ##                             every row is at a zero state), shorter while it hovers to fire
 ##
+## A vertex carrying Surf.MARCH (a building's figure, LowPolyMesh.flags) reads the state
+## (2 fract(MARCH_RATE anim_time), 1) in place of a zero one: it walks on the clock, the same as the
+## shaders' march (effect_rig). Any other state it reads as it is. Nothing poses a point on a
+## marching part on the CPU, so angle() and posed() take the state as given.
+##
 ## Reserved: 11 YAW (Y). A model that needs a channel at another amplitude gets a variant row of
 ## its own with its own id and constant, never per-instance data: the instance's state is the same
 ## four numbers for every model.
@@ -107,6 +112,8 @@ const THRUST_RATE := 9.0
 const THRUST_IDLE := 0.35
 ## What a hovering model's x carries besides its bank (BattleUnits): a zero state is not a flight.
 const BANK_BASE := 4.0
+## MARCH: walk cycles a second on the clock (two steps each).
+const MARCH_RATE := 0.6
 
 
 ## A rig stamp (LowPolyMesh.rig, rig2): `channel` about `pivot` in the model's space (for SLIDE,

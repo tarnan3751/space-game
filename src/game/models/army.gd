@@ -183,15 +183,18 @@ const MARSHAL_AT := Vector3(-1.0, 0.65, 1.85)
 ## the alliance beacon's dish's turn round the tower (the L6 hovering ring's the other way).
 ## Radians a second for a turn.
 const DOOR_PERIOD := 3.5
-## The troopers standing at attention on the landing pad to L2 (_drill_squad): how many (one: a
-## colonist costs about 680 triangles even at a quarter of its sides, and the hangar keeps a
-## quarter of its budget free), the pace between them in their rank, their size
-## (Figures.COLONIST_HEIGHT times it) and the share of their round parts' sides they are built
-## with (LowPolyMesh.detail): a quarter, as they stand still and small.
-const DRILL_TROOPERS := 1
-const DRILL_PACE := 0.4
-const DRILL_SCALE := 0.8
-const DRILL_DETAIL := 0.25
+## The trooper patrolling the landing pad to L2 (_patrol): its size (Figures.COLONIST_HEIGHT
+## times it), the share of its round parts' sides it is built with (LowPolyMesh.detail: a half, as
+## it is small and the hangar keeps a quarter of its budget free), the radius of its round and its
+## turn round the pad (radians a second). The turn is its stride's ground speed over the radius, so
+## its feet do not slide: a step is the sole's sweep about the hip at the rig's full swing, 2 legs
+## sin(Rig.HIP_SWING), the legs (hip to sole) 0.3 of its height (Figures._body), two steps a march
+## cycle at Rig.MARCH_RATE.
+const PATROL_SCALE := 0.8
+const PATROL_DETAIL := 0.5
+const PATROL_RADIUS := 0.4
+const PATROL_RATE := 4.0 * 0.3 * Figures.COLONIST_HEIGHT * PATROL_SCALE * sin(Rig.HIP_SWING) * Rig.MARCH_RATE \
+		/ PATROL_RADIUS
 const ROOF_DISH_SWEEP := 35.0
 const ROOF_DISH_PERIOD := 4.0
 const CADET_RATE := 1.6
@@ -211,9 +214,10 @@ const BEACON_DISH_RATE := 1.0
 ## A long vaulted hangar: the main bay with its striped door, the control tower in the back
 ## corner, its cream column banded orange under the cab, landing lights along the apron, an orange
 ## deck ringed in hazard stripes across the front, a big roof dish sweeping on the main bay. Wider
-## door at 2 and 3, a second bay at 3 (an orange landing pad in its place before, a trooper standing
-## on it), a small roof dish and a radar turning on the cab's roof at 4. The main bay's door rises
-## over its lit inside and drops again, the lights chase along the apron, the cab's glass pulses.
+## door at 2 and 3, a second bay at 3 (an orange landing pad in its place before, a trooper
+## patrolling round it), a small roof dish and a radar turning on the cab's roof at 4. The main
+## bay's door rises over its lit inside and drops again, the lights chase along the apron, the
+## cab's glass pulses.
 ##
 ## From 6 the tower grows taller at each level and the apron's lights stand in two rows before
 ## the main door, chasing apart: L6 chrome roofs with cyan ribs, a chrome tower with cyan strips
@@ -238,7 +242,7 @@ static func build_hangar(p: Parts, level: int) -> void:
 	else:
 		m.disc(0.75, 24, Vector3(1.35, g + 0.002, 0.2), Parts.HAZARD)
 		m.disc(0.6, 24, Vector3(1.35, g + 0.004, 0.2), ORANGE)
-		_drill_squad(m, Vector3(1.35, g + 0.004, 0.2))
+		_patrol(p, Vector3(1.35, g + 0.004, 0.2))
 	# The apron: an orange deck across the front, ringed in hazard stripes, the lamps on it.
 	m.box_chamfered(Vector3(4.7, 0.05, 0.88), 0.02, Vector3(0, g, 1.94), Parts.HAZARD)
 	m.box_chamfered(Vector3(4.5, 0.08, 0.72), 0.02, Vector3(0, g, 1.94), ORANGE)
@@ -305,19 +309,22 @@ static func build_hangar(p: Parts, level: int) -> void:
 		_marshaller(p, MARSHAL_AT + Vector3(0, g, 0))
 
 
-## The troopers standing at attention on the landing pad to L2, their middle at `pad`:
-## DRILL_TROOPERS troopers (Figures.colonist at attention in its stance) in a rank across the
-## camera's view, DRILL_PACE apart, facing it, part of the body at DRILL_DETAIL, so they cost no
-## moving part and no draw. They stand still: a building has no
-## per-instance state to drive the walking rig (Rig) with.
-static func _drill_squad(m: LowPolyMesh, pad: Vector3) -> void:
-	var detail := m.detail
-	m.detail = DRILL_DETAIL
-	var rank := Vector3(0.70710678, 0, -0.70710678)
-	for k: int in DRILL_TROOPERS:
-		var foot := pad + rank * DRILL_PACE * (k - (DRILL_TROOPERS - 1) * 0.5)
-		Figures.colonist(m, foot, 45.0, Figures.stance(), Figures.PRIMARY_HEADS, DRILL_SCALE)
-	m.detail = detail
+## The trooper patrolling the landing pad to L2, round its middle `pad`: the colonist
+## (Figures.colonist) on the walking rig (Figures.walk_rig, its arms swinging), marching on the
+## clock (Surf.MARCH), PATROL_RADIUS out, facing along its round. A moving part, it turns about the
+## vertical through `pad` at PATROL_RATE, so it walks its round as its legs step.
+static func _patrol(p: Parts, pad: Vector3) -> void:
+	var m := p.moving(pad, Motion.spin(Vector3.UP, PATROL_RATE))
+	m.detail = PATROL_DETAIL
+	m.flags = Surf.MARCH
+	# At -X a turn about +Y carries it towards +Z, the way it faces.
+	var foot := Vector3(-PATROL_RADIUS, 0, 0)
+	var pose := Figures.neutral()
+	var j := Figures.joints(foot, 0.0, pose, Figures.PRIMARY_HEADS, PATROL_SCALE)
+	var rigging := Figures.walk_rig(j)
+	Figures.swing_arms(rigging, j)
+	Figures.colonist(m, foot, 0.0, pose, Figures.PRIMARY_HEADS, PATROL_SCALE, true, rigging)
+	m.flags = 0
 
 
 ## The hangar's marshaller from 10, hovering at `at` before the main door, facing the apron (+Z):
@@ -716,17 +723,22 @@ static func _lecture_room(m: LowPolyMesh, room: Vector3, level: int, tier: int) 
 	_mast(m, room + Vector3(-0.05, tall, 0.06), 0.35, GLOW)
 
 
-## The hologram cadet standing at ease, its feet on `foot`: the colonist (Figures.colonist) in
-## its stance, 0.8 tall, every part a cyan hologram (LowPolyMesh.tint) bobbing together, with no
-## outline, over the plinth's cyan lens. A moving part, it turns about the vertical through its
-## feet at CADET_RATE, a hologram's showcase turn. From 5 a halo floats over it out of step, at Crown a solid one in the core's
-## light violet.
+## The hologram cadet marching in place, its feet on `foot`: the colonist (Figures.colonist) on the
+## walking rig (Figures.walk_rig, its arms swinging), 0.8 tall, every part a cyan hologram
+## (LowPolyMesh.tint) bobbing together and marching on the clock (Surf.MARCH), with no outline,
+## over the plinth's cyan lens. A moving part, it turns about the vertical through its feet at
+## CADET_RATE, a hologram's showcase turn. From 5 a halo floats over it out of step, at Crown a
+## solid one in the core's light violet.
 static func _cadet(p: Parts, foot: Vector3, level: int) -> void:
 	var m := p.moving(foot, Motion.spin(Vector3.UP, CADET_RATE))
 	m.detail = 0.5
-	m.flags = Surf.HOLO | Surf.BOB
+	m.flags = Surf.HOLO | Surf.BOB | Surf.MARCH
 	m.tint = MaterialKit.ENERGY
-	Figures.colonist(m, Vector3.ZERO, 0.0, Figures.stance())
+	var pose := Figures.neutral()
+	var j := Figures.joints(Vector3.ZERO, 0.0, pose)
+	var rigging := Figures.walk_rig(j)
+	Figures.swing_arms(rigging, j)
+	Figures.colonist(m, Vector3.ZERO, 0.0, pose, Figures.PRIMARY_HEADS, 1.0, true, rigging)
 	m.flags = 0
 	m.tint = Color(0, 0, 0, 0)
 	m.detail = 1.0
