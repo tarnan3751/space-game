@@ -98,6 +98,21 @@ const AIM_TURN := {
 }
 const AIM_TURN_DEFAULT := 4.0
 const AIM_RETURN := 3.0
+## How far a direct-fire defence's barrels pitch (BuildingView.can_pitch), per type: the lowest and
+## the highest elevation they reach, degrees over level; they aim at the target's drawn middle
+## (BattleUnits.aim_point, an aircraft's height and a hovering machine's lift in it).
+const PITCH_LIMITS := {
+	"laser_turret": Vector2(-15, 45), "flak_cannon": Vector2(0, 75), "cloaked_sentry": Vector2(-15, 45),
+	"missile_battery": Vector2(0, 60), "railgun": Vector2(0, 20), "ion_beam": Vector2(-15, 45),
+}
+## A lobbing defence's elevation by its target's range, per type: degrees at its full range and at
+## its foot, straight between; and how fast it gets there (as AIM_TURN).
+const LOB_ELEVATION := {"orbital_cannon": Vector2(20, 70), "plasma_mortar": Vector2(45, 70)}
+## The share of a lobbing gun's range its far elevation is reached at, per type (1 for any other):
+## the orbital cannon's 50 cells reach past the field's farthest unit (about 34 cells), so its whole
+## span is spread over 0.7 of them.
+const LOB_REACH := {"orbital_cannon": 0.7}
+const LOB_TURN := 1.5
 ## How close (radians) an aiming head must face its target before its held shot leaves, and the
 ## longest a shot is held (seconds of battle).
 const AIM_READY := 0.12
@@ -992,13 +1007,33 @@ func _aim_defences(shown: float) -> void:
 		if not sim.building_disabled(id):
 			var target := sim.building_target(id)
 			if target != 0 and sim.unit_state(target) != BattleArmy.DEAD:
+				var point := units.aim_point(target)
 				var turn := float(AIM_TURN.get(_types[id], AIM_TURN_DEFAULT))
-				view.aim_at(units.aim_point(target), view.elevation(), _clock, shown, turn, turn)
+				var lobs := LOB_ELEVATION.has(_types[id])
+				view.aim_at(point, _elevation(id, view, point), _clock, shown, turn, LOB_TURN if lobs else turn)
 			else:
 				view.idle_aim(_clock, shown, AIM_RETURN)
 		if _held_shots.has(id) and (view.aim_error(units.aim_point(_held_shots[id])) <= AIM_READY
 				or _clock - _held_since[id] >= AIM_HOLD or sim.building_disabled(id)):
 			_release_shot(id)
+
+
+## The elevation (radians over level) defence `id`'s barrels want for the world point `point`: a
+## lobbing gun's by its range (LOB_ELEVATION), a direct-fire one's straight at it from its
+## trunnion, within PITCH_LIMITS; the barrels' own for a type with neither.
+func _elevation(id: int, view: BuildingView, point: Vector3) -> float:
+	var type := _types[id]
+	var from := view.pitch_origin()
+	var across := Vector2(point.x - from.x, point.z - from.z).length()
+	if LOB_ELEVATION.has(type):
+		var lob: Vector2 = LOB_ELEVATION[type]
+		var reach := float(_stat(id, "range_cells")) * float(LOB_REACH.get(type, 1.0))
+		var share := clampf(across / maxf(1.0, reach), 0.0, 1.0)
+		return deg_to_rad(lerpf(lob.y, lob.x, share))
+	if not PITCH_LIMITS.has(type):
+		return view.elevation()
+	var limits: Vector2 = PITCH_LIMITS[type]
+	return clampf(atan2(point.y - from.y, across), deg_to_rad(limits.x), deg_to_rad(limits.y))
 
 
 ## Fires defence `id`'s held shot: its weapon from its next muzzle socket, wherever its head is now,
