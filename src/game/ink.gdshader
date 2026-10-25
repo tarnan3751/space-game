@@ -35,9 +35,9 @@ void vertex() {
 		* (1.0 - INSTANCE_CUSTOM.w);
 	float scale = length(MODEL_MATRIX[0].xyz);
 	int flags = surf_flags(UV2);
-	vec3 normal = effect_rig(effect_spin(NORMAL, flags, vec4(vec3(0.0), CUSTOM0.w)), flags, CUSTOM1, CUSTOM2,
-		INSTANCE_CUSTOM, false);
-	vec3 rigged = effect_rig(effect_spin(VERTEX, flags, CUSTOM0), flags, CUSTOM1, CUSTOM2, INSTANCE_CUSTOM, true);
+	vec3 normal = effect_spin(NORMAL, flags, vec4(vec3(0.0), CUSTOM0.w));
+	vec3 rigged = effect_spin(VERTEX, flags, CUSTOM0);
+	effect_rig(flags, CUSTOM1, CUSTOM2, INSTANCE_CUSTOM, rigged, normal);
 	vec3 spun = effect_gait(rigged, INSTANCE_CUSTOM);
 	vec3 moved = effect_vertex(spun, flags, surf_phase(COLOR), MODEL_MATRIX);
 	vec3 pushed = moved + normalize(normal) * width / scale;

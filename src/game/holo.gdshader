@@ -31,7 +31,9 @@ varying float fade;
 
 void vertex() {
 	int flags = surf_flags(UV2);
-	vec3 rigged = effect_rig(effect_spin(VERTEX, flags, CUSTOM0), flags, CUSTOM1, CUSTOM2, INSTANCE_CUSTOM, true);
+	vec3 rigged = effect_spin(VERTEX, flags, CUSTOM0);
+	vec3 normal = NORMAL;
+	effect_rig(flags, CUSTOM1, CUSTOM2, INSTANCE_CUSTOM, rigged, normal);
 	vec3 spun = effect_gait(rigged, INSTANCE_CUSTOM);
 	VERTEX = effect_vertex(spun, flags, surf_phase(COLOR), MODEL_MATRIX);
 	world_y = (MODEL_MATRIX * vec4(VERTEX, 1.0)).y;

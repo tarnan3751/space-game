@@ -30,8 +30,7 @@ void vertex() {
 	int flags = surf_flags(UV2);
 	VERTEX = effect_spin(VERTEX, flags, CUSTOM0);
 	NORMAL = effect_spin(NORMAL, flags, vec4(vec3(0.0), CUSTOM0.w));
-	VERTEX = effect_rig(VERTEX, flags, CUSTOM1, CUSTOM2, INSTANCE_CUSTOM, true);
-	NORMAL = effect_rig(NORMAL, flags, CUSTOM1, CUSTOM2, INSTANCE_CUSTOM, false);
+	effect_rig(flags, CUSTOM1, CUSTOM2, INSTANCE_CUSTOM, VERTEX, NORMAL);
 	VERTEX = effect_vertex(effect_gait(VERTEX, INSTANCE_CUSTOM), flags, surf_phase(COLOR), MODEL_MATRIX);
 	hit_flash = INSTANCE_CUSTOM.z;
 	if (rival > 0.5) {

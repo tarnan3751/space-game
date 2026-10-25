@@ -125,29 +125,68 @@ vec3 effect_gait(vec3 vertex, vec4 custom) {
 	return moved;
 }
 
-// RIG (LowPolyMesh.rig, docs/reference/art-style.md, **Rig**): a vertex turned about its own joint
-// (CUSTOM1: pivot xyz, channel) and then about the joint it hangs from (CUSTOM2), each by the
-// angle its channel takes from the instance's state: x the gait's phase while y >= 0 and the fire
-// phase while y < 0, y the gait's share while >= 0 and minus the aim's share while < 0. The
-// channel table is Rig's (src/game/rig.gd), which mirrors these functions for the CPU: change
-// both together. A normal is turned the same way about zero pivots. A mesh with no rigged part
-// carries neither channel, so they are read only under the flag.
+// RIG (LowPolyMesh.rig, docs/reference/art-style.md, **Rig**): a vertex moved by its own joint
+// (CUSTOM1: pivot xyz, channel) and then by the joint it hangs from (CUSTOM2), each by the amount
+// its channel takes from the instance's state: x the gait's phase while y >= 0 (a hovering
+// model's bank plus RIG_BANK_BASE, so a zero state is not a flight), the fire phase plus 2 on an
+// odd shot while y < 0; y the gait's share while >= 0 and minus the aim's share while < 0. Most
+// channels turn about an axis through the pivot; SLIDE, SLIDE_L and SLIDE_R move by the stamp's
+// vector, THRUST scales about its pivot (flickering only in battle). The channel table
+// is Rig's (src/game/rig.gd), which mirrors these functions for the CPU: change both together. A
+// normal is turned the same way about zero pivots, and neither moved nor scaled. A mesh with no
+// rigged part carries neither channel, so they are read only under the flag.
 const int RIG_HIP_L = 1;
 const int RIG_HIP_R = 2;
 const int RIG_KNEE_L = 3;
 const int RIG_KNEE_R = 4;
 const int RIG_AIM = 5;
-// Radians: 44, 70, 30 and 16 degrees, as Rig has them.
+const int RIG_SHOULDER_L = 6;
+const int RIG_SHOULDER_R = 7;
+const int RIG_ELBOW_L = 8;
+const int RIG_ELBOW_R = 9;
+const int RIG_WHEEL = 10;
+const int RIG_BANK = 12;
+const int RIG_SLIDE = 13;
+const int RIG_BAY_L = 14;
+const int RIG_BAY_R = 15;
+const int RIG_SLIDE_L = 16;
+const int RIG_SLIDE_R = 17;
+const int RIG_HIP_HEAVY_L = 18;
+const int RIG_HIP_HEAVY_R = 19;
+const int RIG_KNEE_HEAVY_L = 20;
+const int RIG_KNEE_HEAVY_R = 21;
+const int RIG_THRUST = 22;
+// Radians, as Rig has them: 44, 70, 30 and 16 degrees; 35 and 30; 50 and 80; 80; 22 and 40.
 const float RIG_HIP_SWING = 0.7679;
 const float RIG_KNEE_BEND = 1.2217;
 const float RIG_AIM_RAISE = 0.5236;
 const float RIG_RECOIL_KICK = 0.2793;
+const float RIG_ARM_SWING = 0.6109;
+const float RIG_ELBOW_BEND = 0.5236;
+const float RIG_PUNCH_SWING = 0.8727;
+const float RIG_PUNCH_REACH = 1.3963;
+const float RIG_BAY_OPEN = 1.3963;
+const float RIG_HEAVY_HIP = 0.384;
+const float RIG_HEAVY_KNEE = 0.6981;
 const float RIG_RECOIL_SPAN = 0.3;
+const float RIG_PUNCH_SPAN = 0.5;
+const float RIG_THRUST_FLUTTER = 0.2;
+const float RIG_THRUST_RATE = 9.0;
+const float RIG_THRUST_IDLE = 0.35;
+const float RIG_BANK_BASE = 4.0;
 
-float rig_angle(int channel, vec4 state) {
+// How far `channel` moves for `state`: radians for a turning channel, the share of the vector for
+// a slide, the scale for THRUST (whose pivot's x is `pivot_x`).
+float rig_amount(int channel, vec4 state, float pivot_x) {
 	float walk = max(state.y, 0.0);
 	float s = sin(PI * state.x);
 	float aim = max(-state.y, 0.0);
+	float odd = state.x >= 2.0 ? 1.0 : 0.0;
+	float fire = state.x - 2.0 * odd;
+	float kick = aim * (1.0 - smoothstep(0.0, RIG_RECOIL_SPAN, fire));
+	float punch = aim * sin(PI * min(fire / RIG_PUNCH_SPAN, 1.0));
+	float flying = state.y >= 0.0 && state.x >= RIG_BANK_BASE - 1.0 ? 1.0 : 0.0;
+	float battle = state.y < 0.0 ? 1.0 : flying;
 	if (channel == RIG_HIP_L) {
 		return -RIG_HIP_SWING * walk * s;
 	}
@@ -161,38 +200,100 @@ float rig_angle(int channel, vec4 state) {
 		return RIG_KNEE_BEND * walk * max(s, 0.0);
 	}
 	if (channel == RIG_AIM) {
-		float kick = aim * (1.0 - smoothstep(0.0, RIG_RECOIL_SPAN, state.x));
 		return -(RIG_AIM_RAISE * aim + RIG_RECOIL_KICK * kick);
+	}
+	if (channel == RIG_SHOULDER_L) {
+		return RIG_ARM_SWING * walk * s - RIG_PUNCH_SWING * punch * (1.0 - odd);
+	}
+	if (channel == RIG_SHOULDER_R) {
+		return -RIG_ARM_SWING * walk * s - RIG_PUNCH_SWING * punch * odd;
+	}
+	if (channel == RIG_ELBOW_L) {
+		return -RIG_ELBOW_BEND * walk * max(-s, 0.0) + RIG_PUNCH_REACH * punch * (1.0 - odd);
+	}
+	if (channel == RIG_ELBOW_R) {
+		return -RIG_ELBOW_BEND * walk * max(s, 0.0) + RIG_PUNCH_REACH * punch * odd;
+	}
+	if (channel == RIG_WHEEL) {
+		return PI * state.x;
+	}
+	if (channel == RIG_BANK) {
+		return (state.x - RIG_BANK_BASE) * flying;
+	}
+	if (channel == RIG_SLIDE) {
+		return kick;
+	}
+	if (channel == RIG_BAY_L) {
+		return RIG_BAY_OPEN * smoothstep(0.0, 1.0, aim);
+	}
+	if (channel == RIG_BAY_R) {
+		return -RIG_BAY_OPEN * smoothstep(0.0, 1.0, aim);
+	}
+	if (channel == RIG_SLIDE_L) {
+		return kick * (1.0 - odd);
+	}
+	if (channel == RIG_SLIDE_R) {
+		return kick * odd;
+	}
+	if (channel == RIG_HIP_HEAVY_L) {
+		return -RIG_HEAVY_HIP * walk * s;
+	}
+	if (channel == RIG_HIP_HEAVY_R) {
+		return RIG_HEAVY_HIP * walk * s;
+	}
+	if (channel == RIG_KNEE_HEAVY_L) {
+		return RIG_HEAVY_KNEE * walk * max(-s, 0.0);
+	}
+	if (channel == RIG_KNEE_HEAVY_R) {
+		return RIG_HEAVY_KNEE * walk * max(s, 0.0);
+	}
+	if (channel == RIG_THRUST) {
+		return 1.0 + RIG_THRUST_FLUTTER * battle * sin(TAU * (RIG_THRUST_RATE * anim_time + 0.37 * pivot_x))
+			- RIG_THRUST_IDLE * aim;
 	}
 	return 0.0;
 }
 
-// The axis a channel turns about, in the model's space: X for every channel built so far.
+// The axis a turning channel turns about, in the model's space: Z for the bank and the bay doors,
+// X for the rest.
 vec3 rig_axis(int channel) {
+	if (channel == RIG_BANK || channel == RIG_BAY_L || channel == RIG_BAY_R) {
+		return vec3(0.0, 0.0, 1.0);
+	}
 	return vec3(1.0, 0.0, 0.0);
 }
 
-// `v` turned about the joint `joint` (pivot xyz, channel) by its channel's angle, as Godot's
-// Basis(axis, angle) turns it; about the origin for a normal (`about_pivot` false).
-vec3 rig_turn(vec3 v, vec4 joint, vec4 state, bool about_pivot) {
+// `v` (a point) and `n` (its normal) moved by the joint `joint` (pivot xyz, channel), the amount
+// found once for both: turned as Godot's Basis(axis, angle) turns them, a point about the pivot.
+void rig_move(inout vec3 v, inout vec3 n, vec4 joint, vec4 state) {
 	int channel = int(joint.w + 0.5);
 	if (channel == 0) {
-		return v;
+		return;
 	}
-	float a = rig_angle(channel, state);
+	float a = rig_amount(channel, state, joint.x);
+	if (channel == RIG_SLIDE || channel == RIG_SLIDE_L || channel == RIG_SLIDE_R) {
+		v += joint.xyz * a;
+		return;
+	}
+	if (channel == RIG_THRUST) {
+		v = joint.xyz + (v - joint.xyz) * a;
+		return;
+	}
 	vec3 k = rig_axis(channel);
-	vec3 pivot = about_pivot ? joint.xyz : vec3(0.0);
-	vec3 off = v - pivot;
 	float c = cos(a);
 	float s = sin(a);
-	return pivot + off * c + cross(k, off) * s + k * dot(k, off) * (1.0 - c);
+	vec3 off = v - joint.xyz;
+	v = joint.xyz + off * c + cross(k, off) * s + k * dot(k, off) * (1.0 - c);
+	n = n * c + cross(k, n) * s + k * dot(k, n) * (1.0 - c);
 }
 
-vec3 effect_rig(vec3 v, int flags, vec4 joint, vec4 parent, vec4 state, bool about_pivot) {
+// A rigged vertex and its normal posed: by its own joint, then by its parent's.
+void effect_rig(int flags, vec4 joint, vec4 parent, vec4 state, inout vec3 v, inout vec3 n) {
 	if (!has_flag(flags, FLAG_RIG)) {
-		return v;
+		return;
 	}
-	return rig_turn(rig_turn(v, joint, state, about_pivot), parent, state, about_pivot);
+	rig_move(v, n, joint, state);
+	rig_move(v, n, parent, state);
 }
 
 // How far through its climb a RISE part is now, 0 to 1.
