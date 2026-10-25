@@ -3,8 +3,11 @@ extends RefCounted
 ## drone, and the gunship and the bomber, each flown by a colonist seated behind a glass windscreen
 ## (UnitModels.pilot, UnitModels.canopy). Every one flies at its height over its origin and bobs,
 ## every part of it, its pilot and the gunship's rotors included, on the one phase (LowPolyMesh.flags
-## set to Surf.BOB for the build), so nothing comes apart as it bobs. Every rotor, wing, engine and
-## canopy is a function of its own taking its pivot's transform. The tier repaints the hull, the
+## set to Surf.BOB for the build), so nothing comes apart as it bobs, and banks into its turns, every
+## part on Rig.BANK about its middle (the bomber's bay doors hang from it). Every rotor, wing, engine
+## and canopy is a function of its own taking its pivot's transform. Each gun's muzzle is a socket,
+## `muzzle` the left one and `muzzle_2` the right; the bomber's bomb rack is `bay`, and its engines'
+## tails `exhaust` and `exhaust_2`. The tier repaints the hull, the
 ## panels, the trim and the glows (UnitModels.hull, panel, trim, glow).
 
 ## How high each flies: its lowest point over the ground, at rest.
@@ -39,7 +42,9 @@ const SKIMMER_DECK := 0.21
 static func build_skimmer(p: Parts) -> void:
 	var m := p.body
 	m.flags = Surf.BOB
+	m.rig = Rig.part(Rig.BANK, Vector3(0, SKIMMER_HOVER + 0.13, 0))
 	_saucer(m, UnitModels.pivot(Vector3(0, SKIMMER_HOVER + 0.05, 0)), p.tier)
+	m.rig = Vector4.ZERO
 	m.flags = 0
 
 
@@ -67,7 +72,7 @@ static func _saucer(m: LowPolyMesh, xf: Transform3D, tier: int) -> void:
 	m.box_chamfered(Vector3(0.045, 0.2, 0.26), 0.015, xf * Vector3(0, 0.1, -0.18), ORANGE, UnitModels.euler(xf, Vector3(-18, 0, 0)))
 	_dome_eye(m, xf * UnitModels.pivot(Vector3(0, 0.162, -0.01)), tier)
 	for side: float in [1.0, -1.0]:
-		_gun_pod(m, xf * UnitModels.pivot(Vector3(side * 0.15, -0.012, 0.13)), tier)
+		_gun_pod(m, xf * UnitModels.pivot(Vector3(side * 0.15, -0.012, 0.13)), tier, "muzzle" if side > 0.0 else "muzzle_2")
 
 
 ## The sensor dome on the pivot `xf` (its foot), looking along its +Z: a glass dome with a dark iris
@@ -77,14 +82,16 @@ static func _dome_eye(m: LowPolyMesh, xf: Transform3D, tier: int) -> void:
 	var iris := xf * Vector3(0, 0.055, 0.105)
 	m.orb(0.052, 12, 4, iris, Figures.VISOR, UnitModels.euler(xf))
 	m.orb(0.022, 8, 3, iris + xf.basis * Vector3(0, 0.008, 0.042), UnitModels.glow(tier, Surf.PULSE, false))
+	m.socket("eye", iris + xf.basis * Vector3(0, 0.008, 0.06), xf.basis.z)
 
 
 ## A gun pod on the pivot `xf` (its back, under the lens), firing along its +Z: a stubby gunmetal
-## barrel and a tip glowing in the tier's glow.
-static func _gun_pod(m: LowPolyMesh, xf: Transform3D, tier: int) -> void:
+## barrel and a tip glowing in the tier's glow, the socket `muzzle`.
+static func _gun_pod(m: LowPolyMesh, xf: Transform3D, tier: int, muzzle: String) -> void:
 	var tip := xf * Vector3(0, 0, 0.15)
 	Parts.pipe(m, xf.origin, tip, 0.04, Parts.GUNMETAL, 10, false)
 	m.orb(0.03, 10, 3, tip, UnitModels.glow(tier, Surf.PULSE))
+	m.socket(muzzle, tip, xf.basis.z)
 
 
 # --- The gunship ----------------------------------------------------------------------
@@ -100,6 +107,7 @@ static func build_gunship(p: Parts) -> void:
 	var tier := p.tier
 	var bottom := GUNSHIP_HOVER + 0.06
 	m.flags = Surf.BOB
+	m.rig = Rig.part(Rig.BANK, Vector3(0, bottom + 0.16, 0))
 	m.box_chamfered(Vector3(0.38, 0.32, 0.72), 0.08, Vector3(0, bottom, -0.02), UnitModels.hull(tier))
 	m.box_chamfered(Vector3(0.39, 0.08, 0.73), 0.02, Vector3(0, bottom - 0.002, -0.02), Parts.HULL_DARK)
 	UnitModels.deck(m, Vector3(0.22, 0.016, 0.56), Vector3(0, bottom + 0.32, -0.04), tier)
@@ -120,11 +128,13 @@ static func build_gunship(p: Parts) -> void:
 		m.spin = Vector4(pivot.x, pivot.y, pivot.z, side * ROTOR_RATE)
 		_rotor(m, UnitModels.pivot(pivot), tier)
 		m.spin = Vector4.ZERO
+	m.rig = Vector4.ZERO
 	m.flags = 0
 
 
 ## The chin gun on the pivot `xf` under the nose: a gunmetal ball turret and two fat barrels
-## forward side by side, glowing at their muzzles.
+## forward side by side, glowing at their muzzles, the left's the socket `muzzle`, the right's
+## `muzzle_2`.
 static func _chin_gun(m: LowPolyMesh, xf: Transform3D, tier: int) -> void:
 	m.orb(0.075, 12, 4, xf.origin, Parts.GUNMETAL)
 	for k: float in [-1.0, 1.0]:
@@ -132,6 +142,7 @@ static func _chin_gun(m: LowPolyMesh, xf: Transform3D, tier: int) -> void:
 		Parts.pipe(m, xf * Vector3(k * 0.044, -0.015, 0.03), muzzle, 0.04, Parts.GUNMETAL, 10)
 		m.disc(0.028, 8, muzzle + xf.basis * Vector3(0, 0, 0.002), UnitModels.glow(tier, Surf.PULSE, false),
 			UnitModels.euler(xf, Vector3(90, 0, 0)))
+		m.socket("muzzle" if k > 0.0 else "muzzle_2", muzzle, xf.basis.z)
 
 
 ## A nacelle standing on the pivot `xf` at a wing's tip: a tier-hull capsule with a band of the tier's
@@ -171,18 +182,22 @@ static func build_bomber(p: Parts) -> void:
 	var tier := p.tier
 	var bottom := BOMBER_HOVER + 0.15
 	m.flags = Surf.BOB
+	var body := Rig.part(Rig.BANK, Vector3(0, bottom + 0.1, 0))
+	m.rig = body
 	m.box_chamfered(Vector3(0.44, 0.2, 0.92), 0.07, Vector3(0, bottom, -0.02), UnitModels.hull(tier))
 	UnitModels.deck(m, Vector3(0.26, 0.014, 0.72), Vector3(0, bottom + 0.2, -0.08), tier)
 	for side: float in [1.0, -1.0]:
 		var root := UnitModels.pivot(Vector3(side * 0.2, bottom + 0.02, 0.08), Vector3(0, side * 34.0, 0))
 		_wing(m, root, side, tier)
-		_engine(m, UnitModels.pivot(Vector3(side * 0.3, bottom + 0.125, 0.12), Vector3(-90, 0, 0)), tier)
+		_engine(m, UnitModels.pivot(Vector3(side * 0.3, bottom + 0.125, 0.12), Vector3(-90, 0, 0)), tier,
+			"exhaust" if side > 0.0 else "exhaust_2")
 		for out: float in [0.3, 0.6]:
 			_bomb(m, root * Vector3(side * out, -0.004, 0.1), 0.03 if out < 0.5 else 0.06)
-	_bomb_bay(m, UnitModels.pivot(Vector3(0, bottom, -0.02)))
+	_bomb_bay(m, UnitModels.pivot(Vector3(0, bottom, -0.02)), body, tier)
 	var seat := UnitModels.seat_under(bottom + 0.2 + UnitModels.canopy_top(0.14, 60.0), 0.44)
 	UnitModels.pilot(m, Vector3(0, seat, 0.25), 0.0, 0.44)
 	UnitModels.canopy(m, UnitModels.pivot(Vector3(0, bottom + 0.2, 0.26)), 0.14, 0.016, 60.0, 10.0, 170.0, tier, 16)
+	m.rig = Vector4.ZERO
 	m.flags = 0
 
 
@@ -197,8 +212,8 @@ static func _wing(m: LowPolyMesh, xf: Transform3D, side: float, tier: int) -> vo
 
 ## An engine on the pivot `xf`, its thrust along the pivot's +Y (backwards), sunk in the wing: a
 ## tier-hull nacelle with a dark intake in a ring of the tier's trim and a glowing exhaust, a short
-## flame cone out of it.
-static func _engine(m: LowPolyMesh, xf: Transform3D, tier: int) -> void:
+## flame cone out of it, its mouth the socket `exhaust`.
+static func _engine(m: LowPolyMesh, xf: Transform3D, tier: int, exhaust: String) -> void:
 	var rot := UnitModels.euler(xf)
 	m.lathe(PackedVector2Array([
 		Vector2(0.065, 0.0), Vector2(0.085, 0.05), Vector2(0.085, 0.38), Vector2(0.072, 0.44),
@@ -208,14 +223,27 @@ static func _engine(m: LowPolyMesh, xf: Transform3D, tier: int) -> void:
 	var glow := UnitModels.glow(tier, Surf.PULSE, false)
 	m.disc(0.072, 16, xf * Vector3(0, 0.435, 0), glow, rot)
 	m.cone(0.055, 0.12, 12, xf * Vector3(0, 0.435, 0), glow, rot)
+	m.socket(exhaust, xf * Vector3(0, 0.435, 0), xf.basis.y)
 
 
-## The bomb bay on the pivot `xf` (the body's underside): a gunmetal rack across the body and two
-## fat orange bombs slung under it (_bomb), nose forward.
-static func _bomb_bay(m: LowPolyMesh, xf: Transform3D) -> void:
+## The bomb bay on the pivot `xf` (the body's underside): a gunmetal rack across the body, two fat
+## orange bombs slung under it (_bomb), nose forward, the socket `bay` under them, and two doors of
+## the tier's hull closed flat under the bombs, hinged at their outer edges, which swing down to
+## hang open as the bomber aims (Rig.BAY_L, BAY_R, hanging from the `body` joint), so they show
+## below the hull from the camera.
+static func _bomb_bay(m: LowPolyMesh, xf: Transform3D, body: Vector4, tier: int) -> void:
 	m.box_chamfered(Vector3(0.4, 0.05, 0.2), 0.02, xf * Vector3(0, -0.05, 0.1), Parts.GUNMETAL, UnitModels.euler(xf))
 	for x: float in [-0.11, 0.11]:
 		_bomb(m, xf * Vector3(x, -0.05, 0.08), 0.0)
+	m.socket("bay", xf * Vector3(0, -0.19, 0.08), xf.basis * Vector3.DOWN)
+	for side: float in [1.0, -1.0]:
+		var hinge := xf * Vector3(side * 0.21, -0.17, 0.08)
+		m.rig = Rig.part(Rig.BAY_L if side > 0.0 else Rig.BAY_R, hinge)
+		m.rig2 = body
+		m.box_chamfered(Vector3(0.2, 0.024, 0.26), 0.008, hinge + xf.basis * Vector3(-side * 0.1, -0.012, 0),
+			UnitModels.hull(tier), UnitModels.euler(xf))
+	m.rig = body
+	m.rig2 = Vector4.ZERO
 
 
 ## A fat orange bomb slung `drop` under `hang`, the middle of its top, on a gunmetal pylon, nose
