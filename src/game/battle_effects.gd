@@ -100,10 +100,17 @@ const ARC_TINT := Color(0.62, 0.78, 1.0)
 const BAR_SIZE := Vector2(0.7, 0.09)
 const BAR_BORDER := 0.03
 ## A shield's dome is this tall for its radius, and flickers for this long, this often, when its
-## pool absorbs.
+## pool absorbs, between full and SHIELD_FLICKER_FADE faded, brighter (SHIELD_FLICKER_BRIGHT) on its
+## full beats; when the pool is gone it fades out over SHIELD_DROP_SECONDS, swelling a little, in a
+## ring. The shield generators a battle can draw.
 const SHIELD_HEIGHT := 0.55
 const SHIELD_FLICKER_SECONDS := 0.3
 const SHIELD_FLICKER_RATE := 20.0
+const SHIELD_FLICKER_FADE := 0.55
+const SHIELD_FLICKER_BRIGHT := 1.6
+const SHIELD_DROP_SECONDS := 0.4
+const SHIELD_DROP_SWELL := 0.08
+const MAX_SHIELDS := 16
 
 ## Called with (building id, unit id) when a bolt aimed at either arrives.
 var arrived: Callable
@@ -629,9 +636,16 @@ var _stuns: Timed
 ## A counter the scattering of debris and puffs is drawn from, so it is the same every run.
 var _scatter := 0
 
-var _shields: Dictionary[int, MeshInstance3D] = {}
+## The shield domes, one MultiMesh: per generator its instance, centre, radius, pool, when it last
+## absorbed (-1 never) and when it dropped (-1 while up).
+var _shield_domes: MultiMesh
+var _shield_buffer: Instances
+var _shields: Dictionary[int, int] = {}
+var _shield_at: Dictionary[int, Vector3] = {}
+var _shield_radius: Dictionary[int, float] = {}
 var _shield_pool: Dictionary[int, int] = {}
 var _shield_flicker: Dictionary[int, float] = {}
+var _shield_drop: Dictionary[int, float] = {}
 
 
 ## Call once, before adding to the tree. `walls` is how many walls could fall, `area` the field's
@@ -818,6 +832,11 @@ func setup(walls: int, area: AABB) -> void:
 			Parts.pipe(crackle, from, to, 0.05, ARC, 3, false)
 			from = to
 	_stuns = Timed.new(_multimesh(crackle.to_mesh(), MAX_STUNS, area, false), MAX_STUNS)
+	# A shield's dome, unit radius, SHIELD_HEIGHT tall.
+	var shield := LowPolyMesh.new()
+	shield.dome(1.0, SHIELD_HEIGHT, 24, 6, Vector3.ZERO, SHIELD)
+	_shield_domes = _multimesh(shield.to_mesh(), MAX_SHIELDS, area, false)
+	_shield_buffer = Instances.new(MAX_SHIELDS)
 
 
 # --- Adding ----------------------------------------------------------------------
@@ -1091,27 +1110,32 @@ func strike_landed(at: Vector3, radius: float, top: float, now: float, seconds: 
 	_smoke.add(Vector3(at.x, 0.0, at.z), radius * 0.9, now + seconds * 0.3, SMOKE_SECONDS, Color.WHITE)
 
 
-## A shield generator `id`'s dome, centred on `at`, `radius` across the ground.
+## A shield generator `id`'s dome, centred on `at`, `radius` across the ground; MAX_SHIELDS at
+## most.
 func add_shield(id: int, at: Vector3, radius: float) -> void:
-	var dome := LowPolyMesh.new()
-	dome.dome(1.0, SHIELD_HEIGHT, 24, 6, Vector3.ZERO, SHIELD)
-	var instance := MeshInstance3D.new()
-	instance.mesh = dome.to_mesh()
-	instance.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
-	instance.position = at
-	instance.scale = Vector3.ONE * radius
-	add_child(instance)
-	_shields[id] = instance
+	if _shields.size() == MAX_SHIELDS:
+		return
+	_shields[id] = _shields.size()
+	_shield_at[id] = at
+	_shield_radius[id] = radius
 	_shield_pool[id] = 0
 	_shield_flicker[id] = -1.0
+	_shield_drop[id] = -1.0
+	_shield_domes.visible_instance_count = _shields.size()
 
 
-## Shows generator `id`'s dome while its `pool` is up, flickering from `now` when it fell.
+## Shows generator `id`'s dome while its `pool` is up, flickering from `now` when it fell and
+## fading out in a ring from `now` when it is gone.
 func set_shield(id: int, pool: int, now: float) -> void:
 	if not _shields.has(id):
 		return
 	if pool < _shield_pool[id]:
 		_shield_flicker[id] = now
+		if pool <= 0:
+			_shield_drop[id] = now
+			impact(_shield_at[id], _shield_radius[id], MaterialKit.ENERGY, now, SHIELD_DROP_SECONDS)
+	elif pool > 0:
+		_shield_drop[id] = -1.0
 	_shield_pool[id] = pool
 
 
@@ -1139,11 +1163,8 @@ func draw(now: float) -> void:
 	_puffs.draw(now, 1.0, 1.5)
 	_glows.draw(now, 1.0, 0.0)
 	_stuns.draw(now, 1.0, 0.0)
+	_draw_shields(now)
 	_scorches.draw(now, 1.0, 0.0)
-	for id: int in _shields:
-		var since := now - _shield_flicker[id]
-		var flickering := _shield_flicker[id] >= 0.0 and since < SHIELD_FLICKER_SECONDS
-		_shields[id].visible = _shield_pool[id] > 0 and (not flickering or int(since * SHIELD_FLICKER_RATE) % 2 == 0)
 
 
 ## Starts a frame's health bars.
@@ -1178,6 +1199,28 @@ static func along(forward: Vector3, width: float, length: float) -> Basis:
 	side = side.normalized()
 	var up := forward.cross(side)
 	return Basis(side * width, up * width, forward * length)
+
+
+## Each shield's dome: up, flickering (never hidden) for SHIELD_FLICKER_SECONDS after it absorbs,
+## fading out after it drops, gone at no size.
+func _draw_shields(now: float) -> void:
+	if _shields.is_empty():
+		return
+	for id: int in _shields:
+		var r := _shield_radius[id]
+		var fade := 0.0
+		var tint := Color.WHITE
+		var since := now - _shield_flicker[id]
+		if _shield_flicker[id] >= 0.0 and since < SHIELD_FLICKER_SECONDS:
+			var beat := int(since * SHIELD_FLICKER_RATE) % 2 == 0
+			fade = 0.0 if beat else SHIELD_FLICKER_FADE
+			tint = Color.WHITE * (SHIELD_FLICKER_BRIGHT if beat else 1.0)
+		if _shield_pool[id] <= 0:
+			var gone := (now - _shield_drop[id]) / SHIELD_DROP_SECONDS if _shield_drop[id] >= 0.0 else 1.0
+			fade = clampf(gone, 0.0, 1.0)
+			r *= 1.0 + SHIELD_DROP_SWELL * fade if gone < 1.0 else 0.0
+		_shield_buffer.put(_shields[id], Basis.from_scale(Vector3.ONE * r), _shield_at[id], tint, Color(0, 0, 0, fade))
+	_shield_domes.buffer = _shield_buffer.data
 
 
 func _count_shot(from: Vector3, color: Color) -> void:
