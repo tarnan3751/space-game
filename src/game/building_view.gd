@@ -18,8 +18,12 @@ extends Node3D
 ## In battle a defence whose head carries a `muzzle` socket (a moving part's, LowPolyMesh.socket)
 ## aims it: BattleView turns the head towards its target (aim_at) and, once it has had none for
 ## AIM_IDLE_SECONDS, eases it back into its idle Motion (idle_aim), which it then follows again. The
-## head's Motion turns it about +Y. A defence whose muzzle is on its body, or that has none, never
-## aims. socket_point() and socket_direction() give a socket where it is now, in the world.
+## aim turns the head about +Y: an idle Motion that turns it about +Y too (a scan) gives way to the
+## aim, any other (the orbital cannon's elevation) runs on under it. Each shot kicks the head back
+## along its muzzle (fired, RECOIL): the head's pose is its aim's yaw, then its idle Motion, then
+## the kick. A moving part that rides another (Parts.riding) is carried by it. A defence whose
+## muzzle is on its body, or that has none, never aims. socket_point() and socket_direction() give
+## a socket where it is now, in the world.
 ##
 ## While the building is busy a ConstructionDrone works over it, driven from _process; when the
 ## work ends the drone leaves, and if the view is freed first (a finished level replaces it)
@@ -44,6 +48,15 @@ const LABEL_OVER_DRONE := 0.5
 ## in seconds of battle, and how close (radians) it comes to the swing before following it again.
 const AIM_IDLE_SECONDS := 2.5
 const AIM_SETTLED := 0.02
+## How far (world units) a shot kicks an aiming head back along its muzzle, per type, and for any
+## other type; the kick takes RECOIL_SECONDS of battle on Motion.recoil's wave, out fast and back
+## slowly.
+const RECOIL := {
+	"laser_turret": 0.18, "missile_battery": 0.1, "plasma_mortar": 0.25, "flak_cannon": 0.2,
+	"cloaked_sentry": 0.1, "railgun": 0.35, "ion_beam": 0.075, "orbital_cannon": 0.45,
+}
+const RECOIL_DEFAULT := 0.125
+const RECOIL_SECONDS := 0.25
 
 enum Aim { IDLE, AIMING, RETURNING }
 
@@ -80,6 +93,9 @@ var _inked: bool = false
 var _movers: Array[Node3D] = []
 var _motions: Array[Motion] = []
 var _rests: PackedVector3Array = PackedVector3Array()
+## Per moving part, the index of the one it rides (BuildingModels.RIDES_META), -1 for none; a part
+## rides one made before it, so posing in order poses the carrier first.
+var _rides := PackedInt32Array()
 var _animate: bool = true
 ## BaseView's merged wall mesh draws this building, so its own model is hidden (set_merged).
 var _merged: bool = false
@@ -97,6 +113,13 @@ var _aim_heading: float = 0.0
 var _aim: Aim = Aim.IDLE
 var _aim_yaw: float = 0.0
 var _aim_wait: float = 0.0
+## Whether the aiming head's idle Motion turns it about +Y (a scan the aim takes over), the way its
+## muzzle faces in its own space (the kick's), the battle's clock as the last aim call gave it, and
+## when the head last fired (fired).
+var _aim_turns: bool = true
+var _muzzle_direction := Vector3.FORWARD
+var _now: float = 0.0
+var _fired_at: float = -INF
 
 
 ## Call once, before adding to the tree. `level` picks the model (level 1's while it is 0),
@@ -241,7 +264,6 @@ func set_disabled(on: bool) -> void:
 func is_disabled() -> bool:
 	return _disabled
 
-
 ## Gives the bodies a rival colony's faction tint (MaterialKit.rival), or takes it off; the
 ## outlines stay plain ink. For a battle's defender (BattleView), never a ghost.
 func set_rival(on: bool) -> void:
@@ -295,10 +317,38 @@ func _process(delta: float) -> void:
 		return
 	var time := Motion.clock()
 	for i: int in _movers.size():
-		if i == _aim_index and _aim != Aim.IDLE:
-			_movers[i].transform = Transform3D(Basis(Vector3.UP, _aim_yaw), _rests[i])
-		else:
-			_movers[i].transform = _motions[i].transform_at(time, _rests[i])
+		_pose(i, time)
+
+
+## Poses moving part `i` at `time`: its Motion (the aiming head's aim, idle Motion and kick), carried
+## by the part it rides as that part stands now.
+func _pose(i: int, time: float) -> void:
+	var pose := _aim_pose(time) if i == _aim_index else _motions[i].transform_at(time, _rests[i])
+	var on := _rides[i]
+	if on >= 0:
+		pose = _movers[on].transform * Transform3D(Basis.IDENTITY, -_rests[on]) * pose
+	_movers[i].transform = pose
+
+
+## The aiming head's pose at `time`: the aim's yaw (or its idle scan's), then the rest of its idle
+## Motion, then the kick of its last shot back along its muzzle.
+func _aim_pose(time: float) -> Transform3D:
+	var yaw := _aim_yaw if _aim != Aim.IDLE else _idle_yaw(time)
+	var turn := Basis(Vector3.UP, yaw)
+	var origin := _rests[_aim_index]
+	if not _aim_turns:
+		var idle := _motions[_aim_index].transform_at(time, Vector3.ZERO)
+		origin += turn * idle.origin
+		turn = turn * idle.basis
+	var kick := recoil_share()
+	if kick > 0.0:
+		origin -= (turn * _muzzle_direction) * float(RECOIL.get(building_type, RECOIL_DEFAULT)) * kick
+	return Transform3D(turn, origin)
+
+
+## The aiming head's yaw its idle Motion gives at `time`: its scan's, 0 when it does not turn about +Y.
+func _idle_yaw(time: float) -> float:
+	return _motions[_aim_index].angle_at(time) if _aim_turns else 0.0
 
 
 ## Whether the view has a head that aims (a `muzzle` socket on a moving part).
@@ -307,13 +357,14 @@ func can_aim() -> bool:
 
 
 ## Turns the aiming head towards the world point `point`, at `rate` (the share of the way a second,
-## as an exponential rate) for `step` seconds of battle; from its idle swing, it starts from where
-## the swing has it.
-func aim_at(point: Vector3, step: float, rate: float) -> void:
+## as an exponential rate) for `step` seconds of battle, the battle's clock at `now`; from its idle
+## swing, it starts from where the swing has it.
+func aim_at(point: Vector3, now: float, step: float, rate: float) -> void:
 	if _aim_index < 0:
 		return
+	_now = now
 	if _aim == Aim.IDLE:
-		_aim_yaw = _motions[_aim_index].angle_at(Motion.clock())
+		_aim_yaw = _idle_yaw(Motion.clock())
 	_aim = Aim.AIMING
 	_aim_wait = 0.0
 	_aim_yaw = lerp_angle(_aim_yaw, _aim_wanted(point), 1.0 - exp(-rate * step))
@@ -324,20 +375,21 @@ func aim_at(point: Vector3, step: float, rate: float) -> void:
 func aim_error(point: Vector3) -> float:
 	if _aim_index < 0:
 		return 0.0
-	var yaw := _aim_yaw if _aim != Aim.IDLE else _motions[_aim_index].angle_at(Motion.clock())
+	var yaw := _aim_yaw if _aim != Aim.IDLE else _idle_yaw(Motion.clock())
 	return absf(angle_difference(yaw, _aim_wanted(point)))
 
 
-## The aiming head has no target for `step` seconds of battle: it holds its aim, then after
-## AIM_IDLE_SECONDS eases back to its idle swing at `rate` and follows it again.
-func idle_aim(step: float, rate: float) -> void:
+## The aiming head has no target for `step` seconds of battle, the battle's clock at `now`: it holds
+## its aim, then after AIM_IDLE_SECONDS eases back to its idle swing at `rate` and follows it again.
+func idle_aim(now: float, step: float, rate: float) -> void:
+	_now = now
 	match _aim:
 		Aim.AIMING:
 			_aim_wait += step
 			if _aim_wait >= AIM_IDLE_SECONDS:
 				_aim = Aim.RETURNING
 		Aim.RETURNING:
-			var swing := _motions[_aim_index].angle_at(Motion.clock())
+			var swing := _idle_yaw(Motion.clock())
 			_aim_yaw = lerp_angle(_aim_yaw, swing, 1.0 - exp(-rate * step))
 			if absf(angle_difference(_aim_yaw, swing)) < AIM_SETTLED:
 				_aim = Aim.IDLE
@@ -350,9 +402,28 @@ func _aim_wanted(point: Vector3) -> float:
 	return atan2(point.x - at.x, point.z - at.z) - _aim_heading
 
 
+## The aiming head fired at `now` on the battle's clock: it kicks back along its muzzle by its
+## type's RECOIL over RECOIL_SECONDS. BattleView calls it as a shot leaves a muzzle (_muzzle).
+func fired(now: float) -> void:
+	if _aim_index < 0:
+		return
+	_now = now
+	_fired_at = now
+	_pose_aim()
+
+
+## How far into its kick the aiming head is now, 0 (at rest) to 1 (fully back); 0 for a view that
+## never aims or has not fired lately.
+func recoil_share() -> float:
+	var u := (_now - _fired_at) / RECOIL_SECONDS
+	if u < 0.0 or u >= 1.0:
+		return 0.0
+	return (Motion.recoil(u * 0.8) + 1.0) * 0.5
+
+
 ## Poses the aiming head at once, so its sockets are where it now faces (_process poses it too).
 func _pose_aim() -> void:
-	_movers[_aim_index].transform = Transform3D(Basis(Vector3.UP, _aim_yaw), _rests[_aim_index])
+	_pose(_aim_index, Motion.clock())
 
 
 ## Whether the model has the socket `name`.
@@ -411,6 +482,7 @@ func _collect_movers(node: Node) -> void:
 			_movers.append(mover)
 			_motions.append(mover.get_meta(BuildingModels.MOVE_META) as Motion)
 			_rests.append(mover.position)
+			_rides.append(int(mover.get_meta(BuildingModels.RIDES_META, -1)))
 		_collect_movers(child)
 
 
@@ -423,6 +495,9 @@ func _collect_sockets(root: Node3D) -> void:
 			_aim_index = i
 			var facing := _sockets["muzzle"].direction
 			_aim_heading = atan2(facing.x, facing.z)
+			_muzzle_direction = facing.normalized()
+			var idle := _motions[i]
+			_aim_turns = idle.kind != Motion.Kind.SLIDE and idle.axis.dot(Vector3.UP) > 0.999
 
 
 func _add_sockets(node: Node3D) -> void:

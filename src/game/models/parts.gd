@@ -90,6 +90,8 @@ var body := LowPolyMesh.new()
 var movers: Array[LowPolyMesh] = []
 var pivots := PackedVector3Array()
 var motions: Array[Motion] = []
+## Per moving part, the index of the moving part it rides (riding()), -1 for none.
+var rides := PackedInt32Array()
 
 
 ## A new moving part, which moves about `pivot` as `motion` says: build it in its own space,
@@ -100,6 +102,17 @@ func moving(pivot: Vector3, motion: Motion) -> LowPolyMesh:
 	movers.append(mesh)
 	pivots.append(pivot)
 	motions.append(motion)
+	rides.append(-1)
+	return mesh
+
+
+## A new moving part that rides the moving part `on` (one moving() or riding() made): it moves
+## about `pivot` (in the model's space, `on` at rest) as `motion` says, and is carried by whatever
+## moves `on` (BuildingView poses it after `on`'s motion and aim): a ring round a barrel that aims.
+## Built as moving() builds one, and counted with them.
+func riding(on: LowPolyMesh, pivot: Vector3, motion: Motion) -> LowPolyMesh:
+	var mesh := moving(pivot, motion)
+	rides[rides.size() - 1] = movers.find(on)
 	return mesh
 
 

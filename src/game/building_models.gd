@@ -14,7 +14,10 @@ extends RefCounted
 ## has none. The meshes are built once per type, level and tier and shared; the nodes are per
 ## view. A level above a type's models shows its top model. The root and each moving part's node
 ## carry their sockets (LowPolyMesh.socket) as SOCKETS_META when they have any: a muzzle on a
-## turret's head is on the head's node, so it turns with it.
+## turret's head is on the head's node, so it turns with it. A moving part that rides another
+## (Parts.riding: a ring round a barrel that aims) carries RIDES_META, the index of the one it
+## rides; its node stands beside the others under the root, at its own pivot, and BuildingView
+## carries it with the part it rides.
 ##
 ## Each category shares a look: every building but a wall stands on the concrete foundation pad
 ## (Parts.foundation) in its category's accent colour (docs/reference/art-style.md), and walls
@@ -37,6 +40,9 @@ const OUTLINE_META := "outline"
 ## Set on a model's root and on a moving part's node when the body or the part has sockets
 ## (LowPolyMesh.socket): its sockets by name, in that node's space.
 const SOCKETS_META := "sockets"
+## Set on a moving part's node that rides another (Parts.riding): the index of the one it rides,
+## among the model's moving parts in their order as nodes.
+const RIDES_META := "rides"
 
 const CoreModels := preload("res://src/game/models/core.gd")
 const ResourceModels := preload("res://src/game/models/resources.gd")
@@ -107,6 +113,8 @@ class Moving:
 	var motion: Motion
 	## The part's sockets, in its own space (the pivot at the origin).
 	var sockets: Dictionary[String, LowPolyMesh.Socket] = {}
+	## The index in Meshes.moving of the part it rides (Parts.riding), -1 for none.
+	var rides: int = -1
 
 
 ## The Tier of the levels unlocked at Command Center `cc`: one mapping, used for every type.
@@ -264,15 +272,19 @@ static func _meshes(p: Parts) -> Meshes:
 	meshes.body = p.body.to_mesh()
 	meshes.outline = p.body.to_outline_mesh()
 	meshes.sockets = p.body.sockets
+	# Each kept part's index in meshes.moving, by its index in p.movers (an empty part is dropped).
+	var kept: Dictionary[int, int] = {}
 	for i: int in p.movers.size():
 		if p.movers[i].triangle_count() == 0:
 			continue
+		kept[i] = meshes.moving.size()
 		var moving := Moving.new()
 		moving.body = p.movers[i].to_mesh()
 		moving.outline = p.movers[i].to_outline_mesh()
 		moving.pivot = p.pivots[i]
 		moving.motion = p.motions[i]
 		moving.sockets = p.movers[i].sockets
+		moving.rides = kept.get(p.rides[i], -1)
 		meshes.moving.append(moving)
 	return meshes
 
@@ -288,6 +300,8 @@ static func _add_parts(root: Node3D, meshes: Meshes) -> void:
 		node.set_meta(MOVE_META, moving.motion)
 		if not moving.sockets.is_empty():
 			node.set_meta(SOCKETS_META, moving.sockets)
+		if moving.rides >= 0:
+			node.set_meta(RIDES_META, moving.rides)
 		root.add_child(node)
 		_add_instances(node, moving.body, moving.outline)
 

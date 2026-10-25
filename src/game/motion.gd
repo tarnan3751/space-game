@@ -107,12 +107,18 @@ func wave(time: float) -> float:
 				return 1.0 - 2.0 * fall * fall
 			return -1.0
 		_:
-			if u < 0.1:
-				var kick := u / 0.1
-				return -1.0 + 2.0 * (1.0 - (1.0 - kick) * (1.0 - kick))
-			if u < 0.8:
-				return 1.0 - 2.0 * smoothstep(0.1, 0.8, u)
-			return -1.0
+			return recoil(u)
+
+
+## The RECOIL wave at the cycle's share `u` (0 to 1), from -1 to 1: a fast rise over 10 %, a slow
+## fall over 70 %, a hold at -1 for 20 %. BuildingView.fired() kicks an aiming part on it once.
+static func recoil(u: float) -> float:
+	if u < 0.1:
+		var kick := u / 0.1
+		return -1.0 + 2.0 * (1.0 - (1.0 - kick) * (1.0 - kick))
+	if u < 0.8:
+		return 1.0 - 2.0 * smoothstep(0.1, 0.8, u)
+	return -1.0
 
 
 static func _wave(new_kind: Kind, new_axis: Vector3, new_amplitude: float, new_period: float,

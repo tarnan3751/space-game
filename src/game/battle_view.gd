@@ -965,9 +965,9 @@ func _aim_defences(shown: float) -> void:
 		if not sim.building_disabled(id):
 			var target := sim.building_target(id)
 			if target != 0 and sim.unit_state(target) != BattleArmy.DEAD:
-				view.aim_at(units.aim_point(target), shown, float(AIM_TURN.get(_types[id], AIM_TURN_DEFAULT)))
+				view.aim_at(units.aim_point(target), _clock, shown, float(AIM_TURN.get(_types[id], AIM_TURN_DEFAULT)))
 			else:
-				view.idle_aim(shown, AIM_RETURN)
+				view.idle_aim(_clock, shown, AIM_RETURN)
 		if _held_shots.has(id) and (view.aim_error(units.aim_point(_held_shots[id])) <= AIM_READY
 				or _clock - _held_since[id] >= AIM_HOLD or sim.building_disabled(id)):
 			_release_shot(id)
@@ -1202,7 +1202,8 @@ func units_brought() -> PackedStringArray:
 
 
 ## Where a shot leaves building `id`: its next muzzle socket (its weapon record's sockets in turn, as
-## many as its model has), or its centre MUZZLE_SHARE of its height up when it has none.
+## many as its model has), kicking an aiming head back (BuildingView.fired), or its centre
+## MUZZLE_SHARE of its height up when it has none.
 func _muzzle(id: int) -> Vector3:
 	var view: BuildingView = _views.get(id)
 	var sockets := _weapons[id].sockets
@@ -1211,7 +1212,10 @@ func _muzzle(id: int) -> Vector3:
 		if k >= sockets.size() or not view.has_socket(sockets[k]):
 			k = 0
 		_next_muzzle[id] = k + 1
-		return view.socket_point(sockets[k])
+		# Read before the kick, which moves the socket back: the shot leaves where the muzzle was.
+		var at := view.socket_point(sockets[k])
+		view.fired(_clock)
+		return at
 	var centre: Vector2 = _centres.get(id, Vector2.ZERO)
 	return Vector3(centre.x, _muzzles.get(id, 1.0), centre.y)
 
