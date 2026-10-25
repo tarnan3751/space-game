@@ -1795,10 +1795,10 @@ static func _hull_radius(profile: PackedVector2Array, along: float) -> float:
 	return 0.0
 
 
-## A transmitter tower: four legs tapering to an emitter orb, braced, ringed with lights, a
-## big dish on its flank. Taller with a ring of lights more at each level. The rings blink in a
-## chase up the tower, the dish circles it slowly on a collar, and the orb pulses and floats
-## under a hologram halo.
+## A transmitter tower on a cream base block banded orange: four legs 0.16 across tapering to a
+## big emitter orb, ringed with lights in cream housings, a big dish on its flank. Taller with a
+## ring of lights more at each level. The rings blink in a chase up the tower, the dish circles it
+## slowly on a collar, and the orb pulses and floats under a hologram halo sized to it.
 ##
 ## From 4 the tower climbs faster and the dish's collar sits between two rings: L4 chrome legs,
 ## base and ring housings, the rings' lights cyan; L5 a bigger dish and a broad band of light
@@ -1814,11 +1814,13 @@ static func build_alliance_beacon(p: Parts, level: int) -> void:
 	var obsidian := p.tier >= Parts.Tier.OBSIDIAN
 	var crown := p.tier >= Parts.Tier.CROWN
 	Parts.foundation(m, 3)
-	m.box_chamfered(Vector3(1.9, 0.22, 1.9), 0.06, Vector3(0, g, 0), _plating(p.tier, ARMOUR))
+	# The base: a solid cream block banded orange (violet glowing over the band from the Obsidian
+	# tier, on the faces the camera sees).
+	m.box_chamfered(Vector3(1.9, 0.22, 1.9), 0.06, Vector3(0, g, 0), _plating(p.tier, Parts.HULL_LIGHT))
+	m.box_chamfered(Vector3(1.94, 0.1, 1.94), 0.03, Vector3(0, g + 0.04, 0), ORANGE)
 	if obsidian:
-		# A violet band glowing round the obsidian base, on the faces the camera sees.
-		m.box(Vector3(1.7, 0.08, 0.02), Vector3(0, g + 0.07, 0.951), VIOLET_PANEL)
-		m.box(Vector3(0.02, 0.08, 1.7), Vector3(0.951, g + 0.07, 0), VIOLET_PANEL)
+		m.box(Vector3(1.7, 0.04, 0.02), Vector3(0, g + 0.07, 0.971), VIOLET_PANEL)
+		m.box(Vector3(0.02, 0.04, 1.7), Vector3(0.971, g + 0.07, 0), VIOLET_PANEL)
 	var foot := g + 0.22
 	m.box_chamfered(Vector3(1.3, 0.14, 1.3), 0.05, Vector3(0, foot, 0), Parts.HULL_DARK)
 	foot += 0.14
@@ -1843,32 +1845,22 @@ static func build_alliance_beacon(p: Parts, level: int) -> void:
 		leg = Parts.CHROME
 	var corners: Array[Vector2] = [Vector2(1, 1), Vector2(1, -1), Vector2(-1, -1), Vector2(-1, 1)]
 	for c: Vector2 in corners:
-		Parts.beam(m, Vector3(c.x * base, foot, c.y * base), Vector3(c.x * crown_width, top, c.y * crown_width), 0.12,
+		Parts.beam(m, Vector3(c.x * base, foot, c.y * base), Vector3(c.x * crown_width, top, c.y * crown_width), 0.16,
 			leg)
 		if obsidian and not crown:
 			# A violet vein down the leg's outer edge, standing proud of it, in two runs that stop
 			# short of the turning dish collar's band.
-			var out := Vector3(c.x, 0, c.y) * 0.06
+			var out := Vector3(c.x, 0, c.y) * 0.08
 			var low := Vector3(c.x * base, foot, c.y * base)
 			var high := Vector3(c.x * crown_width, top, c.y * crown_width)
 			for run: Vector2 in [Vector2(0.1, mount - 0.14 - foot), Vector2(mount + 0.14 - foot, height - 0.1)]:
 				Parts.beam(m, low.lerp(high, run.x / height) + out, low.lerp(high, run.y / height) + out, 0.08,
 					VIOLET_PANEL, 0.01)
-	# Cross braces between the rings.
+	# The stages between the rings, no braces across them, so the legs and rings read as a tower.
 	var stops := PackedFloat32Array([0.0])
 	for i: int in level:
 		stops.append(float(i + 1) / (level + 1))
 	stops.append(1.0)
-	for k: int in stops.size() - 1:
-		var lower := stops[k]
-		var upper := stops[k + 1]
-		for i: int in 4:
-			var a := corners[i]
-			var b := corners[(i + 1) % 4]
-			var wl := lerpf(base, crown_width, lower)
-			var wu := lerpf(base, crown_width, upper)
-			m.strut(Vector3(a.x * wl, foot + height * lower, a.y * wl),
-				Vector3(b.x * wu, foot + height * upper, b.y * wu), 0.04, Parts.ROD)
 	# The rings of lights, blinking in turn from the bottom up.
 	var rings := stops.size() - 2
 	var lamp := LAMP
@@ -1879,18 +1871,18 @@ static func build_alliance_beacon(p: Parts, level: int) -> void:
 	for k: int in range(1, stops.size() - 1):
 		var y := foot + height * stops[k]
 		var radius := lerpf(base, crown_width, stops[k]) * 1.42 + 0.1
-		m.ring(radius - 0.12, radius, 0.08, 24, Vector3(0, y - 0.04, 0), Parts.CHROME_ROUND if chrome else ARMOUR_ROUND)
+		m.ring(radius - 0.12, radius, 0.12, 24, Vector3(0, y - 0.06, 0), Parts.CHROME_ROUND if chrome else HULL_ROUND)
 		m.ring(radius, radius + 0.035, 0.05, 24, Vector3(0, y - 0.025, 0),
 			lamp.phased(fposmod(-float(k - 1) / rings, 1.0)))
 		if level >= 5:
 			# From 5 a broad band of light under each ring, cyan, violet from the Obsidian tier.
-			m.ring(radius - 0.01, radius + 0.06, 0.07, 24, Vector3(0, y - 0.11, 0), _glow(p.tier).phased(k / 8.0))
+			m.ring(radius - 0.01, radius + 0.06, 0.07, 24, Vector3(0, y - 0.13, 0), _glow(p.tier).phased(k / 8.0))
 	# The big dish facing out from the tower on a collar that turns about it, between the rings
 	# of lights at every level, so the dish circles the tower slowly; bigger from 5.
 	var collar := lerpf(base, crown_width, seat) * 1.42 + 0.1
 	var dish := p.moving(Vector3(0, mount, 0), Motion.spin(Vector3.UP, 0.35))
-	dish.ring(collar - 0.12, collar, 0.08, 24, Vector3(0, -0.04, 0), Parts.CHROME_ROUND if chrome else ARMOUR_ROUND)
-	Parts.beam(dish, Vector3(collar - 0.02, 0, 0), Vector3(collar + 0.2, 0, 0), 0.1, Parts.CHROME if chrome else Parts.GUNMETAL)
+	dish.ring(collar - 0.12, collar, 0.12, 24, Vector3(0, -0.06, 0), Parts.CHROME_ROUND if chrome else HULL_ROUND)
+	Parts.beam(dish, Vector3(collar - 0.02, 0, 0), Vector3(collar + 0.2, 0, 0), 0.16, Parts.CHROME if chrome else Parts.GUNMETAL)
 	var tilt := Vector3(55, 90, 0)
 	var dish_centre := Vector3(collar + 0.2, 0, 0)
 	var size := 0.62 if level < 5 else 0.76
@@ -1903,7 +1895,7 @@ static func build_alliance_beacon(p: Parts, level: int) -> void:
 	m.prism(0.2, 0.16, 0.12, 16, Vector3(0, top, 0), GOLD_ROUND if gold else Parts.GUNMETAL)
 	m.ring(0.2, 0.3, 0.06, 24, Vector3(0, top + 0.12, 0), ORANGE_ROUND)
 	# The orb rests a bob's height over the collar, so it never sinks into it.
-	var orb := 0.17 + 0.02 * level
+	var orb := 1.4 * (0.17 + 0.02 * level)
 	var lift := top + 0.12 + 0.08
 	var glow := ORB_BOB
 	if crown:
@@ -1915,10 +1907,10 @@ static func build_alliance_beacon(p: Parts, level: int) -> void:
 	var halo := Vector3(0, lift + 0.12 + orb * 2, 0)
 	if crown:
 		# The gold halo over the core, and the hologram beam rising out of it.
-		Parts.torus(m, 0.3, 0.035, 24, 8, halo, GOLD_BOB.phased(0.5))
-		m.prism(0.1, 0.26, 0.42, 16, halo + Vector3(0, 0.06, 0), HOLO_VIOLET)
+		Parts.torus(m, 0.42, 0.035, 24, 8, halo, GOLD_BOB.phased(0.5))
+		m.prism(0.1, 0.26, 0.24, 16, halo + Vector3(0, 0.06, 0), HOLO_VIOLET)
 	else:
-		m.ring(0.2, 0.26, 0.03, 24, halo, HOLOGRAM.phased(0.5))
+		m.ring(0.28, 0.36, 0.03, 24, halo, HOLOGRAM.phased(0.5))
 	if level >= 6:
 		# The obsidian ring hovering round the tower's upper reach, between two rings of lights,
 		# turning slowly, rimmed in violet.
