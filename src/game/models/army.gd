@@ -63,12 +63,12 @@ static var SCREEN_FLOW := Surf.make(MaterialKit.Layer.SCREEN, MaterialKit.CORE_G
 ## The lit hangar inside an opening door: an orange glow, its stripes rising.
 static var INTERIOR := Surf.make(MaterialKit.Layer.GLOW, MaterialKit.ARMY, 2.0, Surf.UNLIT | Surf.FLOW, false,
 	false, 0.35)
-## Goo lapping round behind glass (phased() sets its speed), goo swirling in an open vat, its
-## bubbles, the bright meniscus at its surface, and the pipes carrying it along.
+## Goo lapping round behind glass (phased() sets its speed), goo swirling and pulsing in an open
+## vat, its bubbles, the bright meniscus at its surface, and the pipes carrying it along.
 static var GOO_FLOW := Surf.make(MaterialKit.Layer.GLASS, MaterialKit.NANITE_GREEN, 1.0,
 	Surf.UNLIT | Surf.FLOW_U, true, true, 0.55)
 static var GOO_SWIRL := Surf.make(MaterialKit.Layer.GLASS, MaterialKit.NANITE_GREEN, 1.0,
-	Surf.UNLIT | Surf.FLOW_U, false, true, 0.65)
+	Surf.UNLIT | Surf.FLOW_U | Surf.PULSE, false, true, 0.65)
 ## A bubble is nearly white with a hint of the goo's green, so it shows against the goo: a
 ## hologram rising through it and fading; too small for an outline.
 static var BUBBLE := Surf.make(MaterialKit.Layer.GLOW, MaterialKit.NANITE_GREEN.lerp(Color.WHITE, 0.85), 1.0,
@@ -143,7 +143,7 @@ static var CYAN_PIPE := Surf.make(MaterialKit.Layer.PIPE, MaterialKit.ENERGY, 2.
 static var GOO_BRIGHT := Surf.make(MaterialKit.Layer.GLASS, MaterialKit.NANITE_GREEN.lerp(Color.WHITE, 0.3), 1.0,
 	Surf.UNLIT | Surf.FLOW_U, true, true, 0.55)
 static var GOO_BRIGHT_SWIRL := Surf.make(MaterialKit.Layer.GLASS, MaterialKit.NANITE_GREEN.lerp(Color.WHITE, 0.3), 1.0,
-	Surf.UNLIT | Surf.FLOW_U, false, true, 0.65)
+	Surf.UNLIT | Surf.FLOW_U | Surf.PULSE, false, true, 0.65)
 static var HOVER_CRYSTAL := Surf.make(MaterialKit.Layer.CRYSTAL, MaterialKit.CRYSTAL, 1.0, Surf.UNLIT | Surf.PULSE | Surf.BOB,
 	false, true, 0.6)
 ## The drydock's: the welders' sparks cyan, then crystal (and the crystal arcs off them); the
@@ -173,13 +173,47 @@ static var MARSHAL_WAND := Surf.make(MaterialKit.Layer.GLOW, MaterialKit.ARMY.le
 ## Where the L10 marshaller hovers: on the apron before the main door, over the lamps.
 const MARSHAL_AT := Vector3(-1.0, 0.65, 1.85)
 
+## The idle motions' rates, bold enough to read in a second of play (docs/reference/art-style.md,
+## **Animation**): the hangar's main door's period and its big roof dish's sweep (degrees) and
+## period; the cadet hologram's turn; the fabricator's crane cab's travel either way and its
+## period; the heavy fabricator's press stroke either way and its period, a strike in every second
+## and a half; the lab's telescope's nod (degrees) and its period, the L9 ring of rings' turn (the
+## other way), and the phase its hologram turns and bobs on (_hologram); the foundry's stirrer's
+## turn (the L7 stirrer ring at half of it, the other way); the drydock's first gantry's period;
+## the alliance beacon's dish's turn round the tower (the L6 hovering ring's the other way).
+## Radians a second for a turn.
+const DOOR_PERIOD := 3.5
+## The troopers standing at attention on the landing pad to L2 (_drill_squad): how many (one: a
+## colonist costs about 680 triangles even at a quarter of its sides, and the hangar keeps a
+## quarter of its budget free), the pace between them in their rank, their size
+## (Figures.COLONIST_HEIGHT times it) and the share of their round parts' sides they are built
+## with (LowPolyMesh.detail): a quarter, as they stand still and small.
+const DRILL_TROOPERS := 1
+const DRILL_PACE := 0.4
+const DRILL_SCALE := 0.8
+const DRILL_DETAIL := 0.25
+const ROOF_DISH_SWEEP := 35.0
+const ROOF_DISH_PERIOD := 4.0
+const CADET_RATE := 1.6
+const TROLLEY_TRAVEL := 0.24
+const TROLLEY_PERIOD := 3.0
+const PRESS_STROKE := 0.22
+const PRESS_PERIOD := 1.5
+const TELESCOPE_NOD := 16.0
+const TELESCOPE_PERIOD := 4.0
+const HOLOGRAM_RATE := 1.2
+const HOLOGRAM_PHASE := 0.6
+const STIRRER_RATE := 2.4
+const GANTRY_PERIOD := 4.0
+const BEACON_DISH_RATE := 1.0
+
 
 ## A long vaulted hangar: the main bay with its striped door, the control tower in the back
 ## corner, its cream column banded orange under the cab, landing lights along the apron, an orange
-## deck ringed in hazard stripes across the front. Wider door at 2 and 3, a second bay at 3 (an
-## orange landing pad in its place before), roof dishes at 4. The main bay's door rises over its
-## lit inside and drops again, the lights chase along the apron, the cab's glass pulses and a radar
-## turns on its roof; from 4 the big roof dish sweeps.
+## deck ringed in hazard stripes across the front, a big roof dish sweeping on the main bay. Wider
+## door at 2 and 3, a second bay at 3 (an orange landing pad in its place before, a trooper standing
+## on it), a small roof dish and a radar turning on the cab's roof at 4. The main bay's door rises
+## over its lit inside and drops again, the lights chase along the apron, the cab's glass pulses.
 ##
 ## From 6 the tower grows taller at each level and the apron's lights stand in two rows before
 ## the main door, chasing apart: L6 chrome roofs with cyan ribs, a chrome tower with cyan strips
@@ -204,6 +238,7 @@ static func build_hangar(p: Parts, level: int) -> void:
 	else:
 		m.disc(0.75, 24, Vector3(1.35, g + 0.002, 0.2), Parts.HAZARD)
 		m.disc(0.6, 24, Vector3(1.35, g + 0.004, 0.2), ORANGE)
+		_drill_squad(m, Vector3(1.35, g + 0.004, 0.2))
 	# The apron: an orange deck across the front, ringed in hazard stripes, the lamps on it.
 	m.box_chamfered(Vector3(4.7, 0.05, 0.88), 0.02, Vector3(0, g, 1.94), Parts.HAZARD)
 	m.box_chamfered(Vector3(4.5, 0.08, 0.72), 0.02, Vector3(0, g, 1.94), ORANGE)
@@ -235,24 +270,29 @@ static func build_hangar(p: Parts, level: int) -> void:
 		_crown_beacon(m, cab + Vector3(0.12, 0.6, -0.1), 0.62)
 	else:
 		_mast(m, cab + Vector3(0.12, 0.6, -0.1), 0.3 + 0.03 * level, GLOW)
-	# The radar turning on the cab's roof, clear of the mast; bigger from 6.
-	var big := 1.45 if level >= 6 else 1.0
-	var stub := cab + Vector3(-0.14, 0.6, 0.12)
-	m.box_chamfered(Vector3(0.16, 0.12, 0.16), 0.03, stub, Parts.GUNMETAL)
-	var radar := p.moving(stub + Vector3(0, 0.12, 0), Motion.spin(Vector3.UP, Parts.DISH_RATE))
-	radar.box_chamfered(Vector3(0.08, 0.08, 0.08), 0.02, Vector3.ZERO, Parts.GUNMETAL)
-	var tilt := Vector3(60, 90, 0)
-	var hub := Vector3(0, 0.08, 0)
-	Parts.dish(radar, 0.18 * big, 0.07 * big, hub, GOLD_ROUND if p.tier >= Parts.Tier.GOLD else HULL_ROUND, tilt)
-	var axis := LowPolyMesh.turn(Vector3.UP, tilt)
-	Parts.pipe(radar, hub + axis * 0.03, hub + axis * 0.15 * big, 0.015, Parts.ROD)
-	radar.orb(0.03 * big, 10, 4, hub + axis * 0.15 * big, CYAN_LAMP if chrome else GLOW)
+	if level >= 4:
+		# From 4 the radar turning on the cab's roof, clear of the mast, bigger from 6 (to 3 the
+		# big roof dish is the hangar's sweep, in its place).
+		var big := 1.45 if level >= 6 else 1.0
+		var stub := cab + Vector3(-0.14, 0.6, 0.12)
+		m.box_chamfered(Vector3(0.16, 0.12, 0.16), 0.03, stub, Parts.GUNMETAL)
+		var radar := p.moving(stub + Vector3(0, 0.12, 0), Motion.spin(Vector3.UP, Parts.DISH_RATE))
+		radar.box_chamfered(Vector3(0.08, 0.08, 0.08), 0.02, Vector3.ZERO, Parts.GUNMETAL)
+		var tilt := Vector3(60, 90, 0)
+		var hub := Vector3(0, 0.08, 0)
+		Parts.dish(radar, 0.18 * big, 0.07 * big, hub, GOLD_ROUND if p.tier >= Parts.Tier.GOLD else HULL_ROUND, tilt)
+		var axis := LowPolyMesh.turn(Vector3.UP, tilt)
+		Parts.pipe(radar, hub + axis * 0.03, hub + axis * 0.15 * big, 0.015, Parts.ROD)
+		radar.orb(0.03 * big, 10, 4, hub + axis * 0.15 * big, CYAN_LAMP if chrome else GLOW)
 	if level >= 2:
 		# Fuel tanks on the apron, beside the main door.
 		for z: float in [1.75, 1.99]:
 			Parts.tank(m, 0.1, 0.32, Vector3(-2.15, deck, z), ORANGE_ROUND, 0.03)
+	# The big roof dish sweeps at every level, so the hangar's idle reads from L1, where the
+	# door's travel under its low hood is short; from 4 a small one on the second bay and the
+	# radar on the cab.
+	_roof_dish(p, Vector3(-1.0, g + 1.98, -1.5), 0.5, true)
 	if level >= 4:
-		_roof_dish(p, Vector3(-1.0, g + 1.98, -1.5), 0.5, true)
 		_roof_dish(p, Vector3(1.35, g + 1.38, -0.4), 0.32, false)
 	if level >= 7:
 		_vault(p, Vector3(1.75, g, 1.58), 1.0, 0.85, 0.4, 0.5, false, level)
@@ -263,6 +303,21 @@ static func build_hangar(p: Parts, level: int) -> void:
 				Vector3(90, 90.0 * face.x, 0))
 	if level >= 10:
 		_marshaller(p, MARSHAL_AT + Vector3(0, g, 0))
+
+
+## The troopers standing at attention on the landing pad to L2, their middle at `pad`:
+## DRILL_TROOPERS troopers (Figures.colonist at attention in its stance) in a rank across the
+## camera's view, DRILL_PACE apart, facing it, part of the body at DRILL_DETAIL, so they cost no
+## moving part and no draw. They stand still: a building has no
+## per-instance state to drive the walking rig (Rig) with.
+static func _drill_squad(m: LowPolyMesh, pad: Vector3) -> void:
+	var detail := m.detail
+	m.detail = DRILL_DETAIL
+	var rank := Vector3(0.70710678, 0, -0.70710678)
+	for k: int in DRILL_TROOPERS:
+		var foot := pad + rank * DRILL_PACE * (k - (DRILL_TROOPERS - 1) * 0.5)
+		Figures.colonist(m, foot, 45.0, Figures.stance(), Figures.PRIMARY_HEADS, DRILL_SCALE)
+	m.detail = detail
 
 
 ## The hangar's marshaller from 10, hovering at `at` before the main door, facing the apron (+Z):
@@ -407,7 +462,7 @@ static func _roof_dish(p: Parts, foot: Vector3, radius: float, sweeps: bool) -> 
 	var m := p.body
 	var centre := foot + Vector3(0, stub - 0.02, 0)
 	if sweeps:
-		m = p.moving(centre, Motion.swing(Vector3.UP, 30.0, 7.0))
+		m = p.moving(centre, Motion.swing(Vector3.UP, ROOF_DISH_SWEEP, ROOF_DISH_PERIOD))
 		centre = Vector3.ZERO
 	Parts.dish(m, radius, radius * 0.38, centre, GOLD_ROUND if p.tier >= Parts.Tier.GOLD else HULL_ROUND, aim)
 	var axis := LowPolyMesh.turn(Vector3.UP, aim)
@@ -474,7 +529,7 @@ static func _vault(p: Parts, back: Vector3, width: float, length: float, wall: f
 		m.box(Vector3(door, rise + 0.06, 0.008), Vector3(back.x, back.y, z + 0.006), INTERIOR)
 		strip = (back.y + height + 0.14 + hood) * 0.5 - 0.03
 		above = hood
-		leaves = p.moving(at + Vector3(0, rise * 0.5, 0), Motion.slide(Vector3.UP, rise * 0.5, 6.0))
+		leaves = p.moving(at + Vector3(0, rise * 0.5, 0), Motion.slide(Vector3.UP, rise * 0.5, DOOR_PERIOD))
 		at = Vector3(0, 0, 0.015)
 	var leaf := door / 4.0
 	for i: int in 4:
@@ -663,11 +718,11 @@ static func _lecture_room(m: LowPolyMesh, room: Vector3, level: int, tier: int) 
 
 ## The hologram cadet standing at ease, its feet on `foot`: the colonist (Figures.colonist) in
 ## its stance, 0.8 tall, every part a cyan hologram (LowPolyMesh.tint) bobbing together, with no
-## outline, over the plinth's cyan lens. A moving part, it turns slowly about the vertical through its feet, a hologram's
-## showcase turn. From 5 a halo floats over it out of step, at Crown a solid one in the core's
+## outline, over the plinth's cyan lens. A moving part, it turns about the vertical through its
+## feet at CADET_RATE, a hologram's showcase turn. From 5 a halo floats over it out of step, at Crown a solid one in the core's
 ## light violet.
 static func _cadet(p: Parts, foot: Vector3, level: int) -> void:
-	var m := p.moving(foot, Motion.spin(Vector3.UP, 0.5))
+	var m := p.moving(foot, Motion.spin(Vector3.UP, CADET_RATE))
 	m.detail = 0.5
 	m.flags = Surf.HOLO | Surf.BOB
 	m.tint = MaterialKit.ENERGY
@@ -858,9 +913,12 @@ static func build_fabricator(p: Parts, level: int) -> void:
 	var bridge := 0.72
 	Parts.beam(m, Vector3(0.45, top + 0.17, bridge), Vector3(1.25, top + 0.17, bridge), 0.16, _trim(p.tier, Parts.HULL_DARK), 0.04)
 	# The crane's cab rides on the bridge, its hook hanging under it, from leg to leg.
-	var trolley := p.moving(Vector3(0.85, top, bridge), Motion.slide(Vector3.RIGHT, 0.2, 5.0))
+	var trolley := p.moving(Vector3(0.85, top, bridge), Motion.slide(Vector3.RIGHT, TROLLEY_TRAVEL, TROLLEY_PERIOD))
 	trolley.box_chamfered(Vector3(0.28, 0.22, 0.3), 0.05, Vector3(0, 0.25, 0), Parts.HULL_DARK)
 	trolley.box(Vector3(0.2, 0.08, 0.02), Vector3(0, 0.35, 0.15), CAB_GLASS)
+	# The cab's warning lamp, blinking as it rides.
+	trolley.prism(0.05, 0.04, 0.04, 10, Vector3(0, 0.47, 0), Parts.GUNMETAL)
+	trolley.dome(0.045, 0.05, 10, 3, Vector3(0, 0.51, 0), LAMP)
 	trolley.prism(0.012, 0.012, 0.6, 8, Vector3(0, -0.24, 0), Parts.ROD)
 	trolley.box_chamfered(Vector3(0.12, 0.07, 0.12), 0.02, Vector3(0, -0.31, 0), Parts.HAZARD)
 	# Smokestacks on the furnace box, which rises into a furnace house at 9.
@@ -1041,10 +1099,11 @@ static func _press_arm(p: Parts, shoulder: Vector3, anvil: Vector3, phase: float
 	Parts.pipe(m, shoulder + Vector3(0.2, 0.24, 0), elbow + Vector3(-0.1, -0.26, 0), 0.08, HULL_ROUND)
 	m.prism(0.25, 0.25, 0.44, 16, elbow + Vector3(0, 0, -0.22), Parts.GUNMETAL, Vector3(90, 0, 0))
 	Parts.pipe(m, elbow, anvil + Vector3(0, 1.28, 0), 0.16, Parts.GUNMETAL)
-	# The head strikes the anvil's face (0.3 up) and lifts to 0.66, where it hung before it moved.
-	var head := p.moving(anvil + Vector3(0, 0.48, 0),
-		Motion.slide(Vector3.UP, 0.18, 2.4, phase, Motion.Ease.HAMMER))
-	Parts.pipe(head, Vector3(0, 0.36, 0), Vector3(0, 1.1, 0), 0.09, HULL_ROUND, 16, false)
+	# The head strikes the anvil's face (0.3 up) and lifts PRESS_STROKE twice over, its piston
+	# always inside the ram (from 1.28 up).
+	var head := p.moving(anvil + Vector3(0, 0.3 + PRESS_STROKE, 0),
+		Motion.slide(Vector3.UP, PRESS_STROKE, PRESS_PERIOD, phase, Motion.Ease.HAMMER))
+	Parts.pipe(head, Vector3(0, 0.36, 0), Vector3(0, 1.0, 0), 0.09, HULL_ROUND, 16, false)
 	head.box_chamfered(Vector3(0.6, 0.38, 0.6), 0.08, Vector3.ZERO, Parts.CHROME if p.tier >= Parts.Tier.CHROME else ORANGE)
 	head.box(Vector3(0.62, 0.08, 0.62), Vector3(0, 0.04, 0), Parts.GOLD_TRIM if p.tier >= Parts.Tier.GOLD else Parts.HAZARD)
 	m.box_chamfered(Vector3(0.6, 0.3, 0.6), 0.05, anvil, Parts.GUNMETAL)
@@ -1133,7 +1192,7 @@ static func build_research_lab(p: Parts, level: int) -> void:
 	var across := Vector3(0.7071, 0, 0.7071)
 	m.ring(0.6, 0.65, 0.18, 24, centre - across * 0.09, GLOW_PULSE, Parts.facing(across))
 	# The telescope nods along the slit, about its trunnion at the dome's centre.
-	var telescope := p.moving(centre, Motion.swing(across, 10.0, 8.0))
+	var telescope := p.moving(centre, Motion.swing(across, TELESCOPE_NOD, TELESCOPE_PERIOD))
 	var aim := Vector3(0.42, 0.8, -0.42).normalized()
 	Parts.pipe(telescope, aim * 0.3, aim * 0.95, 0.1, HULL_ROUND)
 	telescope.ring(0.07, 0.13, 0.1, 16, aim * 0.85, ORANGE_ROUND, Parts.facing(aim))
@@ -1218,7 +1277,7 @@ static func _lab_tower(p: Parts, foot: Vector3, level: int) -> void:
 	m.ring(R - 0.02, R + 0.04, 0.22, 24, centre - across * 0.11, GLOW_PULSE, Parts.facing(across))
 	# The longer telescope, nodding along the slit, out of the slit's other side from the radar
 	# mast, towards the camera, so it never meets the dish's sweep.
-	var telescope := p.moving(centre, Motion.swing(across, 10.0, 8.0))
+	var telescope := p.moving(centre, Motion.swing(across, TELESCOPE_NOD, TELESCOPE_PERIOD))
 	var aim := Vector3(-0.42, 0.8, 0.42).normalized()
 	Parts.pipe(telescope, aim * 0.35, aim * 1.25, 0.12, Parts.CHROME_ROUND)
 	telescope.ring(0.09, 0.16, 0.12, 16, aim * 1.1, ORANGE_ROUND, Parts.facing(aim))
@@ -1250,7 +1309,7 @@ static func _lab_tower(p: Parts, foot: Vector3, level: int) -> void:
 	if level >= 9:
 		# The ring of rings hovering round the hologram, turning: a ring with six upright rings
 		# standing round it, obsidian rimmed in violet, gold at Crown.
-		var gyro := p.moving(subject - Vector3(0, 0.05, 0), Motion.spin(Vector3.UP, -0.6))
+		var gyro := p.moving(subject - Vector3(0, 0.05, 0), Motion.spin(Vector3.UP, -HOLOGRAM_RATE))
 		gyro.ring(0.6, 0.68, 0.05, 24, Vector3.ZERO, GOLD_BOB.phased(0.6) if crown else HOVER)
 		for k: int in 6:
 			var degrees := 60.0 * k
@@ -1259,14 +1318,17 @@ static func _lab_tower(p: Parts, foot: Vector3, level: int) -> void:
 	_lab_corners(p, level)
 
 
-## The lab's hologram floating at `subject`: an orb 0.3 in radius on `shell` round a core glowing
-## on `core`, so it reads brighter than a hologram alone, in two tilted rings on `rings`.
+## The lab's hologram floating at `subject`: an orb 0.3 in radius on `shell`'s tint and flags round
+## a core glowing on `core`, so it reads brighter than a hologram alone, in two tilted rings on
+## `rings`. The orb is on the crystal layer, its cells turning round it (FLOW_U at
+## HOLOGRAM_PHASE), so it spins; all of it bobs on that phase, with the L9 ring of rings.
 static func _hologram(m: LowPolyMesh, subject: Vector3, shell: Surf, rings: Surf, core: Surf) -> void:
-	m.orb(0.14, 12, 4, subject, core)
-	m.orb(0.3, 16, 6, subject, shell)
+	m.orb(0.14, 12, 4, subject, core.phased(HOLOGRAM_PHASE))
+	m.orb(0.3, 16, 6, subject, Surf.make(MaterialKit.Layer.CRYSTAL, shell.tint, 1.0, shell.flags | Surf.FLOW_U, true, true,
+		HOLOGRAM_PHASE))
 	for tilt: Vector3 in [Vector3(35, 0, 0), Vector3(0, 0, -35)]:
 		m.lathe(PackedVector2Array([Vector2(0.44, 0), Vector2(0.44, 0.03), Vector2(0.39, 0.03)]), 16,
-			subject, rings, tilt)
+			subject, rings.phased(HOLOGRAM_PHASE), tilt)
 
 
 ## The lab's band of light round a ring's lip: cyan at the Chrome tier, violet veins from the
@@ -1350,7 +1412,7 @@ static func build_nanite_foundry(p: Parts, level: int) -> void:
 		big, big + Vector3(0, 0.2, 0), Vector3(second.x, big.y + 0.2, second.z), second,
 	]), pipe, obsidian)
 	# The stirrer: a hub with two crossed paddles turning in the big vat's goo.
-	var stirrer := p.moving(vats[0][0] + Vector3(0, stir, 0), Motion.spin(Vector3.UP, 1.6))
+	var stirrer := p.moving(vats[0][0] + Vector3(0, stir, 0), Motion.spin(Vector3.UP, STIRRER_RATE))
 	stirrer.prism(0.1, 0.08, 0.14, 12, Vector3(0, -0.02, 0), ORANGE_ROUND)
 	for yaw: float in [0.0, 90.0]:
 		stirrer.box_chamfered(Vector3(0.76, 0.08, 0.07), 0.02, Vector3(0, -0.04, 0), ORANGE, Vector3(0, yaw, 0))
@@ -1379,7 +1441,7 @@ static func build_nanite_foundry(p: Parts, level: int) -> void:
 	if level >= 7:
 		# The stirrer ring hovering over the big vat, turning against the stirrer: obsidian rimmed
 		# in violet, four crystal vanes pointing in.
-		var hover := p.moving(vats[0][0] + Vector3(0, stir + 0.42, 0), Motion.spin(Vector3.UP, -0.8))
+		var hover := p.moving(vats[0][0] + Vector3(0, stir + 0.42, 0), Motion.spin(Vector3.UP, -STIRRER_RATE * 0.5))
 		hover.ring(0.44, 0.56, 0.06, 24, Vector3.ZERO, HOVER)
 		hover.lathe(PackedVector2Array([Vector2(0.565, 0.01), Vector2(0.565, 0.05)]), 24, Vector3.ZERO, HOVER_RIM)
 		hover.lathe(PackedVector2Array([Vector2(0.54, 0.062), Vector2(0.46, 0.062)]), 24, Vector3.ZERO, HOVER_RIM)
@@ -1621,7 +1683,7 @@ static func build_drydock(p: Parts, level: int) -> void:
 		var crane := m
 		var at := Vector3(gx, 0, 0)
 		if k == 0:
-			crane = p.moving(at, Motion.slide(Vector3.RIGHT, 0.3, 7.0))
+			crane = p.moving(at, Motion.slide(Vector3.RIGHT, 0.3, GANTRY_PERIOD))
 			at = Vector3.ZERO
 		if level >= 3:
 			# From 3 a slim cantilever on a post at the back, braced, its beam reaching out over the
@@ -1880,7 +1942,7 @@ static func build_alliance_beacon(p: Parts, level: int) -> void:
 	# The big dish facing out from the tower on a collar that turns about it, between the rings
 	# of lights at every level, so the dish circles the tower slowly; bigger from 5.
 	var collar := lerpf(base, crown_width, seat) * 1.42 + 0.1
-	var dish := p.moving(Vector3(0, mount, 0), Motion.spin(Vector3.UP, 0.35))
+	var dish := p.moving(Vector3(0, mount, 0), Motion.spin(Vector3.UP, BEACON_DISH_RATE))
 	dish.ring(collar - 0.12, collar, 0.12, 24, Vector3(0, -0.06, 0), Parts.CHROME_ROUND if chrome else HULL_ROUND)
 	Parts.beam(dish, Vector3(collar - 0.02, 0, 0), Vector3(collar + 0.2, 0, 0), 0.16, Parts.CHROME if chrome else Parts.GUNMETAL)
 	var tilt := Vector3(55, 90, 0)
@@ -1915,7 +1977,7 @@ static func build_alliance_beacon(p: Parts, level: int) -> void:
 		# The obsidian ring hovering round the tower's upper reach, between two rings of lights,
 		# turning slowly, rimmed in violet.
 		var share := (level - 0.5) / (level + 1)
-		var hover := p.moving(Vector3(0, foot + height * share - 0.03, 0), Motion.spin(Vector3.UP, -0.5))
+		var hover := p.moving(Vector3(0, foot + height * share - 0.03, 0), Motion.spin(Vector3.UP, -BEACON_DISH_RATE))
 		hover.ring(0.5, 0.64, 0.06, 24, Vector3.ZERO, HOVER)
 		hover.lathe(PackedVector2Array([Vector2(0.645, 0.01), Vector2(0.645, 0.05)]), 24, Vector3.ZERO, HOVER_RIM)
 		hover.lathe(PackedVector2Array([Vector2(0.62, 0.062), Vector2(0.52, 0.062)]), 24, Vector3.ZERO, HOVER_RIM)
