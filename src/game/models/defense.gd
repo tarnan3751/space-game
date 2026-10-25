@@ -1661,15 +1661,16 @@ static func build_orbital_cannon(p: Parts, level: int) -> void:
 	var heading := Vector3(0, yaw, 0)
 	var aim := Vector3(47.0 if level < 3 else float(ORBITAL_PITCHES[level - 3]), yaw, 0)
 	var trunnion := Vector3(0, deck + 0.36, 0)
+	# The gun elevates slowly about its trunnion: the cheeks, the breech block, the barrel and what it
+	# carries; in battle it turns to aim (BuildingView) over its elevation, its muzzle socket at the
+	# bore. The block's foot sits 0.3 down in the deck and the elevation slides it a further 0.06
+	# through the deck's top, between the cheeks, which hide where it meets the deck: by construction.
+	var gun := p.moving(trunnion, Motion.swing(LowPolyMesh.turn(Vector3.RIGHT, heading), 4.0, 9.0))
 	for side: float in [-1.0, 1.0]:
 		var cheek := LowPolyMesh.turn(Vector3(side * 0.6, 0, 0), heading)
-		m.box_chamfered(Vector3(0.2, 0.78, 1.15), 0.06, Vector3(cheek.x, deck, cheek.z), ARMOUR, heading)
-		m.prism(0.22, 0.22, 0.1, 20, trunnion + LowPolyMesh.turn(Vector3(side * 0.7, 0, 0), heading),
+		gun.box_chamfered(Vector3(0.2, 0.78, 1.15), 0.06, Vector3(cheek.x, deck - trunnion.y, cheek.z), ARMOUR, heading)
+		gun.prism(0.22, 0.22, 0.1, 20, LowPolyMesh.turn(Vector3(side * 0.7, 0, 0), heading),
 			GOLD if p.tier >= Parts.Tier.GOLD else Parts.GUNMETAL, heading + Vector3(0, 0, -90 * side))
-	# The gun elevates slowly about its trunnion: the breech block, the barrel and what it carries.
-	# The block's foot sits 0.3 down in the deck and the elevation slides it a further 0.06 through
-	# the deck's top, between the cheeks, which hide where it meets the deck: by construction.
-	var gun := p.moving(trunnion, Motion.swing(LowPolyMesh.turn(Vector3.RIGHT, heading), 4.0, 9.0))
 	gun.box_chamfered(Vector3(0.96, 0.95, 0.96), 0.08, LowPolyMesh.turn(Vector3(0, -0.45, 0), aim),
 		_by_tier(p.tier, Parts.HULL_LIGHT, Parts.CHROME, Parts.OBSIDIAN), aim)
 	var length := 1.2 + 0.15 * level if level < 3 else float(ORBITAL_LENGTHS[level - 3])
@@ -1681,6 +1682,7 @@ static func build_orbital_cannon(p: Parts, level: int) -> void:
 		Vector2(0.3, 0), Vector2(0.42, 0.06), Vector2(0.42, 0.34), Vector2(0.26, 0.38), Vector2(0.22, 0.3),
 	]), 24, _at(barrel, Vector3(0, length, 0), aim), _by_tier(p.tier, SHELL, Parts.CHROME_ROUND, Parts.OBSIDIAN_ROUND), aim)
 	gun.disc(0.22, 20, _at(barrel, Vector3(0, length + 0.3, 0), aim), BORE_ION, aim)
+	gun.socket("muzzle", _at(barrel, Vector3(0, length + 0.38, 0), aim), LowPolyMesh.turn(Vector3.UP, aim))
 	gun.tube(0.42, 0.44, 0.08, 24, _at(barrel, Vector3(0, length + 0.12, 0), aim), GOLD if p.tier >= Parts.Tier.GOLD else ARMOUR_ROUND,
 		aim)
 	gun.ring(0.5, 0.53, 0.1, 24, _at(barrel, Vector3(0, length + 0.44, 0), aim), ION_HOLO, aim)
@@ -1764,8 +1766,8 @@ static func build_orbital_cannon(p: Parts, level: int) -> void:
 		m.prism(0.11, 0.11, 0.06, 4, Parts.around(1.58, degrees, top), INLAY.phased(fposmod(degrees, 90.0) / 90.0),
 			Vector3(90, 90.0 - degrees, 0))
 	var along := LowPolyMesh.turn(Vector3.UP, aim)
-	# The uplink ring hovers between the second and the third accelerator ring.
-	var uplink := p.moving(trunnion + _at(barrel, Vector3(0, 0.5 + (length - 0.7) * ORBITAL_RING_AT, 0), aim),
+	# The uplink ring hovers between the second and the third accelerator ring, riding the gun.
+	var uplink := p.riding(gun, trunnion + _at(barrel, Vector3(0, 0.5 + (length - 0.7) * ORBITAL_RING_AT, 0), aim),
 		Motion.spin(along, 0.5))
 	_ion_focus(uplink, 0.62, 0.78, aim, p.tier)
 	if level < 5:
