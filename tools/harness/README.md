@@ -382,7 +382,8 @@ without its legs (the pilots'). In both modes it checks every type at every tier
 and length (a spinning part's whole round included, a spin tag's about its pivot) within 20% of the size table, a flying unit's
 lowest point within 20% of its hover height, and that no point, BOB's lift taken off where it bobs,
 dips below its pad; each unit's line says its triangles, instances and extent. Each shot recentres
-the camera on the units showing, a little left of and below the screen's middle, and checks in both
+the camera on the units showing, a little left of and below the screen's middle (never so far left
+that the first unit comes within 8 px of the screen's left edge), and checks in both
 modes that every unit showing is on the screen and clear of the HUD's Build, Template base and Reset
 base buttons. Rendered, it shoots the five rows at camera size 24 (the silhouettes and the tiers
 side by side), each tier's row alone at size 10 in two halves (the seven smaller units, then the

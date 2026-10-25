@@ -61,6 +61,8 @@ const ROW_DEPTH := 4.2
 const ACADEMY_GAP := 2.4
 ## Degrees the units are turned from facing the camera: a three-quarter view.
 const TURN := 25.0
+## The least space, in pixels, between a shot's units and the screen's left edge.
+const EDGE := 8.0
 const SETTLE_SECONDS := 0.5
 const SETTLE_FRAMES := 10
 
@@ -202,13 +204,16 @@ func _shot(main: MainScript, size: float, target: Vector3, name: String) -> void
 	await _frame(main, size, target)
 	var screen := Rect2(Vector2.ZERO, main.get_viewport().get_visible_rect().size)
 	# Centre the units showing a little left of and below the screen's middle, clear of the buttons
-	# along its top right and its bottom right.
+	# along its top right and its bottom right, but never so far left that the row's first unit
+	# leaves the screen: its left edge at least EDGE in.
 	var union := Rect2()
 	for i: int in _units.size():
 		if _units[i].is_visible_in_tree():
 			var rect := _screen_rect(main, i)
 			union = rect if union.size == Vector2.ZERO else union.merge(rect)
-	main.camera.pan(screen.get_center(), screen.size * Vector2(0.45, 0.54) - union.get_center())
+	var at := screen.size * Vector2(0.45, 0.54)
+	at.x = maxf(at.x, union.size.x * 0.5 + EDGE)
+	main.camera.pan(screen.get_center(), at - union.get_center())
 	await frames(SETTLE_FRAMES)
 	var buttons: Array[Rect2] = []
 	for button: Control in [main.hud.build_button(), main.hud.template_button(), main.hud.reset_button()]:

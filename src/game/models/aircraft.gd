@@ -27,34 +27,65 @@ static var BLADE := Surf.make(MaterialKit.Layer.HULL, MaterialKit.HULL_DARK, 1.0
 
 # --- The skimmer ----------------------------------------------------------------------
 
-## The skimmer: a small hover drone, a lens-shaped tier-hull saucer with a rim of the tier's trim, a
-## glass sensor dome, an orange dive fin, one glowing eye in front and a glowing ring under it,
-## hovering and bobbing.
+## The skimmer's lens: its radius to the rim's outside, and the radius of the trim ring round its
+## crown.
+const SKIMMER_RADIUS := 0.35
+const SKIMMER_DECK := 0.21
+
+## The skimmer: a hover drone that hunts defences, a lens-shaped saucer, its underside the tier's
+## hull and its top veined (UnitModels.veined), a rim of the tier's trim and a second trim ring round
+## its crown, four glow slots round a glass sensor dome with a dark
+## iris and a glowing pupil, a tall orange heading fin behind, two gunmetal gun pods under its front
+## rim with glowing tips and a glowing ring under it; hovering and bobbing.
 static func build_skimmer(p: Parts) -> void:
 	var m := p.body
 	m.flags = Surf.BOB
-	_saucer(m, UnitModels.pivot(Vector3(0, SKIMMER_HOVER + 0.04, 0)), p.tier)
+	_saucer(m, UnitModels.pivot(Vector3(0, SKIMMER_HOVER + 0.05, 0)), p.tier)
 	m.flags = 0
 
 
 ## The saucer on the pivot `xf` (the lens's underside), facing its +Z.
 static func _saucer(m: LowPolyMesh, xf: Transform3D, tier: int) -> void:
+	const R := SKIMMER_RADIUS - 0.005
 	var rot := UnitModels.euler(xf)
 	m.lathe(PackedVector2Array([
-		Vector2(0, 0), Vector2(0.16, 0.015), Vector2(0.27, 0.05), Vector2(0.3, 0.075), Vector2(0.27, 0.1),
-		Vector2(0.16, 0.135), Vector2(0, 0.15),
-	]), 20, xf.origin, UnitModels.veined(tier, true), rot)
-	m.lathe(PackedVector2Array([Vector2(0.304, 0.058), Vector2(0.304, 0.092)]), 20, xf.origin, UnitModels.trim(tier, true), rot)
-	Parts.torus(m, 0.19, 0.022, 16, 4, xf * Vector3(0, -0.04, 0), UnitModels.glow(tier, Surf.PULSE), rot)
-	m.dome(0.1, 0.07, 16, 3, xf * Vector3(0, 0.142, -0.02), Parts.GLASS, rot)
-	m.box_chamfered(Vector3(0.035, 0.13, 0.18), 0.012, xf * Vector3(0, 0.1, -0.15), ORANGE, UnitModels.euler(xf, Vector3(-18, 0, 0)))
-	_eye(m, xf * UnitModels.pivot(Vector3(0, 0.075, 0.27), Vector3(90, 0, 0)), tier)
+		Vector2(0, 0), Vector2(0.18, 0.016), Vector2(0.29, 0.05), Vector2(R, 0.085),
+	]), 24, xf.origin, UnitModels.hull(tier, true), rot)
+	m.lathe(PackedVector2Array([
+		Vector2(R, 0.085), Vector2(0.3, 0.12), Vector2(SKIMMER_DECK, 0.15),
+	]), 24, xf.origin, UnitModels.veined(tier, true), rot)
+	m.lathe(PackedVector2Array([
+		Vector2(SKIMMER_DECK, 0.15), Vector2(0.12, 0.165), Vector2(0, 0.168),
+	]), 24, xf.origin, UnitModels.veined(tier, true), rot)
+	m.lathe(PackedVector2Array([Vector2(SKIMMER_RADIUS, 0.068), Vector2(SKIMMER_RADIUS, 0.102)]), 24, xf.origin,
+		UnitModels.trim(tier, true), rot)
+	m.ring(SKIMMER_DECK - 0.012, SKIMMER_DECK + 0.02, 0.022, 24, xf * Vector3(0, 0.138, 0), UnitModels.trim(tier, true), rot)
+	for k: int in 4:
+		var degrees := 45.0 + 90.0 * k
+		m.box(Vector3(0.1, 0.03, 0.03), xf * Parts.around(0.27, degrees, 0.118), UnitModels.glow(tier, Surf.PULSE, false),
+			UnitModels.euler(xf, Vector3(0, -degrees - 90.0, 0)))
+	Parts.torus(m, 0.24, 0.03, 20, 4, xf * Vector3(0, -0.05, 0), UnitModels.glow(tier, Surf.PULSE), rot)
+	m.box_chamfered(Vector3(0.045, 0.2, 0.26), 0.015, xf * Vector3(0, 0.1, -0.18), ORANGE, UnitModels.euler(xf, Vector3(-18, 0, 0)))
+	_dome_eye(m, xf * UnitModels.pivot(Vector3(0, 0.162, -0.01)), tier)
+	for side: float in [1.0, -1.0]:
+		_gun_pod(m, xf * UnitModels.pivot(Vector3(side * 0.15, -0.012, 0.13)), tier)
 
 
-## The eye on the pivot `xf`, looking along its +Y: a gunmetal socket and a glowing lens.
-static func _eye(m: LowPolyMesh, xf: Transform3D, tier: int) -> void:
-	Parts.drum(m, 0.06, 0.05, 0.015, 12, xf.origin, Parts.GUNMETAL, UnitModels.euler(xf))
-	m.orb(0.042, 10, 4, xf * Vector3(0, 0.05, 0), UnitModels.glow(tier, Surf.PULSE))
+## The sensor dome on the pivot `xf` (its foot), looking along its +Z: a glass dome with a dark iris
+## on its front and a pupil glowing in the tier's glow.
+static func _dome_eye(m: LowPolyMesh, xf: Transform3D, tier: int) -> void:
+	m.dome(0.14, 0.1, 16, 3, xf.origin, Parts.GLASS, UnitModels.euler(xf))
+	var iris := xf * Vector3(0, 0.055, 0.105)
+	m.orb(0.052, 12, 4, iris, Figures.VISOR, UnitModels.euler(xf))
+	m.orb(0.022, 8, 3, iris + xf.basis * Vector3(0, 0.008, 0.042), UnitModels.glow(tier, Surf.PULSE, false))
+
+
+## A gun pod on the pivot `xf` (its back, under the lens), firing along its +Z: a stubby gunmetal
+## barrel and a tip glowing in the tier's glow.
+static func _gun_pod(m: LowPolyMesh, xf: Transform3D, tier: int) -> void:
+	var tip := xf * Vector3(0, 0, 0.15)
+	Parts.pipe(m, xf.origin, tip, 0.04, Parts.GUNMETAL, 10, false)
+	m.orb(0.03, 10, 3, tip, UnitModels.glow(tier, Surf.PULSE))
 
 
 # --- The gunship ----------------------------------------------------------------------
