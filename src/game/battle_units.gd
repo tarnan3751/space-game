@@ -29,8 +29,17 @@ extends Node3D
 ## the same, so the brawler's fists punch in turn; socket_point() gives any of its
 ## sockets (`muzzle`, `muzzle_2`, `bay`, `exhaust`, …) as last drawn. An aiming unit's shot is held
 ## until its aim's share reaches AIM_READY, so a bolt never leaves a rifle still rising. A hit
-## flashes it for HIT_SECONDS; a death shrinks, sinks and fades it over DEATH_SECONDS, after
-## which it is drawn no more. A thrown unit (a grav trap) flies to where it landed on an arc.
+## flashes it for HIT_SECONDS. A death plays over its class's seconds (death_seconds():
+## FIGURE_DEATH, MACHINE_DEATH), its fade (w) thinning the outline, and after it the unit is drawn
+## no more; the fall is the instance's transform, so every part and the outline go together. A figure
+## (a ground type walking on Rig.HIP_L and HIP_R) topples backwards about its ankles; a walker (on the
+## heavy hips) pitches forward and comes down onto the ground; any other ground machine rolls over its side's bottom
+## edge (DEATH_ROLL, DEATH_ROLL_DEFAULT) and settles to the ground; an air unit spirals down, nose
+## first, to the ground. Each falls over the first FALL_SHARE of its death, faster as it goes, and
+## shrinks away over the last SHRINK_SHARE about the ground under it; through all of it the lowest
+## of the model's extreme points (_hull) is kept at or above the ground, so no part ever shows
+## through it, and a falling aircraft comes to rest on it. A thrown unit (a grav trap) flies to where it
+## landed on an arc.
 ## Damaged units show a health bar (BattleEffects.bar), its fill eased towards the hull left.
 ##
 ## From FAR_ZOOM out the MultiMeshes draw each type's far version (UnitModels.meshes, far: fewer
@@ -38,8 +47,26 @@ extends Node3D
 ## battle over the Cost ceilings (docs/reference/art-style.md), since every instance of a
 ## MultiMesh is drawn wherever the camera looks.
 
-const DEATH_SECONDS := 0.3
-const DEATH_SINK := 0.15
+## How long a death lasts: a figure's, and a machine's or an aircraft's (A3's effects read
+## death_seconds()).
+const FIGURE_DEATH := 0.45
+const MACHINE_DEATH := 0.6
+## The shares of a death the fall takes and the shrink at its end take.
+const FALL_SHARE := 0.6
+const SHRINK_SHARE := 0.15
+## A figure's topple backwards (80 degrees), a walker's pitch forward (30), a ground machine's roll
+## over its side (110 for the light dune runner, 35 for the rest), and an aircraft's spin (turns),
+## nose-down pitch (25) and roll (30) on its way down.
+const TOPPLE := 1.3963
+const KNEEL_PITCH := 0.5236
+## How far over the ground a fallen model's lowest extreme point is kept (its extreme points are a
+## few vertices, so a vertex between them may lie a little lower).
+const GROUND_MARGIN := 0.03
+const DEATH_ROLL := {"dune_runner": 1.9199}
+const DEATH_ROLL_DEFAULT := 0.6109
+const SPIRAL_TURNS := 1.5
+const DIVE_PITCH := 0.4363
+const DIVE_ROLL := 0.5236
 const HIT_SECONDS := 0.12
 ## How fast the gait's share follows walking or standing (a second), and how fast a unit turns
 ## (the share of the way a second, as an exponential rate).
@@ -112,6 +139,15 @@ var _fire_seconds := PackedFloat32Array()
 var _sockets: Array[Dictionary] = []
 var _muzzles: Array[LowPolyMesh.Socket] = []
 var _aim_yaw := PackedFloat32Array()
+## Per type: how it dies (Fall), how long that takes, how far a machine rolls, its model's bounds
+## (the lowest point, over which an aircraft and a hovering machine come down) and its extreme
+## points (_extremes), which a falling model is kept above the ground by.
+enum Fall { FIGURE, WALKER, MACHINE, AIRCRAFT }
+var _fall := PackedInt32Array()
+var _death_seconds := PackedFloat32Array()
+var _roll := PackedFloat32Array()
+var _box: Array[AABB] = []
+var _hull: Array[PackedVector3Array] = []
 
 ## Per unit (id - 1), as many as the sim has deployed: its type, its place at the last two ticks
 ## and as last drawn (world x and z), its heading, gait phase and share, when its hit flash began,
@@ -193,6 +229,18 @@ func setup(sim: BattleSim, catalog: Catalog, army: Dictionary, levels: Dictionar
 		_top.append(box.end.y)
 		_middle.append(box.get_center().y)
 		_stride.append(float(WHEEL_STRIDE.get(unit, STRIDE * box.size.y)))
+		var fall := Fall.MACHINE
+		if not ground:
+			fall = Fall.AIRCRAFT
+		elif _has_channel(meshes.body, Rig.HIP_L):
+			fall = Fall.FIGURE
+		elif _has_channel(meshes.body, Rig.HIP_HEAVY_L):
+			fall = Fall.WALKER
+		_fall.append(fall)
+		_death_seconds.append(FIGURE_DEATH if fall == Fall.FIGURE else MACHINE_DEATH)
+		_roll.append(float(DEATH_ROLL.get(unit, DEATH_ROLL_DEFAULT)))
+		_box.append(box)
+		_hull.append(_extremes(meshes.body))
 
 
 ## The world point a unit's enemies' shots are aimed at: its middle.
@@ -273,7 +321,14 @@ func hit(id: int, now: float) -> void:
 		_flash_at[id - 1] = now
 
 
-## Unit `id` died: it shrinks and fades from `now`.
+## How long unit `id`'s death lasts, in seconds (its class's: FIGURE_DEATH or MACHINE_DEATH).
+func death_seconds(id: int) -> float:
+	if id < 1 or id > _count:
+		return MACHINE_DEATH
+	return _death_seconds[_type[id - 1]]
+
+
+## Unit `id` died: it falls and fades from `now`.
 func die(id: int, now: float) -> void:
 	if id >= 1 and id <= _count and _death_at[id - 1] < 0.0:
 		_death_at[id - 1] = now
@@ -303,11 +358,11 @@ func draw(alpha: float, now: float, delta: float, effects: BattleEffects, far: b
 	var ease_aim := minf(1.0, AIM_EASE * delta)
 	var ease_bank := 1.0 - exp(-BANK_EASE * delta)
 	for u: int in _count:
+		var t := _type[u]
 		var dying := _death_at[u] >= 0.0
-		var fade := clampf((now - _death_at[u]) / DEATH_SECONDS, 0.0, 1.0) if dying else 0.0
+		var fade := clampf((now - _death_at[u]) / _death_seconds[t], 0.0, 1.0) if dying else 0.0
 		if fade >= 1.0:
 			continue
-		var t := _type[u]
 		var id := u + 1
 		var at := _prev[u].lerp(_cur[u], alpha)
 		var lift := 0.0
@@ -348,9 +403,11 @@ func draw(alpha: float, now: float, delta: float, effects: BattleEffects, far: b
 		if _flash_at[u] >= 0.0:
 			var since := now - _flash_at[u]
 			flash = 1.0 - since / HIT_SECONDS if since >= 0.0 and since < HIT_SECONDS else 0.0
-		var size := 1.0 - fade * fade
-		var basis := Basis(Vector3.UP, _yaw[u] + _aim_yaw[t] * _aim[u]).scaled(Vector3.ONE * maxf(size, 0.01))
-		var origin := Vector3(at.x, lift - DEATH_SINK * fade, at.y)
+		var placed := Transform3D(Basis(Vector3.UP, _yaw[u] + _aim_yaw[t] * _aim[u]), Vector3(at.x, lift, at.y))
+		if dying:
+			placed = placed * _fallen(u, t, fade)
+		var basis := placed.basis
+		var origin := placed.origin
 		var custom := Color(Rig.BANK_BASE + _bank[u] if _hovers[t] == 1 else _phase[u], _gait[u] * _hop[t], flash, fade)
 		if _aim[u] > 0.0:
 			var fire := clampf((now - _fired_at[u]) / _fire_seconds[t], 0.0, 1.0) if _fired_at[u] >= 0.0 else 1.0
@@ -391,6 +448,43 @@ func drawn() -> int:
 	for n: int in _drawn:
 		total += n
 	return total
+
+
+## Unit `u` of type `t` `fade` of the way through its death, in its model's space: fallen as its
+## class falls (Fall), shrunk away at the end, a hovering or flying one brought down to the ground,
+## and lifted so the lowest of its extreme points (_hull) is never below the ground.
+func _fallen(u: int, t: int, fade: float) -> Transform3D:
+	var fall := minf(fade / FALL_SHARE, 1.0)
+	fall *= fall
+	var size := maxf(1.0 - smoothstep(1.0 - SHRINK_SHARE, 1.0, fade), 0.01)
+	var box := _box[t]
+	var pivot := Vector3.ZERO
+	var turn := Basis.IDENTITY
+	var drop := 0.0
+	match _fall[t]:
+		Fall.FIGURE:
+			turn = Basis(Vector3.RIGHT, -TOPPLE * fall)
+		Fall.WALKER:
+			pivot = Vector3(0.0, 0.0, box.end.z)
+			turn = Basis(Vector3.RIGHT, KNEEL_PITCH * fall)
+			drop = box.size.y * fall
+		Fall.MACHINE:
+			var side := 1.0 if u % 2 == 0 else -1.0
+			pivot = Vector3(side * box.end.x, 0.0, 0.0)
+			turn = Basis(Vector3.BACK, -side * _roll[t] * fall)
+			drop = box.position.y * fall
+		Fall.AIRCRAFT:
+			pivot = box.get_center()
+			turn = Basis(Vector3.UP, TAU * SPIRAL_TURNS * fall) * Basis(Vector3.RIGHT, DIVE_PITCH * fall) \
+				* Basis(Vector3.BACK, DIVE_ROLL * fall)
+			drop = box.end.y * fall
+	var fallen := Transform3D(Basis.IDENTITY.scaled(Vector3.ONE * size), Vector3.ZERO) \
+		* Transform3D(turn, pivot - turn * pivot)
+	var lowest := INF
+	for point: Vector3 in _hull[t]:
+		lowest = minf(lowest, (fallen * point).y)
+	fallen.origin.y += maxf(-drop, GROUND_MARGIN * fall - lowest)
+	return fallen
 
 
 ## Unit `u`'s muzzle in the world, drawn with `basis` at `origin`: its type's `muzzle` socket, or
@@ -458,6 +552,25 @@ static func _muzzle_yaw(muzzle: LowPolyMesh.Socket) -> float:
 	if absf(ahead.y) > cos(AIM_YAW_VERTICAL):
 		return 0.0
 	return -atan2(ahead.x, ahead.z)
+
+
+## The vertices of a mesh furthest along each of the 26 directions to a cube's faces, edges and
+## corners: whichever way the model is turned, its lowest vertex is one of these or close to it.
+static func _extremes(mesh: Mesh) -> PackedVector3Array:
+	var vertices: PackedVector3Array = mesh.surface_get_arrays(0)[Mesh.ARRAY_VERTEX]
+	var points := PackedVector3Array()
+	for x: int in range(-1, 2):
+		for y: int in range(-1, 2):
+			for z: int in range(-1, 2):
+				if x == 0 and y == 0 and z == 0:
+					continue
+				var along := Vector3(x, y, z)
+				var best := vertices[0]
+				for v: Vector3 in vertices:
+					if v.dot(along) > best.dot(along):
+						best = v
+				points.append(best)
+	return points
 
 
 ## Whether any part of a mesh is rigged on `channel`, as its own joint or its parent's.
