@@ -342,6 +342,33 @@ any of them can be reversed as a data or model change.
   defender's buildings and walls only, never on the units, outlines, rubble or the base, and
   never in a practice battle; no material per building.
 
+- **The model and animation pass, the model phase** (the owner's ask of 2026-10-25, the calls
+  the coordinator's; `docs/reference/art-style.md`): reviewing the Milestone 2 renders the owner
+  judged the models decent but not good enough and the animation "really bad", and asked for a
+  long pass, models first, then every animation, each verified from frames to a high standard;
+  projectiles must be specific to their source (a missile battery fires missiles) with the right
+  lights, models and explosions. Two art critiques (units and figures; buildings) set the standard
+  and the fixes, and the model phase landed them (vehicles and aircraft, figures and infantry,
+  defences, core and resources, army; main d595cbd): the category accent on at least a quarter of
+  what the camera sees, on a big part, never on trim; no hull-mid main mass; nothing structural
+  under 0.14 across on new or reworked models (`Parts.STRUCTURAL_MIN`, the post family); Gold on a
+  part, an Obsidian level keeping its accent surface, Crown filigree only on bands 0.1 or taller;
+  a camera-facing deck plate on every machine; pilots sunk behind framed canopies; a per-part
+  figure ink (0.75 on the big masses, 0.5 on limbs); red on a big part of every defence; the
+  halftone coarsened to a print screen (7 px, 25%, 0.08) after a measured pair; the academy's
+  cadet rebuilt as a hologram on the colonist (the box figure stays rejected); the jet flames
+  fixed as fire colours at every tier. Judged at the overview zoom first. The animation phase
+  that follows rests on three calls: rigid-part animation in the vertex shader rather than
+  skeletons (per-vertex channels with pivots, a channel table mirrored in `src/game/rig.gd`,
+  instance state in INSTANCE_CUSTOM; GLES3 skinning is slow and a MultiMesh cannot be skinned),
+  sockets on models with defence heads aimed as the mover holding the `muzzle` socket
+  (`BattleSim.building_target`, the only core change, a read), and a weapon table in the view
+  (`src/game/weapons.gd`) with one projectile, muzzle effect and impact per type. Every series
+  ships frame strips (`tools/harness` `strip()`, the `anim_*` scenarios) that the coordinator and
+  the reviewer read; a series whose frames do not read fails. The owner's review list: the
+  halftone, the hologram cadet, the structural rule, the rival-tint-neutral flames, and the
+  animation architecture.
+
 ### 3.2 Open
 
 - **Economy validation on the server.** Either port the small economy rules to TypeScript,
