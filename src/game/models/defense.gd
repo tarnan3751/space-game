@@ -249,6 +249,8 @@ const WELL_CORES := [0.22, 0.27, 0.3]
 const WELL_RING_INNER := 0.9
 const WELL_RING_OUTER := 1.03
 const WELL_RING_DROP := 0.6
+## The EMP tower's core's radius at every level.
+const EMP_CORE_RADIUS := 0.34
 ## The EMP tower from L4, by level from L4: the plinth's height and the storey it gains between
 ## its two blocks; the L5 pulse ring's radii and how far under the cage it hovers, round the
 ## tower's neck, so the core shows over it.
@@ -1294,7 +1296,8 @@ static func build_gravity_well(p: Parts, level: int) -> void:
 		m.ring(0.64, 0.76, 0.02, 8, Vector3(0, top, 0), Parts.FILIGREE, Parts.OCTAGON)
 
 
-## From L4 the tower gains a storey between its blocks, taller every level, and its capacitor
+## A big yellow core in a bar cage atop a stepped tower ringed by capacitor cans banded in broad
+## blinking bands. From L4 the tower gains a storey between its blocks, taller every level, and its capacitor
 ## stacks a third can. L4 (Chrome): chrome plinth, blocks, storey and cans, the cans' bands
 ## blinking cyan in their chase, a cyan band round each stack's foot and round the storey's top,
 ## red armour plates on the storey's corners. L5 (Obsidian): a taller plinth with glowing violet
@@ -1327,8 +1330,8 @@ static func build_emp_tower(p: Parts, level: int) -> void:
 	Parts.drum(m, 0.28, 0.12, 0.04, 16, Vector3(0, neck, 0), SHELL_MID)
 	var cage := Vector3(0, neck + 0.12, 0)
 	Parts.drum(m, 0.46, 0.08, 0.02, 16, cage, Parts.GUNMETAL)
-	# The core grows to L4's 0.34, where the cage's bars (at 0.4) still show round it.
-	m.orb(0.22 + 0.03 * mini(level, 4), 16, 6, cage + Vector3(0, 0.34, 0), BRIGHT_FLOAT if crown else EMP_CORE)
+	# The core is 0.34 from L1, as big as the cage's bars (at 0.4) let it be and still show round it.
+	m.orb(EMP_CORE_RADIUS, 16, 6, cage + Vector3(0, 0.34, 0), BRIGHT_FLOAT if crown else EMP_CORE)
 	for k: int in 8:
 		m.box(Vector3(0.05, 0.56, 0.05), Parts.around(0.4, 22.5 + 45.0 * k, cage.y + 0.08), Parts.ROD,
 			Vector3(0, -22.5 - 45.0 * k, 0))
@@ -1339,7 +1342,7 @@ static func build_emp_tower(p: Parts, level: int) -> void:
 		Parts.arc(m, from, to, 3, 0.03, EMP_ARC.phased(k / 3.0))
 	Parts.torus(m, 0.4, 0.05, 16, 10, cage + Vector3(0, 0.62, 0), GOLD if p.tier >= Parts.Tier.GOLD else Parts.GUNMETAL)
 	m.dome(0.22, 0.12, 16, 6, cage + Vector3(0, 0.67, 0), SHELL_MID)
-	Parts.mast(m, cage + Vector3(0, 0.78, 0), 0.22, 0.05, EMP_BLINK.phased(0.5))
+	_lamp_post(m, cage + Vector3(0, 0.78, 0), 0.22, EMP_BLINK.phased(0.5))
 	# The cans' bands blink in a chase round the ring: yellow, cyan from the Chrome tier, violet
 	# crystal from the Obsidian tier.
 	var cans: Array[float] = [135.0, 315.0]
@@ -1836,7 +1839,7 @@ static func _capacitor(m: LowPolyMesh, pos: Vector3, height: float, top: bool, b
 	Parts.drum(m, 0.2, height, 0.04, 16, pos, body)
 	if not top:
 		return pos + Vector3(0, height, 0)
-	m.ring(0.19, 0.225, 0.07, 16, pos + Vector3(0, height * 0.5, 0), band)
+	m.ring(0.19, 0.225, 0.1, 16, pos + Vector3(0, height * 0.5 - 0.015, 0), band)
 	Parts.drum(m, 0.12, 0.08, 0.02, 16, pos + Vector3(0, height, 0), Parts.GUNMETAL)
 	return pos + Vector3(0, height + 0.08, 0)
 
