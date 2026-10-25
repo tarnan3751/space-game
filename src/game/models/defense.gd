@@ -1180,8 +1180,8 @@ static func build_cloaked_sentry(p: Parts, level: int) -> void:
 	if level >= 2:
 		guns = [-0.17, 0.17]
 	var yaw := SCREEN_RIGHT - 30.0
-	for offset: float in guns:
-		_sentry_gun(lid, LowPolyMesh.turn(Vector3(offset, 0, 0), Vector3(0, yaw, 0)), yaw, level, p.tier)
+	for k: int in guns.size():
+		_sentry_gun(lid, LowPolyMesh.turn(Vector3(guns[k], 0, 0), Vector3(0, yaw, 0)), yaw, level, p.tier, k, guns.size())
 	if level >= 5:
 		# A broad armoured mantlet bridging the two gun heads, its front edge and a sensor dome on it
 		# lit (cyan, violet from the Obsidian tier).
@@ -1929,8 +1929,9 @@ static func _vane(s: LowPolyMesh, root: Vector3, tip: Vector3, width: float, thi
 
 ## The cloaked sentry's gun: a low head on the lid with a short barrel and a red sight. From L4 a
 ## chrome head and barrel (obsidian and a violet crystal sight from the Obsidian tier), twin
-## longer barrels from L5, and at the Crown the antimatter core glowing in its sight.
-static func _sentry_gun(m: LowPolyMesh, pos: Vector3, yaw: float, level: int = 1, tier: int = Parts.Tier.BASE) -> void:
+## longer barrels from L5, and at the Crown the antimatter core glowing in its sight. Each barrel's
+## end is a muzzle socket, the `guns` guns' in turn (this is gun `gun`), then their second barrels.
+static func _sentry_gun(m: LowPolyMesh, pos: Vector3, yaw: float, level: int, tier: int, gun: int, guns: int) -> void:
 	var heading := Vector3(0, yaw, 0)
 	m.box_chamfered(Vector3(0.26, 0.15, 0.34), 0.04, pos, _by_tier(tier, SHELL_MID, Parts.CHROME, Parts.OBSIDIAN), heading)
 	var aim := Vector3(84, yaw, 0)
@@ -1938,9 +1939,13 @@ static func _sentry_gun(m: LowPolyMesh, pos: Vector3, yaw: float, level: int = 1
 	var across: Array[float] = [0.0]
 	if level >= 5:
 		across = [-0.055, 0.055]
-	for x: float in across:
-		m.prism(0.045 if level < 5 else 0.038, 0.045 if level < 5 else 0.038, 0.42 if level < 5 else 0.52, 16,
-			_at(pos, Vector3(x, 0.08, 0.12), heading), barrel, aim)
+	var length := 0.42 if level < 5 else 0.52
+	for k: int in across.size():
+		var root := _at(pos, Vector3(across[k], 0.08, 0.12), heading)
+		m.prism(0.045 if level < 5 else 0.038, 0.045 if level < 5 else 0.038, length, 16, root, barrel, aim)
+		var muzzle := k * guns + gun
+		m.socket("muzzle" if muzzle == 0 else "muzzle_%d" % (muzzle + 1), _at(root, Vector3(0, length + 0.02, 0), aim),
+			LowPolyMesh.turn(Vector3.UP, aim))
 	var sight := LASER
 	if tier >= Parts.Tier.CROWN:
 		sight = BRIGHT_CORE
