@@ -21,6 +21,17 @@ extends HarnessScenario
 ##   of its full travel is seen, and the defence kicks no more
 ##   often than it fires (BuildingView.fired, counted against the bolts and shells it fires).
 ##
+## Then per pitching defence (PITCHERS, at level 1 and the laser turret, flak cannon and ion beam at
+## their top level too, and the flak cannon and ion beam at their top level against a Gunship,
+## "-pitch-gunship") "<type>-<level>-pitch" (PITCH_FRAMES at PITCH_STEP_MS, the orbital cannon's
+## at PITCH_SLOW_STEP_MS, camera PITCH_ZOOM, cropped): a unit deployed off to the screen's right
+## coming at it, so the barrels lie across the screen as they tilt. Checks: the defence pitches
+## (BuildingView.can_pitch), its barrels' elevation sweeps at least MIN_PITCH_SWEEP (or 0.9 of the
+## way to the elevation they want at the end, if that is less) and ends within
+## BattleView.AIM_READY of it; against an aircraft, that the elevation they want rises at least
+## MIN_AIR_RISE as it closes and that they never point lower than MIN_AIR_ELEVATION while they aim
+## at it.
+##
 ## Then "emp-freeze": a level 6 missile battery (its launcher and its radar turning) aiming at a Dune
 ## Runner, an EMP Burst cast on it, the strip (EMP_FRAMES at EMP_STEP_MS) over the stun and the wake.
 ## Checks: while it is disabled no moving part moves (the muzzle socket and the radar stand still
@@ -70,6 +81,38 @@ const REVEAL_STEP_MS := 60
 ## and a cell.
 const REVEAL_LEAD := 1000
 const WAIT_TICKS := 1200
+## The pitch strips: per pitching defence, the unit that comes at it and where it is deployed (in
+## cells from the defence's centre: off to the screen's right, so the barrels lie across the screen
+## as they tilt), at its top level; the silo stands far off the other way, so the unit makes for
+## the defence. A Bomber for the guns that shoot at the air (it flies highest and comes closest, so
+## the barrels rise as it closes, even on the tall top levels), a Brawler closing
+## in for the laser turret, the cloaked sentry and the plasma mortar (they dip, the mortar steepens),
+## a Hover Tank from far off for the orbital cannon (it steepens as the tank closes).
+const PITCHERS := {
+	"laser_turret": ["brawler", Vector2i(6, -6)], "cloaked_sentry": ["brawler", Vector2i(5, -5)],
+	"plasma_mortar": ["brawler", Vector2i(6, -6)], "flak_cannon": ["bomber", Vector2i(6, -6)],
+	"missile_battery": ["bomber", Vector2i(6, -6)], "railgun": ["bomber", Vector2i(6, -6)],
+	"ion_beam": ["bomber", Vector2i(5, -5)], "orbital_cannon": ["hover_tank", Vector2i(14, -14)],
+}
+const PITCH_TOP_LEVEL: Array[String] = ["laser_turret", "flak_cannon", "ion_beam"]
+## The tall top-level anti-air guns shot again against a Gunship ("-pitch-gunship"), which keeps
+## its distance, so they must look up at it too.
+const PITCH_GUNSHIP: Array[String] = ["flak_cannon", "ion_beam"]
+const PITCH_SILO := Vector2i(-12, 10)
+const PITCH_FRAMES := 16
+const PITCH_STEP_MS := 300
+## The orbital cannon's tank takes longer to close.
+const PITCH_SLOW_STEP_MS := 700
+const PITCH_ZOOM := 9.0
+## The least the barrels' elevation must sweep over a pitch strip (degrees), or 0.9 of the way
+## from their built elevation to the elevation they want at its end, if that is less.
+const MIN_PITCH_SWEEP := 15.0
+## Against an aircraft: how far (degrees) the elevation the barrels want (or, when their travel
+## caps it from the start, the barrels themselves) must rise from when the defence takes it as its
+## target to the strip's end, as it closes, and the least the barrels may point while they aim at
+## it (never level).
+const MIN_AIR_RISE := 5.0
+const MIN_AIR_ELEVATION := 5.0
 const DEFENCE := 2
 
 var _catalog: Catalog
@@ -84,6 +127,15 @@ var _last_fired := -INF
 var _kicked_before_shot := false
 var _headings := PackedFloat32Array()
 var _best_error := INF
+## The pitch strip's unit and where it is deployed (the next one there whenever the last falls),
+## "" while no pitch strip runs; the barrels' elevation each frame and how far from the wanted one.
+var _pitch_unit := ""
+var _pitch_from := Vector2i.ZERO
+var _elevations := PackedFloat32Array()
+var _pitch_errors := PackedFloat32Array()
+## While it has a target: the barrels' elevation and the elevation they want, each frame.
+var _aim_elevations := PackedFloat32Array()
+var _aim_wanted := PackedFloat32Array()
 ## The EMP strip's defence, its radar, and what _watch_frozen counts: the frames it was disabled,
 ## those of them its parts moved, the frames they moved after it woke, and the last poses.
 var _frozen_view: BattleView = null
@@ -103,6 +155,12 @@ func run(main: MainScript) -> void:
 		await _aim(main, type, 1)
 		if TOP_LEVEL.has(type):
 			await _aim(main, type, _catalog.max_level(type))
+	for type: String in PITCHERS:
+		await _pitch(main, type, 1)
+		if PITCH_TOP_LEVEL.has(type):
+			await _pitch(main, type, _catalog.max_level(type))
+	for type: String in PITCH_GUNSHIP:
+		await _pitch(main, type, _catalog.max_level(type), "gunship")
 	await _emp_freeze(main)
 	await _reveal(main)
 	main.get_tree().process_frame.disconnect(_sample)
@@ -142,6 +200,79 @@ func _aim(main: MainScript, type: String, level: int) -> void:
 	check(_kicks <= _shots, "the %s %d kicked %d times for %d shots" % [type, level, _kicks, _shots])
 	_watch(null)
 	await _leave(main)
+
+
+## The pitch strip of `type` at `level`: its PITCHERS unit (or `unit`) coming at it from the
+## screen's right.
+func _pitch(main: MainScript, type: String, level: int, unit: String = "") -> void:
+	var entry: Array = PITCHERS[type]
+	_pitch_unit = str(entry[0]) if unit == "" else unit
+	_pitch_from = _centre_cell(type) + (entry[1] as Vector2i)
+	var silo := _centre_cell(type) + PITCH_SILO
+	var setup := {
+		"seed": SEED,
+		"attacker": {"army": {_pitch_unit: UNITS}, "unit_levels": {_pitch_unit: _catalog.unit_max_level(_pitch_unit)},
+			"abilities": {}, "ability_levels": {}},
+		"defender": {"buildings": [
+			{"id": 1, "type": DECOY, "level": 1, "cell": [silo.x, silo.y]},
+			{"id": DEFENCE, "type": type, "level": level, "cell": [DEFENCE_CELL.x, DEFENCE_CELL.y]},
+		], "resources": {}},
+		"commands": [],
+	}
+	var error := main.open_battle(setup, true)
+	check(error == "", "the battle opens for the %s %d's pitch: '%s'" % [type, level, error])
+	if error != "":
+		_pitch_unit = ""
+		return
+	main.battle_hud.visible = false
+	main.battle.select_unit("")
+	var view: BattleView = main.battle
+	var defence: BuildingView = view._views[DEFENCE]
+	check(defence.can_pitch(), "the %s %d pitches its barrels (a trunnion on its aiming part)" % [type, level])
+	frame_world(main, PITCH_ZOOM, _head(view, defence))
+	await frames(3)
+	_watch(defence)
+	var built := defence.elevation()
+	_place(view)
+	await _strip(main, "%s-%d-pitch%s" % [type, level, "" if unit == "" else "-" + unit], PITCH_FRAMES,
+		PITCH_SLOW_STEP_MS if type == "orbital_cannon" else PITCH_STEP_MS, true)
+	var low := INF
+	var high := -INF
+	for elevation: float in _elevations:
+		low = minf(low, elevation)
+		high = maxf(high, elevation)
+	var sweep := rad_to_deg(high - low) if not _elevations.is_empty() else 0.0
+	var wanted := rad_to_deg(absf(defence._pitch_wanted))
+	var least := minf(MIN_PITCH_SWEEP, wanted * 0.9)
+	var last := _pitch_errors[_pitch_errors.size() - 1] if not _pitch_errors.is_empty() else INF
+	say("the %s %d's barrels: built %.0f, from %.0f to %.0f degrees, ending %.0f; the last wanted %.3f radians off"
+		% [type, level, rad_to_deg(built), rad_to_deg(low), rad_to_deg(high), rad_to_deg(defence.elevation()), last])
+	check(sweep >= least, "the %s %d's barrels swept %.0f degrees (at least %.0f)" % [type, level, sweep, least])
+	check(last <= BattleView.AIM_READY, "the %s %d's barrels ended within %.2f radians of their target's elevation (%.3f)"
+		% [type, level, BattleView.AIM_READY, last])
+	if _catalog.unit_class(_pitch_unit) == "air" and not _aim_wanted.is_empty():
+		# The elevation wanted rises as it closes, or, where the barrels' travel caps it from the
+		# start (the railgun's), the barrels themselves climb to it.
+		var rise := rad_to_deg(maxf(_aim_wanted[_aim_wanted.size() - 1] - _aim_wanted[0],
+			_aim_elevations[_aim_elevations.size() - 1] - _aim_elevations[0]))
+		var lowest := INF
+		for elevation: float in _aim_elevations:
+			lowest = minf(lowest, elevation)
+		check(rise >= MIN_AIR_RISE, "the %s %d's barrels rose %.0f degrees as the %s closed (at least %.0f)"
+			% [type, level, rise, _pitch_unit, MIN_AIR_RISE])
+		check(rad_to_deg(lowest) >= MIN_AIR_ELEVATION, "the %s %d's barrels never pointed level at the %s (lowest %.0f degrees)"
+			% [type, level, _pitch_unit, rad_to_deg(lowest)])
+	_watch(null)
+	_pitch_unit = ""
+	await _leave(main)
+
+
+## Deploys the pitch strip's unit on its spot, or the nearest cell that takes it.
+func _place(view: BattleView) -> void:
+	for k: int in 5:
+		if view.deploy(_pitch_unit, _pitch_from + Vector2i(k, -k)) == "":
+			return
+	check(false, "a %s deployed near %s" % [_pitch_unit, _pitch_from])
 
 
 ## A level 6 missile battery frozen by an EMP Burst while it aims, and waking.
@@ -296,6 +427,10 @@ func _watch(defence: BuildingView) -> void:
 	_last_fired = -INF
 	_kicked_before_shot = false
 	_headings.clear()
+	_elevations.clear()
+	_pitch_errors.clear()
+	_aim_elevations.clear()
+	_aim_wanted.clear()
 	_best_error = INF
 
 
@@ -318,6 +453,12 @@ func _sample(main: MainScript) -> void:
 	_max_kick = maxf(_max_kick, kick)
 	var facing := _watched.socket_direction("muzzle")
 	_headings.append(atan2(facing.x, facing.z))
+	if _watched.can_pitch():
+		_elevations.append(_watched.elevation())
+		_pitch_errors.append(absf(_watched._pitch_wanted - _watched._pitch))
+		if view.sim.building_target(DEFENCE) != 0:
+			_aim_elevations.append(_watched.elevation())
+			_aim_wanted.append(_watched._built_elevation + _watched._pitch_wanted)
 	var target := view.sim.building_target(DEFENCE)
 	if target != 0 and view.sim.unit_state(target) != BattleArmy.DEAD:
 		_best_error = minf(_best_error, _watched.aim_error(view.units.aim_point(target)))
@@ -330,6 +471,10 @@ func _resupply(view: BattleView) -> void:
 	for unit: int in range(1, view.sim.unit_count() + 1):
 		if view.sim.unit_state(unit) != BattleArmy.DEAD:
 			return
+	if _pitch_unit != "":
+		if view.sim.left_to_deploy(_pitch_unit) > 0:
+			_place(view)
+		return
 	var air := view.sim.unit_type(1) == AIR_UNIT
 	if view.sim.left_to_deploy(AIR_UNIT if air else GROUND_UNIT) > 0:
 		_deploy(view, air)
