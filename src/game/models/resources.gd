@@ -1638,9 +1638,8 @@ static func _silo_strip(tier: int) -> Surf:
 	return Parts.CYAN_STRIP
 
 
-static var VAULT_ARMOUR := Surf.make(MaterialKit.Layer.PLATE, MaterialKit.HULL_MID)
-static var VAULT_DOOR := Surf.make(MaterialKit.Layer.PLATE, MaterialKit.HULL_LIGHT, 1.0, Surf.LIT, true)
-static var LID := Surf.make(MaterialKit.Layer.PLATE, MaterialKit.HULL_MID, 1.5, Surf.LIT, true)
+static var VAULT_ARMOUR := Surf.make(MaterialKit.Layer.PLATE, MaterialKit.HULL_LIGHT)
+static var LID := Surf.make(MaterialKit.Layer.PLATE, MaterialKit.HULL_LIGHT, 1.5, Surf.LIT, true)
 static var VAULT_SCREEN := Surf.make(MaterialKit.Layer.SCREEN, MaterialKit.ANTIMATTER, 3.0)
 static var VENT_CAP := Surf.make(MaterialKit.Layer.VENT, MaterialKit.HULL_MID, 3.0)
 ## The glow seams' current, the screen layer's lit segments: rising up the corners (FLOW) and
@@ -1665,10 +1664,14 @@ static var CONTAINMENT_RIM := Surf.make(MaterialKit.Layer.GLOW, Parts.CORE_GLOW_
 	true, 0.7)
 static var PYLON_INLAY := Surf.make(MaterialKit.Layer.CRYSTAL, MaterialKit.CRYSTAL, 1.0, Surf.UNLIT | Surf.PULSE)
 
-## The antimatter vault's armoured cube, and its containment pylons' corners.
+## The antimatter vault's armoured cube, its glowing seams' width, its door's radius and the height
+## of the door's centre over the cube's foot, and its containment pylons' corners.
 const VAULT_SIZE := 1.7
-const VAULT_HEIGHT := 1.15
+const VAULT_HEIGHT := 1.25
 const VAULT_CHAMFER := 0.14
+const VAULT_SEAM := 0.1
+const VAULT_DOOR_RADIUS := 0.55
+const VAULT_DOOR_HEIGHT := 0.62
 const VAULT_CORNERS := [Vector2(-1, -1), Vector2(1, -1), Vector2(-1, 1), Vector2(1, 1)]
 ## The pylons' corners in order round the vault, for the chase and the arcs.
 const VAULT_ROUND := [Vector2(-1, -1), Vector2(1, -1), Vector2(1, 1), Vector2(-1, 1)]
@@ -1717,12 +1720,13 @@ static func build_antimatter_vault(p: Parts, level: int) -> void:
 	# Seams: a band round the four faces, and one up each chamfered corner.
 	for k: int in 4:
 		var yaw := Vector3(0, 90 * k, 0)
-		m.box(Vector3(VAULT_SIZE - 2 * VAULT_CHAMFER, 0.05, 0.02), LowPolyMesh.turn(Vector3(0, floor_y + 0.86, half), yaw), SEAM_BAND, yaw)
+		m.box(Vector3(VAULT_SIZE - 2 * VAULT_CHAMFER, VAULT_SEAM, 0.02), LowPolyMesh.turn(Vector3(0, floor_y + VAULT_HEIGHT - 0.3, half), yaw),
+			SEAM_BAND, yaw)
 	for corner: Vector2 in VAULT_CORNERS:
 		var edge := Vector3(corner.x, 0, corner.y) * (half - VAULT_CHAMFER * 0.5)
-		m.box(Vector3(0.05, VAULT_HEIGHT - 0.2, 0.03), edge + Vector3(corner.x, 0, corner.y) * 0.012 + Vector3(0, floor_y + 0.06, 0),
+		m.box(Vector3(VAULT_SEAM, VAULT_HEIGHT - 0.2, 0.03), edge + Vector3(corner.x, 0, corner.y) * 0.012 + Vector3(0, floor_y + 0.06, 0),
 			SEAM, Vector3(0, rad_to_deg(atan2(corner.x, corner.y)), 0))
-	_vault_door(m, Vector3(0, floor_y + 0.52, half), gold)
+	_vault_door(m, Vector3(0, floor_y + VAULT_DOOR_HEIGHT, half))
 	# The control screen on the shadowed face.
 	m.box_chamfered(Vector3(0.06, 0.36, 0.56), 0.02, Vector3(half, floor_y + 0.5, 0), Parts.HULL_DARK)
 	m.box(Vector3(0.02, 0.26, 0.44), Vector3(half + 0.05, floor_y + 0.55, 0), VAULT_SCREEN)
@@ -1812,19 +1816,22 @@ static func _containment_ring(p: Parts, core: Vector3, r: float, tilt: Vector3, 
 	ring.lathe(PackedVector2Array([Vector2(r + 0.065, -0.017), Vector2(r + 0.065, 0.017)]), 24, Vector3.ZERO, CONTAINMENT_RIM, tilt)
 
 
-## The vault door: a round plate in a rim, a hub and a three-spoke handwheel, violet lock
-## lights round it.
-static func _vault_door(m: LowPolyMesh, centre: Vector3, gold: bool) -> void:
+## The vault door, VAULT_DOOR_RADIUS round, in the antimatter accent at every tier: a round plate
+## in a gunmetal rim, a gunmetal hub and three-spoke handwheel, and eight gold bolts round it.
+static func _vault_door(m: LowPolyMesh, centre: Vector3) -> void:
 	var facing := Vector3(90, 0, 0)
-	m.tube(0, 0.4, 0.06, 24, centre, VAULT_DOOR, facing)
-	Parts.torus(m, 0.42, 0.05, 24, 10, centre + Vector3(0, 0, -0.01), Parts.GOLD_ROUND if gold else Parts.GUNMETAL, facing)
-	m.tube(0, 0.1, 0.08, 16, centre + Vector3(0, 0, 0.06), Parts.HULL_DARK_ROUND, facing)
+	var r := VAULT_DOOR_RADIUS
+	m.tube(0, r, 0.06, 24, centre, ANTIMATTER_ACCENT_ROUND, facing)
+	Parts.torus(m, r + 0.02, 0.04, 24, 6, centre + Vector3(0, 0, -0.01), Parts.GUNMETAL, facing)
+	m.tube(0, 0.12, 0.1, 16, centre + Vector3(0, 0, 0.06), Parts.GUNMETAL, facing)
 	for k: int in 3:
-		var spoke := Vector3(cos(PI * k / 3), sin(PI * k / 3), 0) * 0.24
-		m.strut(centre + Vector3(0, 0, 0.11) - spoke, centre + Vector3(0, 0, 0.11) + spoke, 0.05, Parts.ROD)
-	for k: int in 6:
-		var angle := TAU * (k + 0.5) / 6
-		m.box(Vector3(0.06, 0.06, 0.04), centre + Vector3(cos(angle) * 0.32, sin(angle) * 0.32 - 0.03, 0.05), ANTIMATTER_GLOW)
+		var spoke := Vector3(cos(PI * k / 3), sin(PI * k / 3), 0) * 0.32
+		m.strut(centre + Vector3(0, 0, 0.12) - spoke, centre + Vector3(0, 0, 0.12) + spoke, 0.07, Parts.GUNMETAL)
+	for k: int in 8:
+		var angle := TAU * (k + 0.5) / 8
+		var turn := Vector3(0, 0, rad_to_deg(angle))
+		var bolt := centre + Vector3(cos(angle) * (r - 0.09), sin(angle) * (r - 0.09), 0.04)
+		m.box(Vector3(0.08, 0.08, 0.05), bolt - LowPolyMesh.turn(Vector3(0, 0.04, 0), turn), Parts.GOLD_TRIM, turn)
 
 
 ## A containment pylon: an armoured column on a foot with its glowing containment cell bared
@@ -1838,7 +1845,7 @@ static func _containment_pylon(m: LowPolyMesh, foot: Vector3, width: float, heig
 		phase: float) -> Vector3:
 	var gold := tier >= Parts.Tier.GOLD
 	var square := Vector3(0, 45, 0)
-	var lower := PYLON_ARMOUR
+	var lower := Parts.HULL_LIGHT
 	if tier >= Parts.Tier.OBSIDIAN:
 		lower = Parts.OBSIDIAN
 	elif tier >= Parts.Tier.CHROME:
@@ -1847,8 +1854,9 @@ static func _containment_pylon(m: LowPolyMesh, foot: Vector3, width: float, heig
 	m.box_chamfered(Vector3(width, height * 0.36, width), 0.04, foot, lower, square)
 	m.prism(width * 0.36, width * 0.36, height * 0.34, 16, foot + Vector3(0, height * 0.36, 0), CELL.phased(phase))
 	for side: float in [-1.0, 1.0]:
-		m.box(Vector3(0.05, height * 0.34, 0.05), foot + LowPolyMesh.turn(Vector3(side * width * 0.4, height * 0.36, 0), square),
-			Parts.ROD, square)
+		m.box_chamfered(Vector3(Parts.STRUCTURAL_MIN, height * 0.34, Parts.STRUCTURAL_MIN), 0.03,
+			foot + LowPolyMesh.turn(Vector3(side * (width * 0.36 + Parts.STRUCTURAL_MIN * 0.5), height * 0.36, 0), square),
+			Parts.GUNMETAL, square)
 	m.box_chamfered(Vector3(width, height * 0.3, width), 0.04, foot + Vector3(0, height * 0.7, 0), lower, square)
 	if tier >= Parts.Tier.CROWN:
 		# Under the head's seams, which start 0.05 up it.
