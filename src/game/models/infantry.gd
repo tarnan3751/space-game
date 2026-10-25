@@ -30,8 +30,6 @@ static var FUSE := Surf.make(MaterialKit.Layer.GLOW, MaterialKit.DEFENCE, 1.0, S
 ## layer's fine stripes blended to khaki there) and the band still reads as a stripe close up.
 static var HAZARD_YELLOW := Surf.make(MaterialKit.Layer.FLAT, MaterialKit.HAZARD)
 static var HAZARD_BAND := Surf.make(MaterialKit.Layer.FLAT, MaterialKit.INK)
-## The brawler's shoulder plates: army-orange plate, flat.
-static var ORANGE := Parts.surf("orange")
 ## The jet trooper's flames, fire rather than the tier's glow, the same at every tier (the tier's
 ## near-white glows above Chrome washed them out): a white-hot band at the nozzle's mouth and an
 ## ENERGY cyan cone, unlit, pulsing, not inked.
@@ -102,8 +100,9 @@ static func build_jet_trooper(p: Parts) -> void:
 	m.flags = 0
 
 
-## The brawler: the automaton made heavier, crouched low with its guard up: big fists, broad
-## shoulder plates and an armoured girdle round its middle, its armour taking the tier's hull.
+## The brawler: the automaton made heavier, crouched low with its guard up: big fists, broad orange
+## shoulder plates edged in the tier's trim and an armoured girdle of the tier's hull round its
+## middle.
 static func build_brawler(p: Parts) -> void:
 	var m := p.body
 	var pose := _guard()
@@ -357,12 +356,16 @@ static func _girdle(m: LowPolyMesh, xf: Transform3D, top: float, k: float, tier:
 	]), 12, xf.origin, UnitModels.hull(tier, true), UnitModels.euler(xf))
 
 
-## A broad shoulder plate over the shoulder joint `shoulder` on side `side`, tilted out: orange to
-## Gold, the tier's hull from Chrome, the brawler's armour taking its tier.
+## A broad orange shoulder plate over the shoulder joint `shoulder` on side `side`, tilted out, at
+## every tier, so the brawler stays bright on the dark ones, a strip of the tier's trim along its
+## outer edge.
 static func _shoulder_plate(m: LowPolyMesh, waist: Transform3D, shoulder: Vector3, k: float, side: float,
 		tier: int) -> void:
-	m.box_chamfered(Vector3(0.16, 0.05, 0.15) * k, 0.03 * k, shoulder + waist.basis * Vector3(side * 0.02, 0.03, 0) * k,
-		ORANGE if tier < Parts.Tier.CHROME else UnitModels.hull(tier), UnitModels.euler(waist, Vector3(0, 0, -side * 24.0)))
+	var xf := Transform3D(waist.basis * Basis.from_euler(Vector3(0, 0, deg_to_rad(-side * 24.0))),
+		shoulder + waist.basis * Vector3(side * 0.02, 0.03, 0) * k)
+	m.box_chamfered(Vector3(0.16, 0.05, 0.15) * k, 0.03 * k, xf.origin, ORANGE_SMALL, UnitModels.euler(xf))
+	m.box_chamfered(Vector3(0.03, 0.058, 0.152) * k, 0.012 * k, xf * (Vector3(side * 0.068, 0, 0) * k), UnitModels.trim(tier),
+		UnitModels.euler(xf))
 
 
 ## A big fist on the wrist joint `xf`, over the automaton's hand: a gunmetal mitt half again its
