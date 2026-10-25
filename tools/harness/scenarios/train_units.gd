@@ -60,6 +60,7 @@ func run(main: MainScript) -> void:
 		if hud.train_card(unit).is_visible_in_tree():
 			shown.append(unit)
 	check(shown == catalog.units_of_producer(PRODUCER), "the panel shows the academy's units: %s" % ", ".join(shown))
+	_check_housing(hud, state)
 	check(hud.queue_shown().is_empty(), "the queue starts empty")
 
 	# Two Rangers and a Breacher; the first Ranger by a real touch on its card.
@@ -105,6 +106,7 @@ func run(main: MainScript) -> void:
 	check(hud.army_meter_text() == expected, "the army meter reads %s (expected %s)" % [hud.army_meter_text(), expected])
 	check(hud.train_card_info("ranger") == "Housing %d   Housed 1" % catalog.unit_housing("ranger"),
 		"the Ranger card counts it: %s" % hud.train_card_info("ranger"))
+	_check_housing(hud, state)
 	await screenshot("trained")
 
 	# The Research Lab: selecting it closes the training panel; its Research opens the research.
@@ -195,6 +197,8 @@ func _fresh_academy(main: MainScript) -> void:
 	hud.action_button().pressed.emit()
 	await _wait(main, Hud.MENU_OPEN_SECONDS)
 	check(hud.is_training_open(), "Train opened the training panel")
+	check(hud.housing_text() == "No Hangar: build one to house units" and not hud.housing_bar().is_visible_in_tree(),
+		"with no Hangar the header reads: %s" % hud.housing_text())
 	var needs := "Needs %s %d" % [catalog.display_name(PRODUCER), catalog.unit_producer_level("breacher")]
 	check(hud.train_card("breacher").disabled and hud.train_card_info("breacher") == needs,
 		"the Breacher card is locked: %s" % hud.train_card_info("breacher"))
@@ -223,6 +227,20 @@ func _fresh_academy(main: MainScript) -> void:
 	await _wait(main, Hud.MENU_OPEN_SECONDS)
 	check(hud.is_menu_open() and not hud.is_training_open() and not hud.army_panel().visible
 		and main.placement.selected_id == 0, "Build closed the training panel, cleared the selection and opened the build panel")
+
+
+## The training header's housing line and bar against the state's housing.
+func _check_housing(hud: Hud, state: BaseState) -> void:
+	var used := state.housing_used()
+	var capacity := state.housing_capacity()
+	var expected := "Housing %s / %s" % [Format.amount(used), Format.amount(capacity)]
+	check(hud.housing_text() == expected, "the header reads %s (expected %s)" % [hud.housing_text(), expected])
+	var track := (hud.housing_fill().get_parent() as Control).size.x
+	var width := roundf(track * used / capacity)
+	if used > 0:
+		width = maxf(width, Hud.HOUSING_MIN_FILL)
+	check(hud.housing_bar().is_visible_in_tree() and hud.housing_fill().size.x == width,
+		"the housing bar is filled %d of %d px (expected %d)" % [hud.housing_fill().size.x, track, width])
 
 
 func _first(state: BaseState, type: String) -> BuildingState:

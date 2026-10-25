@@ -174,6 +174,11 @@ const QUEUE_GLYPH_SIZE := Vector2(32, 32)
 ## A research card: a training card's with a line for the unit's level and one for the lab level
 ## its next level needs.
 const RESEARCH_CARD_SIZE := Vector2(200, 164)
+## The training header's housing line: the army's figure in front of it and the bar at its end.
+const HOUSING_ICON := Vector2(20, 20)
+const HOUSING_BAR_SIZE := Vector2(120, 14)
+## The bar's fill while any unit is housed, however few, in pixels.
+const HOUSING_MIN_FILL := 2.0
 
 ## The dev cheats are on (main.gd): every meter shows, full, reading "∞" instead of amount / cap.
 var cheats: bool = false
@@ -253,6 +258,12 @@ var _army_id: int = 0
 var _army_tween: Tween
 var _army_title: Label
 var _army_close: Button
+## The training page's housing line under the title: its text, and its bar, whose fill grows
+## across the track by housing used over capacity.
+var _housing_row: HBoxContainer
+var _housing_label: Label
+var _housing_bar: Control
+var _housing_fill: Control
 var _train_page: Control
 var _train_scroll: ScrollContainer
 ## The making page's cards, in the training page's place over the same queue strip.
@@ -656,6 +667,21 @@ func army_title() -> String:
 	return _army_title.text
 
 
+## The training header's housing line: "Housing used / capacity", or, with no Hangar, why none.
+func housing_text() -> String:
+	return _housing_label.text
+
+
+## The training header's housing bar; hidden while the base has no Hangar.
+func housing_bar() -> Control:
+	return _housing_bar
+
+
+## The housing bar's fill; its parent is the track it grows across.
+func housing_fill() -> Control:
+	return _housing_fill
+
+
 ## A unit's training card.
 func train_card(unit: String) -> Button:
 	return _train_cards[unit].button
@@ -807,6 +833,7 @@ func _open_army(page: ArmyPage) -> void:
 	_army_page = page
 	_army_id = _selected_id
 	_train_page.visible = page == ArmyPage.TRAIN or page == ArmyPage.MAKE
+	_housing_row.visible = page == ArmyPage.TRAIN
 	_train_scroll.visible = page == ArmyPage.TRAIN
 	_make_scroll.visible = page == ArmyPage.MAKE
 	_make_scroll.scroll_horizontal = 0
@@ -915,7 +942,28 @@ func _refresh_training(state: BaseState, building: BuildingState) -> void:
 			card.info.text = "Needs %s %d" % [_catalog.display_name(building.type), needed]
 		else:
 			card.info.text = "Housing %d   Housed %d" % [_catalog.unit_housing(unit), state.army_count(unit)]
+	_refresh_housing(state)
 	_refresh_queue(state)
+
+
+## The header's housing line: the army's housing used over its capacity, on the line and the bar;
+## with no Hangar, in the dim style, why no unit can be housed, and no bar.
+func _refresh_housing(state: BaseState) -> void:
+	var capacity := state.housing_capacity()
+	_housing_bar.visible = capacity > 0
+	if capacity == 0:
+		_housing_label.theme_type_variation = &"CardCount"
+		_housing_label.text = "No Hangar: build one to house units"
+		return
+	var used := state.housing_used()
+	_housing_label.theme_type_variation = &"HousingText"
+	_housing_label.text = "Housing %s / %s" % [Format.amount(used), Format.amount(capacity)]
+	var track := HOUSING_BAR_SIZE - Vector2(2 * BORDER, 2 * BORDER)
+	var width := roundf(track.x * clampf(float(used) / capacity, 0.0, 1.0))
+	# One unit housed still shows on the bar.
+	if used > 0:
+		width = maxf(width, HOUSING_MIN_FILL)
+	_housing_fill.size = Vector2(width, track.y)
 
 
 ## The Foundry's ability cards, then its queue (the training page's strip). A card is locked,
@@ -1590,9 +1638,10 @@ func _show_expedition() -> void:
 
 ## The army panel: like the build panel, the screen's full width at its bottom edge, its content
 ## padded into the safe area and a column kept clear for the Build button. A header of the
-## building's name and level and a close button, over one of two pages: the training page, a
-## strip of unit cards and, under it, the queue strip; or the research page, the research
-## running over a strip of unit cards. Built hidden; _open_army shows a page.
+## building's name and level (and, on the training page, the army's housing under it) and a
+## close button, over one of two pages: the training page, a strip of unit cards and, under it,
+## the queue strip; or the research page, the research running over a strip of unit cards. Built
+## hidden; _open_army shows a page.
 func _build_army_panel() -> void:
 	_army = PanelContainer.new()
 	_army.theme = _theme
@@ -1618,10 +1667,17 @@ func _build_army_panel() -> void:
 	header.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	header.add_theme_constant_override("separation", 10)
 	column.add_child(header)
+	var heading := VBoxContainer.new()
+	heading.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	heading.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	# Centred on the close button, as the title alone was on the pages without the housing line.
+	heading.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	heading.add_theme_constant_override("separation", 0)
+	header.add_child(heading)
 	_army_title = Label.new()
 	_army_title.theme_type_variation = &"InfoTitle"
-	_army_title.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	header.add_child(_army_title)
+	heading.add_child(_army_title)
+	_build_housing_line(heading)
 	_army_close = _button("X", CLOSE_SIZE, &"CloseButton")
 	_army_close.pressed.connect(_on_army_close)
 	header.add_child(_army_close)
@@ -1689,6 +1745,55 @@ func _build_army_panel() -> void:
 		card.button.pressed.connect(func() -> void: research_ability_pressed.emit(ability))
 		research_cards.add_child(card.button)
 		_research_ability_cards[ability] = card
+
+
+## The training header's housing line under `parent`: the army's figure, the text the refresh
+## fills, and a small bar like a meter's, the army accent's fill with its gloss in a trough, the
+## ink border drawn again over it.
+func _build_housing_line(parent: Control) -> void:
+	_housing_row = HBoxContainer.new()
+	_housing_row.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_housing_row.add_theme_constant_override("separation", 8)
+	parent.add_child(_housing_row)
+	var icon := HudIcon.new()
+	icon.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	icon.kind = "army"
+	icon.color = MaterialKit.ARMY
+	icon.custom_minimum_size = HOUSING_ICON
+	icon.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	_housing_row.add_child(icon)
+	_housing_label = Label.new()
+	_housing_label.theme_type_variation = &"HousingText"
+	_housing_row.add_child(_housing_label)
+	var bar := Panel.new()
+	bar.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	bar.theme_type_variation = &"MeterTrough"
+	bar.custom_minimum_size = HOUSING_BAR_SIZE
+	bar.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	_housing_row.add_child(bar)
+	_housing_bar = bar
+	var track := Control.new()
+	track.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	track.position = Vector2(BORDER, BORDER)
+	track.size = HOUSING_BAR_SIZE - Vector2(2 * BORDER, 2 * BORDER)
+	bar.add_child(track)
+	var fill := ColorRect.new()
+	fill.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	fill.color = MaterialKit.ARMY
+	fill.clip_contents = true
+	fill.size = Vector2(0, track.size.y)
+	track.add_child(fill)
+	_housing_fill = fill
+	var gloss := ColorRect.new()
+	gloss.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	gloss.color = GLOSS
+	gloss.size = Vector2(track.size.x, track.size.y / 3.0)
+	fill.add_child(gloss)
+	var frame := Panel.new()
+	frame.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	frame.theme_type_variation = &"MeterFrame"
+	bar.add_child(frame)
+	frame.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 
 
 ## A horizontal ScrollContainer under `parent`, `height` high (its cards' with room for their
@@ -2062,6 +2167,7 @@ func _make_theme() -> Theme:
 	_label_variation(ui, &"CardCount", 16, TEXT_DIM, 0)
 	_label_variation(ui, &"CardReason", 15, TEXT_DIM, 0)
 	_label_variation(ui, &"QueueName", 16, TEXT, 0)
+	_label_variation(ui, &"HousingText", 16, TEXT, 0)
 	_label_variation(ui, &"CardWarning", 15, WARNING, 0)
 	_label_variation(ui, &"MeterText", 18, TEXT, 2, _meter_font())
 	_label_variation(ui, &"InfoTitle", 24, TEXT, 0, DISPLAY_FONT)
