@@ -13,7 +13,9 @@ extends HarnessScenario
 ## "<defence>-fire" (FIRE_FRAMES at FIRE_STEP_MS, or STEPS's for the slow ones: the shells, the
 ## well's pull, the grav trap's throw) starts DEPLOY_DELAY_TICKS before the deploy (sent through
 ## BattleView.script_commands), so it holds the empty field, the unit's arrival and the defence's
-## first shot. Then, for a defence, "<defence>-impact": a close strip (IMPACT_VIEW across, cropped)
+## first shot (the gravity well at level 5, LEVELS, and over 2.4 s, so its hold shows; then
+## "gravity_well-release", RELEASE_FRAMES at RELEASE_STEP_MS from just before the hold ends, the
+## vortex fading out). Then, for a defence, "<defence>-impact": a close strip (IMPACT_VIEW across, cropped)
 ## on the unit from its next shot (BattleEffects.bolts_fired moving with the defence's colour
 ## last), IMPACT_FRAMES at
 ## IMPACT_STEP_MS or IMPACT_STEPS's for the slow ones, so its projectile's arrival and its impact
@@ -44,13 +46,25 @@ const FIRE_STEP_MS := 50
 const STEPS := {
 	"plasma_mortar": [10, 150],
 	"orbital_cannon": [12, 200],
-	"gravity_well": [8, 100],
+	"gravity_well": [24, 100],
 	"grav_trap": [8, 100],
 }
 ## The margin round a fire strip's two ends and the least height of the view its cropped tile
 ## shows (frame_span).
 const MARGIN := 1.5
 const MIN_VIEW := 4.5
+## The defences shown at a level of their own (the gravity well at its longest hold but one, so
+## its fire strip holds the vortex over two seconds), and its release strip: how many ticks before
+## the hold ends it starts, its frames and their step.
+const LEVELS := {"gravity_well": 5}
+const WELL := "gravity_well"
+const RELEASE_LEAD_TICKS := 6
+const RELEASE_FRAMES := 8
+const RELEASE_STEP_MS := 80
+## The gravity well holding three gunships: their cells, the strip's frames and step.
+const THREE_CELLS: Array[Vector2i] = [Vector2i(34, 23), Vector2i(36, 23), Vector2i(35, 21)]
+const THREE_FRAMES := 16
+const THREE_STEP_MS := 100
 ## The close impact strips: the least view, the frames and their step, and the slow ones'.
 const IMPACT_VIEW := 3.0
 const IMPACT_FRAMES := 8
@@ -92,6 +106,7 @@ func run(main: MainScript) -> void:
 		await _fire(main, type)
 		shot += 1
 	check(shot >= 15, "%d defences and traps shot" % shot)
+	await _well_three(main)
 	await _building_fall(main)
 	await _wall_break(main)
 
@@ -103,7 +118,7 @@ func _fire(main: MainScript, type: String) -> void:
 	var cell := UNIT_CELL if trap else DEFENCE_CELL
 	var buildings := [
 		{"id": 1, "type": DECOY, "level": DECOY_LEVEL, "cell": [DECOY_CELL.x, DECOY_CELL.y]},
-		{"id": 2, "type": type, "level": LEVEL, "cell": [cell.x, cell.y]},
+		{"id": 2, "type": type, "level": LEVELS.get(type, LEVEL), "cell": [cell.x, cell.y]},
 	]
 	if not _open(main, buildings, unit, LEVEL):
 		return
@@ -126,6 +141,10 @@ func _fire(main: MainScript, type: String) -> void:
 	await _until(view, acted)
 	check(acted.call(), "the %s acted on the %s (hull %d of %d)" % [type, unit, view.sim.unit_hp(1),
 		view.sim.unit_max_hp(1)])
+	if type == WELL:
+		var ends := view.sim.army.hold_until[0]
+		await _until(view, func() -> bool: return view.sim.tick >= ends - RELEASE_LEAD_TICKS)
+		await strip("%s-release" % type, RELEASE_FRAMES, RELEASE_STEP_MS, true)
 	if not trap and not view.sim.is_over():
 		var target := view.units.aim_point(1)
 		frame_span(main, target, target, MARGIN, IMPACT_VIEW, true)
@@ -157,6 +176,38 @@ func _check_weapons() -> void:
 			missing.append(unit)
 	check(missing.is_empty(), "every one of %d armed types and units has a weapon record (missing: %s)" % [listed,
 		", ".join(missing)])
+
+
+## A gravity well at its LEVELS level holding three Gunships at once: "gravity_well-three"
+## (THREE_FRAMES at THREE_STEP_MS, cropped) from the deploys, a vortex to each and the well's glow
+## and swirl once.
+func _well_three(main: MainScript) -> void:
+	var buildings := [
+		{"id": 1, "type": DECOY, "level": DECOY_LEVEL, "cell": [DECOY_CELL.x, DECOY_CELL.y]},
+		{"id": 2, "type": WELL, "level": LEVELS[WELL], "cell": [DEFENCE_CELL.x, DEFENCE_CELL.y]},
+	]
+	if not _open(main, buildings, AIR_UNIT, LEVEL, THREE_CELLS.size()):
+		return
+	var view: BattleView = main.battle
+	var head := view.field.cell_to_world(DEFENCE_CELL, _catalog.size_of(WELL)) + Vector3(0.0, 1.5, 0.0)
+	var at := view.field.cell_to_world(UNIT_CELL, 1) + Vector3(0.0, 0.5, 0.0)
+	frame_span(main, head, at, MARGIN + 1.0, MIN_VIEW, true)
+	await frames(3)
+	var deploys: Array[Dictionary] = []
+	for cell: Vector2i in THREE_CELLS:
+		deploys.append({"op": "deploy", "tick": view.sim.tick + DEPLOY_DELAY_TICKS, "unit": AIR_UNIT, "cell": [cell.x, cell.y]})
+	view.script_commands(deploys)
+	await strip("%s-three" % WELL, THREE_FRAMES, THREE_STEP_MS, true)
+	var holding := func() -> int:
+		var count := 0
+		for u: int in view.sim.unit_count():
+			if view.sim.army.hold_until[u] > 0:
+				count += 1
+		return count
+	await _until(view, func() -> bool: return holding.call() == THREE_CELLS.size())
+	var held: int = holding.call()
+	check(held == THREE_CELLS.size(), "the gravity well held %d of %d gunships" % [held, THREE_CELLS.size()])
+	await _leave(main)
 
 
 ## A Hover Tank fells a Drone Bay.
@@ -207,10 +258,10 @@ func _wall_break(main: MainScript) -> void:
 ## Opens a practice battle of `buildings` against `unit` at `level`, its HUD hidden and no unit
 ## selected (no red zone), so the strips show only the field; false if it is refused. The army
 ## brings a second, never deployed, so the battle does not end when the first falls.
-func _open(main: MainScript, buildings: Array, unit: String, level: int) -> bool:
+func _open(main: MainScript, buildings: Array, unit: String, level: int, deployed: int = 1) -> bool:
 	var setup := {
 		"seed": SEED,
-		"attacker": {"army": {unit: 2}, "unit_levels": {unit: level}, "abilities": {}, "ability_levels": {}},
+		"attacker": {"army": {unit: deployed + 1}, "unit_levels": {unit: level}, "abilities": {}, "ability_levels": {}},
 		"defender": {"buildings": buildings, "resources": {}},
 		"commands": [],
 	}
