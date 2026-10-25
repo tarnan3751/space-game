@@ -11,18 +11,23 @@ extends Node3D
 ## The scene: the defender's field in the landscape of the battle's seed (a BaseView of its own,
 ## the grid off), its walls in the field's merged WallMesh, every other building a BuildingView at
 ## its level and tier, the units (BattleUnits, a MultiMesh pair a type) and the effects
-## (BattleEffects, each kind one MultiMesh). A defence whose head carries a muzzle socket (the laser
-## turret) turns it towards its target (BattleSim.building_target) at its AIM_TURN rate, holds it
-## while disabled, and goes back to its idle swing a while after its target is gone
-## (BuildingView.aim_at, idle_aim); its shots leave its muzzle sockets in turn (its weapon
-## record's, MUZZLES for most), each held (the sim's hit is instant; the shot is the view's) until
-## the head faces its target within AIM_READY, AIM_HOLD at most, so a shot never leaves a barrel
-## turned away. Any other defence's shots leave its centre, MUZZLE_SHARE of its height up. Every
-## shot, shell, hit, spring and death is drawn by the weapon record of the type that made it
-## (Weapons, BattleEffects.fire and land). A hit whitens a building for a moment and shakes it; a
-## fallen building collapses (it sinks, tilts and shakes in dust) and is replaced by its rubble
-## (BuildingModels.create_rubble), popping up with debris and a smoke column; a fallen wall leaves
-## the merged mesh for a low strip with chunks and dust. A hidden sentry shows once revealed, in a
+## (BattleEffects, each kind one MultiMesh). A defence whose head carries a muzzle socket (every
+## defence with a direction: the laser turret, missile battery, plasma mortar, flak cannon, cloaked
+## sentry, railgun, ion beam and orbital cannon) turns it towards its target
+## (BattleSim.building_target) at its type's AIM_TURN rate, and goes back to its idle scan a while
+## after its target is gone (BuildingView.aim_at, idle_aim); its shots leave its muzzle sockets in
+## turn (its weapon record's, MUZZLES for most), each kicking the head back (BuildingView.fired) and
+## held (the sim's hit is instant; the shot is the view's) until the head faces its target within
+## AIM_READY, AIM_HOLD at most, so a shot never leaves a barrel turned away. A defence with its
+## muzzle socket on its body (the arc tower, the EMP tower, the gravity well) fires from it without
+## aiming; any other defence's shots leave its centre, MUZZLE_SHARE of its height up. While an EMP
+## burst has a defence disabled its moving parts hold their pose, and they snap back to the clock
+## when it wakes (_woke), in a flash of energy. Every shot, shell, hit, spring and death is drawn by
+## the weapon record of the type that made it (Weapons, BattleEffects.fire and land). A hit whitens
+## a building for a moment and shakes it; a fallen building collapses (it sinks, tilts and shakes in
+## dust) and is replaced by its rubble (BuildingModels.create_rubble), popping up with debris and a
+## smoke column; a fallen wall leaves the merged mesh for a low strip with chunks and dust. A hidden
+## sentry shows once revealed, fading in over REVEAL_SECONDS (BuildingView.set_reveal) in a
 ## shimmer; a trap stays hidden (a view of its own made at setup) until it springs, when it pops up
 ## and goes off. A shield generator's pool is a faint dome while it is up. The camera is the base's IsoCamera, free over the field. An
 ## expedition's battle (`rival`) draws the defender as a rival colony: its buildings and walls take
@@ -86,7 +91,11 @@ const HIT_FACE := 0.48
 const MUZZLES: Array[String] = Weapons.DEFENCE_MUZZLES
 ## How fast an aiming head turns towards its target (the share of the way a second, as an
 ## exponential rate) per type, and for any other type; how fast it goes back to its idle swing.
-const AIM_TURN := {"laser_turret": 10.0}
+## Fast for the light guns, slower for the heavy ones.
+const AIM_TURN := {
+	"laser_turret": 10.0, "cloaked_sentry": 10.0, "flak_cannon": 6.0, "railgun": 5.0, "ion_beam": 5.0,
+	"missile_battery": 3.0, "plasma_mortar": 2.0, "orbital_cannon": 1.5,
+}
 const AIM_TURN_DEFAULT := 4.0
 const AIM_RETURN := 3.0
 ## How close (radians) an aiming head must face its target before its held shot leaves, and the
