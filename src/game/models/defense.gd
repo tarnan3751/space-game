@@ -265,9 +265,10 @@ const EMP_RISES := [0.45, 0.9, 1.2]
 const EMP_RING_INNER := 0.6
 const EMP_RING_OUTER := 0.74
 const EMP_RING_DROP := 0.14
-## The railgun to L3, by level: how far the mount lifts the gun; the rails' width, the gap
-## between them where the strip runs, and the spine under them.
-const RAIL_LIFTS_LOW := [0.3, 0.38, 0.46]
+## The railgun to L3, by level: how far the mount lifts the gun (its housing clear of the cans'
+## tops, so it turns over them in battle); the rails' width, the gap between them where the strip
+## runs, and the spine under them.
+const RAIL_LIFTS_LOW := [0.58, 0.61, 0.63]
 const RAIL_WIDE := 0.2
 const RAIL_GAP := 0.16
 const RAIL_SPINE := 0.3
@@ -275,7 +276,7 @@ const RAIL_SPINE := 0.3
 ## over the drum; the capacitor cans' height on the drum, and how far the rear row and the L5
 ## front bank stand out on the plinth. The L6 targeting ring's height over the gun's deck.
 const RAIL_PLINTHS := [0.34, 0.34, 0.46, 0.5]
-const RAIL_LIFTS := [0.55, 0.7, 0.9, 1.1]
+const RAIL_LIFTS := [0.65, 0.7, 0.9, 1.1]
 const RAIL_CAN := 0.5
 const RAIL_ROW := 0.98
 const RAIL_RING_LIFT := 1.05
@@ -1440,38 +1441,46 @@ static func build_railgun(p: Parts, level: int) -> void:
 	m.ring(0.35, 0.4, 0.07, 24, foot + Vector3(0, 0.16, 0), ARMOUR_ROUND)
 	var band := 0.08 if level < 5 else 0.16
 	m.ring(0.35, 0.385, band, 24, foot + Vector3(0, lift - 0.04 - band, 0), glow)
-	m.box_chamfered(Vector3(0.95, 0.46, 1.1), 0.08, _at(deck, Vector3(0, 0, -0.3), heading),
+	# The rail assembly turns on the mount: the housing, the rails and all they carry, one moving
+	# part about the mount's axis (its pivot on the ground under it, so it is built in the model's
+	# space less that), holding still until it aims in battle (BuildingView), each shot kicking it
+	# back along the rails; its muzzle socket at the rails' end.
+	var axis := Vector3(foot.x, 0, foot.z)
+	var gun := p.moving(axis, Motion.swing(Vector3.UP, 0.0, 1.0))
+	var deck_g := deck - axis
+	gun.box_chamfered(Vector3(0.95, 0.46, 1.1), 0.08, _at(deck_g, Vector3(0, 0, -0.3), heading),
 		_by_tier(p.tier, ARMOUR, Parts.CHROME, Parts.OBSIDIAN), heading)
-	m.box_chamfered(Vector3(0.7, 0.3, 0.34), 0.05, _at(deck, Vector3(0, 0.46, -0.62), heading), VENT, heading)
-	m.box(Vector3(0.36, 0.05, 0.02), _at(deck, Vector3(0, 0.6, -0.449), heading), ION, heading)
+	gun.box_chamfered(Vector3(0.7, 0.3, 0.34), 0.05, _at(deck_g, Vector3(0, 0.46, -0.62), heading), VENT, heading)
+	gun.box(Vector3(0.36, 0.05, 0.02), _at(deck_g, Vector3(0, 0.6, -0.449), heading), ION, heading)
 	for side: float in [-1.0, 1.0]:
-		m.box_chamfered(Vector3(0.05, 0.3, 0.8), 0.015, _at(deck, Vector3(side * 0.49, 0.08, -0.3), heading),
+		gun.box_chamfered(Vector3(0.05, 0.3, 0.8), 0.015, _at(deck_g, Vector3(side * 0.49, 0.08, -0.3), heading),
 			_by_tier(p.tier, SHELL, ARMOUR, ARMOUR), heading)
-	m.box_chamfered(Vector3(0.6, 0.06, 0.3), 0.02, _at(deck, Vector3(0, 0.46, 0.0), heading), HAZARD_FINE, heading)
+	gun.box_chamfered(Vector3(0.6, 0.06, 0.3), 0.02, _at(deck_g, Vector3(0, 0.46, 0.0), heading), HAZARD_FINE, heading)
 	var length := 1.8 + 0.3 * mini(level, 4)
-	var root := _at(deck, Vector3(0, 0.42, -1.0), heading)
+	var root := _at(deck_g, Vector3(0, 0.42, -1.0), heading)
 	var rail := Vector3(RAIL_WIDE, 0.3, RAIL_WIDE + 0.02) if low else Vector3(0.14, 0.26, 0.16)
 	var across := RAIL_WIDE * 0.5 + RAIL_GAP * 0.5 if low else 0.16
 	if low:
 		# The spine the two rails stand on, so they read as one barrel.
-		m.box_chamfered(Vector3(RAIL_SPINE, RAIL_SPINE, length - 0.1), 0.04, _at(root, Vector3(0, -0.1, length * 0.5 - 0.05), aim),
+		gun.box_chamfered(Vector3(RAIL_SPINE, RAIL_SPINE, length - 0.1), 0.04, _at(root, Vector3(0, -0.1, length * 0.5 - 0.05), aim),
 			Parts.GUNMETAL, aim)
 	for side: float in [-1.0, 1.0]:
-		m.box_chamfered(Vector3(rail.x, rail.y, length), 0.04, _at(root, Vector3(side * across, 0, length * 0.5), aim),
+		gun.box_chamfered(Vector3(rail.x, rail.y, length), 0.04, _at(root, Vector3(side * across, 0, length * 0.5), aim),
 			_by_tier(p.tier, Parts.HULL_LIGHT if low else Parts.GUNMETAL, Parts.CHROME, Parts.OBSIDIAN), aim)
-		m.box_chamfered(Vector3(rail.z, rail.y + 0.02, 0.16), 0.04, _at(root, Vector3(side * across, -0.01, length - 0.08), aim),
+		gun.box_chamfered(Vector3(rail.z, rail.y + 0.02, 0.16), 0.04, _at(root, Vector3(side * across, -0.01, length - 0.08), aim),
 			GOLD if p.tier >= Parts.Tier.GOLD else ARMOUR, aim)
 		if level >= 4:
 			# A light strip down the rail's outer face.
-			m.box(Vector3(0.02, 0.08, length - 0.6), _at(root, Vector3(side * 0.24, 0.1, length * 0.5), aim), glow, aim)
-	m.box(Vector3(RAIL_GAP if low else 0.14, 0.08, length - 0.5), _at(root, Vector3(0, 0.14 if low else 0.08, length * 0.5 + 0.15), aim),
+			gun.box(Vector3(0.02, 0.08, length - 0.6), _at(root, Vector3(side * 0.24, 0.1, length * 0.5), aim), glow, aim)
+	gun.box(Vector3(RAIL_GAP if low else 0.14, 0.08, length - 0.5), _at(root, Vector3(0, 0.14 if low else 0.08, length * 0.5 + 0.15), aim),
 		RAIL_CURRENT, aim)
-	m.box(Vector3(0.16, 0.18, 0.06), _at(root, Vector3(0, 0.03, length - 0.06), aim), ION_PULSE, aim)
+	gun.box(Vector3(0.16, 0.18, 0.06), _at(root, Vector3(0, 0.03, length - 0.06), aim), ION_PULSE, aim)
+	gun.socket("muzzle", _at(root, Vector3(0, 0.03, length + 0.02), aim), LowPolyMesh.turn(Vector3.BACK, aim))
 	# Three bold collars along the barrel, wider round the wider barrel to L3.
 	var pitch := (length - 0.75) / 3.0 if low else 0.75
 	var collar := Parts.FILIGREE if p.tier >= Parts.Tier.CROWN else _by_tier(p.tier, Parts.GUNMETAL, Parts.CHROME, Parts.OBSIDIAN)
 	for i: int in 3:
-		m.box_chamfered(Vector3(0.74, 0.44, 0.16) if low else Vector3(0.6, 0.4, 0.16), 0.03,
+		gun.box_chamfered(Vector3(0.74, 0.44, 0.16) if low else Vector3(0.6, 0.4, 0.16), 0.03,
 			_at(root, Vector3(0, -0.12 if low else -0.08, 0.75 + pitch * i), aim), collar, aim)
 	# The banks stand on the drum either side of the mount (one at L1), the rear row on the plinth
 	# behind it from L3, and from L5 a third bank on the plinth's front under the barrel: the charge
@@ -1497,11 +1506,12 @@ static func build_railgun(p: Parts, level: int) -> void:
 	m.ring(0.855, 0.875, 0.07, 24, Vector3(0, top + 0.03, 0), VEIN_PANEL)
 	m.ring(0.5, 0.84, 0.012, 24, lower, VEIN_PANEL)
 	for side: float in [-1.0, 1.0]:
-		m.box(Vector3(0.18, 0.02, 0.6), _at(deck, Vector3(side * 0.36, 0.46, -0.1), heading), VEIN_PANEL, heading)
+		gun.box(Vector3(0.18, 0.02, 0.6), _at(deck_g, Vector3(side * 0.36, 0.46, -0.1), heading), VEIN_PANEL, heading)
 	for degrees: float in [15.0, 75.0]:
 		m.prism(0.07, 0.07, 0.05, 4, Parts.around(1.0, degrees, top), INLAY.phased(degrees / 90.0), Vector3(90, 90.0 - degrees, 0))
 	var ring_y := deck.y + RAIL_RING_LIFT
-	var ring := p.moving(Vector3(0, ring_y, 0), Motion.spin(Vector3.UP, 0.6))
+	# Round the mount's axis, so the rails turn through it.
+	var ring := p.moving(Vector3(axis.x, ring_y, axis.z), Motion.spin(Vector3.UP, 0.6))
 	_hover_ring(ring, 0.56, 0.7, p.tier)
 	if level < 7:
 		return
@@ -1510,11 +1520,11 @@ static func build_railgun(p: Parts, level: int) -> void:
 	# The breech: the antimatter core glowing light violet behind the rails, in gold rings, where the
 	# camera sees it; a gold crown on the muzzle.
 	var breech := _at(root, Vector3(0, 0.13, -0.3), aim)
-	m.prism(0.22, 0.22, 0.3, 20, breech, BRIGHT_CORE, along)
-	m.dome(0.22, 0.12, 20, 3, breech, BRIGHT_CORE, aim + Vector3(-90, 0, 0))
+	gun.prism(0.22, 0.22, 0.3, 20, breech, BRIGHT_CORE, along)
+	gun.dome(0.22, 0.12, 20, 3, breech, BRIGHT_CORE, aim + Vector3(-90, 0, 0))
 	for k: int in 2:
-		Parts.torus(m, 0.22, 0.035, 20, 8, _at(breech, Vector3(0, 0, 0.27 * k), aim), Parts.GOLD_ROUND, along)
-	_crown(m, _at(root, Vector3(0, 0.26, length - 0.1), aim), 0.2, 5, 0.18)
+		Parts.torus(gun, 0.22, 0.035, 20, 8, _at(breech, Vector3(0, 0, 0.27 * k), aim), Parts.GOLD_ROUND, along)
+	_crown(gun, _at(root, Vector3(0, 0.26, length - 0.1), aim), 0.2, 5, 0.18)
 
 
 ## A big crystal lens in a fat housing banded in red (gold at the Gold tier) on a tripod of
@@ -1525,7 +1535,8 @@ static func build_railgun(p: Parts, level: int) -> void:
 ## housing, cowl, cell, feet and rings obsidian, the cowl's band violet, veins round the plinth's
 ## top, the conduits violet, crystal inlays on the feet, a crystal focusing array of three violet
 ## points round the lens and violet crystal studs on the rings. L5 a focus ring hovering round the
-## beam, turning about it. L6 (Crown): gold filigree round the plinth and on the cowl, the
+## beam, turning about it with the second focusing ring. The emitter, the housing and the lens with
+## all round it, turns over the tripod: it scans, and aims in battle. L6 (Crown): gold filigree round the plinth and on the cowl, the
 ## antimatter core glowing light violet in the lens, in a gold crown, and in a broad band round the
 ## cowl, where the camera sees it.
 static func build_ion_beam(p: Parts, level: int) -> void:
