@@ -674,11 +674,15 @@ even proportions with no neck, no joints, no taper and no hands or feet.
   move segments as step 5 decides. A figure is one `LowPolyMesh`, the caller's; nothing in it is a
   moving part and it uses no `Motion`. A rigged build (a battle unit's) poses it in `neutral()`
   (legs straight but for a touch of knee, the torso pitched a little with no twist, so the
-  shoulders lie on one line across it) and passes a `Rigging` from `walk_rig(joints, arm_channel)`
-  to `colonist()` or `automaton()`: each thigh is stamped with its hip channel, each shin and foot
-  with its knee channel under the hip, the arms as one group on `arm_channel` about the shoulders'
-  midpoint, the head and the torso not at all (**Rig**). Without one (the study poses, the seated
-  pilot) nothing is rigged. Three poses: `stance()` (feet about shoulder width apart,
+  shoulders lie on one line across it) and passes a `Rigging` from `walk_rig(joints, arm_channel,
+  hip, knee)` to `colonist()` or `automaton()`: each thigh is stamped with its hip channel, each
+  shin and foot with its knee channel under the hip, the arms as one group on `arm_channel` about
+  the shoulders' midpoint; `swing_arms(rigging, joints)` puts each upper arm on its `SHOULDER`
+  channel and each forearm and hand on its `ELBOW` channel under it instead; the rigging's `body`
+  stamp (a flying figure's `BANK`) carries the head and the torso and is the parent of any segment
+  with one joint of its own. A segment carries the first two stamps of its chain that are set
+  (`Figures.stamp`: a shin's knee, hip, body), since a vertex has two joints (**Rig**). Without a
+  rigging (the study poses, the seated pilot) nothing is rigged. Three poses: `stance()` (feet about shoulder width apart,
   knees a little bent, the torso a few degrees forward and twisted, the elbows bent and the arms a
   little out, the sides unalike), `stride()` (walking upright: the left leg reaching forward
   with its knee bent and its heel coming down, the right nearly straight behind pushing off its
@@ -748,9 +752,10 @@ unit is built at its height over that point. One cell is one unit. A unit has no
 (`MAX_MOVING` is 0), so the battle draws every unit of a type from one MultiMesh of its body and
 one of its outline (`battle-view.md`, **Units**); what turns is a part tagged with
 `LowPolyMesh.spin`, which the shaders spin, what moves is a part tagged with `LowPolyMesh.rig`,
-which the shaders turn (**Rig**: the ranger's legs and its arms and rifle), and the hop, the lean,
-the aim, the hit flash and the death are the battle's per-instance data (**Surface effects**). A
-unit's muzzle is a socket (**Sockets**), which the battle fires its shots from.
+which the shaders turn (**Rig**: every unit's legs, arms, wheels, guns, bank and bay doors), and
+the hop, the lean, the aim, the bank, the hit flash and the death are the battle's per-instance
+data (**Surface effects**; `battle-view.md`, **Units**). A unit's muzzles, bay and exhausts are
+sockets (**Sockets**), which the battle fires its shots from.
 
 - **Tiers.** One shape per type; the tier repaints a machine's hull, panels, trim and glows, as
   the buildings' tiers do (**Tiers**), so a Crown unit reads black and gold with violet as a Crown
@@ -802,8 +807,9 @@ unit's muzzle is a socket (**Sockets**), which the battle fires its shots from.
   own taking its pivot's transform, as `Figures` builds a figure's segments, so the battle view can
   later tag or move segments without rebuilding a model; what an infantry unit wears or carries is
   built on its figure's joints (`Figures.joints`). The walking units (the brawler, the siege
-  walker, the titan and the colonists) stand in one pose each; the machines' legs are posed by
-  their joints' positions in the hip pivot's frame.
+  walker, the titan and the colonists) stand in one pose each, which the rig walks from; the
+  machines' legs are posed by their joints' positions in the hip pivot's frame and stamped on the
+  heavy hip and knee channels about those joints.
 - **Crews.** A human in a machine is the colonist (`Figures.colonist`) scaled and seated
   (`UnitModels.pilot(m, seat, yaw, scale, legs = false)`: `Figures.seated()` with the pelvis on
   `seat`, its legs left out where the hull hides them, returning its joints for the controls in
@@ -847,17 +853,17 @@ unit's muzzle is a socket (**Sockets**), which the battle fires its shots from.
 
 | Type | Model | Size (world units) | Triangles |
 | --- | --- | --- | --- |
-| `ranger` | the colonist rigged (`neutral` with the arms at low ready: the right hand at the grip in front of the belly, the left reaching down and forward to the fore end), a rifle pointing forward and 30° down (a fat gunmetal receiver, a stock of the tier's trim, a magazine, a gunmetal shroud, a 0.03 barrel and a muzzle in the tier's glow, its `muzzle` socket); a pack over the backpack and a pistol in a holster on the right thigh (on the right hip's channel), both orange to Gold and the tier's hull above; in battle its legs walk and its arms and rifle rise level to aim and kick on each shot (**Rig**) | 0.80 tall | 1,712 |
-| `breacher` | the colonist at 0.85 tall in a bulkier suit: a belly plate and pauldrons (orange to Gold, the tier's trim above), heavy `HULL_MID` boot shells over the dark soles, a fat hazard-yellow charge with one black band round its middle and gunmetal end cones, held across in both hands in front, and a big dark charge pack on its back rising behind the helmet, its top third a hazard-yellow cap with a black band round it, a gunmetal detonator block and a red fuse lamp on a short mast blinking (red at every tier: the pack is live) | 0.95 tall | 1,800 |
-| `jet_trooper` | the colonist flying, leaning in with the legs trailing and the toes pointed, its right hand forward with a one-handed carbine (two thirds of the ranger's rifle: a fat gunmetal receiver, a stock of the tier's trim, a 0.03 barrel and a muzzle in the tier's glow, its `muzzle` socket); a jetpack (orange to Gold, the tier's hull above) with two gunmetal nozzles blowing fat flames 0.075 across and 0.3 long, the same at every tier (a white-hot band at the mouth, then an `ENERGY` cyan cone, unlit, PULSE, not inked) and orange stub wings swept back 25°; every part bobs | 0.82 tall, flames to 0.50 up | 1,752 |
-| `brawler` | the automaton at 1.08 scale crouched with its guard up: big gunmetal fists with knuckle bands of the tier's trim, broad orange shoulder plates at every tier, each edged with a strip of the tier's trim, a thick girdle of the tier's hull round its middle | 1.06 tall | 1,688 |
-| `dune_runner` | an open buggy: a cream chamfered hull, deck plates on a long fender along each side over the wheels and round the engine block, an orange bonnet, a bumper of the tier's trim, an engine block of the tier's panels with two glowing exhausts behind, four chunky dark tyres with broad hub caps of the tier's trim, the colonist driver seated behind the dash at a steering wheel, an orange roll cage carrying a pintle twin gun (a gunmetal receiver, two 0.035 barrels, muzzles in the tier's glow) between two lamps of the tier's glow | 0.86 long, 0.68 wide, 0.78 tall | 2,040 (2,070 from Gold) |
-| `skimmer` | a lens-shaped saucer 0.7 across, its underside the tier's hull and its top `veined`, a rim of the tier's trim and a second trim ring round its crown, four glow slots round a glass sensor dome with a dark iris and a glowing pupil, a tall orange heading fin, two gunmetal gun pods under the front rim with glowing tips, and a glowing ring under it (PULSE); its lowest point 0.62 up, bobbing | 0.70 across | 1,014 |
-| `siege_walker` | a cream chamfered hull with a chest band (orange to Gold, the tier's trim above) on two digitigrade legs (gunmetal hip joints under orange caps, thighs of the tier's panels with orange plates, knee joints with caps of the tier's trim, cream shins, hull-mid feet with toe caps of the tier's trim), two big gun arms (a cream pod with an orange top plate, twin 0.042 gunmetal barrels out of a shared shroud, muzzles in the tier's glow), the colonist pilot sunk behind a glass windscreen and a dashboard, a block behind it carrying the deck plate, a mast with a lamp of the tier's glow blinking | 1.50 tall, 0.98 wide | 2,850 (2,860 from Gold) |
-| `hover_tank` | a cream hull 0.8 by 1.2 floating 0.22 up over a glowing underside, its deck plate round the turret, orange skirts 0.14 tall flared 20° out with three glowing vents each (PULSE), their lowest edge 0.18 up, two gunmetal thrusters on the rear corners angled out with glowing mouths; a tall turret (a drum 0.25 tall) on a ring of the tier's trim with a cap of the tier's trim, an orange mantlet, one fat barrel (0.09) with collars of the tier's trim at its middle and muzzle and a glowing bore, and a hatch (0.13) with the pilot sunk behind a small windscreen of the same radius; it bobs | 1.42 long, 0.98 wide, 0.95 tall | 2,072 (2,082 from Gold) |
-| `titan` | a giant biped: hull-mid thighs and cream shins under orange plates (the plate layer at two repeats a unit), gunmetal knee joints with caps of the tier's trim, big dark feet with toe caps of the tier's trim; a cream bridge with an orange rear block capped in the tier's trim, two colonists seated behind a wide glass windscreen and a gunmetal dashboard, two huge cannon arms (cream housings with orange top plates, fat gunmetal barrels, collars of the tier's trim, glowing bores) and an antenna mast with a lamp of the tier's glow blinking | 2.46 tall, 1.82 wide | 4,276 |
-| `gunship` | a cream chamfered fuselage with a dark belly band and its deck plate on the roof, a nose with the pilot sunk behind a glass windscreen, a gunmetal twin chin gun (two 0.04 barrels, glowing muzzles), hull-mid stub wings carrying a cream nacelle at each tip with a band of the tier's glow and a cap of the tier's trim, a tail boom (the hull, the tier's trim from Obsidian) with orange fins; two counter-rotating rotors (`LowPolyMesh.spin`, 9 radians a second), each a sunk gunmetal hub under a trim cap, three dark blades and a glowing ring round their tips; its lowest point 1.22 up, bobbing | 1.60 across the rotors, 1.40 long | 2,434 (2,444 from Gold) |
-| `bomber` | a cream centre body with its deck plate along the top, two wings swept 34° (`veined`) with leading edges of the tier's trim and orange winglets, two cream engines sunk in the wing roots with intake rings of the tier's trim, dark intakes and exhausts and flame cones in the tier's glow; six orange bombs on show: two under a gunmetal rack in the bay, one under each wing outboard of its engine and one on a pylon under each wingtip; the pilot sunk behind a small windscreen; its lowest point 1.61 up, bobbing | 1.83 span, 0.93 long | 2,468 (2,478 from Gold) |
+| `ranger` | the colonist rigged (`neutral` with the arms at low ready: the right hand at the grip in front of the belly, the left reaching down and forward to the fore end), a rifle pointing forward and 30° down, carried 15° across the body to its left so it shows beside the legs from the front (the battle turns the ranger by as much while it aims) (a fat gunmetal receiver, a stock of the tier's trim, a magazine, a gunmetal shroud, a 0.03 barrel and a muzzle in the tier's glow, its `muzzle` socket); a pack over the backpack and a pistol in a holster on the right thigh (on the right hip's channel), both orange to Gold and the tier's hull above; in battle its legs walk and its arms and rifle rise level to aim and kick on each shot (**Rig**) | 0.80 tall | 1,712 |
+| `breacher` | the colonist at 0.85 tall in a bulkier suit: a belly plate and pauldrons (orange to Gold, the tier's trim above), heavy `HULL_MID` boot shells over the dark soles, a fat hazard-yellow charge with one black band round its middle and gunmetal end cones, held across in both hands in front, and a big dark charge pack on its back rising behind the helmet, its top third a hazard-yellow cap with a black band round it, a gunmetal detonator block and a red fuse lamp on a short mast blinking (red at every tier: the pack is live); posed on `neutral`, its legs walk (`walk_rig`), its arms and the charge still; no socket | 0.95 tall | 1,800 |
+| `jet_trooper` | the colonist flying, leaning in with the legs trailing and the toes pointed, its right hand forward with a one-handed carbine (two thirds of the ranger's rifle: a fat gunmetal receiver, a stock of the tier's trim, a 0.03 barrel and a muzzle in the tier's glow, its `muzzle` socket); a jetpack (orange to Gold, the tier's hull above) with two gunmetal nozzles blowing fat flames 0.075 across and 0.3 long, the same at every tier (a white-hot band at the mouth, then an `ENERGY` cyan cone, unlit, PULSE, not inked) and orange stub wings swept back 25°; every part bobs and banks (`BANK` about the waist), the right arm and carbine carried low and raised level to aim (`AIM` about the right shoulder), the flames flickering and shortening as it hovers to fire (`THRUST` about the nozzles' mouths, its `exhaust` and `exhaust_2` sockets) | 0.82 tall, flames to 0.50 up | 1,752 |
+| `brawler` | the automaton at 1.08 scale crouched with its guard up: big gunmetal fists with knuckle bands of the tier's trim, broad orange shoulder plates at every tier, each edged with a strip of the tier's trim, a thick girdle of the tier's hull round its middle; the legs alike, walking (`walk_rig`), the arms counter-swinging and punching in turn (`swing_arms`), the fists' fronts its `muzzle` (left) and `muzzle_2` (right) | 1.06 tall | 1,688 |
+| `dune_runner` | an open buggy: a cream chamfered hull, deck plates on a long fender along each side over the wheels and round the engine block, an orange bonnet, a bumper of the tier's trim, an engine block of the tier's panels with two glowing exhausts behind, four chunky dark tyres (`RUNNER_WHEEL` 0.15) with broad hub caps of the tier's trim, an orange bar across each cap, rolling on `WHEEL`, the colonist driver seated behind the dash at a steering wheel, an orange roll cage carrying a pintle twin gun (a gunmetal receiver, two 0.035 barrels, muzzles in the tier's glow, `muzzle` the left, `muzzle_2` the right) between two lamps of the tier's glow | 0.86 long, 0.68 wide, 0.78 tall | 2,080 (2,110 from Gold) |
+| `skimmer` | a lens-shaped saucer 0.7 across, its underside the tier's hull and its top `veined`, a rim of the tier's trim and a second trim ring round its crown, four glow slots round a glass sensor dome with a dark iris and a glowing pupil, a tall orange heading fin, two gunmetal gun pods under the front rim with glowing tips, and a glowing ring under it (PULSE); its lowest point 0.62 up, bobbing and banking; the pods' tips `muzzle` and `muzzle_2`, the pupil `eye` | 0.70 across | 1,014 |
+| `siege_walker` | a cream chamfered hull with a chest band (orange to Gold, the tier's trim above) on two digitigrade legs (gunmetal hip joints under orange caps, thighs of the tier's panels with orange plates, knee joints with caps of the tier's trim, cream shins, hull-mid feet with toe caps of the tier's trim), two big gun arms (a cream pod with an orange top plate, twin 0.042 gunmetal barrels out of a shared shroud, muzzles in the tier's glow), the colonist pilot sunk behind a glass windscreen and a dashboard, a block behind it carrying the deck plate, a mast with a lamp of the tier's glow blinking; the legs step on the heavy hip and knee channels, each gun pod recoils 0.15 in turn (`SLIDE_L`, `SLIDE_R`), the socket between its muzzles `muzzle` on the left arm and `muzzle_2` on the right | 1.50 tall, 0.98 wide | 2,850 (2,860 from Gold) |
+| `hover_tank` | a cream hull 0.8 by 1.2 floating 0.22 up over a glowing underside, its deck plate round the turret, orange skirts 0.14 tall flared 20° out with three glowing vents each (PULSE), their lowest edge 0.18 up, two gunmetal thrusters on the rear corners angled out with glowing mouths; a tall turret (a drum 0.25 tall) on a ring of the tier's trim with a cap of the tier's trim, an orange mantlet, one fat barrel (0.09) with collars of the tier's trim at its middle and muzzle and a glowing bore, and a hatch (0.13) with the pilot sunk behind a small windscreen of the same radius; it bobs and banks, the barrel and mantlet recoil 0.25 (`SLIDE`), the bore its `muzzle`, the thrusters' mouths `exhaust` and `exhaust_2` | 1.42 long, 0.98 wide, 0.95 tall | 2,072 (2,082 from Gold) |
+| `titan` | a giant biped: hull-mid thighs and cream shins under orange plates (the plate layer at two repeats a unit), gunmetal knee joints with caps of the tier's trim, big dark feet with toe caps of the tier's trim; a cream bridge with an orange rear block capped in the tier's trim, two colonists seated behind a wide glass windscreen and a gunmetal dashboard, two huge cannon arms (cream housings with orange top plates, fat gunmetal barrels, collars of the tier's trim, glowing bores) and an antenna mast with a lamp of the tier's glow blinking; the legs step on the heavy channels, the cannons recoil 0.25 in turn (`SLIDE_L`, `SLIDE_R`), the bores `muzzle` (left) and `muzzle_2` | 2.46 tall, 1.82 wide | 4,276 |
+| `gunship` | a cream chamfered fuselage with a dark belly band and its deck plate on the roof, a nose with the pilot sunk behind a glass windscreen, a gunmetal twin chin gun (two 0.04 barrels, glowing muzzles), hull-mid stub wings carrying a cream nacelle at each tip with a band of the tier's glow and a cap of the tier's trim, a tail boom (the hull, the tier's trim from Obsidian) with orange fins; two counter-rotating rotors (`LowPolyMesh.spin`, 9 radians a second), each a sunk gunmetal hub under a trim cap, three dark blades and a glowing ring round their tips; its lowest point 1.22 up, bobbing and banking; the chin gun's muzzles `muzzle` (left) and `muzzle_2` | 1.60 across the rotors, 1.40 long | 2,434 (2,444 from Gold) |
+| `bomber` | a cream centre body with its deck plate along the top, two wings swept 34° (`veined`) with leading edges of the tier's trim and orange winglets, two cream engines sunk in the wing roots with intake rings of the tier's trim, dark intakes and exhausts and flame cones in the tier's glow; six orange bombs on show: two under a gunmetal rack in the bay, one under each wing outboard of its engine and one on a pylon under each wingtip; two bay doors of the tier's hull closed flat under the bay's bombs, swinging down to hang open as it aims (`BAY_L`, `BAY_R`); the pilot sunk behind a small windscreen; its lowest point 1.59 up, bobbing and banking; `bay` under the rack, `exhaust` and `exhaust_2` at the engines' tails | 1.83 span, 0.93 long | 2,528 (2,538 from Gold) |
 
 "Cream" in the table is the tier's hull (`hull()`), "hull mid" its panels (`panel()`). The counts
 are the same at every tier, since a tier only swaps surfaces, but for a deck plate's trim strip
@@ -981,44 +987,64 @@ work per frame.
 
 A part rig in the vertex shader, for the battle's units, which are drawn from MultiMeshes and so
 can have no moving part: a model builder tags a limb's parts with a **rig channel** and a pivot
-(`LowPolyMesh.rig`), and the toon, ink and hologram shaders turn them by an angle the channel takes
-from the instance's state (`INSTANCE_CUSTOM`), two levels deep: a vertex turns about its own joint
+(`LowPolyMesh.rig`), and the toon, ink and hologram shaders move them (most turn; a slide moves,
+a thrust scales) by the amount the channel takes from the instance's state (`INSTANCE_CUSTOM`), two
+levels deep: a vertex turns about its own joint
 (`CUSTOM1`: a shin about its knee), then about the joint it hangs from (`CUSTOM2`: with the thigh
 about the hip). No skeleton (slow on GLES3, and a MultiMesh cannot be skinned), no draw, no
 instance. The turn comes after a spin and before the gait and the surface effects; the shadow pass
 and the outline (which turns its normals too) follow it. The `RIG` flag gates the reads, since a
 mesh without the attributes would read a default there.
 
-The state: x the gait's phase in steps (two a cycle) while y ≥ 0, the fire phase (0 at a shot, 1 by
-the next) while y < 0; y the gait's share while ≥ 0, minus the aim's share while < 0
-(`battle-view.md`, **Units**). Any other instance reads zeros: every channel at 0, the model as
-built, so a rigged model shows its bake pose in the base, the gallery and the cards' pictures. Each
-channel has a fixed axis and an angle function; the table is in `src/game/rig.gd` (`Rig`) and in
-`effects.gdshaderinc` (`rig_angle`, `rig_axis`), which must agree: `Rig` mirrors the shaders for the
-CPU (`Rig.posed`, `posed_direction`), so a view can find a point on a rigged part as it is drawn (a
-muzzle, **Sockets**). With walk = max(y, 0), s = sin(πx), aim = max(−y, 0) and kick = aim × (1 −
-smoothstep(0, `RECOIL_SPAN` 0.3, x)):
+The state: x the gait's phase in steps (two a cycle) while y ≥ 0, or on a hovering model (which
+never hops) `BANK_BASE` (4) plus its bank in radians, so a level flight is not the zero state of a
+model outside a battle; while y < 0, x is the fire phase f (0 at a shot, 1 by the next) plus 2 after
+an odd shot, the parity p (the shot's index mod 2), so a twin weapon's sides take turns, `muzzle`
+the left on p 0 and `muzzle_2` the right on p 1; y the gait's share while ≥ 0, minus the aim's share
+while < 0 (`battle-view.md`, **Units**). Any other instance reads zeros: every channel at rest, the
+model as built, so a rigged model shows its bake pose in the base, the gallery and the cards'
+pictures. Each channel has a fixed kind and amount function; the table is in `src/game/rig.gd`
+(`Rig`) and in `effects.gdshaderinc` (`rig_amount`, `rig_axis`, `rig_move`), which must agree: `Rig`
+mirrors the shaders for the CPU (`Rig.posed`, `posed_direction`), so a view can find a point on a
+rigged part as it is drawn (a muzzle, **Sockets**). The shaders find each joint's amount once for a
+vertex and its normal. With walk = max(y, 0), s = sin(πx), aim = max(−y, 0), p = 1 for x ≥ 2 else 0,
+f = x − 2p, flying = 1 for y ≥ 0 and x ≥ `BANK_BASE` − 1 else 0, battle = 1 for y < 0 or flying else
+0, kick = aim × (1 − smoothstep(0, `RECOIL_SPAN` 0.3, f)) and punch = aim × sin(π min(f /
+`PUNCH_SPAN` 0.5, 1)) on the side whose turn it is:
 
-| Id | Channel | Axis | Angle |
+| Id | Channel | Kind | Amount |
 | --- | --- | --- | --- |
 | 1, 2 | `HIP_L`, `HIP_R` | X | ∓`HIP_SWING` (44°) × walk × s: the left thigh forward while s > 0, the right back |
 | 3, 4 | `KNEE_L`, `KNEE_R` | X | `KNEE_BEND` (70°) × walk × max(∓s, 0): a knee bends while its leg is behind |
 | 5 | `AIM` | X | −(`AIM_RAISE` (30°) × aim + `RECOIL_KICK` (16°) × kick): the arms and the gun raised to aim, kicked up by each shot |
+| 6, 7 | `SHOULDER_L`, `_R` | X | ±`ARM_SWING` (35°) × walk × s, the arm's counter-swing to its own side's hip, − `PUNCH_SWING` (50°) × punch on its own side's turn |
+| 8, 9 | `ELBOW_L`, `_R` | X | −`ELBOW_BEND` (30°) × walk × max(∓s, 0), bent further as its arm swings forward, + `PUNCH_REACH` (80°) × punch on its own side's turn, straightened |
+| 10 | `WHEEL` | X | π x: a turn every cycle, so the phase's wrap at 2 never jumps |
+| 12 | `BANK` | Z | (x − `BANK_BASE`) × flying: a hovering model's roll into its turn |
+| 13 | `SLIDE` | move | the stamp's vector (its pivot) × kick: a barrel's recoil |
+| 14, 15 | `BAY_L`, `_R` | Z | ±`BAY_OPEN` (80°) × smoothstep(0, 1, aim): bay doors hinged on their outer edges |
+| 16, 17 | `SLIDE_L`, `_R` | move | as `SLIDE`, on p 0 for the left, p 1 for the right: a pair of guns recoiling in turn |
+| 18, 19 | `HIP_HEAVY_L`, `_R` | X | as `HIP_L`, `_R` at `HEAVY_HIP` (22°): a walker's |
+| 20, 21 | `KNEE_HEAVY_L`, `_R` | X | as `KNEE_L`, `_R` at `HEAVY_KNEE` (40°) |
+| 22 | `THRUST` | scale | 1 + `THRUST_FLUTTER` (0.2) × battle × sin(2π (`THRUST_RATE` (9) × `anim_time` + 0.37 pivot.x)) − `THRUST_IDLE` (0.35) × aim, about the pivot: a flame flickering in battle, still at a zero state, shorter while it hovers to fire |
 
-Reserved, not yet built (ids, axes and functions fixed for the lanes that rig the rest of the
-roster): 6, 7 `SHOULDER_L`, `_R` (X, an arm's counter-swing, ±`ARM_SWING` × walk × s); 8, 9
-`ELBOW_L`, `_R` (X); 10 `WHEEL` (X, 2π x: whole turns a cycle, so the phase's wrap at 2 never jumps);
-11 `YAW` (Y); 12 `BANK` (Z, x read as radians on a hovering model, which never hops); 13 `SLIDE` (a
-translation by the pivot's vector times kick: a barrel's recoil); 14 `BAY` (X, a bomb bay's doors
-or a hatch opening with aim); 15 `FIST` (X, a melee swing on the fire phase). A model that needs a
-channel at another amplitude (a mech's hip swinging less than a colonist's) gets a variant row with
-its own id and constant, never per-instance data: the state is the same four numbers for every
-model.
+A turning channel turns about its axis through the pivot; a move or a scale leaves a normal as it
+is. The brawler's punch is the aim-time term of `SHOULDER` and `ELBOW` rather than a channel of its
+own, since a forearm's two joints are already its elbow and its shoulder. Reserved: 11 `YAW` (Y). A
+model that needs a channel at another amplitude gets a variant row with its own id and constant
+(the heavy hips and knees), never per-instance data: the state is the same four numbers for every
+model. `Rig.AIMING` lists the channels that read the aim: a type whose mesh carries one aims while
+it attacks.
 
-The figures carry it through `Figures.walk_rig(joints, arm_channel)` (**Figures**). The ranger is
-the first rigged unit: its legs walk, and its arms and rifle are one group on `AIM` about the
-shoulders' midpoint, so the hands never leave the rifle (**Units**). The `rig` harness scenario
-(`tools/harness/README.md`) poses a row of rangers and drives a battle.
+The figures carry it through `Figures.walk_rig` and `swing_arms` (**Figures**); the machines stamp
+their parts themselves. Per unit: the ranger's legs walk and its arms and rifle are one group on
+`AIM` about the shoulders' midpoint, so the hands never leave the rifle; the breacher's legs walk;
+the jet trooper banks as a whole, its right arm and carbine on `AIM` about the right shoulder and its
+flames on `THRUST`; the brawler walks with its arms swinging and punches in turn; the dune runner's
+wheels roll; the siege walker and the titan step on the heavy channels and recoil in turn; the
+hover tank banks and its barrel recoils; the skimmer and the gunship bank; the bomber banks and
+opens its bay (**Units**). The `rig` harness scenario (`tools/harness/README.md`) poses a row of
+rangers, poses every type through `Rig` to check its sockets and the ground, and drives a battle.
 
 ### Sockets
 
@@ -1029,8 +1055,11 @@ part, with the rig stamps current when it was added, so a muzzle on a rigged arm
 `Meshes` and `Moving` records and sets them on the model's root and each moving part's node
 (`SOCKETS_META`); `BuildingView.socket_point` and `socket_direction` give one in the world. A
 defence whose `muzzle` is on a moving part aims that part in battle (`battle-view.md`, **Aim and
-muzzles**). Sockets today: the ranger's rifle muzzle, and the laser turret's barrel tips on its
-head (`muzzle`, `muzzle_2`, from level 7 `muzzle_3` and `muzzle_4`).
+muzzles**). Sockets today: every unit's weapons (`muzzle`, and `muzzle_2` for a second barrel or
+arm, the left one first; the brawler's fists), the skimmer's `eye`, the bomber's `bay`, the jet
+trooper's, the hover tank's and the bomber's `exhaust` and `exhaust_2` (**Units**), and the laser
+turret's barrel tips on its head (`muzzle`, `muzzle_2`, from level 7 `muzzle_3` and `muzzle_4`).
+`BattleUnits.socket_point` gives a unit's in the world (`battle-view.md`, **Units**).
 
 ### Budget and checks
 

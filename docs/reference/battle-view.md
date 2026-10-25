@@ -142,32 +142,64 @@ The view stays on the field after the end, its last effects finishing, until `le
 data, sized to the type's count in the army; units not yet deployed or gone are left out with
 `visible_instance_count`. Each frame it writes one buffer a type and hands it to both. A unit has no
 moving part (`UnitModels.MAX_MOVING` is 0); the gunship's rotors are spun by the shaders
-(`LowPolyMesh.spin`, `art-style.md`), and a rigged model's limbs turned by them (the rig,
-`art-style.md`, **Rig**: the ranger's legs and its arms and rifle).
+(`LowPolyMesh.spin`, `art-style.md`), and a rigged model's parts moved by them (the rig,
+`art-style.md`, **Rig**: legs, arms, wheels, guns, banks and bay doors).
 
 - **Transform**: the interpolated position, the heading turned smoothly (`TURN_RATE`) towards the
-  last move (`unit_heading`) or, while attacking, towards the target's centre.
+  last move (`unit_heading`) or, while attacking, towards the target's centre. Every unit is
+  deployed facing `DEPLOY_YAW` and turns onto its course from there. While a unit aims, a type whose
+  aimed `muzzle` (on `Rig.AIM`) does not point straight ahead (the ranger's rifle, carried 15
+  degrees across its body) turns further by the yaw of the muzzle's level direction off +Z at full
+  aim, times the aim's share, so the muzzle points at its target; the yaw is derived from the
+  socket, not a constant, and a muzzle within `AIM_YAW_VERTICAL` (30 degrees) of vertical, or not on
+  `AIM` (the brawler's fists), gives none.
 - **Custom data** (`INSTANCE_CUSTOM`, read by the toon, ink and hologram shaders through
-  `effects.gdshaderinc`): x the gait's phase in steps walked, y the gait's share, z the hit flash,
-  w the death's fade. A walking ground unit hops once a step (a step is `STRIDE`, 0.45, of its
-  model's height), leans forward and sways, the shear growing with the vertex's height; the share
-  follows walking or standing at `GAIT_EASE` a second. A wheeled unit only jolts (`WHEELED`); a
-  hovering or flying one (its mesh bobs) bobs by its own surface flags. A hit (a defence's shot
-  arriving, a lightning strike) whitens it over `HIT_SECONDS` (0.12); a death shrinks, sinks and
-  fades it over `DEATH_SECONDS` (0.3), its outline thinning to nothing, after which it is not drawn.
-  A rigged type (its mesh carries `Surf.RIG`) walks with its legs while the gait shows (the hip and
-  knee channels read x and y as above), and aims while it attacks (`unit_state` `ATTACKING`): its
-  gait's share eases to 0 first, then its aim's share rises to 1 at `AIM_EASE` (10) a second, and
-  while the aim shows, y is minus its share and x the fire phase, 0 at its last shot and 1 by the
-  next (the seconds since over its `fire_ms` at its level), which raises the gun and kicks it on
-  each shot. Leaving the attack, the aim eases to 0 before the gait comes back, so the legs never
-  snap. An unrigged type's data is as before.
+  `effects.gdshaderinc`): x the gait's phase in steps walked, y the gait's share, z the hit flash, w
+  the death's fade. A walking ground unit hops once a step (a step is `STRIDE`, 0.45, of its model's
+  height), leans forward and sways, the shear growing with the vertex's height; the share follows
+  walking or standing at `GAIT_EASE` a second. A wheeled unit only jolts (`WHEELED`) and steps at
+  `WHEEL_STRIDE`, half its wheels' circumference, so its wheels (`WHEEL`, half a turn a step) roll
+  with the ground. A hovering or flying one (its mesh bobs) bobs by its own surface flags, and its x
+  is `Rig.BANK_BASE` (4) plus its bank in radians instead of a phase (so the shaders tell a level
+  flight from the zero state of a model outside a battle, and a flame flickers only in battle): its
+  drawn heading's turn rate times `BANK_GAIN` (0.2), at most `BANK_MAX` (25 degrees) in the air and
+  `BANK_MAX_GROUND` (12) for a ground unit hovering low, eased at `BANK_EASE` (10) a second. A hit
+  (a defence's shot arriving, a lightning strike) whitens it over `HIT_SECONDS` (0.12). A rigged
+  type walks with its legs while the gait shows (the hip and knee channels read x and y as above). A
+  type whose mesh carries a channel that reads the aim (`Rig.AIMING`: the ranger's and the jet
+  trooper's arms, the brawler's punch, a slide's recoil, the bomber's bay, the jet's thrust) aims
+  while it attacks (`unit_state` `ATTACKING`): its gait's share and its bank ease to 0 first, then
+  its aim's share rises to 1 at `AIM_EASE` (10) a second, and while the aim shows, y is minus its
+  share and x the fire phase, 0 at its last shot and 1 by the next (the seconds since over its
+  `fire_ms` at its level), plus 2 after an odd shot (the shot's index from 0, mod 2: the parity a
+  twin weapon's sides take turns on, `muzzle` on the left on even shots, `muzzle_2` on the right on
+  odd ones), which raises the gun and kicks it, recoils a barrel or throws a punch on each shot.
+  Leaving the attack, the aim eases to 0 before the gait or the bank comes back, so nothing snaps.
+  `drawn_state(id)` gives a unit's state as last drawn. Any other type's data is as before.
+- **Deaths**: a death plays over its class's seconds, `death_seconds(id)`: `FIGURE_DEATH` (0.45) for
+  a figure (a ground type walking on `HIP_L` and `HIP_R`), `MACHINE_DEATH` (0.6) for every other
+  ground unit and every air unit; the effects that go with it (blasts, smoke, wrecks) are A3's,
+  which read `death_seconds`. The fall is the instance's transform, so every part and the outline go
+  together: a figure topples backwards about its ankles (`TOPPLE`, 80 degrees); a walker (on the
+  heavy hips) pitches forward 30 degrees (`KNEEL_PITCH`) and comes down onto the ground; any other
+  ground machine rolls over a side's bottom edge (the dune runner 110 degrees, onto its back, the
+  rest 35; by its id's parity) and settles to the ground; an aircraft (the jet trooper too) spirals
+  down `SPIRAL_TURNS` (1.5) turns, nose down 25 degrees and rolled 30, to the ground. Each falls
+  over the first `FALL_SHARE` (0.6) of its death, faster as it goes, then holds and shrinks away
+  over the last `SHRINK_SHARE` (0.15); throughout, it is kept so the lowest of its model's extreme
+  points (the vertices furthest along 26 directions) stays `GROUND_MARGIN` over the ground as it
+  falls, so no part shows through it and a falling one comes to rest on it. The fade (w) thins its
+  outline to nothing, after which it is not drawn.
 - **Shots**: a unit's hit (`UNIT_HIT`) goes through `BattleUnits.shoot`, which fires its bolt on
-  the next draw (the same frame): from its `muzzle` socket posed by the state it is drawn in
-  (`Rig.posed`, the CPU mirror of the shaders' angles), with a muzzle flash (`MUZZLE_FLASH`), or from
-  its middle when the model has no socket. A rigged unit's is held until its aim's share reaches
-  `AIM_READY` (0.9), so a bolt never leaves a rifle still rising; the sim's hit is instant and the
-  bolt is the view's.
+  the next draw (the same frame): from its `muzzle` socket, or on an odd shot its `muzzle_2` where
+  it has one, posed by the state it is drawn in (`Rig.posed`, the CPU mirror of the shaders'
+  angles), with a muzzle flash (`MUZZLE_FLASH`), or from its middle when the model has no socket.
+  An aiming unit's is held until its aim's share reaches `AIM_READY` (0.9), so a bolt never leaves a
+  rifle still rising; the sim's hit is instant and the bolt is the view's. A melee blow brings no
+  shot, so `after_step` also marks each unit's `UNIT_HIT` from the sim's events: a blow no shot
+  follows starts the fire phase and counts as a shot all the same (the brawler's punches, the
+  walker's recoil). `socket_point(id, name)` gives any of a unit's sockets (`muzzle`, `muzzle_2`,
+  `bay`, `exhaust`, `exhaust_2`, `eye`) in the world as last drawn.
 - **Throws**: a unit a grav trap throws flies from where it stood to where it landed on an arc
   `THROW_HEIGHT` high over `THROW_SECONDS`.
 - **Health bars**: a damaged unit carries a cyan bar over its head, its fill easing towards the
