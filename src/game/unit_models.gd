@@ -168,6 +168,17 @@ static func veined(tier: int, smooth: bool = false) -> Surf:
 	return panel(tier, smooth) if tier >= Parts.Tier.OBSIDIAN else hull(tier, smooth)
 
 
+## A machine's deck plate: the one camera-facing top plate every machine carries so that no tier
+## reads as a dark lump from the camera, as the titan's deck cap does. A thin plate `size` standing
+## on `pos`, turned `rot`, of the hull to Chrome and the veins from Obsidian (veined()), and from
+## Gold up a strip of the tier's trim down its middle, half its width and 0.9 of its length: gold,
+## the cyan light strip, chrome on the veins, Crown's gold filigree.
+static func deck(m: LowPolyMesh, size: Vector3, pos: Vector3, tier: int, rot: Vector3 = Vector3.ZERO) -> void:
+	m.box(size, pos, veined(tier), rot)
+	if tier >= Parts.Tier.GOLD:
+		m.box(Vector3(size.x * 0.5, size.y + 0.008, size.z * 0.9), pos, trim(tier), rot)
+
+
 ## The trim of `tier` (rims, caps, bands, collars, edges): hull mid at Base, then gold, the cyan
 ## light strips at Chrome, chrome on the obsidian and Crown's gold filigree.
 static func trim(tier: int, smooth: bool = false) -> Surf:
@@ -240,7 +251,7 @@ static func canopy_top(radius: float, rise: float) -> float:
 ## `to_deg` round its +Y (90 dead ahead), in a gunmetal frame: a lip at its foot and a rim along its
 ## top edge. Open above and behind, so the pilot seated in it (pilot(), seat_under()) shows over it:
 ## the glass is opaque. The frame is gunmetal at every tier, so `_tier` is unused: the tier shows
-## on the machine's own trim instead.
+## on the machine's deck plate (deck()) instead.
 static func canopy(m: LowPolyMesh, xf: Transform3D, radius: float, depth: float, rise: float, from_deg: float,
 		to_deg: float, _tier: int, sides: int = 24) -> void:
 	const STEPS := 3

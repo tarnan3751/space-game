@@ -10,6 +10,9 @@ extends RefCounted
 ## The army-orange plates: flat and smooth.
 static var ORANGE := Parts.surf("orange")
 static var ORANGE_ROUND := Figures.ARMY_PLATE
+## The army orange on the flat layer, for the small plates (under 0.4 across): the plate layer's
+## seams fall on a part's middle at any repeat, since a part's UVs start from its centre.
+static var ORANGE_FINE := Surf.make(MaterialKit.Layer.FLAT, MaterialKit.ARMY)
 ## The dune runner's tyres: dark hull, smooth, so they read as rubber.
 static var TYRE := Parts.HULL_DARK_ROUND
 
@@ -128,45 +131,66 @@ static func _gun_arm(m: LowPolyMesh, xf: Transform3D, side: float, tier: int) ->
 
 # --- The hover tank -----------------------------------------------------------------
 
-## The hover tank: a low tier-hull hull hovering on orange chamfered skirts, their lower edges and the
-## underside glowing in the tier's glow (PULSE), two rear thrusters, a turret with one fat plasma
-## barrel glowing at the muzzle and a hatch with the pilot's helmet and shoulders showing behind a
-## small windscreen; it bobs as it hovers.
+## How high the hover tank's hull floats: its underside over the ground, at rest.
+const TANK_HOVER := 0.22
+
+## The hover tank: a tier-hull hull floating TANK_HOVER up over a glowing underside, its deck plate
+## on top (UnitModels.deck), on orange skirts flared out along its sides with three glowing vents
+## in each, two thrusters on its rear corners angled out; a tall turret on a ring of the tier's
+## trim, capped in the tier's trim, with an orange mantlet and one fat barrel with collars of
+## the tier's trim and a glowing bore, and the pilot sunk in a hatch behind a small windscreen; it
+## bobs as it hovers.
 static func build_hover_tank(p: Parts) -> void:
 	var m := p.body
 	var tier := p.tier
 	var glow := UnitModels.glow(tier, Surf.PULSE)
 	m.flags = Surf.BOB
-	m.box_chamfered(Vector3(0.6, 0.02, 0.96), 0.008, Vector3(0, 0.17, -0.03), glow)
-	m.box_chamfered(Vector3(0.7, 0.22, 1.08), 0.07, Vector3(0, 0.18, -0.03), UnitModels.hull(tier))
+	m.box(Vector3(0.7, 0.03, 1.1), Vector3(0, TANK_HOVER - 0.025, -0.05), glow)
+	m.box_chamfered(Vector3(0.8, 0.28, 1.2), 0.08, Vector3(0, TANK_HOVER, -0.05), UnitModels.hull(tier))
+	UnitModels.deck(m, Vector3(0.62, 0.012, 1.02), Vector3(0, TANK_HOVER + 0.28, -0.05), tier)
 	for side: float in [1.0, -1.0]:
-		m.box_chamfered(Vector3(0.1, 0.03, 1.1), 0.01, Vector3(side * 0.39, 0.12, -0.03), glow)
-		m.box_chamfered(Vector3(0.12, 0.17, 1.16), 0.04, Vector3(side * 0.39, 0.15, -0.03), ORANGE)
-		_thruster(m, UnitModels.pivot(Vector3(side * 0.18, 0.29, -0.57), Vector3(-90, 0, 0)), tier)
-	_turret(m, UnitModels.pivot(Vector3(0, 0.4, -0.1)), tier)
+		_skirt(m, UnitModels.pivot(Vector3(side * 0.45, TANK_HOVER - 0.025, -0.05), Vector3(0, 0, side * 20.0)), side, tier)
+		_thruster(m, UnitModels.pivot(Vector3(side * 0.3, TANK_HOVER + 0.16, -0.6), Vector3(-90, -side * 25.0, 0)), tier)
+	_turret(m, UnitModels.pivot(Vector3(0, TANK_HOVER + 0.28, -0.04)), tier)
 	m.flags = 0
 
 
-## A rear thruster on the pivot `xf`, blowing along its +Y: a gunmetal drum and its glowing mouth.
+## A skirt on the pivot `xf` (the middle of its lower edge, the pivot leaning its top in) on side
+## `side`: a long orange plate with three vents glowing in the tier's glow along its outer face.
+static func _skirt(m: LowPolyMesh, xf: Transform3D, side: float, tier: int) -> void:
+	var rot := UnitModels.euler(xf)
+	m.box_chamfered(Vector3(0.08, 0.14, 1.16), 0.03, xf.origin, ORANGE, rot)
+	for z: float in [-0.3, 0.0, 0.3]:
+		m.box(Vector3(0.012, 0.045, 0.12), xf * Vector3(side * 0.041, 0.045, z), UnitModels.glow(tier, Surf.PULSE, false), rot)
+
+
+## A thruster on the pivot `xf`, blowing along its +Y: a gunmetal nozzle and its mouth glowing.
 static func _thruster(m: LowPolyMesh, xf: Transform3D, tier: int) -> void:
-	Parts.drum(m, 0.075, 0.07, 0.02, 16, xf * Vector3(0, -0.05, 0), Parts.GUNMETAL, UnitModels.euler(xf))
-	m.disc(0.05, 12, xf * Vector3(0, 0.022, 0), UnitModels.glow(tier, Surf.PULSE, false), UnitModels.euler(xf))
+	var rot := UnitModels.euler(xf)
+	m.lathe(PackedVector2Array([
+		Vector2(0.05, -0.12), Vector2(0.08, -0.07), Vector2(0.08, 0.06), Vector2(0.07, 0.08),
+	]), 10, xf.origin, Parts.GUNMETAL, rot)
+	m.disc(0.06, 10, xf * Vector3(0, 0.081, 0), UnitModels.glow(tier, Surf.PULSE, false), rot)
 
 
-## The turret on the pivot `xf` (its ring on the hull): a tier-hull drum on a ring of the tier's trim,
-## a gunmetal mantlet, the fat barrel with a muzzle collar of the tier's trim and a glowing bore,
-## and the hatch (_hatch).
+## The turret on the pivot `xf` (its ring on the hull): a tall tier-hull drum on a ring of the
+## tier's trim, a cap of the tier's trim, an orange mantlet, the fat gunmetal barrel with a collar
+## of the tier's trim at its middle and at its muzzle and a glowing bore, and the hatch (_hatch).
 static func _turret(m: LowPolyMesh, xf: Transform3D, tier: int) -> void:
-	m.ring(0.25, 0.3, 0.04, 16, xf.origin, UnitModels.trim(tier, true), UnitModels.euler(xf))
-	Parts.drum(m, 0.27, 0.17, 0.06, 16, xf.origin, UnitModels.hull(tier, true), UnitModels.euler(xf))
-	m.box_chamfered(Vector3(0.2, 0.13, 0.1), 0.03, xf * Vector3(0, 0.025, 0.25), Parts.GUNMETAL, UnitModels.euler(xf))
-	var bore := Vector3(0, 0.09, 0.0)
-	Parts.pipe(m, xf * (bore + Vector3(0, 0, 0.28)), xf * (bore + Vector3(0, 0, 0.68)), 0.06, Parts.GUNMETAL, 12, false)
-	m.tube(0.04, 0.085, 0.1, 16, xf * (bore + Vector3(0, 0, 0.64)), UnitModels.trim(tier, true),
-		UnitModels.euler(xf, Vector3(90, 0, 0)))
-	m.disc(0.042, 12, xf * (bore + Vector3(0, 0, 0.7)), UnitModels.glow(tier, Surf.PULSE, false),
-		UnitModels.euler(xf, Vector3(90, 0, 0)))
-	_hatch(m, xf * UnitModels.pivot(Vector3(0.08, 0.17, -0.08)), tier)
+	const TALL := 0.25
+	var rot := UnitModels.euler(xf)
+	m.ring(0.19, 0.3, 0.04, 16, xf.origin, UnitModels.trim(tier, true), rot)
+	Parts.drum(m, 0.2, TALL, 0.05, 16, xf.origin, UnitModels.hull(tier, true), rot)
+	m.lathe(PackedVector2Array([Vector2(0.15, 0), Vector2(0.15, 0.02), Vector2(0, 0.02)]), 16, xf * Vector3(0, TALL - 0.004, 0),
+		UnitModels.trim(tier, true), rot)
+	m.box_chamfered(Vector3(0.26, 0.18, 0.14), 0.04, xf * Vector3(0, 0.035, 0.17), ORANGE_FINE, rot)
+	var bore := Vector3(0, 0.125, 0.0)
+	var along := UnitModels.euler(xf, Vector3(90, 0, 0))
+	Parts.pipe(m, xf * (bore + Vector3(0, 0, 0.22)), xf * (bore + Vector3(0, 0, 0.72)), 0.09, Parts.GUNMETAL, 16, false)
+	m.tube(0.085, 0.11, 0.07, 12, xf * (bore + Vector3(0, 0, 0.42)), UnitModels.trim(tier, true), along)
+	m.tube(0.07, 0.14, 0.1, 12, xf * (bore + Vector3(0, 0, 0.66)), UnitModels.trim(tier, true), along)
+	m.disc(0.07, 12, xf * (bore + Vector3(0, 0, 0.74)), UnitModels.glow(tier, Surf.PULSE, false), along)
+	_hatch(m, xf * UnitModels.pivot(Vector3(0.05, TALL + 0.016, -0.05)), tier)
 
 
 ## The hatch on the pivot `xf` (the turret's top): a ring of the tier's trim, the pilot sunk in it
