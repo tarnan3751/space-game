@@ -1294,7 +1294,8 @@ static func _antenna(m: LowPolyMesh, foot: Vector3, height: float, foot_surf: Su
 ## Vats of glowing green nanite goo seen through glass bands, round a pump block, with pipes
 ## and their elbows running between them. A vat more at each level; gold rims at 4. The goo
 ## laps round every vat under its bright meniscus, bubbles rise through it, the pipes and the
-## pump's screens flow, and a stirrer turns in the big vat's open top.
+## pump's screens flow, and a stirrer turns in the big vat's open top. That vat, 0.62 in radius
+## with its open top 0.5 in radius, is the main mass the others stand round.
 ##
 ## From 5 the vats stand taller at each level and the pump block rises to a tower: L5 chrome vats
 ## with cyan rims, a chrome pump tower and cyan pipes; L6 a sixth vat, a tall column on the right;
@@ -1323,7 +1324,7 @@ static func build_nanite_foundry(p: Parts, level: int) -> void:
 		m.box_chamfered(Vector3(0.3, 0.1, 0.3), 0.03, pump + Vector3(0, 0.45, 0), VENT)
 	# [position, radius, height] of each vat, in the order the levels add them.
 	var vats: Array[Array] = [
-		[Vector3(-0.62, g, -0.62), 0.5, 1.35],
+		[Vector3(-0.62, g, -0.62), 0.62, 1.35],
 		[Vector3(0.68, g, -0.72), 0.38, 1.0],
 		[Vector3(-0.72, g, 0.66), 0.38, 0.9],
 		[Vector3(0.78, g, 0.62), 0.32, 0.75],
@@ -1343,16 +1344,16 @@ static func build_nanite_foundry(p: Parts, level: int) -> void:
 	if chrome:
 		pipe = CYAN_PIPE
 	# An arch of pipe over from the big vat's lid into the next one's.
-	var big: Vector3 = vats[0][0] + Vector3(0.3, lids.x, -0.02)
+	var big: Vector3 = vats[0][0] + Vector3(0.56, lids.x, -0.02)
 	var second: Vector3 = vats[1][0] + Vector3(-0.16, lids.y, 0.01)
 	_goo_pipe(m, PackedVector3Array([
 		big, big + Vector3(0, 0.2, 0), Vector3(second.x, big.y + 0.2, second.z), second,
 	]), pipe, obsidian)
 	# The stirrer: a hub with two crossed paddles turning in the big vat's goo.
 	var stirrer := p.moving(vats[0][0] + Vector3(0, stir, 0), Motion.spin(Vector3.UP, 1.6))
-	stirrer.prism(0.08, 0.06, 0.12, 12, Vector3(0, -0.02, 0), ORANGE_ROUND)
+	stirrer.prism(0.1, 0.08, 0.14, 12, Vector3(0, -0.02, 0), ORANGE_ROUND)
 	for yaw: float in [0.0, 90.0]:
-		stirrer.box_chamfered(Vector3(0.44, 0.08, 0.05), 0.02, Vector3(0, -0.04, 0), ORANGE, Vector3(0, yaw, 0))
+		stirrer.box_chamfered(Vector3(0.76, 0.08, 0.07), 0.02, Vector3(0, -0.04, 0), ORANGE, Vector3(0, yaw, 0))
 	for i: int in mini(level + 1, vats.size()):
 		var spot: Vector3 = vats[i][0]
 		var radius: float = vats[i][1]
@@ -1379,12 +1380,12 @@ static func build_nanite_foundry(p: Parts, level: int) -> void:
 		# The stirrer ring hovering over the big vat, turning against the stirrer: obsidian rimmed
 		# in violet, four crystal vanes pointing in.
 		var hover := p.moving(vats[0][0] + Vector3(0, stir + 0.42, 0), Motion.spin(Vector3.UP, -0.8))
-		hover.ring(0.3, 0.42, 0.06, 24, Vector3.ZERO, HOVER)
-		hover.lathe(PackedVector2Array([Vector2(0.425, 0.01), Vector2(0.425, 0.05)]), 24, Vector3.ZERO, HOVER_RIM)
-		hover.lathe(PackedVector2Array([Vector2(0.4, 0.062), Vector2(0.32, 0.062)]), 24, Vector3.ZERO, HOVER_RIM)
+		hover.ring(0.44, 0.56, 0.06, 24, Vector3.ZERO, HOVER)
+		hover.lathe(PackedVector2Array([Vector2(0.565, 0.01), Vector2(0.565, 0.05)]), 24, Vector3.ZERO, HOVER_RIM)
+		hover.lathe(PackedVector2Array([Vector2(0.54, 0.062), Vector2(0.46, 0.062)]), 24, Vector3.ZERO, HOVER_RIM)
 		for k: int in 4:
 			var degrees := 45.0 + 90.0 * k
-			hover.cone(0.04, 0.16, 8, Parts.around(0.31, degrees, 0.03), HOVER_CRYSTAL,
+			hover.cone(0.04, 0.16, 8, Parts.around(0.45, degrees, 0.03), HOVER_CRYSTAL,
 				Parts.facing(Parts.around(-1.0, degrees, 0.0)))
 
 
@@ -1491,9 +1492,9 @@ static func _vat(m: LowPolyMesh, foot: Vector3, radius: float, height: float, ti
 	if index == 0:
 		m.lathe(PackedVector2Array([
 			Vector2(radius, 0.05), Vector2(radius, top - 0.08), Vector2(radius - 0.08, top),
-			Vector2(radius - 0.13, top), Vector2(radius - 0.13, top - 0.05),
+			Vector2(radius - 0.12, top), Vector2(radius - 0.12, top - 0.05),
 		]), 16, foot + Vector3(0, upper, 0), upper_shell)
-		m.disc(radius - 0.13, 16, foot + Vector3(0, height - 0.05, 0), GOO_BRIGHT_SWIRL if bright else GOO_SWIRL)
+		m.disc(radius - 0.12, 16, foot + Vector3(0, height - 0.05, 0), GOO_BRIGHT_SWIRL if bright else GOO_SWIRL)
 		return
 	m.lathe(PackedVector2Array([
 		Vector2(radius, 0.05), Vector2(radius, top - 0.08), Vector2(radius - 0.08, top), Vector2(0, top),
