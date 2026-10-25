@@ -643,13 +643,18 @@ strip. Each battle is surrendered and left before the next.
   a Hover Tank's last shot on a Drone Bay) and
   `wall-break` (12, 50 ms: a level 4 Breacher on a Barrier Wall).
 - `scenarios/anim_base.gd`: the construction drone over a Metal Silo placed on the fresh base,
-  `drone-arrive` and `drone-laser` (8, 150 ms, camera size 6); then on the Template base, one
-  building of every type but the walls and the traps, `<type>-idle` (8, 150 ms), framed on its
-  middle at 1.6 times its footprint plus 2.5.
+  `drone-arrive` and `drone-laser` (8, 150 ms, camera size 6), then at its next shots
+  `drone-beam` (framed on the beam at camera size 10, cropped) and `drone-sparks` (on the work
+  point at size 4, cropped); then every type but the walls and the traps at level 1, its middle
+  level and its top level, each a view of the scenario's own alone at the field's middle (the
+  base's views hidden), `<type>-<level>` (8, 150 ms, cropped), framed on the moving part its
+  idle reads by at that level at the camera size its `FOCUS` entry gives (by level band, 4.5 to
+  10; a type without one, the defences, on its middle at 2.6 a cell). Checks: the drone fires three times, and every view
+  shot showed its model.
 - `scenarios/anim_effects.gd`: `swarm-dome` (8, 250 ms), `emp-ring` (8, 50 ms) and `emp-grey`
   (8, 500 ms: the stun and the waking), `strike-marker` (8, 100 ms), `strike-land` (16, 50 ms,
   from 12 ticks before it lands) and `strike-smoke` (8, 150 ms); `shield-hit` and `shield-drop`
   (8, 100 ms) on a shield generator's pool; `rubble-settle` (12, 100 ms) from a Drone Bay's fall
   and `smoke-column` (8, 250 ms) two seconds later.
 
-Each runs in about one to two minutes rendered, inside the watchdog's 300 seconds.
+Each runs in about one to two and a half minutes rendered, inside the watchdog's 300 seconds.
