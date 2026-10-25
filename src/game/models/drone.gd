@@ -7,10 +7,11 @@ extends RefCounted
 ## bay's unlit blurs.
 ##
 ## BuildingModels builds and caches each of the three (create_drone, create_drone_effect). The
-## beam, the flare's dome, its sparks and the rotor blur each have a surface of their own, and
-## each is animated by the shaders (docs/reference/art-style.md, **Animation**): the beam flows
-## from the emitter to the hit point and pulses, the dome pulses, the sparks flicker and shake,
-## each on its own phase, and the rotors are hologram discs whose hazard stripes spin.
+## beam's core and sheath, the flare's dome, its sparks and the rotor blur each have a surface of
+## their own, and each is animated by the shaders (docs/reference/art-style.md, **Animation**):
+## the beam's core pulses and its sheath's bands flow from the emitter to the hit point, the dome
+## pulses, the sparks flicker and shake, each on its own phase, and the rotors are hologram discs
+## whose hazard stripes spin.
 
 ## The eye and the emitter lens.
 static var GLOW := Surf.make(MaterialKit.Layer.GLOW, MaterialKit.ENERGY, 1.0, Surf.UNLIT, true)
@@ -19,14 +20,21 @@ static var DUCT_BAND := Surf.make(MaterialKit.Layer.HAZARD, Color.WHITE, 3.0, Su
 ## the disc as a blur arc as U scrolls; ROTOR_SPEEDS gives each its phase, the pairs
 ## counter-rotating.
 static var ROTOR := Surf.make(MaterialKit.Layer.GLASS, Color.WHITE, 1.0, Surf.HOLO | Surf.FLOW_U)
-## The laser and its flare: unlit and too thin or small for the outline. The beam is on the bands
-## layer, a broad bright band ink-edged on its leading side, at 2 repeats a unit; its V falls from
-## the emitter to the hit point (a face's V is minus its height), so its flow phase is below 0.5
-## to carry the bands towards the hit point as pulses. The sparks take phases k/5.
-static var BEAM := Surf.make(MaterialKit.Layer.BANDS, MaterialKit.ENERGY, 2.0,
-	Surf.UNLIT | Surf.FLOW | Surf.PULSE, true, false, 0.15)
-static var FLARE := Surf.make(MaterialKit.Layer.GLOW, MaterialKit.ENERGY, 1.0, Surf.UNLIT | Surf.PULSE, true, false)
+## The laser and its flare: unlit and not outlined. The beam is a white-hot core, BEAM_CORE (a
+## near-white cyan, pulsing), in a soft glow sheath, BEAM_SHEATH: a hologram on the bands layer,
+## a broad bright band ink-edged on its leading side, at 2 repeats a unit; its V falls from the
+## emitter to the hit point (a face's V is minus its height), so its flow phase is below 0.5 to
+## carry the bands towards the hit point as pulses. The flare's dome is a bright cyan; its sparks
+## are hazard yellow and white-hot by turns, on phases k / SPARKS.size().
+const WHITE_HOT := Color("d8fbff")
+static var BEAM_CORE := Surf.make(MaterialKit.Layer.GLOW, WHITE_HOT, 1.0, Surf.UNLIT | Surf.PULSE, true, false)
+static var BEAM_SHEATH := Surf.make(MaterialKit.Layer.BANDS, MaterialKit.ENERGY, 2.0,
+	Surf.HOLO | Surf.FLOW, true, false, 0.15)
+static var FLARE := Surf.make(MaterialKit.Layer.GLOW, MaterialKit.ENERGY.lerp(Color.WHITE, 0.3), 1.0, Surf.UNLIT | Surf.PULSE, true,
+	false)
 static var SPARK := Surf.make(MaterialKit.Layer.GLOW, MaterialKit.HAZARD, 1.0,
+	Surf.UNLIT | Surf.FLICKER | Surf.JITTER, false, false)
+static var SPARK_HOT := Surf.make(MaterialKit.Layer.GLOW, WHITE_HOT, 1.0,
 	Surf.UNLIT | Surf.FLICKER | Surf.JITTER, false, false)
 
 ## The parked drone idles: every part of it bobs together, on PARKED_PHASE, which is also the
@@ -53,11 +61,17 @@ const BASE := Vector3(0, -0.07, 0)
 const KNUCKLE := Vector3(0, -0.05, 0.12)
 const ARM_END := Vector3(0, -0.12, 0.22)
 const EMITTER := Vector3(0, -0.15, 0.265)
-const BEAM_WIDTH := 0.05
-const FLARE_RADIUS := 0.14
-## Each spark's length beyond the flare's edge, round it in turn: their tips about 0.25 out.
-const SPARKS := [0.14, 0.08, 0.12, 0.09, 0.11]
-const SPARK_WIDTH := 0.04
+## The beam's core and its sheath, across.
+const BEAM_WIDTH := 0.07
+const SHEATH_WIDTH := 0.2
+const FLARE_RADIUS := 0.17
+## Each spark's length beyond the flare's edge, round it in turn: their tips 0.3 to 0.45 out, so
+## the burst reads at camera size 10.
+const SPARKS := [0.3, 0.18, 0.26, 0.2, 0.31, 0.16, 0.24, 0.21]
+const SPARK_WIDTH := 0.09
+## How steeply the sparks rise off the face, their tips' height a share of their length: the
+## yellow ones low, the white-hot ones steep, so the burst stands out of the face.
+const SPARK_RISE := [0.7, 1.4]
 ## Each rotor's FLOW_U phase, round the drone in turn: its spin's speed and direction.
 const ROTOR_SPEEDS := [0.92, 0.08, 0.96, 0.04]
 
@@ -99,24 +113,27 @@ static func add_drone(m: LowPolyMesh, pos: Vector3, parked: bool) -> void:
 	m.orb(0.03, 8, 4, emitter, glow)
 
 
-## The laser: a thin square rod one unit long up +Y from the origin, stretched to its length by
-## the node it hangs under. A box, not a prism: its planar UVs keep the texture as dense across
-## the rod as along it, where a lathe's whole repeat round so thin a rod would mip the bands away.
+## The laser: a white-hot square rod one unit long up +Y from the origin, in a wider hologram
+## sheath whose bands flow down it, stretched to its length by the node it hangs under. Boxes, not
+## prisms: their planar UVs keep the texture as dense across the rod as along it, where a lathe's
+## whole repeat round so thin a rod would mip the bands away.
 static func build_beam(p: Parts) -> void:
-	p.body.box(Vector3(BEAM_WIDTH, 1.0, BEAM_WIDTH), Vector3.ZERO, BEAM)
+	p.body.box(Vector3(BEAM_WIDTH, 1.0, BEAM_WIDTH), Vector3.ZERO, BEAM_CORE)
+	p.body.box(Vector3(SHEATH_WIDTH, 1.0, SHEATH_WIDTH), Vector3.ZERO, BEAM_SHEATH)
 
 
-## Where the laser hits: a small glowing dome with hazard-yellow spark shards fanned round it,
-## each one a thin triangle seen from both sides, rising a little from its root.
+## Where the laser hits: a small bright dome with spark shards fanned round it, hazard yellow and
+## white-hot by turns, each one a thin triangle seen from both sides, rising from its root.
 static func build_flare(p: Parts) -> void:
 	var m := p.body
 	m.dome(FLARE_RADIUS, FLARE_RADIUS * 0.8, 10, 3, Vector3.ZERO, FLARE)
 	for k: int in SPARKS.size():
 		var length: float = SPARKS[k]
-		var degrees := 20.0 + 72.0 * k
+		var degrees := 20.0 + 360.0 / SPARKS.size() * k
 		var root := Parts.around(FLARE_RADIUS * 0.7, degrees, 0.02)
-		var tip := Parts.around(FLARE_RADIUS + length, degrees, 0.02 + length * 0.7)
+		var rise: float = SPARK_RISE[k % 2]
+		var tip := Parts.around(FLARE_RADIUS + length, degrees, 0.02 + length * rise)
 		var side := Parts.around(SPARK_WIDTH * 0.5, degrees + 90.0, 0)
-		var spark := SPARK.phased(k / float(SPARKS.size()))
+		var spark := (SPARK if k % 2 == 0 else SPARK_HOT).phased(k / float(SPARKS.size()))
 		m.triangle(root - side, root + side, tip, spark)
 		m.triangle(root + side, root - side, tip, spark)
