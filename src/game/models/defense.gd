@@ -1555,26 +1555,32 @@ static func build_ion_beam(p: Parts, level: int) -> void:
 		if level >= 4:
 			m.prism(0.06, 0.06, 0.04, 4, foot + Vector3(0, 0.08, 0), INLAY.phased(k / 3.0), Vector3(0, 45.0 - degrees, 0))
 	var aim := Vector3(40, 100, 0)
+	# The emitter turns over the tripod: the housing, the lens and all round it, one moving part
+	# about the tripod's axis (its pivot at the origin, so it is built in the model's space). It
+	# scans slowly and aims in battle (BuildingView), its muzzle socket at the lens; the focusing
+	# rings ride it.
+	var gun := p.moving(Vector3.ZERO, Motion.swing(Vector3.UP, 15.0, 9.0))
 	var housing := head - LowPolyMesh.turn(Vector3(0, 0.2, 0), aim)
 	# The housing behind the lens: gold at the Gold tier, a part of gold rather than a line.
 	var shell := Parts.GOLD_ROUND if p.tier == Parts.Tier.GOLD else _by_tier(p.tier, SHELL, Parts.CHROME_ROUND,
 		Parts.OBSIDIAN_ROUND)
-	Parts.drum(m, ION_HOUSING, 0.34, 0.05, 20, housing, shell, aim)
-	m.tube(ION_HOUSING - 0.05, ION_HOUSING + 0.05, 0.08, 20, _at(housing, Vector3(0, 0.08, 0), aim), ARMOUR_ROUND, aim)
+	Parts.drum(gun, ION_HOUSING, 0.34, 0.05, 20, housing, shell, aim)
+	gun.tube(ION_HOUSING - 0.05, ION_HOUSING + 0.05, 0.08, 20, _at(housing, Vector3(0, 0.08, 0), aim), ARMOUR_ROUND, aim)
 	var lens := _at(housing, Vector3(0, 0.3, 0), aim)
 	var lens_surf := LENS_PULSE
 	if p.tier >= Parts.Tier.CROWN:
 		lens_surf = BRIGHT_CORE
 	elif level >= 3:
 		lens_surf = ION_LENS
-	m.lathe(PackedVector2Array([
+	gun.lathe(PackedVector2Array([
 		Vector2(0, 0), Vector2(0.18, 0.04), Vector2(0.3, 0.1), Vector2(0.18, 0.17), Vector2(0, 0.21),
 	]), 20, lens, lens_surf, aim)
+	gun.socket("muzzle", _at(lens, Vector3(0, 0.22, 0), aim), LowPolyMesh.turn(Vector3.UP, aim))
 	# The focusing rings turn about the beam, alternate rings the other way, each with two glowing
 	# studs that show it turning. The studs stand out from the ring's outer edge, beyond the
-	# spokes, which run inside the rings.
+	# spokes, which run inside the rings. They ride the emitter.
 	var along := LowPolyMesh.turn(Vector3.UP, aim)
-	var turning: Array[LowPolyMesh] = [p.moving(lens, Motion.spin(along, 1.6)), p.moving(lens, Motion.spin(along, -1.1))]
+	var turning: Array[LowPolyMesh] = [p.riding(gun, lens, Motion.spin(along, 1.6)), p.riding(gun, lens, Motion.spin(along, -1.1))]
 	var rings := 2 if level < 2 else 4
 	var reach := 0.0
 	var stud := FOCUS if p.tier >= Parts.Tier.OBSIDIAN else ION
@@ -1589,23 +1595,23 @@ static func build_ion_beam(p: Parts, level: int) -> void:
 			var degrees := 60.0 * i + 180.0 * k
 			ring.strut(LowPolyMesh.turn(Parts.around(major + 0.03, degrees, reach + 0.035), aim),
 				LowPolyMesh.turn(Parts.around(major + 0.08, degrees, reach + 0.035), aim), 0.05, stud)
-	m.prism(0.07, 0.05, 1.0, 10, _at(lens, Vector3(0, 0.21, 0), aim), ION_HOLO, aim)
+	gun.prism(0.07, 0.05, 1.0, 10, _at(lens, Vector3(0, 0.21, 0), aim), ION_HOLO, aim)
 	for k: int in 3:
 		var spoke := _at(lens, Parts.around(0.27, 120.0 * k, 0.1), aim)
 		var spoke_end := _at(lens, Parts.around(0.26 - 0.035 * (rings - 1), 120.0 * k, reach + 0.03), aim)
-		m.prism(0.02, 0.02, spoke.distance_to(spoke_end), 8, spoke, Parts.ROD, Parts.facing(spoke_end - spoke))
-	m.orb(0.07, 12, 6, _at(lens, Vector3(0, reach + 0.12, 0), aim), ION_PULSE.phased(0.5))
+		gun.prism(0.02, 0.02, spoke.distance_to(spoke_end), 8, spoke, Parts.ROD, Parts.facing(spoke_end - spoke))
+	gun.orb(0.07, 12, 6, _at(lens, Vector3(0, reach + 0.12, 0), aim), ION_PULSE.phased(0.5))
 	if level < 3:
 		return
 	# A cowl behind the housing banded in the tier's glow, and a power cell on the near corner.
 	var glow := Parts.CORE_GLOW if p.tier >= Parts.Tier.OBSIDIAN else Parts.CYAN_STRIP
-	Parts.drum(m, ION_COWL, 0.14, 0.04, 20, _at(housing, Vector3(0, -0.12, 0), aim),
+	Parts.drum(gun, ION_COWL, 0.14, 0.04, 20, _at(housing, Vector3(0, -0.12, 0), aim),
 		Parts.FILIGREE if p.tier >= Parts.Tier.CROWN else _by_tier(p.tier, SHELL, Parts.CHROME_ROUND, Parts.OBSIDIAN_ROUND), aim)
 	# At the Crown the band is the antimatter core, broad and glowing light violet where it shows.
 	if p.tier >= Parts.Tier.CROWN:
-		m.ring(ION_COWL - 0.005, ION_COWL + 0.035, 0.18, 20, _at(housing, Vector3(0, -0.14, 0), aim), BRIGHT_CORE, aim)
+		gun.ring(ION_COWL - 0.005, ION_COWL + 0.035, 0.18, 20, _at(housing, Vector3(0, -0.14, 0), aim), BRIGHT_CORE, aim)
 	else:
-		m.ring(ION_COWL - 0.005, ION_COWL + 0.015, 0.06, 20, _at(housing, Vector3(0, -0.08, 0), aim), glow, aim)
+		gun.ring(ION_COWL - 0.005, ION_COWL + 0.015, 0.06, 20, _at(housing, Vector3(0, -0.08, 0), aim), glow, aim)
 	var cell := Parts.around(ION_CELL, 45.0, Parts.PAD_HEIGHT)
 	Parts.drum(m, 0.13, 0.42, 0.03, 16, cell, _by_tier(p.tier, RIBBED, CHROME_RIBBED, OBSIDIAN_RIBBED))
 	m.ring(0.125, 0.145, 0.06, 16, cell + Vector3(0, 0.26, 0), glow)
@@ -1617,14 +1623,15 @@ static func build_ion_beam(p: Parts, level: int) -> void:
 	# The focusing array: three violet crystal points round the lens's rim, along the beam, between
 	# the spokes.
 	for k: int in 3:
-		m.cone(0.05, 0.2, 8, _at(lens, Parts.around(0.28, 60.0 + 120.0 * k, 0.06), aim), FOCUS.phased(k / 3.0), aim)
+		gun.cone(0.05, 0.2, 8, _at(lens, Parts.around(0.28, 60.0 + 120.0 * k, 0.06), aim), FOCUS.phased(k / 3.0), aim)
 	if level >= 5:
-		var focus := p.moving(_at(lens, Vector3(0, ION_FOCUS_OFF, 0), aim), Motion.spin(along, 0.7))
-		_ion_focus(focus, 0.22, 0.32, aim, p.tier)
+		# On the second focusing ring's part, turning with it, so the emitter, its rings and this
+		# stay within the moving parts' budget.
+		_ion_focus(turning[1], 0.22, 0.32, aim, p.tier, LowPolyMesh.turn(Vector3(0, ION_FOCUS_OFF, 0), aim))
 	if level < 6:
 		return
 	_plinth_filigree(m, 0.78)
-	_ion_crown(m, _at(lens, Vector3(0, 0.02, 0), aim), 0.36, 5, 0.24, aim)
+	_ion_crown(gun, _at(lens, Vector3(0, 0.02, 0), aim), 0.36, 5, 0.24, aim)
 
 
 ## A fire-control spire stands on the bunker's left corner at every level: a tower of three square
@@ -1898,17 +1905,17 @@ static func _rail_cell(m: LowPolyMesh, pos: Vector3, height: float, step: int, t
 	else:
 		m.cone(0.08, 0.2, 8, pos + Vector3(0, height, 0), FOCUS.phased(phase))
 
-## A hovering ring built about its own centre and turned by `rot` so it rings a beam or a barrel
-## (the ion beam's focus ring from L5, the orbital cannon's uplink ring from L4): _hover_ring's
-## obsidian, its glowing violet face, its veined rim (gold at the Crown) and four red sights round
-## its inner edge, bobbing together.
-static func _ion_focus(s: LowPolyMesh, inner: float, outer: float, rot: Vector3, tier: int) -> void:
-	s.ring(inner, outer, 0.07, 24, Vector3.ZERO, HOVER, rot)
-	s.lathe(PackedVector2Array([Vector2(outer - 0.02, 0.072), Vector2(inner + 0.02, 0.072)]), 24, Vector3.ZERO, HOVER_RIM, rot)
-	s.lathe(PackedVector2Array([Vector2(outer + 0.006, 0.006), Vector2(outer + 0.006, 0.064)]), 24, Vector3.ZERO,
+## A hovering ring centred on `at` (its part's pivot by default) and turned by `rot` so it rings a
+## beam or a barrel (the ion beam's focus ring from L5, the orbital cannon's uplink ring from L4):
+## _hover_ring's obsidian, its glowing violet face, its veined rim (gold at the Crown) and four red
+## sights round its inner edge, bobbing together.
+static func _ion_focus(s: LowPolyMesh, inner: float, outer: float, rot: Vector3, tier: int, at: Vector3 = Vector3.ZERO) -> void:
+	s.ring(inner, outer, 0.07, 24, at, HOVER, rot)
+	s.lathe(PackedVector2Array([Vector2(outer - 0.02, 0.072), Vector2(inner + 0.02, 0.072)]), 24, at, HOVER_RIM, rot)
+	s.lathe(PackedVector2Array([Vector2(outer + 0.006, 0.006), Vector2(outer + 0.006, 0.064)]), 24, at,
 		HOVER_GOLD if tier >= Parts.Tier.CROWN else HOVER_VEINS, rot)
 	for k: int in 4:
-		s.orb(0.035, 8, 4, LowPolyMesh.turn(Parts.around(inner - 0.01, 90.0 * k, 0.035), rot), HOVER_SIGHT)
+		s.orb(0.035, 8, 4, at + LowPolyMesh.turn(Parts.around(inner - 0.01, 90.0 * k, 0.035), rot), HOVER_SIGHT)
 
 
 ## A gold crown like _crown, turned by `rot`: its band round the turned +Y through `pos`, its
