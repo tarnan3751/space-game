@@ -11,8 +11,10 @@ extends RefCounted
 static var ORANGE := Parts.surf("orange")
 static var ORANGE_ROUND := Figures.ARMY_PLATE
 ## The army orange on the flat layer, for the small plates (under 0.4 across): the plate layer's
-## seams fall on a part's middle at any repeat, since a part's UVs start from its centre.
+## seams fall on a part's middle at any repeat, since a part's UVs start from its centre. The
+## titan's leg plates take the plate layer at two repeats a unit, so their seams read as panels.
 static var ORANGE_FINE := Surf.make(MaterialKit.Layer.FLAT, MaterialKit.ARMY)
+static var ORANGE_LEG := Surf.make(MaterialKit.Layer.PLATE, MaterialKit.ARMY, 2.0)
 ## The dune runner's tyres: dark hull, smooth, so they read as rubber.
 static var TYRE := Parts.HULL_DARK_ROUND
 
@@ -271,11 +273,11 @@ static func _titan_leg(m: LowPolyMesh, xf: Transform3D, side: float, tier: int) 
 	var ankle := Vector3(side * 0.05, -1.02, -0.02)
 	m.orb(0.16, 16, 4, xf.origin, Parts.GUNMETAL)
 	Parts.beam(m, xf.origin, xf * knee, 0.26, UnitModels.panel(tier), 0.06)
-	_leg_plate(m, xf * Vector3(0, -0.06, 0), xf * knee, 0.3, 0.13, ORANGE)
+	_leg_plate(m, xf * Vector3(0, -0.06, 0), xf * knee, 0.3, 0.13, ORANGE_LEG)
 	m.orb(0.15, 16, 4, xf * knee, Parts.GUNMETAL)
 	m.dome(0.12, 0.08, 16, 2, xf * (knee + Vector3(0, 0, 0.1)), UnitModels.trim(tier, true), UnitModels.euler(xf, Vector3(90, 0, 0)))
 	Parts.beam(m, xf * knee, xf * ankle, 0.24, UnitModels.hull(tier), 0.06)
-	_leg_plate(m, xf * (knee + Vector3(0, -0.12, 0)), xf * (ankle + Vector3(0, 0.08, 0)), 0.27, 0.12, ORANGE)
+	_leg_plate(m, xf * (knee + Vector3(0, -0.12, 0)), xf * (ankle + Vector3(0, 0.08, 0)), 0.27, 0.12, ORANGE_LEG)
 	m.orb(0.1, 12, 4, xf * ankle, Parts.GUNMETAL)
 	var foot := Vector3(side * 0.05, -xf.origin.y, 0.06)
 	m.box_chamfered(Vector3(0.38, 0.13, 0.6), 0.06, xf * foot, Parts.HULL_DARK, UnitModels.euler(xf))
