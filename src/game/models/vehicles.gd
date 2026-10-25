@@ -19,57 +19,84 @@ static var TYRE := Parts.HULL_DARK_ROUND
 
 # --- The dune runner -------------------------------------------------------------------
 
-## The dune runner: an open four-wheel buggy, a tier-hull chamfered hull on four big dark tyres, an
-## orange bonnet and roll cage, a colonist driver at the wheel behind the dash, and a lamp bar of
-## the tier's glow on the cage.
+## The dune runner: an open four-wheel buggy, a tier-hull chamfered hull on four big dark tyres with
+## broad hub caps, its deck plates (UnitModels.deck) where the camera sees them: a long fender along
+## each side over the wheels, beside the seat, and a rear deck round the engine block. An orange
+## bonnet and roll cage, an engine block of the tier's panels with two glowing exhausts behind, a
+## colonist driver at the wheel behind the dash, and a pintle twin gun on the cage between two lamps
+## of the tier's glow.
 static func build_dune_runner(p: Parts) -> void:
 	var m := p.body
 	var tier := p.tier
 	m.box_chamfered(Vector3(0.4, 0.15, 0.78), 0.05, Vector3(0, 0.1, 0), UnitModels.hull(tier))
-	m.box_chamfered(Vector3(0.34, 0.07, 0.2), 0.03, Vector3(0, 0.25, 0.27), ORANGE)
+	for side: float in [1.0, -1.0]:
+		UnitModels.deck(m, Vector3(0.13, 0.018, 0.84), Vector3(side * 0.24, 0.305, 0.0), tier)
+	UnitModels.deck(m, Vector3(0.3, 0.012, 0.18), Vector3(0, 0.25, -0.29), tier)
+	m.box_chamfered(Vector3(0.34, 0.07, 0.2), 0.03, Vector3(0, 0.255, 0.27), ORANGE_FINE)
 	m.box_chamfered(Vector3(0.32, 0.06, 0.06), 0.025, Vector3(0, 0.12, 0.41), UnitModels.trim(tier))
-	m.box_chamfered(Vector3(0.28, 0.1, 0.15), 0.035, Vector3(0, 0.25, -0.3), Parts.GUNMETAL)
+	_engine_block(m, UnitModels.pivot(Vector3(0, 0.255, -0.3)), tier)
 	for z: float in [0.27, -0.27]:
 		for side: float in [1.0, -1.0]:
 			_wheel(m, UnitModels.pivot(Vector3(side * 0.245, 0.15, z), Vector3(0, 0, -side * 90.0)), 0.15, 0.11, tier)
-	m.box_chamfered(Vector3(0.22, 0.2, 0.05), 0.02, Vector3(0, 0.25, -0.19), Parts.HULL_DARK)
-	m.box_chamfered(Vector3(0.3, 0.1, 0.1), 0.03, Vector3(0, 0.25, 0.13), UnitModels.panel(tier))
+	m.box(Vector3(0.22, 0.2, 0.05), Vector3(0, 0.255, -0.19), UnitModels.panel(tier))
+	m.box_chamfered(Vector3(0.3, 0.1, 0.1), 0.03, Vector3(0, 0.255, 0.13), UnitModels.panel(tier))
 	var driver := UnitModels.pilot(m, Vector3(0, 0.27, -0.05), 0.0, 0.6)
 	_steering_wheel(m, (driver.wrists[0].origin + driver.wrists[1].origin) * 0.5 + Vector3(0, -0.01, 0.025))
 	_roll_cage(m, tier)
 
 
+## The engine block on the pivot `xf` (its foot on the hull, at the tail): a block of the tier's
+## panels and two exhausts glowing in the tier's glow, facing back.
+static func _engine_block(m: LowPolyMesh, xf: Transform3D, tier: int) -> void:
+	m.box_chamfered(Vector3(0.2, 0.1, 0.13), 0.035, xf.origin, UnitModels.panel(tier), UnitModels.euler(xf))
+	for side: float in [1.0, -1.0]:
+		m.disc(0.03, 6, xf * Vector3(side * 0.055, 0.05, -0.067), UnitModels.glow(tier, Surf.PULSE, false),
+			UnitModels.euler(xf, Vector3(-90, 0, 0)))
+
+
 ## A wheel on the hub pivot `xf`, its axle along the pivot's +Y (outwards): a chunky dark tyre of
-## `radius` and `width`, rounded at its shoulders, and a hub cap of the tier's trim on its outer
-## face.
+## `radius` and `width`, rounded at its shoulders and open on its inner face, which the hull hides,
+## and a broad hub cap of the tier's trim on its outer face.
 static func _wheel(m: LowPolyMesh, xf: Transform3D, radius: float, width: float, tier: int) -> void:
 	var half := width * 0.5
 	m.lathe(PackedVector2Array([
-		Vector2(radius * 0.45, -half), Vector2(radius * 0.9, -half), Vector2(radius, -half + width * 0.15),
+		Vector2(radius * 0.9, -half), Vector2(radius, -half + width * 0.15),
 		Vector2(radius, half - width * 0.15), Vector2(radius * 0.9, half), Vector2(radius * 0.45, half),
-	]), 12, xf.origin, TYRE, UnitModels.euler(xf))
-	m.dome(radius * 0.5, width * 0.28, 10, 2, xf * Vector3(0, half - 0.004, 0), UnitModels.trim(tier, true),
+	]), 10, xf.origin, TYRE, UnitModels.euler(xf))
+	m.dome(radius * 0.7, width * 0.4, 10, 2, xf * Vector3(0, half - 0.004, 0), UnitModels.trim(tier, true),
 		UnitModels.euler(xf))
 
 
 ## The steering wheel at `centre`, between the driver's hands: a gunmetal hoop tilted towards it.
 static func _steering_wheel(m: LowPolyMesh, centre: Vector3) -> void:
-	Parts.torus(m, 0.045, 0.012, 12, 4, centre + Vector3(0, -0.01, 0), Parts.GUNMETAL, Vector3(-62, 0, 0))
+	Parts.torus(m, 0.045, 0.012, 8, 3, centre + Vector3(0, -0.01, 0), Parts.GUNMETAL, Vector3(-62, 0, 0))
 
 
-## The roll cage: an orange hoop over the seat braced back to the tail, and on its top bar a
-## gunmetal lamp bar with two lamps of the tier's glow facing forward.
+## The roll cage: an orange hoop over the seat braced back to the tail, the pintle twin gun
+## (_twin_gun) on its top bar and a lamp of the tier's glow on the bar to either side of it.
 static func _roll_cage(m: LowPolyMesh, tier: int) -> void:
 	const R := 0.028
-	var top := 0.6
+	var top := 0.68
 	Parts.pipe_run(m, PackedVector3Array([
 		Vector3(0.17, 0.25, -0.2), Vector3(0.15, top, -0.15), Vector3(-0.15, top, -0.15), Vector3(-0.17, 0.25, -0.2),
-	]), R, ORANGE_ROUND, 10)
+	]), R, ORANGE_ROUND, 8)
 	for side: float in [1.0, -1.0]:
-		Parts.pipe(m, Vector3(side * 0.15, top, -0.15), Vector3(side * 0.15, 0.3, -0.36), R, ORANGE_ROUND, 10, false)
-	m.box_chamfered(Vector3(0.26, 0.05, 0.06), 0.015, Vector3(0, top + 0.015, -0.15), Parts.GUNMETAL)
-	for side: float in [1.0, -1.0]:
-		m.disc(0.02, 8, Vector3(side * 0.07, top + 0.04, -0.119), UnitModels.glow(tier, 0, false), Vector3(90, 0, 0))
+		Parts.pipe(m, Vector3(side * 0.15, top, -0.15), Vector3(side * 0.15, 0.3, -0.36), R, ORANGE_ROUND, 8, false)
+		m.orb(0.032, 8, 3, Vector3(side * 0.11, top + 0.035, -0.135), UnitModels.glow(tier))
+	_twin_gun(m, UnitModels.pivot(Vector3(0, top + 0.02, -0.15)), tier)
+
+
+## The pintle twin gun on the pivot `xf` (its receiver's foot on the cage's top bar), firing along
+## the pivot's +Z: a gunmetal receiver, two barrels side by side and their muzzles in the tier's
+## glow.
+static func _twin_gun(m: LowPolyMesh, xf: Transform3D, tier: int) -> void:
+	var rot := UnitModels.euler(xf)
+	m.box_chamfered(Vector3(0.11, 0.07, 0.1), 0.02, xf.origin, Parts.GUNMETAL, rot)
+	for k: float in [-1.0, 1.0]:
+		var to := xf * Vector3(k * 0.036, 0.04, 0.24)
+		Parts.pipe(m, xf * Vector3(k * 0.036, 0.04, 0.04), to, 0.035, Parts.GUNMETAL, 8)
+		m.disc(0.024, 8, to + xf.basis * Vector3(0, 0, 0.002), UnitModels.glow(tier, Surf.PULSE, false),
+			UnitModels.euler(xf, Vector3(90, 0, 0)))
 
 
 # --- The siege walker -----------------------------------------------------------------
