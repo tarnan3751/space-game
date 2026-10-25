@@ -244,10 +244,10 @@ upload; nothing is allocated a frame:
 | `SHELL`, `SHELL_LAND` | the record's projectile (the mortar's plasma, the orbital cannon's ball) on an arc landing where the sim aimed it when it lands; its impact as wide as the splash |
 | `HOLD` | a violet pull round the gravity well, half its range, and its vortex beam from it to each unit of its targets' class in its reach, held `hold_ms`, with a ring on the unit |
 | `DETONATE`, `THROW` | the trap sprung (**The field and the buildings**); the thrown units' flights |
-| `REVEAL` | the sentry shown, in a shimmer of energy rings and wisps |
+| `REVEAL` | the sentry shown, fading in over 0.3 s (**Aim and muzzles**), in a shimmer of energy rings and wisps |
 | `FALL` | the building's collapse and rubble, or the wall's strip with chunks and dust |
 | `DEATH` | the unit's fade, and its record's death: a wreck, a crash or a blast (**Weapons**) |
-| `ABILITY` | by the ability's effect (`catalog.ability_effect`, the event's source its place in `ability_types()` plus one): a **swarm** a nanite-green hologram dome over its radius (`DOME_HEIGHT` of it high) fading out until its `land_tick`; an **EMP** an arc-blue ring as wide as its radius, and every drawn defence the sim now has disabled (`building_disabled`) dimmed grey (`BuildingView.set_disabled`, the shared `MaterialKit.disabled`, under a hit's flash) until a step finds it awake or fallen, when it flashes awake (an energy star and ring over it and a glow on the ground); a **strike** a pulsing red ring on the ground as wide as its radius or wider than the footprint under it, the same crosshair standing up facing the camera over the top of the tallest building it will hit, and in the last ten ticks before it lands a bright column falling from the sky (`SKY`, 8 units up) onto its point; all until its `land_tick` |
+| `ABILITY` | by the ability's effect (`catalog.ability_effect`, the event's source its place in `ability_types()` plus one): a **swarm** a nanite-green hologram dome over its radius (`DOME_HEIGHT` of it high) fading out until its `land_tick`; an **EMP** an arc-blue ring as wide as its radius, and every drawn defence the sim now has disabled (`building_disabled`) dimmed grey (`BuildingView.set_disabled`, the shared `MaterialKit.disabled`, under a hit's flash), its moving parts frozen, until a step finds it awake or fallen, when it flashes awake (an energy star and ring over it and a glow on the ground); a **strike** a pulsing red ring on the ground as wide as its radius or wider than the footprint under it, the same crosshair standing up facing the camera over the top of the tallest building it will hit, and in the last ten ticks before it lands a bright column falling from the sky (`SKY`, 8 units up) onto its point; all until its `land_tick` |
 | `STRIKE_LAND` | the marker, the crosshair and the bolt end; a white-hot fireball (`BattleEffects.Timed`'s POP, an opaque unlit dome, `FIREBALL_SHARE` of the radius) pops over `STRIKE_BLAST_SECONDS` (0.6 s) from half the height of what it hit, so it shows over it, inside an orange ring 1.6 times the radius and a hotter disc, both lasting as long; pale smoke rises and swells from the landing for `SMOKE_SECONDS` (1.1 s), timed from it (not the RISE surface on the global clock), and fades |
 
 The primitives (`BattleEffects`), none with a shadow or an outline:
@@ -367,18 +367,36 @@ direction; `BuildingView` collects them from its model's root and moving parts
 (`BuildingModels.SOCKETS_META`) and gives one in the world as the view stands now
 (`socket_point`, `socket_direction`).
 
-- **Aim**: a defence whose `muzzle` socket is on a moving part (the laser turret's head) aims it
-  (`BuildingView.can_aim`); one whose muzzle is on its body, or with none, never does. Each frame
-  the view turns the head towards the unit `BattleSim.building_target` names (unless it is dead) at
-  the type's `AIM_TURN` rate (10 for the laser turret, `AIM_TURN_DEFAULT` 4 otherwise, as an
-  exponential share of the way a second, in seconds of battle), starting from where its idle swing
-  had it (`aim_at`). While the defence is disabled it holds its aim. With no target it holds its
+- **Aim**: a defence whose `muzzle` socket is on a moving part aims it (`BuildingView.can_aim`):
+  the laser turret's head, the missile battery's launcher, the plasma mortar's barrel, the flak
+  cannon's head, the cloaked sentry's lid, the railgun's rail assembly, the ion beam's emitter and
+  the orbital cannon's gun (`art-style.md`, **Moving parts**). One whose muzzle is on its body (the
+  arc tower, the EMP tower, the gravity well), or with none, never does. Each frame the view turns
+  the head towards the unit `BattleSim.building_target` names (unless it is dead) at the type's
+  `AIM_TURN` rate, as an exponential share of the way a second, in seconds of battle: 10 for the
+  laser turret and the cloaked sentry, 6 for the flak cannon, 5 for the railgun and the ion beam, 3
+  for the missile battery, 2 for the plasma mortar, 1.5 for the orbital cannon (`AIM_TURN_DEFAULT` 4
+  for any other), starting from where its idle scan had it (`aim_at`). With no target it holds its
   aim for `BuildingView.AIM_IDLE_SECONDS` (2.5), then eases back to its idle `Motion` at
   `AIM_RETURN` and follows it again (`idle_aim`). The head turns about +Y; the yaw that faces a
-  point is measured from its pivot, against the way its muzzle faces as built.
+  point is measured from its pivot, against the way its muzzle faces as built. An idle Motion that
+  is not a scan about +Y (the orbital cannon's elevation) runs on under the aim. Yaw only: no head
+  pitches towards an air unit.
+- **Kick**: as a shot leaves a muzzle socket (`_muzzle`) the view calls `BuildingView.fired(now)`
+  on the battle's clock, and the aiming part kicks back along its muzzle by its type's
+  `BuildingView.RECOIL` over `RECOIL_SECONDS` (0.25 s), then eases back; the head's pose is its
+  aim's yaw, its idle Motion, then the kick. `recoil_share()` says how far into its kick it is.
+- **EMP**: while a defence is disabled (`BattleSim.building_disabled`) every one of its moving parts
+  holds its pose, its aim included; when a step finds it awake, `_woke(id)` takes its grey off and
+  its parts snap back to the clock (the wake's flash is drawn there).
+- **Reveal**: a hidden defence revealed (`REVEAL`) shows and fades in over `REVEAL_SECONDS` (0.3 s
+  of battle, `_reveal`, driven from `_draw_buildings`): `BuildingView.set_reveal` steps its bodies
+  through `MaterialKit.reveal`'s three shared materials, the shimmer's pale cyan mixed in at 0.8,
+  0.55 and 0.3, its outlines hidden for the first, under a hit's flash; then it is itself.
 - **Muzzles**: a defence with its record's first socket fires from its record's sockets in turn
-  (`MUZZLES` for most: `muzzle`, `muzzle_2`, `muzzle_3`, `muzzle_4`, as many as the model has) with
-  its record's muzzle flash; every other defence fires from its centre `MUZZLE_SHARE` of its
+  (`MUZZLES` for most: `muzzle`, `muzzle_2`, `muzzle_3`, `muzzle_4`; the missile battery's
+  `MISSILE_TUBES`, up to `muzzle_20`, and the flak cannon's `FLAK_BARRELS`, up to `muzzle_8`; as
+  many as the model has, starting over at the first it lacks) with its record's muzzle flash; every other defence fires from its centre `MUZZLE_SHARE` of its
   height up. An aiming defence's shot
   is held until its head faces the unit within `AIM_READY` (0.12 radians), `AIM_HOLD` (0.4 s) at
   most: the sim picks a target and fires on one tick, so the head is still turning to a new target
