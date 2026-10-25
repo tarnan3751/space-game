@@ -1189,6 +1189,8 @@ const TWIN_TANKS := [Vector3(-0.56, 0, 0.56), Vector3(0.56, 0, -0.56)]
 ## axis, towards the camera.
 const PUMP := Vector3(0.38, 0, 0.38)
 const PUMP_FACING := Vector3(0.70710678, 0, 0.70710678)
+const PUMP_HEIGHT := 0.56
+const PUMP_DEPTH := 0.4
 ## The L9 gauge ring's lift over the tanks' shells and its radius, over the deck between them.
 const GAUGE_RING_LIFT := 0.56
 const GAUGE_RING_RADIUS := 0.5
@@ -1243,16 +1245,13 @@ static func build_metal_silo(p: Parts, level: int) -> void:
 	]), 0.06, LIQUID_METAL, 12)
 	var deck := Parts.PAD_HEIGHT + 0.12 + height
 	m.box_chamfered(Vector3(0.3, 0.06, 1.0), 0.02, Vector3(0, deck - 0.02, 0), DECK_PLATE, Vector3(0, 135, 0))
-	for side: float in [-1.0, 1.0]:
-		m.box(Vector3(0.05, 0.12, 1.0), LowPolyMesh.turn(Vector3(side * 0.15, 0, 0), Vector3(0, 135, 0)) + Vector3(0, deck, 0),
-			Parts.ROD, Vector3(0, 135, 0))
 	_valves(m, Vector3(0.66, Parts.PAD_HEIGHT, 0.66), gold)
 	if level >= 6:
 		_metal_pump(p, PUMP + Vector3(0, pipe_y, 0), level)
 	if level >= 7:
 		# A chrome beacon mast on the deck between the tanks, its cyan beacon pulsing.
 		var foot := Vector3(0, deck + 0.04, 0)
-		m.prism(0.06, 0.04, BEACON_MAST, 8, foot, Parts.CHROME_ROUND)
+		Parts.tapered_mast(m, foot, BEACON_MAST, Parts.CHROME_ROUND, 0.0, null, 8)
 		m.orb(0.1, 8, 4, foot + Vector3(0, 0.1 + BEACON_MAST, 0), Parts.CYAN_STRIP)
 		m.prism(0.07, 0.03, 0.05, 8, foot + Vector3(0, 0.19 + BEACON_MAST, 0),
 			Parts.GOLD_ROUND if p.tier >= Parts.Tier.CROWN else Parts.CHROME_ROUND)
@@ -1363,18 +1362,20 @@ static func _catwalk(m: LowPolyMesh, pos: Vector3, radius: float, level: int, ti
 
 
 ## The pump on the liquid-metal pipe from L6, its housing's middle at `centre`, standing on a
-## chrome riser the valves feed: a chrome housing (obsidian from the Obsidian tier) with a cyan
-## belt round its top and a flywheel spinning on its face to the camera, chrome (gold at the Crown
-## tier) round a cyan hub; at L10 the violet antimatter core glowing in a gold cage on its top.
+## chrome riser the valves feed: a fat gold housing (gold on a part, the tanks' lids' colour, at
+## every tier from Chrome), as wide as the gap between the tanks allows and deep towards the
+## camera, with a cyan belt round its top and a flywheel spinning on its face to the camera, chrome
+## (gold at the Crown tier) round a cyan hub; at L10 the violet antimatter core glowing in a gold
+## cage on its top.
 static func _metal_pump(p: Parts, centre: Vector3, level: int) -> void:
 	var m := p.body
 	var crown := p.tier >= Parts.Tier.CROWN
 	var yaw := Vector3(0, 45, 0)
 	var bottom := centre - Vector3(0, 0.22, 0)
 	m.prism(0.11, 0.11, bottom.y - Parts.PAD_HEIGHT, 16, Vector3(centre.x, Parts.PAD_HEIGHT, centre.z), Parts.CHROME_ROUND)
-	m.box_chamfered(Vector3(0.44, 0.44, 0.3), 0.05, bottom, Parts.OBSIDIAN if p.tier >= Parts.Tier.OBSIDIAN else Parts.CHROME, yaw)
-	m.box(Vector3(0.46, 0.06, 0.32), bottom + Vector3(0, 0.32, 0), Parts.CYAN_STRIP, yaw)
-	var face := centre + PUMP_FACING * 0.15
+	m.box_chamfered(Vector3(0.44, PUMP_HEIGHT, PUMP_DEPTH), 0.06, bottom, Parts.GOLD_TRIM, yaw)
+	m.box(Vector3(0.46, 0.08, PUMP_DEPTH + 0.02), bottom + Vector3(0, PUMP_HEIGHT - 0.14, 0), Parts.CYAN_STRIP, yaw)
+	var face := centre + PUMP_FACING * (PUMP_DEPTH * 0.5)
 	var wheel := p.moving(face, Motion.spin(PUMP_FACING, 1.6))
 	var rim := Parts.GOLD_ROUND if crown else Parts.CHROME_ROUND
 	Parts.torus(wheel, 0.15, 0.035, 12, 6, Vector3.ZERO, rim, Parts.facing(PUMP_FACING))
@@ -1383,7 +1384,7 @@ static func _metal_pump(p: Parts, centre: Vector3, level: int) -> void:
 		wheel.strut(axle - spoke * 0.14, axle + spoke * 0.14, 0.04, rim)
 	wheel.orb(0.065, 12, 4, PUMP_FACING * 0.05, Parts.CYAN_STRIP)
 	if level >= 10:
-		var top := centre + Vector3(0, 0.22, 0)
+		var top := bottom + Vector3(0, PUMP_HEIGHT, 0)
 		m.prism(0.13, 0.11, 0.05, 16, top, Parts.GOLD_ROUND)
 		m.orb(0.12, 16, 6, top + Vector3(0, 0.18, 0), Parts.CORE_GLOW)
 		for k: int in 4:
