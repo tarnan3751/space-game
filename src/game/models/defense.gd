@@ -490,7 +490,7 @@ static func build_missile_battery(p: Parts, level: int) -> void:
 	for pod: Vector3 in pods:
 		_pod(launcher, trunnion, aim, pod.x, int(pod.y), int(pod.z), spacing, level, p.tier)
 	if level >= 2:
-		Parts.mast(m, Parts.around(0.95, 225.0, top), 0.7, 0.06, LASER_PULSE)
+		_lamp_post(m, Parts.around(0.95, 225.0, top), 0.7, LASER_PULSE)
 	if level >= 5:
 		_crate(m, Parts.around(1.42, 45.0, Parts.PAD_HEIGHT))
 	if level < 6:
@@ -507,11 +507,11 @@ static func build_missile_battery(p: Parts, level: int) -> void:
 	# The radar mast up the launcher's centre, through the slot between its pods.
 	var dish_y: float = deck + trunnion.y + float(MISSILE_DISH_LIFTS[level - 6])
 	var mast := Parts.GOLD_ROUND if p.tier >= Parts.Tier.CROWN else _by_tier(p.tier, BARREL, Parts.CHROME_ROUND, Parts.CHROME_ROUND)
-	m.prism(0.065, 0.05, dish_y - deck, 16, Vector3(0, deck, 0), mast)
+	m.prism(0.08, 0.07, dish_y - deck, 16, Vector3(0, deck, 0), mast)
 	var band_glow := Parts.CORE_GLOW if p.tier >= Parts.Tier.OBSIDIAN else Parts.CYAN_STRIP
-	m.ring(0.05, 0.08, 0.06, 16, Vector3(0, dish_y - 0.25, 0), band_glow)
+	m.ring(0.07, 0.1, 0.06, 16, Vector3(0, dish_y - 0.25, 0), band_glow)
 	if level >= 7:
-		m.ring(0.05, 0.085, 0.1, 16, Vector3(0, dish_y - 0.5, 0), band_glow)
+		m.ring(0.07, 0.105, 0.1, 16, Vector3(0, dish_y - 0.5, 0), band_glow)
 	if level >= 10:
 		# A gold crown on the mast over the racks, inside the radar ring, holding the antimatter core up
 		# clear of the pods.
@@ -533,9 +533,10 @@ static func build_missile_battery(p: Parts, level: int) -> void:
 
 
 ## A missile pod on the launcher, `columns` by `rows` tubes `spacing` apart, centred `x` across
-## the trunnion: a box (chrome or obsidian at the high tiers) banded with hazard stripes round its
-## face (gold filigree at the Crown), red-tipped tubes whose tips blink in a chase snaking along
-## the rows (violet crystals from L8); from L2 a red armour plate on its top, from L5 a gold plate
+## the trunnion: a box (chrome or obsidian at the high tiers) in a red armour frame round its face
+## (gold filigree at the Crown), so the dark tubes stand out on it at every tier, red-tipped tubes
+## whose tips blink in a chase snaking along the rows (violet crystals from L8); from L2 a hazard
+## striped plate on its top, from L5 a gold plate
 ## on its back, from L8 a glowing violet vein panel across its face and on its side the camera
 ## sees. From L6 the tubes take fewer sides.
 static func _pod(s: LowPolyMesh, trunnion: Vector3, aim: Vector3, x: float, columns: int, rows: int, spacing: float,
@@ -549,7 +550,7 @@ static func _pod(s: LowPolyMesh, trunnion: Vector3, aim: Vector3, x: float, colu
 		_by_tier(tier, SHELL, Parts.CHROME, Parts.OBSIDIAN), aim)
 	s.box_chamfered(Vector3(width + 0.04, height + 0.04, 0.16), 0.03,
 		_at(trunnion, Vector3(x, -height * 0.5 - 0.02, depth * 0.5 - 0.22), aim),
-		Parts.FILIGREE if tier >= Parts.Tier.CROWN else HAZARD_FINE, aim)
+		Parts.FILIGREE if tier >= Parts.Tier.CROWN else ARMOUR, aim)
 	var tube_aim := aim + Vector3(90, 0, 0)
 	var tip := LASER_BLINK if level < 8 else CRYSTAL_BLINK
 	for row: int in rows:
@@ -562,7 +563,7 @@ static func _pod(s: LowPolyMesh, trunnion: Vector3, aim: Vector3, x: float, colu
 				tube_aim)
 	if level >= 2:
 		s.box_chamfered(Vector3(width * 0.8, 0.05, depth * 0.45), 0.02,
-			_at(trunnion, Vector3(x, height * 0.5, -0.12), aim), ARMOUR, aim)
+			_at(trunnion, Vector3(x, height * 0.5, -0.12), aim), HAZARD_FINE, aim)
 	if level >= 5:
 		s.box_chamfered(Vector3(width + 0.05, height + 0.05, 0.08), 0.02,
 			_at(trunnion, Vector3(x, -height * 0.5 - 0.025, -depth * 0.5 + 0.02), aim),
