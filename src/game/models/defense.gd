@@ -220,6 +220,9 @@ const ARC_PLINTHS := [0.36, 0.4, 0.56, 0.6]
 const ARC_HEIGHTS := [1.85, 2.05, 2.3, 2.5]
 const ARC_TWINS := [0.85, 1.0, 1.1, 1.2]
 const ARC_RING := 0.18
+## The cloaked sentry's pod's height, and the radius of the red lens eye on its face towards the camera.
+const SENTRY_POD := 0.44
+const SENTRY_EYE := 0.07
 ## The cloaked sentry from L4, by level from L4: how high its armoured hex skirt lifts the pod; the
 ## L6 cloak ring's radii and its height over the skirt, its sights clear of the shimmer ring under
 ## it all through its bob; the L5 mantlet's size; the L7 crown's distance behind the guns.
@@ -1098,7 +1101,9 @@ static func build_arc_tower(p: Parts, level: int) -> void:
 		Parts.torus(m, sphere - 0.01, 0.035, 20, 6, centre - Vector3(0, 0.035, 0), Parts.GOLD_ROUND)
 
 
-## From L4 an armoured hex skirt lifts the pod higher every level. L4 (Chrome): a chrome skirt
+## A tall hex pod with a red lens eye on the face towards the camera, a red band round it and a
+## glowing cyan ring round its foot. From L4 an armoured hex skirt lifts the pod higher every
+## level. L4 (Chrome): a chrome skirt
 ## banded in defence red, a chrome lid and gun heads with chrome barrels, cyan seams up the pod's
 ## corners the camera sees and round its shoulder, and a cyan cloak shimmering over the pod's
 ## walls (a hologram). L5 a broad chrome mantlet bridging the gun heads, its front edge and a
@@ -1120,20 +1125,25 @@ static func build_cloaked_sentry(p: Parts, level: int) -> void:
 		m.lathe(PackedVector2Array([Vector2(0.78, 0), Vector2(0.78, rise - 0.03), Vector2(0.75, rise), Vector2(0, rise)]), 6,
 			ground, _by_tier(p.tier, POD, Parts.CHROME, Parts.OBSIDIAN))
 		m.lathe(PackedVector2Array([Vector2(0.79, 0), Vector2(0.79, 0.05)]), 6, ground + Vector3(0, rise * 0.4 - 0.025, 0), ARMOUR)
-	Parts.torus(m, 0.83, 0.035, 6, 8, base, SHIMMER)
+	# The shimmer ring round the pod's foot: a steady cyan glow, so it shows in build mode too.
+	Parts.torus(m, 0.83, 0.04, 6, 8, base, ION_PULSE)
 	var pod := POD if level < 6 else Parts.OBSIDIAN
+	var top := SENTRY_POD
 	m.lathe(PackedVector2Array([
-		Vector2(0.74, 0), Vector2(0.74, 0.2), Vector2(0.58, 0.34), Vector2(0, 0.34),
+		Vector2(0.74, 0), Vector2(0.74, top - 0.14), Vector2(0.58, top), Vector2(0, top),
 	]), 6, base, pod)
-	m.ring(0.72, 0.77, 0.06, 6, base + Vector3(0, 0.08, 0), ARMOUR)
+	m.ring(0.72, 0.77, 0.1, 6, base + Vector3(0, 0.1, 0), ARMOUR)
 	for degrees: float in [30.0, 90.0]:
 		m.box_chamfered(Vector3(0.36, 0.1, 0.03), 0.01, Parts.around(0.65, degrees, base.y + 0.07), VENT,
 			Vector3(0, 90.0 - degrees, 0))
-	Parts.drum(m, 0.44, 0.05, 0.02, 6, base + Vector3(0, 0.34, 0), _by_tier(p.tier, Parts.HULL_DARK, Parts.CHROME, Parts.OBSIDIAN))
+	# The red lens eye on the face towards the camera.
+	var eye := Parts.around(1.0, 30.0, 0.0)
+	m.dome(SENTRY_EYE, 0.05, 12, 3, eye * 0.645 + base + Vector3(0, 0.28, 0), LASER_PULSE, Parts.facing(eye))
+	Parts.drum(m, 0.44, 0.05, 0.02, 6, base + Vector3(0, top, 0), _by_tier(p.tier, Parts.HULL_DARK, Parts.CHROME, Parts.OBSIDIAN))
 	if level >= 3:
-		m.ring(0.43, 0.47, 0.06, 6, base + Vector3(0, 0.34, 0), GOLD if p.tier >= Parts.Tier.GOLD else Parts.HULL_DARK)
+		m.ring(0.43, 0.47, 0.1, 6, base + Vector3(0, top - 0.04, 0), GOLD if p.tier >= Parts.Tier.GOLD else Parts.HULL_DARK)
 	# The lid gun scans, turning about the pod's axis.
-	var lid := p.moving(base + Vector3(0, 0.39, 0), Motion.swing(Vector3.UP, 30.0, 5.0))
+	var lid := p.moving(base + Vector3(0, top + 0.05, 0), Motion.swing(Vector3.UP, 30.0, 5.0))
 	var guns: Array[float] = [0.0]
 	if level >= 2:
 		guns = [-0.17, 0.17]
@@ -1160,35 +1170,36 @@ static func build_cloaked_sentry(p: Parts, level: int) -> void:
 		lid.orb(0.15, 16, 6, stem + Vector3(0, 0.33, 0), BRIGHT_CORE)
 	# The lamp and the mast stand near the lid's rim, outside the guns' sweep: past the heads'
 	# reach (0.35 from the axis) and away from the barrels' arc in front.
-	Parts.drum(m, 0.05, 0.14, 0.02, 16, base + Parts.around(0.525, 225.0, 0.34), Parts.GUNMETAL)
-	m.orb(0.05, 12, 6, base + Parts.around(0.525, 225.0, 0.52), LASER_BLINK)
+	Parts.drum(m, 0.05, 0.14, 0.02, 16, base + Parts.around(0.525, 225.0, top), Parts.GUNMETAL)
+	m.orb(0.05, 12, 6, base + Parts.around(0.525, 225.0, top + 0.18), LASER_BLINK)
 	if level >= 2:
-		m.ring(0.6, 0.64, 0.04, 6, base + Vector3(0, 0.36, 0), SHIMMER.phased(0.5))
+		m.ring(0.6, 0.64, 0.04, 6, base + Vector3(0, top + 0.02, 0), SHIMMER.phased(0.5))
 	if level >= 3:
-		Parts.mast(m, base + Parts.around(0.525, 165.0, 0.34), 0.32, 0.045, LASER_BLINK.phased(0.5))
+		_lamp_post(m, base + Parts.around(0.525, 165.0, top), 0.32, LASER_BLINK.phased(0.5))
 	if level < 4:
 		return
 	# Glowing seams up the pod's corners the camera sees and round its shoulder (cyan, violet from
 	# the Obsidian tier), and the cloak shimmering over its walls.
 	var seam := Parts.CORE_GLOW if obsidian else Parts.CYAN_STRIP
 	for degrees: float in [0.0, 60.0]:
-		m.box(Vector3(0.03, 0.17, 0.03), Parts.around(0.745, degrees, base.y + 0.02), seam, Vector3(0, 90.0 - degrees, 0))
-	m.lathe(PackedVector2Array([Vector2(0.748, 0), Vector2(0.748, 0.03)]), 6, base + Vector3(0, 0.17, 0), seam)
-	m.lathe(PackedVector2Array([Vector2(0.8, 0.0), Vector2(0.8, 0.22), Vector2(0.63, 0.37)]), 6, base,
+		m.box(Vector3(0.03, top - 0.17, 0.03), Parts.around(0.745, degrees, base.y + 0.02), seam, Vector3(0, 90.0 - degrees, 0))
+	m.lathe(PackedVector2Array([Vector2(0.748, 0), Vector2(0.748, 0.03)]), 6, base + Vector3(0, top - 0.17, 0), seam)
+	m.lathe(PackedVector2Array([Vector2(0.8, 0.0), Vector2(0.8, top - 0.12), Vector2(0.63, top + 0.03)]), 6, base,
 		VIOLET_HOLO if obsidian else SHIMMER.phased(0.25))
 	if level >= 6:
 		# Vein panels on the shoulder's and the skirt's faces the camera sees, veins round the lid.
-		m.lathe(PackedVector2Array([Vector2(0.75, 0.205), Vector2(0.59, 0.345)]), 6, base, VEIN_PANEL, Vector3.ZERO, 0.0, 120.0)
+		m.lathe(PackedVector2Array([Vector2(0.75, top - 0.135), Vector2(0.59, top + 0.005)]), 6, base, VEIN_PANEL, Vector3.ZERO, 0.0,
+			120.0)
 		for degrees: float in [30.0, 90.0]:
 			m.box(Vector3(0.5, rise * 0.4 - 0.07, 0.02), Parts.around(0.68, degrees, Parts.PAD_HEIGHT + 0.03), VEIN_PANEL,
 				Vector3(0, 90.0 - degrees, 0))
-		m.lathe(PackedVector2Array([Vector2(0.445, 0), Vector2(0.445, 0.03)]), 6, base + Vector3(0, 0.34, 0), Parts.VEINS)
+		m.lathe(PackedVector2Array([Vector2(0.445, 0), Vector2(0.445, 0.03)]), 6, base + Vector3(0, top, 0), Parts.VEINS)
 		var ring := p.moving(base + Vector3(0, SENTRY_RING_LIFT, 0), Motion.spin(Vector3.UP, 0.6))
 		_hover_ring(ring, SENTRY_RING_INNER, SENTRY_RING_OUTER, p.tier)
 	if level >= 7:
-		m.lathe(PackedVector2Array([Vector2(0.475, 0), Vector2(0.475, 0.04)]), 6, base + Vector3(0, 0.345, 0), Parts.FILIGREE)
-		m.lathe(PackedVector2Array([Vector2(0.785, 0), Vector2(0.785, 0.04)]), 6,
-			Vector3(0, Parts.PAD_HEIGHT + rise - 0.08, 0), Parts.FILIGREE)
+		m.lathe(PackedVector2Array([Vector2(0.475, 0), Vector2(0.475, 0.1)]), 6, base + Vector3(0, top - 0.035, 0), Parts.FILIGREE)
+		m.lathe(PackedVector2Array([Vector2(0.785, 0), Vector2(0.785, 0.1)]), 6,
+			Vector3(0, Parts.PAD_HEIGHT + rise - 0.14, 0), Parts.FILIGREE)
 
 
 ## From L4 the core floats higher over the well every level, the pillars growing with it and a
