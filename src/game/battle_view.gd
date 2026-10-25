@@ -73,6 +73,8 @@ const BAR_OVER := 0.4
 ## Where a shot leaves a defence and hits a building: a share of the model's height.
 const MUZZLE_SHARE := 0.75
 const HIT_HEIGHT := 0.6
+## How far from a building's centre towards the unit its hits land, a share of its footprint.
+const HIT_FACE := 0.48
 ## The muzzle sockets a defence's shots leave in turn, as many as its model has (its weapon
 ## record's, Weapons).
 const MUZZLES: Array[String] = Weapons.DEFENCE_MUZZLES
@@ -85,9 +87,11 @@ const AIM_RETURN := 3.0
 ## longest a shot is held (seconds of battle).
 const AIM_READY := 0.12
 const AIM_HOLD := 0.4
-## A unit's reach (field units) up to which its hits are drawn as a blow (an impact at the
-## target), not a bolt.
-const MELEE_REACH := 1000
+## A punch: how long after the blow it lands at the fist, its ring's size against the record's
+## impact size, its white flash's.
+const PUNCH_DELAY := 0.06
+const PUNCH_RING := 1.5
+const PUNCH_FLASH := 0.3
 ## The effects' tints and sizes: the laser turret's shots and the ranger's (the rig scenario tells
 ## them apart by these), the impact a defence's shot makes on a unit at least, a mine's blast, a
 ## gravity well's pull, a fall's dust.
@@ -166,11 +170,12 @@ var _disabled: Dictionary[int, bool] = {}
 var _woken := PackedInt32Array()
 ## Each building's weapon record (Weapons), traps' included.
 var _weapons: Dictionary[int, Weapons.Weapon] = {}
+## The punches still to land, at which building, and when.
+var _blows: Dictionary[int, int] = {}
+var _blow_at: Dictionary[int, float] = {}
 ## Units found in a defence's reach (_in_reach), reused.
 var _found := PackedInt32Array()
-## Per unit type brought: its reach at the attacker's level (field units) and its splash (world
-## units).
-var _reach: Dictionary[String, int] = {}
+## Per unit type brought: its splash (world units).
 var _splash: Dictionary[String, float] = {}
 ## When the battle ended on the clock, -1 while it runs.
 var _ended_at: float = -1.0
@@ -274,10 +279,7 @@ func setup(battle_catalog: Catalog, setup_data: Dictionary, iso_camera: IsoCamer
 		effects.set_shield(id, sim.shield_hp(id), 0.0)
 
 	var attacker: Dictionary = setup_data.get("attacker", {})
-	var levels: Dictionary = attacker.get("unit_levels", {})
 	for unit: String in units_brought():
-		var level := clampi(BattleMath.whole(levels.get(unit, 1)), 1, catalog.unit_max_level(unit))
-		_reach[unit] = int(catalog.unit_level_stats(unit, level).get("range_units", 0))
 		_splash[unit] = catalog.unit_splash(unit) / 1000.0
 	units = BattleUnits.new()
 	units.setup(sim, catalog, attacker.get("army", {}), attacker.get("unit_levels", {}), grid, _centres, area)
@@ -368,6 +370,7 @@ func _process(delta: float) -> void:
 	var alpha := clampf(_accumulator / TICK_SECONDS, 0.0, 1.0)
 	effects.begin_bars()
 	units.draw(alpha, _clock, shown, effects, camera.size >= BattleUnits.FAR_ZOOM)
+	_land_blows()
 	_aim_defences(shown)
 	_draw_buildings(shown)
 	effects.end_bars()
@@ -557,21 +560,58 @@ func _ability_radius(index: int) -> float:
 	return catalog.ability_radius(catalog.ability_types()[index - 1]) / 1000.0
 
 
-## Unit `unit`, standing at the field point (x, y), hits `building`: a bolt from it, or a blow at
-## the building for a short reach; a splash makes the impact as wide.
+## Unit `unit`, standing at the field point (x, y), hits `building`: by its weapon record, a blow
+## at the building's side (a brawler's punch: a ring, sparks and dust, the building shaken), the
+## breacher's charge going off there, or its shot (BattleUnits.shoot, its record's projectile from
+## its next socket); a splash makes the impact as wide.
 func _unit_hit(unit: int, building: int, x: int, y: int) -> void:
 	var type := sim.unit_type(unit)
-	var reach: int = _reach.get(type, 0)
+	var weapon := Weapons.of(type)
 	var splash: float = _splash.get(type, 0.0)
 	var centre: Vector2 = _centres.get(building, Vector2.ZERO)
-	var hit_at := Vector3(centre.x, HIT_HEIGHT, centre.y)
-	if reach <= MELEE_REACH:
-		var from := _ground(x, y)
-		var side := from.lerp(centre, 0.45)
-		effects.impact(Vector3(side.x, HIT_HEIGHT * 0.6, side.y), maxf(0.3, splash), UNIT_SHOT, _clock)
-		_on_arrived(building, 0)
+	var from := _ground(x, y)
+	# Its near face, not its middle, so the impact shows outside it; a bomb on the side under it.
+	var near := centre + (from - centre).limit_length(_sizes.get(building, 1) * HIT_FACE)
+	var hit_at := Vector3(near.x, HIT_HEIGHT, near.y)
+	if weapon.kind == Weapons.Kind.BOMB:
+		hit_at.y = HIT_HEIGHT * 0.5
+	match weapon.kind:
+		Weapons.Kind.MELEE:
+			# Drawn at the fist as the punch lands (_land_blows), a moment after the blow.
+			_blows[unit] = building
+			_blow_at[unit] = _clock + PUNCH_DELAY
+		Weapons.Kind.CHARGE:
+			var size := maxf(weapon.impact_size, splash)
+			var side := near + (from - near).normalized() * BattleEffects.stand_off(weapon, size)
+			var at := Vector3(side.x, 0.3, side.y)
+			effects.land(weapon, at, size, _clock)
+			effects.debris(at, 4, 0.5, 0.1, _clock, MaterialKit.WALL, MaterialKit.HULL_DARK)
+			_on_arrived(building, 0)
+		_:
+			units.shoot(unit, hit_at, building, maxf(0.3, splash), _clock)
+
+
+## The punches due by now: each at the fist that throws it (the brawler's `muzzle`, or `muzzle_2`
+## on an odd blow, by its drawn state's parity, BattleUnits.socket_point): a ring PUNCH_RING times
+## its record's impact size, sparks, a short white flash and dust at its feet; the building shakes.
+func _land_blows() -> void:
+	if _blow_at.is_empty():
 		return
-	units.shoot(unit, hit_at, building, maxf(0.3, splash), _clock)
+	_done.clear()
+	for unit: int in _blow_at:
+		if _clock < _blow_at[unit]:
+			continue
+		_done.append(unit)
+		var weapon := Weapons.of(sim.unit_type(unit))
+		var fist := units.socket_point(unit, "muzzle_2" if units.drawn_state(unit).r >= 2.0 else "muzzle")
+		effects.impact(fist, weapon.impact_size * PUNCH_RING, weapon.color, _clock)
+		effects.sparks(fist, weapon.impact_size * PUNCH_RING, weapon.color.lerp(Color.WHITE, 0.5), _clock)
+		effects.flash(fist, PUNCH_FLASH, Color.WHITE, _clock)
+		effects.puff(Vector3(fist.x, 0.1, fist.z), 0.2, Weapons.DUST, _clock, 0.6, 0.3)
+		_on_arrived(_blows[unit], 0)
+	for unit: int in _done:
+		_blow_at.erase(unit)
+		_blows.erase(unit)
 
 
 ## A bolt reached `building` or `unit` (0 for none): it flashes, a building shakes and shows its bar.

@@ -60,15 +60,8 @@ const HOVER_OVER := 0.9
 const HOVER_SIZE := 0.8
 ## The fireball's radius as a share of the strike's.
 const FIREBALL_SHARE := 0.75
-## A plain bolt's (bolt()) speed in world units a second, any bolt's shortest flight, a plain
-## bolt's look (length and thickness), and a plain shell's arc (its peak over the straight line,
-## as a share of the distance) and size.
-const BOLT_SPEED := 22.0
+## A bolt's shortest flight.
 const BOLT_MIN_SECONDS := 0.06
-const BOLT_LENGTH := 0.55
-const BOLT_WIDTH := 0.13
-const SHELL_ARC := 0.35
-const SHELL_SIZE := 2.2
 ## A missile's shortest flight and least loft (world units); a bomb's fall (world units a second
 ## squared) and its shortest and longest drop.
 const MISSILE_MIN_SECONDS := 0.25
@@ -296,8 +289,7 @@ class Instances:
 ## arc `arc` high over the straight line (0 for straight), or falling (a bomb: carried along at
 ## its speed, dropping under gravity); its mesh along +Z, `width` across and `length` along (a
 ## pulse grows across as it flies). Each keeps what it was aimed at, its impact's size (0 for
-## none) and its record (null for a plain bolt, which lands as a plain impact), and when its trail
-## leaves its next puff.
+## none) and its record, and when its trail leaves its next puff.
 class Flights:
 	var multimesh: MultiMesh
 	var buffer: Instances
@@ -826,19 +818,6 @@ func setup(walls: int, area: AABB) -> void:
 
 # --- Adding ----------------------------------------------------------------------
 
-## A plain bolt from `from` to `to`, `color`, starting at `now`: straight at BOLT_SPEED, or on an
-## arc landing `seconds` later when `seconds` is over 0 (a shell). On arrival it makes an impact
-## of `impact` radius (none at 0) and calls `arrived` with `building` and `unit`.
-func bolt(from: Vector3, to: Vector3, color: Color, now: float, seconds: float = 0.0, impact: float = 0.35,
-		building: int = 0, unit: int = 0) -> void:
-	_count_shot(from, color)
-	var shell := seconds > 0.0
-	var size := SHELL_SIZE if shell else 1.0
-	_bolts.add(from, to, now, seconds if shell else maxf(BOLT_MIN_SECONDS, from.distance_to(to) / BOLT_SPEED),
-		from.distance_to(to) * SHELL_ARC if shell else 0.0, BOLT_WIDTH * size, BOLT_LENGTH * size, color, impact,
-		null, building, unit)
-
-
 ## `weapon` (a Weapons record) fired from `from` at `to`, from `now`: its projectile by its kind,
 ## landing by its impact (land()) of `impact` radius at least (none at 0) and calling `arrived`
 ## with `building` and `unit`, with its muzzle flash at `from` when `flash_on`. `seconds` is a
@@ -1263,9 +1242,7 @@ func _draw_flights(list: Flights, now: float) -> void:
 		if t >= 1.0:
 			var weapon := list.weapon[i]
 			var to := list.to[i]
-			if weapon == null:
-				impact(to, list.impact[i], list.color[i], now)
-			elif list.impact[i] > 0.0:
+			if list.impact[i] > 0.0:
 				land(weapon, _surface(list.from[i], to, stand_off(weapon, list.impact[i])), list.impact[i], now)
 			if arrived.is_valid() and (list.building[i] != 0 or list.unit[i] != 0):
 				arrived.call(list.building[i], list.unit[i])
@@ -1282,7 +1259,7 @@ func _draw_flights(list: Flights, now: float) -> void:
 		list.buffer.put(i, along(forward, across, list.length[i] if not list.grows else across), at, list.color[i],
 			Color(0, 0, 0, 0))
 		var weapon := list.weapon[i]
-		if weapon != null and weapon.trail != Weapons.Trail.NONE and now >= list.trail_at[i]:
+		if weapon.trail != Weapons.Trail.NONE and now >= list.trail_at[i]:
 			list.trail_at[i] = maxf(list.trail_at[i] + TRAIL_STEP, now)
 			if weapon.trail == Weapons.Trail.SMOKE:
 				puff(at - forward * 0.3 * list.width[i], 0.16, Weapons.SMOKE, now, 0.8, 0.25)
