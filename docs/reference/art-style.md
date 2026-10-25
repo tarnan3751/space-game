@@ -1065,6 +1065,27 @@ trooper's, the hover tank's and the bomber's `exhaust` and `exhaust_2` (**Units*
 turret's barrel tips on its head (`muzzle`, `muzzle_2`, from level 7 `muzzle_3` and `muzzle_4`).
 `BattleUnits.socket_point` gives a unit's in the world (`battle-view.md`, **Units**).
 
+### Battle effects
+
+A battle's effects (`battle-view.md`, **Shots and impacts** and **Weapons**) are comic and
+saturated like the models, built in code with `LowPolyMesh` on the kit's surfaces, never inked:
+
+- **Glows** are unlit (`Surf.UNLIT` on the glow layer), so they read at any light: bolt cores,
+  tracers, beams (with FLOW), flames, muzzle stars, ring flashes, sparks, pulses. A bolt's soft
+  edge is a hologram sheath round its core; colours come from `MaterialKit` (defence red, energy
+  cyan, hazard yellow, arc blue, the antimatter violet, army orange) and the named colours in
+  `Weapons` (the plasma violet, the flak yellow, the ion white, the flame orange, the blast's core
+  cream and rim orange, smoke greys, dust).
+- **Blasts** are opaque unlit domes: a cream core popping, an orange one inside it showing as the
+  core shrinks, so an explosion cools from white-hot to orange; rings and sparks round it.
+- **Smoke and dust** are soft unlit discs facing the camera, opaque in the middle and gone at the
+  rim, tinted per instance and fading as they rise and swell: no rim light, no scan bands.
+- **Debris** is lit plate in the hull's dark greys, gunmetal, orange or the walls' colour.
+- **Light** is faked: an additive glow decal on the ground under a flash or a blast, its colour
+  the weapon's warmed towards the blast's core; no light node.
+- **Missiles and bombs** are small models: a white hull with a red nose and gunmetal fins, an
+  orange casing with a hazard band.
+
 ### Budget and checks
 
 A building is at most eight instances, ten at Crown: the body, its outline, and up to three
@@ -1643,4 +1664,5 @@ housing) is held to the same ceilings at the widest zoom: 974 draw calls (about 
 attack HUD and the abilities bar), 2.00 million primitives
 and 1.6 ms of render CPU a frame on the development Mac, the units in their far versions
 (`battle-view.md`, **Cost**). Every unit of a type is three draws (one MultiMesh for the body, one
-for its outline, the body's shadow), every effect kind one.
+for its outline, the body's shadow), every effect kind one while it has anything to draw (the
+bolts two).

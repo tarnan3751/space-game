@@ -405,7 +405,7 @@ states, and checks that a ground type stays above the ground (within a stepping 
 that every socket stays on its part, a slide's socket kicked back on its own side's turn only.
 Then a battle (`main.open_battle`, practice): a level 3 laser turret
 and the Command Center against six rangers deployed by script. At the start of each frame it reads
-the bolt started last frame (`BattleEffects.bolts_fired`, `last_bolt_from`, `last_bolt_color`) and
+the projectile started last frame (`BattleEffects.bolts_fired`, `last_bolt_from`, `last_bolt_color`) and
 checks that a turret's starts at one of its muzzle sockets (within the hit shake), alternating
 between the two, with the head facing its target within 10 degrees, and that a ranger's starts in
 front of its ranger, towards the building it attacks, at its rifle and away from its middle.
@@ -622,9 +622,7 @@ strip. Each battle is surrendered and left before the next.
   `<unit>-move` (8 frames, 100 ms) framed close on the unit (camera size 4 to 7 by its size; the
   four infantry cropped at size 5), `<unit>-fire` (8, 50 ms) framed with `frame_span` on the unit
   and the silo (cropped for the infantry), from just before its second shot (the breacher's first,
-  as it closes in, 12 frames at 70 ms, holding its blast and its death); then `ranger-death` and
-  `dune_runner-death` (12, 50 ms) from just before a Laser Turret's last shot at it, the ticks the
-  strip ran over logged beside the tick it died by. The close strips, cropped, at 2.4 times the
+  as it closes in, 12 frames at 70 ms, holding its blast and its death). The close strips, cropped, at 2.4 times the
   model's height (camera size 3 to 6), for the limbs: `<unit>-close-bank` for a hovering type (12,
   60 ms) from its deploy, turning about 90 degrees onto its course; `<unit>-close-move` (12, 60
   ms) before the wide move strip; `<unit>-close-fire` (16 frames over two shots, 320 ms a frame at
@@ -635,13 +633,24 @@ strip. Each battle is surrendered and left before the next.
   stays in the tile (none for the breacher). It checks that each hovering type banks into its
   turn, that the brawler's, the siege walker's and the titan's blows alternate sides (their drawn
   state's parity), and that a staged death plays out in `death_seconds`.
+  Then, for every type, `<unit>-impact` (14, 70 ms), close (camera size 6, cropped) on the near
+  side of the silo from just before its second shot (the breacher's charge as it reaches the
+  silo): its projectile arriving and its impact; and `<unit>-death` (16, 80 ms, close on the
+  unit, cropped) from when one shot is left in it, two level 7 Railguns shooting it down (the
+  sim's death, so its effects show), the battle run at speed 2 while it waits, the ticks the
+  strip ran over logged beside the tick it died by.
 - `scenarios/anim_defences.gd`: every type with a targets class (the guns and the traps) at
   level 1 beside a level 1 Metal Silo, a Hover Tank (a Gunship for an air defence) deployed by
   the silo, two cells from the defence, three ticks into `<type>-fire` (8, 50 ms; the plasma mortar 10 at 150 ms, the orbital cannon
   12 at 200 ms, the gravity well and the grav trap 8 at 100 ms), framed with `frame_span` on the
-  defence's head and the unit and cropped; then `building-fall` (12, 100 ms, from 250 ms before
-  a Hover Tank's last shot on a Drone Bay) and
-  `wall-break` (12, 50 ms: a level 4 Breacher on a Barrier Wall).
+  defence's head and the unit and cropped, and for a defence `<type>-impact` (8, 50 ms; the
+  missile battery 10 at 60 ms, the plasma mortar 10 at 120 ms, the orbital cannon 12 at 200 ms,
+  the gravity well 8 at 150 ms), close on the unit (camera size 6, cropped) from its next shot (a
+  new projectile in the defence's colour): the projectile arriving and its impact; then
+  `building-fall` (12, 100 ms, from 250 ms before a Hover Tank's last shot on a Drone Bay: the
+  collapse, the rubble popping up, debris and smoke) and `wall-break` (12, 50 ms: a level 4
+  Breacher on a Barrier Wall). It first checks that every armed type (one that targets, holds,
+  throws or shields) and every unit has a weapon record of its own (`Weapons.has`).
 - `scenarios/anim_base.gd`: the construction drone over a Metal Silo placed on the fresh base,
   `drone-arrive` and `drone-laser` (8, 150 ms, camera size 6), then at its next shots
   `drone-beam` (framed on the beam at camera size 10, cropped) and `drone-sparks` (on the work
@@ -652,9 +661,10 @@ strip. Each battle is surrendered and left before the next.
   10; a type without one, the defences, on its middle at 2.6 a cell). Checks: the drone fires three times, and every view
   shot showed its model.
 - `scenarios/anim_effects.gd`: `swarm-dome` (8, 250 ms), `emp-ring` (8, 50 ms) and `emp-grey`
-  (8, 500 ms: the stun and the waking), `strike-marker` (8, 100 ms), `strike-land` (16, 50 ms,
+  (8, 500 ms: the stun and the waking), `emp-wake` (8, 50 ms, camera size 4, from two ticks before
+  the turret wakes from a second burst: its wake flash), `strike-marker` (8, 100 ms), `strike-land` (16, 50 ms,
   from 12 ticks before it lands) and `strike-smoke` (8, 150 ms); `shield-hit` and `shield-drop`
   (8, 100 ms) on a shield generator's pool; `rubble-settle` (12, 100 ms) from a Drone Bay's fall
   and `smoke-column` (8, 250 ms) two seconds later.
 
-Each runs in about one to two and a half minutes rendered, inside the watchdog's 300 seconds.
+Each runs in about one to four minutes rendered, inside the watchdog's 300 seconds.

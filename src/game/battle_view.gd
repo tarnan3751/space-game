@@ -14,13 +14,17 @@ extends Node3D
 ## (BattleEffects, each kind one MultiMesh). A defence whose head carries a muzzle socket (the laser
 ## turret) turns it towards its target (BattleSim.building_target) at its AIM_TURN rate, holds it
 ## while disabled, and goes back to its idle swing a while after its target is gone
-## (BuildingView.aim_at, idle_aim); its shots leave its muzzle sockets in turn (MUZZLES) with a
-## muzzle flash, each held (the sim's hit is instant; the bolt is the view's) until the head faces
-## its target within AIM_READY, AIM_HOLD at most, so a bolt never leaves a barrel turned away. Any other defence's shots leave its centre, MUZZLE_SHARE of its height up. A hit whitens a building for a moment and shakes it; a
-## fallen building is replaced by its rubble (BuildingModels.create_rubble) with its smoke, a
-## fallen wall leaves the merged mesh for a low strip. A hidden sentry shows once revealed; traps
-## never show, but a mine going off leaves a flash and a scorch mark. A shield generator's pool is
-## a faint dome while it is up. The camera is the base's IsoCamera, free over the field. An
+## (BuildingView.aim_at, idle_aim); its shots leave its muzzle sockets in turn (its weapon
+## record's, MUZZLES for most), each held (the sim's hit is instant; the shot is the view's) until
+## the head faces its target within AIM_READY, AIM_HOLD at most, so a shot never leaves a barrel
+## turned away. Any other defence's shots leave its centre, MUZZLE_SHARE of its height up. Every
+## shot, shell, hit, spring and death is drawn by the weapon record of the type that made it
+## (Weapons, BattleEffects.fire and land). A hit whitens a building for a moment and shakes it; a
+## fallen building collapses (it sinks, tilts and shakes in dust) and is replaced by its rubble
+## (BuildingModels.create_rubble), popping up with debris and a smoke column; a fallen wall leaves
+## the merged mesh for a low strip with chunks and dust. A hidden sentry shows once revealed, in a
+## shimmer; a trap stays hidden (a view of its own made at setup) until it springs, when it pops up
+## and goes off. A shield generator's pool is a faint dome while it is up. The camera is the base's IsoCamera, free over the field. An
 ## expedition's battle (`rival`) draws the defender as a rival colony: its buildings and walls take
 ## the faction tint (MaterialKit.rival), the units and the rubble never do.
 ##
