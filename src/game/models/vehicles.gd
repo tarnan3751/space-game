@@ -3,9 +3,11 @@ extends RefCounted
 ## walker, the hover tank and the titan, each crewed by colonists seated at the controls
 ## (UnitModels.pilot, the figures' thin ink) in an open seat or behind a windscreen
 ## (UnitModels.canopy), the machine on the full ink line. Every wheel, leg, gun arm, turret and
-## canopy is a function of its own taking its pivot's transform, so the battle view can later move
-## it. The tier repaints the hull, the panels, the trim and the glows (UnitModels.hull, panel, trim,
-## glow).
+## canopy is a function of its own taking its pivot's transform, and what moves in battle is
+## rigged (Rig, LowPolyMesh.rig): the runner's wheels roll, the walkers' legs step and their guns
+## recoil in turn, the hover tank banks and its barrel recoils. Each gun's muzzle is a socket:
+## `muzzle` the left (or only) one, `muzzle_2` the right. The tier repaints the hull, the panels,
+## the trim and the glows (UnitModels.hull, panel, trim, glow).
 
 ## The army-orange plates: flat and smooth.
 static var ORANGE := Parts.surf("orange")
@@ -29,7 +31,7 @@ const RUNNER_WHEEL := 0.15
 ## each side over the wheels, beside the seat, and a rear deck round the engine block. An orange
 ## bonnet and roll cage, an engine block of the tier's panels with two glowing exhausts behind, a
 ## colonist driver at the wheel behind the dash, and a pintle twin gun on the cage between two lamps
-## of the tier's glow.
+## of the tier's glow. The wheels roll on Rig.WHEEL.
 static func build_dune_runner(p: Parts) -> void:
 	var m := p.body
 	var tier := p.tier
@@ -42,7 +44,10 @@ static func build_dune_runner(p: Parts) -> void:
 	_engine_block(m, UnitModels.pivot(Vector3(0, 0.255, -0.3)), tier)
 	for z: float in [0.27, -0.27]:
 		for side: float in [1.0, -1.0]:
-			_wheel(m, UnitModels.pivot(Vector3(side * 0.245, 0.15, z), Vector3(0, 0, -side * 90.0)), RUNNER_WHEEL, 0.11, tier)
+			m.rig = Rig.part(Rig.WHEEL, Vector3(side * 0.245, RUNNER_WHEEL, z))
+			_wheel(m, UnitModels.pivot(Vector3(side * 0.245, RUNNER_WHEEL, z), Vector3(0, 0, -side * 90.0)), RUNNER_WHEEL, 0.11,
+				tier)
+			m.rig = Vector4.ZERO
 	m.box(Vector3(0.22, 0.2, 0.05), Vector3(0, 0.255, -0.19), UnitModels.panel(tier))
 	m.box_chamfered(Vector3(0.3, 0.1, 0.1), 0.03, Vector3(0, 0.255, 0.13), UnitModels.panel(tier))
 	var driver := UnitModels.pilot(m, Vector3(0, 0.27, -0.05), 0.0, 0.6)
@@ -61,7 +66,8 @@ static func _engine_block(m: LowPolyMesh, xf: Transform3D, tier: int) -> void:
 
 ## A wheel on the hub pivot `xf`, its axle along the pivot's +Y (outwards): a chunky dark tyre of
 ## `radius` and `width`, rounded at its shoulders and open on its inner face, which the hull hides,
-## and a broad hub cap of the tier's trim on its outer face.
+## a broad hub cap of the tier's trim on its outer face and an orange bar across the cap, so the
+## wheel shows it turning.
 static func _wheel(m: LowPolyMesh, xf: Transform3D, radius: float, width: float, tier: int) -> void:
 	var half := width * 0.5
 	m.lathe(PackedVector2Array([
@@ -69,6 +75,8 @@ static func _wheel(m: LowPolyMesh, xf: Transform3D, radius: float, width: float,
 		Vector2(radius, half - width * 0.15), Vector2(radius * 0.9, half), Vector2(radius * 0.45, half),
 	]), 10, xf.origin, TYRE, UnitModels.euler(xf))
 	m.dome(radius * 0.7, width * 0.4, 10, 2, xf * Vector3(0, half - 0.004, 0), UnitModels.trim(tier, true),
+		UnitModels.euler(xf))
+	m.box(Vector3(radius * 1.3, width * 0.32, radius * 0.26), xf * Vector3(0, half + width * 0.02, 0), ORANGE_FINE,
 		UnitModels.euler(xf))
 
 
@@ -97,21 +105,28 @@ static func _roll_cage(m: LowPolyMesh, tier: int) -> void:
 static func _twin_gun(m: LowPolyMesh, xf: Transform3D, tier: int) -> void:
 	var rot := UnitModels.euler(xf)
 	m.box_chamfered(Vector3(0.11, 0.07, 0.1), 0.02, xf.origin, Parts.GUNMETAL, rot)
-	for k: float in [-1.0, 1.0]:
+	for k: float in [1.0, -1.0]:
 		var to := xf * Vector3(k * 0.036, 0.04, 0.24)
 		Parts.pipe(m, xf * Vector3(k * 0.036, 0.04, 0.04), to, 0.035, Parts.GUNMETAL, 8)
 		m.disc(0.024, 8, to + xf.basis * Vector3(0, 0, 0.002), UnitModels.glow(tier, Surf.PULSE, false),
 			UnitModels.euler(xf, Vector3(90, 0, 0)))
+		m.socket("muzzle" if k > 0.0 else "muzzle_2", to, xf.basis.z)
 
 
 # --- The siege walker -----------------------------------------------------------------
+
+## How far a walker's gun pod and a titan's cannon kick back on a shot (Rig.SLIDE_L, SLIDE_R).
+const WALKER_RECOIL := 0.15
+const TITAN_RECOIL := 0.25
 
 ## The siege walker: an armoured biped, a tier-hull chamfered hull with a chest band (orange to
 ## Gold, the tier's trim above), on two thick
 ## digitigrade legs with orange hip caps and thigh plates, knee joints and broad feet; a big gun arm
 ## on each side with twin barrels in a shroud; a colonist pilot sunk in the top behind a glass
 ## windscreen and a dark dashboard, a raised block behind it carrying its deck plate
-## (UnitModels.deck), and a short mast with a lamp of the tier's glow.
+## (UnitModels.deck), and a short mast with a lamp of the tier's glow. Its legs step on the heavy
+## hip and knee channels (Rig.HIP_HEAVY_L, KNEE_HEAVY_L and the right's), and its gun arms recoil in
+## turn (Rig.SLIDE_L, SLIDE_R).
 static func build_siege_walker(p: Parts) -> void:
 	var m := p.body
 	var tier := p.tier
@@ -140,8 +155,10 @@ static func _walker_leg(m: LowPolyMesh, xf: Transform3D, side: float, tier: int)
 	m.orb(0.1, 12, 4, xf.origin, Parts.GUNMETAL)
 	Parts.drum(m, 0.1, 0.05, 0.02, 12, xf * Vector3(side * 0.05, 0, 0), ORANGE_ROUND,
 		UnitModels.euler(xf, Vector3(0, 0, -side * 90.0)))
+	var rig_before := _leg_rig(m, xf, knee, side, true)
 	Parts.beam(m, xf.origin, xf * knee, 0.15, UnitModels.panel(tier), 0.04)
 	_leg_plate(m, xf * Vector3(0, -0.06, 0.02), xf * (knee + Vector3(0, 0.06, 0)), 0.17, 0.1, ORANGE_FINE)
+	_leg_rig(m, xf, knee, side, false)
 	m.orb(0.085, 12, 4, xf * knee, Parts.GUNMETAL)
 	m.dome(0.07, 0.05, 12, 2, xf * (knee + Vector3(0, 0, 0.05)), UnitModels.trim(tier, true), UnitModels.euler(xf, Vector3(90, 0, 0)))
 	Parts.beam(m, xf * knee, xf * ankle, 0.12, UnitModels.hull(tier), 0.035)
@@ -150,13 +167,35 @@ static func _walker_leg(m: LowPolyMesh, xf: Transform3D, side: float, tier: int)
 	m.box_chamfered(Vector3(0.22, 0.08, 0.36), 0.035, xf * foot, Parts.HULL_MID, UnitModels.euler(xf))
 	m.box_chamfered(Vector3(0.2, 0.06, 0.1), 0.025, xf * (foot + Vector3(0, 0.05, 0.14)), UnitModels.trim(tier),
 		UnitModels.euler(xf, Vector3(-14, 0, 0)))
+	m.rig = rig_before
+	m.rig2 = Vector4.ZERO
+
+
+## Stamps a walker's leg parts from the hip pivot `xf` on side `side` (1 the left), its knee at
+## `knee` in the pivot's space, on the heavy channels: with `thigh` the thigh's (Rig.HIP_HEAVY_L or
+## _R about the hip), else the shin's and the foot's (KNEE_HEAVY_L or _R about the knee, then the
+## hip). Returns the rig set before, to put back after the leg.
+static func _leg_rig(m: LowPolyMesh, xf: Transform3D, knee: Vector3, side: float, thigh: bool) -> Vector4:
+	var was := m.rig
+	var s := 0 if side > 0.0 else 1
+	var hip := Rig.part(Rig.HIP_HEAVY_L + s, xf.origin)
+	if thigh:
+		m.rig = hip
+		m.rig2 = Vector4.ZERO
+	else:
+		m.rig = Rig.part(Rig.KNEE_HEAVY_L + s, xf * knee)
+		m.rig2 = hip
+	return was
 
 
 ## A gun arm from the shoulder pivot `xf` on side `side`: a gunmetal shoulder drum out of the hull,
 ## a big tier-hull pod with an orange top plate, twin fat gunmetal barrels forward out of a shared
-## shroud, and their muzzles glowing in the tier's glow.
+## shroud, and their muzzles glowing in the tier's glow. The pod recoils (Rig.SLIDE_L on the left,
+## SLIDE_R on the right) by WALKER_RECOIL; the socket between its muzzles is `muzzle` on the left,
+## `muzzle_2` on the right.
 static func _gun_arm(m: LowPolyMesh, xf: Transform3D, side: float, tier: int) -> void:
 	Parts.drum(m, 0.075, 0.08, 0.02, 12, xf.origin, Parts.GUNMETAL, UnitModels.euler(xf, Vector3(0, 0, -side * 90.0)))
+	m.rig = Rig.part(Rig.SLIDE_L if side > 0.0 else Rig.SLIDE_R, xf.basis * Vector3(0, 0, -WALKER_RECOIL))
 	var pod := Vector3(side * 0.145, -0.09, 0.02)
 	m.box_chamfered(Vector3(0.17, 0.18, 0.42), 0.045, xf * pod, UnitModels.hull(tier), UnitModels.euler(xf))
 	m.box_chamfered(Vector3(0.13, 0.03, 0.32), 0.012, xf * (pod + Vector3(0, 0.18, -0.01)), ORANGE_FINE, UnitModels.euler(xf))
@@ -167,31 +206,39 @@ static func _gun_arm(m: LowPolyMesh, xf: Transform3D, side: float, tier: int) ->
 		Parts.pipe(m, xf * (pod + Vector3(k * 0.045, 0.09, 0.3)), to, 0.042, Parts.GUNMETAL, 12)
 		m.disc(0.03, 8, to + xf.basis * Vector3(0, 0, 0.002), UnitModels.glow(tier, Surf.PULSE, false),
 			UnitModels.euler(xf, Vector3(90, 0, 0)))
+	m.socket("muzzle" if side > 0.0 else "muzzle_2", xf * (pod + Vector3(0, 0.09, 0.46)), xf.basis.z)
+	m.rig = Vector4.ZERO
 
 
 # --- The hover tank -----------------------------------------------------------------
 
-## How high the hover tank's hull floats: its underside over the ground, at rest.
+## How high the hover tank's hull floats: its underside over the ground, at rest; how far its
+## barrel and mantlet kick back on a shot (Rig.SLIDE).
 const TANK_HOVER := 0.22
+const TANK_RECOIL := 0.25
 
 ## The hover tank: a tier-hull hull floating TANK_HOVER up over a glowing underside, its deck plate
 ## on top (UnitModels.deck), on orange skirts flared out along its sides with three glowing vents
 ## in each, two thrusters on its rear corners angled out; a tall turret on a ring of the tier's
 ## trim, capped in the tier's trim, with an orange mantlet and one fat barrel with collars of
 ## the tier's trim and a glowing bore, and the pilot sunk in a hatch behind a small windscreen; it
-## bobs as it hovers.
+## bobs as it hovers, banks into its turns (Rig.BANK) and its barrel recoils (Rig.SLIDE), its bore
+## the `muzzle` socket, the thrusters' mouths `exhaust` and `exhaust_2`.
 static func build_hover_tank(p: Parts) -> void:
 	var m := p.body
 	var tier := p.tier
 	var glow := UnitModels.glow(tier, Surf.PULSE)
 	m.flags = Surf.BOB
+	m.rig = Rig.part(Rig.BANK, Vector3(0, TANK_HOVER + 0.14, -0.05))
 	m.box(Vector3(0.7, 0.03, 1.1), Vector3(0, TANK_HOVER - 0.025, -0.05), glow)
 	m.box_chamfered(Vector3(0.8, 0.28, 1.2), 0.08, Vector3(0, TANK_HOVER, -0.05), UnitModels.hull(tier))
 	UnitModels.deck(m, Vector3(0.62, 0.012, 1.02), Vector3(0, TANK_HOVER + 0.28, -0.05), tier)
 	for side: float in [1.0, -1.0]:
 		_skirt(m, UnitModels.pivot(Vector3(side * 0.45, TANK_HOVER - 0.025, -0.05), Vector3(0, 0, side * 20.0)), side, tier)
-		_thruster(m, UnitModels.pivot(Vector3(side * 0.3, TANK_HOVER + 0.16, -0.6), Vector3(-90, -side * 25.0, 0)), tier)
+		_thruster(m, UnitModels.pivot(Vector3(side * 0.3, TANK_HOVER + 0.16, -0.6), Vector3(-90, -side * 25.0, 0)), tier,
+			"exhaust" if side > 0.0 else "exhaust_2")
 	_turret(m, UnitModels.pivot(Vector3(0, TANK_HOVER + 0.28, -0.04)), tier)
+	m.rig = Vector4.ZERO
 	m.flags = 0
 
 
@@ -204,13 +251,15 @@ static func _skirt(m: LowPolyMesh, xf: Transform3D, side: float, tier: int) -> v
 		m.box(Vector3(0.012, 0.045, 0.12), xf * Vector3(side * 0.041, 0.045, z), UnitModels.glow(tier, Surf.PULSE, false), rot)
 
 
-## A thruster on the pivot `xf`, blowing along its +Y: a gunmetal nozzle and its mouth glowing.
-static func _thruster(m: LowPolyMesh, xf: Transform3D, tier: int) -> void:
+## A thruster on the pivot `xf`, blowing along its +Y: a gunmetal nozzle and its mouth glowing, the
+## socket `exhaust`.
+static func _thruster(m: LowPolyMesh, xf: Transform3D, tier: int, exhaust: String) -> void:
 	var rot := UnitModels.euler(xf)
 	m.lathe(PackedVector2Array([
 		Vector2(0.05, -0.12), Vector2(0.08, -0.07), Vector2(0.08, 0.06), Vector2(0.07, 0.08),
 	]), 10, xf.origin, Parts.GUNMETAL, rot)
 	m.disc(0.06, 10, xf * Vector3(0, 0.081, 0), UnitModels.glow(tier, Surf.PULSE, false), rot)
+	m.socket(exhaust, xf * Vector3(0, 0.081, 0), xf.basis.y)
 
 
 ## The turret on the pivot `xf` (its ring on the hull): a tall tier-hull drum on a ring of the
@@ -223,6 +272,9 @@ static func _turret(m: LowPolyMesh, xf: Transform3D, tier: int) -> void:
 	Parts.drum(m, 0.2, TALL, 0.05, 16, xf.origin, UnitModels.hull(tier, true), rot)
 	m.lathe(PackedVector2Array([Vector2(0.15, 0), Vector2(0.15, 0.02), Vector2(0, 0.02)]), 16, xf * Vector3(0, TALL - 0.004, 0),
 		UnitModels.trim(tier, true), rot)
+	var body := m.rig
+	m.rig = Rig.part(Rig.SLIDE, xf.basis * Vector3(0, 0, -TANK_RECOIL))
+	m.rig2 = body
 	m.box_chamfered(Vector3(0.26, 0.18, 0.14), 0.04, xf * Vector3(0, 0.035, 0.17), ORANGE_FINE, rot)
 	var bore := Vector3(0, 0.125, 0.0)
 	var along := UnitModels.euler(xf, Vector3(90, 0, 0))
@@ -230,6 +282,9 @@ static func _turret(m: LowPolyMesh, xf: Transform3D, tier: int) -> void:
 	m.tube(0.085, 0.11, 0.07, 12, xf * (bore + Vector3(0, 0, 0.42)), UnitModels.trim(tier, true), along)
 	m.tube(0.07, 0.14, 0.1, 12, xf * (bore + Vector3(0, 0, 0.66)), UnitModels.trim(tier, true), along)
 	m.disc(0.07, 12, xf * (bore + Vector3(0, 0, 0.74)), UnitModels.glow(tier, Surf.PULSE, false), along)
+	m.socket("muzzle", xf * (bore + Vector3(0, 0, 0.74)), xf.basis.z)
+	m.rig = body
+	m.rig2 = Vector4.ZERO
 	_hatch(m, xf * UnitModels.pivot(Vector3(0.05, TALL + 0.016, -0.05)), tier)
 
 
@@ -248,7 +303,8 @@ static func _hatch(m: LowPolyMesh, xf: Transform3D, tier: int) -> void:
 ## The titan: a giant biped walker, the loudest unit. Massive legs with orange plates, knee joints
 ## and big feet under a crewed bridge: a tier-hull hull with an orange rear block, two colonists seated
 ## on seats (UnitModels.seat_under) behind a wide glass windscreen and a dark dashboard, two huge
-## cannon arms glowing at their muzzles and an antenna mast with a blinking lamp.
+## cannon arms glowing at their muzzles and an antenna mast with a blinking lamp. Its legs step on
+## the heavy channels and its cannons recoil in turn, as the siege walker's.
 static func build_titan(p: Parts) -> void:
 	var m := p.body
 	var tier := p.tier
@@ -275,8 +331,10 @@ static func _titan_leg(m: LowPolyMesh, xf: Transform3D, side: float, tier: int) 
 	var knee := Vector3(side * 0.04, -0.52, 0.14)
 	var ankle := Vector3(side * 0.05, -1.02, -0.02)
 	m.orb(0.16, 16, 4, xf.origin, Parts.GUNMETAL)
+	var rig_before := _leg_rig(m, xf, knee, side, true)
 	Parts.beam(m, xf.origin, xf * knee, 0.26, UnitModels.panel(tier), 0.06)
 	_leg_plate(m, xf * Vector3(0, -0.06, 0), xf * knee, 0.3, 0.13, ORANGE_LEG)
+	_leg_rig(m, xf, knee, side, false)
 	m.orb(0.15, 16, 4, xf * knee, Parts.GUNMETAL)
 	m.dome(0.12, 0.08, 16, 2, xf * (knee + Vector3(0, 0, 0.1)), UnitModels.trim(tier, true), UnitModels.euler(xf, Vector3(90, 0, 0)))
 	Parts.beam(m, xf * knee, xf * ankle, 0.24, UnitModels.hull(tier), 0.06)
@@ -286,6 +344,8 @@ static func _titan_leg(m: LowPolyMesh, xf: Transform3D, side: float, tier: int) 
 	m.box_chamfered(Vector3(0.38, 0.13, 0.6), 0.06, xf * foot, Parts.HULL_DARK, UnitModels.euler(xf))
 	m.box_chamfered(Vector3(0.34, 0.08, 0.14), 0.035, xf * (foot + Vector3(0, 0.07, 0.22)), UnitModels.trim(tier),
 		UnitModels.euler(xf, Vector3(-14, 0, 0)))
+	m.rig = rig_before
+	m.rig2 = Vector4.ZERO
 
 
 ## An armour plate of `surface` (an orange) along a leg segment from `from` to `to`, `width` across
@@ -300,9 +360,11 @@ static func _leg_plate(m: LowPolyMesh, from: Vector3, to: Vector3, width: float,
 
 ## A cannon arm from the shoulder pivot `xf` on side `side`: a gunmetal shoulder drum, a big tier-hull
 ## housing with an orange top plate, a fat gunmetal barrel, a muzzle collar of the tier's trim and a
-## glowing bore.
+## glowing bore. The housing recoils (Rig.SLIDE_L on the left, SLIDE_R on the right) by
+## TITAN_RECOIL; its bore is `muzzle` on the left, `muzzle_2` on the right.
 static func _cannon_arm(m: LowPolyMesh, xf: Transform3D, side: float, tier: int) -> void:
 	Parts.drum(m, 0.14, 0.12, 0.03, 16, xf.origin, Parts.GUNMETAL, UnitModels.euler(xf, Vector3(0, 0, -side * 90.0)))
+	m.rig = Rig.part(Rig.SLIDE_L if side > 0.0 else Rig.SLIDE_R, xf.basis * Vector3(0, 0, -TITAN_RECOIL))
 	var housing := Vector3(side * 0.26, -0.15, 0.0)
 	m.box_chamfered(Vector3(0.3, 0.3, 0.64), 0.07, xf * housing, UnitModels.hull(tier), UnitModels.euler(xf))
 	m.box_chamfered(Vector3(0.22, 0.05, 0.5), 0.02, xf * (housing + Vector3(0, 0.3, -0.02)), ORANGE, UnitModels.euler(xf))
@@ -312,3 +374,5 @@ static func _cannon_arm(m: LowPolyMesh, xf: Transform3D, side: float, tier: int)
 		UnitModels.euler(xf, Vector3(90, 0, 0)))
 	m.disc(0.068, 16, xf * (bore + Vector3(0, 0, 0.8)), UnitModels.glow(tier, Surf.PULSE, false),
 		UnitModels.euler(xf, Vector3(90, 0, 0)))
+	m.socket("muzzle" if side > 0.0 else "muzzle_2", xf * (bore + Vector3(0, 0, 0.8)), xf.basis.z)
+	m.rig = Vector4.ZERO
