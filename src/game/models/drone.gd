@@ -39,7 +39,8 @@ static var PARKED_GLASS := Surf.make(MaterialKit.Layer.GLASS, MaterialKit.CORE_G
 	PARKED_PHASE)
 static var PARKED_GLOW := Surf.make(MaterialKit.Layer.GLOW, MaterialKit.ENERGY, 1.0, Surf.UNLIT | Surf.BOB, true, true, PARKED_PHASE)
 static var PARKED_ROD := Surf.make(MaterialKit.Layer.FLAT, MaterialKit.GUNMETAL, 1.0, Surf.BOB, true, false, PARKED_PHASE)
-static var PARKED_DUCT := Surf.make(MaterialKit.Layer.HULL, MaterialKit.HULL_MID, 1.0, Surf.BOB, true, true, PARKED_PHASE)
+## The parked drone's ducts are army orange, the bay's accent, so it reads on the deck.
+static var PARKED_DUCT := Surf.make(MaterialKit.Layer.PLATE, MaterialKit.ARMY, 1.0, Surf.BOB, true, true, PARKED_PHASE)
 static var PARKED_BAND := Surf.make(MaterialKit.Layer.HAZARD, Color.WHITE, 3.0, Surf.BOB, true, true, PARKED_PHASE)
 static var PARKED_GUNMETAL := Surf.make(MaterialKit.Layer.PLATE, MaterialKit.GUNMETAL, 1.0, Surf.BOB, true, true, PARKED_PHASE)
 static var PARKED_ROTOR := Surf.make(MaterialKit.Layer.SCREEN, MaterialKit.ENERGY, 4.0, Surf.UNLIT | Surf.FLOW_U | Surf.BOB, false,
