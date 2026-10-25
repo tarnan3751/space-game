@@ -73,10 +73,9 @@ const BAR_OVER := 0.4
 ## Where a shot leaves a defence and hits a building: a share of the model's height.
 const MUZZLE_SHARE := 0.75
 const HIT_HEIGHT := 0.6
-## The muzzle sockets a defence's shots leave in turn, as many as its model has, and the flash at
-## each shot's.
-const MUZZLES: Array[String] = ["muzzle", "muzzle_2", "muzzle_3", "muzzle_4"]
-const DEFENCE_FLASH := 0.24
+## The muzzle sockets a defence's shots leave in turn, as many as its model has (its weapon
+## record's, Weapons).
+const MUZZLES: Array[String] = Weapons.DEFENCE_MUZZLES
 ## How fast an aiming head turns towards its target (the share of the way a second, as an
 ## exponential rate) per type, and for any other type; how fast it goes back to its idle swing.
 const AIM_TURN := {"laser_turret": 10.0}
@@ -89,11 +88,12 @@ const AIM_HOLD := 0.4
 ## A unit's reach (field units) up to which its hits are drawn as a blow (an impact at the
 ## target), not a bolt.
 const MELEE_REACH := 1000
-## The effects' tints and sizes: the defences' shots, the units', a shell's landing, a mine's blast,
-## a gravity well's pull, a fall's dust.
+## The effects' tints and sizes: the laser turret's shots and the ranger's (the rig scenario tells
+## them apart by these), the impact a defence's shot makes on a unit at least, a mine's blast, a
+## gravity well's pull, a fall's dust.
 const DEFENCE_SHOT := MaterialKit.DEFENCE
 const UNIT_SHOT := MaterialKit.ENERGY
-const SHELL_BLAST := Color("ff8a3d")
+const DEFENCE_IMPACT := 0.3
 const MINE_BLAST := MaterialKit.HAZARD
 const WELL_PULL := MaterialKit.ANTIMATTER
 const FALL_DUST := Color("c9c2e0")
@@ -164,8 +164,10 @@ var _shields := PackedInt32Array()
 ## step, reused.
 var _disabled: Dictionary[int, bool] = {}
 var _woken := PackedInt32Array()
-## Arc towers, whose shots are lightning.
-var _arc_towers: Dictionary[int, bool] = {}
+## Each building's weapon record (Weapons), traps' included.
+var _weapons: Dictionary[int, Weapons.Weapon] = {}
+## Units found in a defence's reach (_in_reach), reused.
+var _found := PackedInt32Array()
 ## Per unit type brought: its reach at the attacker's level (field units) and its splash (world
 ## units).
 var _reach: Dictionary[String, int] = {}
@@ -233,6 +235,7 @@ func setup(battle_catalog: Catalog, setup_data: Dictionary, iso_camera: IsoCamer
 		_levels[id] = level
 		_cells[id] = cell
 		_sizes[id] = size
+		_weapons[id] = Weapons.of(type)
 		var centre := field.cell_to_world(cell, size)
 		_centres[id] = Vector2(centre.x, centre.z)
 		match catalog.battle_class(type):
@@ -256,8 +259,6 @@ func setup(battle_catalog: Catalog, setup_data: Dictionary, iso_camera: IsoCamer
 				var stats := catalog.level_stats(type, level)
 				if int(stats.get("shield_hp", 0)) > 0:
 					_shields.append(id)
-				if type == "arc_tower":
-					_arc_towers[id] = true
 	field.walls.rebuild_cells(catalog, _walls)
 	if rival:
 		# The override, not a surface's: the merged mesh is replaced each time a wall falls.
@@ -471,29 +472,23 @@ func _read_events() -> void:
 			BattleEvents.UNIT_HIT:
 				_unit_hit(source, target, events.from_x[i], events.from_y[i])
 			BattleEvents.SHOT:
-				var to := units.aim_point(target)
-				if _arc_towers.has(source):
-					var from := _muzzle(source)
-					effects.lightning(from, to, _clock)
-					effects.impact(to, 0.3, MaterialKit.ARC_BLUE, _clock)
-					units.hit(target, _clock)
-				elif _aimers.has(source):
+				if _aimers.has(source):
 					if _held_shots.has(source):
 						_release_shot(source)
 					_held_shots[source] = target
 					_held_since[source] = _clock
 				else:
-					effects.bolt(_muzzle(source), to, DEFENCE_SHOT, _clock, 0.0, 0.3, 0, target)
+					_fire_defence(source, target)
 			BattleEvents.SHELL:
 				var lands := _point(events.to_x[i], events.to_y[i])
 				var seconds := (events.land_tick[i] - (sim.tick - 1)) * TICK_SECONDS
-				effects.bolt(_muzzle(source), lands, SHELL_BLAST, _clock, maxf(seconds, TICK_SECONDS), 0.0)
+				effects.fire(_weapons[source], _muzzle(source), lands, 0, 0, 0.0, _clock, true,
+					maxf(seconds, TICK_SECONDS))
 			BattleEvents.SHELL_LAND:
 				var splash := float(_stat(source, "splash_units")) / 1000.0
-				effects.impact(_point(events.to_x[i], events.to_y[i]), maxf(splash, 0.6), SHELL_BLAST, _clock)
+				effects.land(_weapons[source], _point(events.to_x[i], events.to_y[i]), maxf(splash, 0.6), _clock)
 			BattleEvents.HOLD:
-				effects.impact(_point(events.from_x[i], events.from_y[i]), float(_stat(source, "range_cells")) * 0.5,
-					WELL_PULL, _clock)
+				_hold(source, _point(events.from_x[i], events.from_y[i]))
 			BattleEvents.DETONATE:
 				var at := _point(events.from_x[i], events.from_y[i])
 				effects.impact(at, maxf(1.0, float(_stat(source, "range_cells"))), MINE_BLAST, _clock)
@@ -504,7 +499,7 @@ func _read_events() -> void:
 			BattleEvents.REVEAL:
 				if _views.has(source):
 					_views[source].visible = true
-					effects.impact(_point(events.from_x[i], events.from_y[i]), 1.0, DEFENCE_SHOT, _clock)
+					_decloak(source)
 			BattleEvents.FALL:
 				_fall(source)
 				_mask_changed = true
@@ -642,12 +637,60 @@ func _aim_defences(shown: float) -> void:
 			_release_shot(id)
 
 
-## Fires defence `id`'s held shot: a bolt from its next muzzle socket, wherever its head is now, at
-## the unit it hit. A defence that falls or is disabled while it holds one fires it at once.
+## Fires defence `id`'s held shot: its weapon from its next muzzle socket, wherever its head is now,
+## at the unit it hit. A defence that falls or is disabled while it holds one fires it at once.
 func _release_shot(id: int) -> void:
 	var target: int = _held_shots[id]
 	_held_shots.erase(id)
-	effects.bolt(_muzzle(id), units.aim_point(target), DEFENCE_SHOT, _clock, 0.0, 0.3, 0, target)
+	_fire_defence(id, target)
+
+
+## Defence `id` fires its weapon (its Weapons record, BattleEffects.fire) from its next muzzle at
+## unit `target`, which flashes when it arrives.
+func _fire_defence(id: int, target: int) -> void:
+	effects.fire(_weapons[id], _muzzle(id), units.aim_point(target), 0, target, DEFENCE_IMPACT, _clock)
+
+
+## A gravity well `id` at `at` pulled: a violet ring round it, and its vortex from its top to every
+## unit it holds (the units of its targets' class in its reach), held as long as they are.
+func _hold(id: int, at: Vector3) -> void:
+	var range_cells := float(_stat(id, "range_cells"))
+	effects.impact(at, range_cells * 0.5, WELL_PULL, _clock)
+	var hold := float(_stat(id, "hold_ms")) / 1000.0
+	var from := _muzzle(id)
+	for unit: int in _in_reach(id, range_cells):
+		effects.fire(_weapons[id], from, units.aim_point(unit), 0, 0, 0.0, _clock, false, hold)
+
+
+## The cloaked sentry `id` shown: a shimmer round it as it decloaks, rings of energy and pale wisps.
+func _decloak(id: int) -> void:
+	var centre := _centres[id]
+	var top := _muzzles[id] / MUZZLE_SHARE
+	var at := Vector3(centre.x, top * 0.5, centre.y)
+	effects.ring_flash(at, 0.9, MaterialKit.ENERGY, _clock, 0.3)
+	effects.impact(Vector3(centre.x, 0.05, centre.y), 0.9, MaterialKit.ENERGY, _clock, 0.4)
+	effects.impact(Vector3(centre.x, top * 0.6, centre.y), 0.6, MaterialKit.CORE_GLASS, _clock + 0.08, 0.35)
+	for k: int in 3:
+		effects.puff(Vector3(centre.x, 0.2, centre.y) + Parts.around(0.4, 120.0 * k, 0.0), 0.18, MaterialKit.CORE_GLASS,
+			_clock + 0.05 * k, 0.5, 0.6)
+
+
+## The live units of the class building `id` targets within `range_cells` of its centre (world
+## units), in id order; the list is reused.
+func _in_reach(id: int, range_cells: float) -> PackedInt32Array:
+	_found.clear()
+	var targets := catalog.targets_of(_types[id])
+	var centre := _centres[id]
+	for unit: int in range(1, sim.unit_count() + 1):
+		if sim.unit_state(unit) == BattleArmy.DEAD:
+			continue
+		var unit_class := catalog.unit_class(sim.unit_type(unit))
+		if targets != "both" and targets != unit_class:
+			continue
+		var at := units.aim_point(unit)
+		if Vector2(at.x, at.z).distance_to(centre) <= range_cells:
+			_found.append(unit)
+	return _found
 
 
 ## The flashes, shakes and bars of the buildings hit lately; `shown` seconds of battle after the
@@ -815,18 +858,17 @@ func units_brought() -> PackedStringArray:
 	return names
 
 
-## Where a shot leaves building `id`: its next muzzle socket (MUZZLES), with a muzzle flash, or its
-## centre MUZZLE_SHARE of its height up when it has none.
+## Where a shot leaves building `id`: its next muzzle socket (its weapon record's sockets in turn, as
+## many as its model has), or its centre MUZZLE_SHARE of its height up when it has none.
 func _muzzle(id: int) -> Vector3:
 	var view: BuildingView = _views.get(id)
-	if view != null and view.has_socket(MUZZLES[0]):
+	var sockets := _weapons[id].sockets
+	if view != null and not sockets.is_empty() and view.has_socket(sockets[0]):
 		var k: int = _next_muzzle.get(id, 0)
-		if k >= MUZZLES.size() or not view.has_socket(MUZZLES[k]):
+		if k >= sockets.size() or not view.has_socket(sockets[k]):
 			k = 0
 		_next_muzzle[id] = k + 1
-		var at := view.socket_point(MUZZLES[k])
-		effects.flash(at, DEFENCE_FLASH, DEFENCE_SHOT, _clock)
-		return at
+		return view.socket_point(sockets[k])
 	var centre: Vector2 = _centres.get(id, Vector2.ZERO)
 	return Vector3(centre.x, _muzzles.get(id, 1.0), centre.y)
 
