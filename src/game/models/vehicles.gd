@@ -21,6 +21,9 @@ static var TYRE := Parts.HULL_DARK_ROUND
 
 # --- The dune runner -------------------------------------------------------------------
 
+## The dune runner's wheels' radius (BattleUnits steps it at half their circumference).
+const RUNNER_WHEEL := 0.15
+
 ## The dune runner: an open four-wheel buggy, a tier-hull chamfered hull on four big dark tyres with
 ## broad hub caps, its deck plates (UnitModels.deck) where the camera sees them: a long fender along
 ## each side over the wheels, beside the seat, and a rear deck round the engine block. An orange
@@ -39,7 +42,7 @@ static func build_dune_runner(p: Parts) -> void:
 	_engine_block(m, UnitModels.pivot(Vector3(0, 0.255, -0.3)), tier)
 	for z: float in [0.27, -0.27]:
 		for side: float in [1.0, -1.0]:
-			_wheel(m, UnitModels.pivot(Vector3(side * 0.245, 0.15, z), Vector3(0, 0, -side * 90.0)), 0.15, 0.11, tier)
+			_wheel(m, UnitModels.pivot(Vector3(side * 0.245, 0.15, z), Vector3(0, 0, -side * 90.0)), RUNNER_WHEEL, 0.11, tier)
 	m.box(Vector3(0.22, 0.2, 0.05), Vector3(0, 0.255, -0.19), UnitModels.panel(tier))
 	m.box_chamfered(Vector3(0.3, 0.1, 0.1), 0.03, Vector3(0, 0.255, 0.13), UnitModels.panel(tier))
 	var driver := UnitModels.pilot(m, Vector3(0, 0.27, -0.05), 0.0, 0.6)

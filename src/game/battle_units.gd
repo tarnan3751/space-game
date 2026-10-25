@@ -6,17 +6,28 @@ extends Node3D
 ##
 ## Each instance's transform carries where the unit is and which way it faces, its custom data
 ## (INSTANCE_CUSTOM, effects.gdshaderinc) what the shaders animate: x the gait's phase in steps
-## walked, y how much of the gait shows, z the hit flash, w the death's fade. A rigged type (its
-## mesh carries Surf.RIG: the ranger) aims while it attacks: its gait eases out, then its aim's
-## share rises to 1 (AIM_EASE), and while it shows y is minus that share and x the fire phase, 0
-## at a shot and 1 by the next (Rig); leaving the attack, the aim eases out before the gait comes
-## back, so the legs never snap. Positions are
+## walked, y how much of the gait shows, z the hit flash, w the death's fade. A hovering type's x
+## is Rig.BANK_BASE plus its bank in radians instead (Rig.BANK): its turn rate (the drawn
+## heading's change a second) times BANK_GAIN, at most BANK_MAX, eased at BANK_EASE. A type whose mesh carries a channel that
+## reads the aim (Rig.AIMING: the ranger's arms, a gun's slide, the brawler's punch, the bomber's bay)
+## aims while it attacks: its gait eases out, then its aim's share rises to 1 (AIM_EASE), and while
+## it shows y is minus that share and x the fire phase, 0 at a shot and 1 by the next, plus 2 after
+## an odd shot (the shot's index, from 0, mod 2: the parity a twin weapon's sides take turns on,
+## `muzzle` the left on even shots, `muzzle_2` the right on odd ones; Rig); leaving the attack, the
+## aim eases out before the gait or the bank comes back, so nothing snaps. While it aims, a type
+## whose aimed muzzle (on Rig.AIM) does not point straight ahead (the ranger's rifle, carried
+## across its body) turns by the yaw of its level direction off +Z, so the muzzle points at its
+## target; a muzzle within AIM_YAW_VERTICAL of straight up or down gives no yaw. A wheeled type steps at
+## WHEEL_STRIDE, half its wheels' turn, so its wheels (Rig.WHEEL) roll with the ground. Positions are
 ## interpolated here only, between the sim's last two ticks (after_step keeps both); the sim is
 ## read, never changed. A walking ground unit hops (the gait) at a step per STRIDE of its height
 ## walked; a wheeled one only jolts (WHEELED); a hovering or flying one bobs by its own surface
 ## flags. A unit turns smoothly towards where it last moved, or towards the building it attacks.
 ## A unit's shots (shoot()) leave its muzzle socket where the model has one (Rig.posed, as the
-## shaders pose the arm it is on) with a muzzle flash, or its middle; a rigged unit's shot is held
+## shaders pose the arm it is on) with a muzzle flash, or its middle; a blow that brings no shot (a
+## melee unit's, read from the sim's UNIT_HIT events) starts the fire phase and counts as a shot all
+## the same, so the brawler's fists punch in turn; socket_point() gives any of its
+## sockets (`muzzle`, `muzzle_2`, `bay`, `exhaust`, …) as last drawn. An aiming unit's shot is held
 ## until its aim's share reaches AIM_READY, so a bolt never leaves a rifle still rising. A hit
 ## flashes it for HIT_SECONDS; a death shrinks, sinks and fades it over DEATH_SECONDS, after
 ## which it is drawn no more. A thrown unit (a grav trap) flies to where it landed on an arc.
@@ -40,6 +51,19 @@ const STRIDE := 0.45
 const WALKING := 0.0005
 ## The gait's share for a ground unit on wheels: a jolt rather than a hop.
 const WHEELED := {"dune_runner": 0.3}
+## A wheeled type's step (world units): half its wheels' circumference, since Rig.WHEEL turns them
+## half a turn a step.
+const WHEEL_STRIDE := {"dune_runner": PI * UnitModels.VehicleModels.RUNNER_WHEEL}
+## A hovering unit's bank: radians per radian a second of turn, the most either way (25 degrees
+## in the air, 12 for a ground unit hovering low, whose hull would dip into the ground), and how
+## fast it follows (the share of the way a second, as an exponential rate).
+const BANK_GAIN := 0.2
+const BANK_MAX := 0.4363
+const BANK_MAX_GROUND := 0.2094
+const BANK_EASE := 10.0
+## The way a unit faces as it is deployed, before it turns onto its course (towards the camera's
+## right): so every unit, an aircraft too, turns onto its course, banking if it hovers.
+const DEPLOY_YAW := PI * 0.25
 ## A thrown unit's flight.
 const THROW_SECONDS := 0.45
 const THROW_HEIGHT := 1.6
@@ -51,6 +75,8 @@ const FAR_ZOOM := 20.0
 ## How fast a rigged unit's aim's share follows attacking or not (a second), the share from which
 ## its held shot is fired, and its muzzle flash's size.
 const AIM_EASE := 10.0
+## How near to vertical (radians) an aimed muzzle's direction gives its type no turn as it aims.
+const AIM_YAW_VERTICAL := 0.5236
 const AIM_READY := 0.9
 const MUZZLE_FLASH := 0.14
 
@@ -76,11 +102,16 @@ var _hop := PackedFloat32Array()
 var _stride := PackedFloat32Array()
 var _top := PackedFloat32Array()
 var _middle := PackedFloat32Array()
-## Per type: whether its model is rigged (Surf.RIG), the seconds between its shots, and its
-## `muzzle` socket (null for none).
-var _rigged := PackedByteArray()
+## Per type: whether it aims (its mesh carries a channel of Rig.AIMING), whether it hovers (its
+## x carries its bank), the seconds between its shots, its sockets by name and its `muzzle` socket (null
+## for none), and the yaw it turns by at full aim so that muzzle points ahead.
+var _aims := PackedByteArray()
+var _hovers := PackedByteArray()
+var _bank_max := PackedFloat32Array()
 var _fire_seconds := PackedFloat32Array()
+var _sockets: Array[Dictionary] = []
 var _muzzles: Array[LowPolyMesh.Socket] = []
+var _aim_yaw := PackedFloat32Array()
 
 ## Per unit (id - 1), as many as the sim has deployed: its type, its place at the last two ticks
 ## and as last drawn (world x and z), its heading, gait phase and share, when its hit flash began,
@@ -98,13 +129,19 @@ var _death_at := PackedFloat32Array()
 var _throw_at := PackedFloat32Array()
 var _throw_from := PackedVector2Array()
 var _bar := PackedFloat32Array()
-## Per unit: its aim's share, when its last shot left (-1 none), its instance state as last drawn
-## (Rig), and the shot it holds until it is ready (shoot()): when it was fired (-1 none), where
-## to, at which building, with what impact and colour.
+## Per unit: its aim's share, its bank, how many shots it has fired, when its last shot left (-1
+## none), its instance state and transform as last drawn (Rig), and the shot it holds until it is
+## ready (shoot()): when it was fired (-1 none), where to, at which building, with what impact and
+## colour.
 var _aim := PackedFloat32Array()
+var _bank := PackedFloat32Array()
+var _shots := PackedInt32Array()
 var _fired_at := PackedFloat32Array()
 var _state := PackedColorArray()
+var _drawn_as: Array[Transform3D] = []
 var _held_at := PackedFloat32Array()
+## Per unit: whether the last step brought it a blow (UNIT_HIT), not yet matched by a shot.
+var _blow := PackedByteArray()
 var _held_to := PackedVector3Array()
 var _held_building := PackedInt32Array()
 var _held_impact := PackedFloat32Array()
@@ -143,14 +180,19 @@ func setup(sim: BattleSim, catalog: Catalog, army: Dictionary, levels: Dictionar
 		_drawn.append(0)
 		var box := meshes.body.get_aabb()
 		var hovers := _has_flag(meshes.body, Surf.BOB)
-		_rigged.append(1 if _has_flag(meshes.body, Surf.RIG) else 0)
+		_aims.append(1 if _aiming(meshes.body) else 0)
+		_hovers.append(1 if hovers else 0)
 		_fire_seconds.append(maxf(0.05, int(catalog.unit_level_stats(unit, level).get("fire_ms", 1000)) / 1000.0))
-		_muzzles.append(meshes.sockets.get("muzzle"))
+		_sockets.append(meshes.sockets)
+		var muzzle: LowPolyMesh.Socket = meshes.sockets.get("muzzle")
+		_muzzles.append(muzzle)
+		_aim_yaw.append(_muzzle_yaw(muzzle))
 		var ground := catalog.unit_class(unit) == "ground"
+		_bank_max.append(BANK_MAX_GROUND if ground else BANK_MAX)
 		_hop.append(0.0 if hovers or not ground else float(WHEELED.get(unit, 1.0)))
 		_top.append(box.end.y)
 		_middle.append(box.get_center().y)
-		_stride.append(STRIDE * box.size.y)
+		_stride.append(float(WHEEL_STRIDE.get(unit, STRIDE * box.size.y)))
 
 
 ## The world point a unit's enemies' shots are aimed at: its middle.
@@ -160,6 +202,19 @@ func aim_point(id: int) -> Vector3:
 		return Vector3.ZERO
 	var at := _cur[u]
 	return Vector3(at.x, _middle[_type[u]], at.y)
+
+
+## Unit `id`'s socket `name` in the world as last drawn (Rig.posed, as the shaders pose the part it
+## is on), or its middle where its model has no such socket.
+func socket_point(id: int, name: String) -> Vector3:
+	var u := id - 1
+	if u < 0 or u >= _count:
+		return Vector3.ZERO
+	var socket: LowPolyMesh.Socket = _sockets[_type[u]].get(name)
+	var drawn := _drawn_as[u]
+	if socket == null:
+		return Vector3(drawn.origin.x, _middle[_type[u]], drawn.origin.z)
+	return drawn * Rig.posed(socket.position, socket.rig, socket.rig2, _state[u])
 
 
 ## Unit `id` fired at `to` (a hit on `building`) at `now`: a bolt of `color` from its muzzle, making
@@ -177,8 +232,12 @@ func shoot(id: int, to: Vector3, building: int, impact: float, color: Color, now
 
 
 ## Reads the units after a sim step: those deployed in it start where they stand, the rest move
-## their last tick's place to the one before.
+## their last tick's place to the one before; each unit that struck a blow in it is marked.
 func after_step() -> void:
+	var events := _sim.events
+	for i: int in events.count:
+		if events.kind[i] == BattleEvents.UNIT_HIT and events.source[i] >= 1 and events.source[i] <= _count:
+			_blow[events.source[i] - 1] = 1
 	var total := _sim.unit_count()
 	for u: int in _count:
 		_prev[u] = _cur[u]
@@ -191,8 +250,7 @@ func after_step() -> void:
 		_prev[u] = at
 		_cur[u] = at
 		_shown[u] = at
-		var heading := _sim.unit_heading(u + 1)
-		_yaw[u] = atan2(heading.x, heading.y) if heading != Vector2i.ZERO else PI * 0.25
+		_yaw[u] = DEPLOY_YAW
 		_phase[u] = 0.0
 		_gait[u] = 0.0
 		_flash_at[u] = -1.0
@@ -200,9 +258,13 @@ func after_step() -> void:
 		_throw_at[u] = -1.0
 		_bar[u] = 1.0
 		_aim[u] = 0.0
+		_bank[u] = 0.0
+		_shots[u] = 0
 		_fired_at[u] = -1.0
 		_state[u] = Color(0, 0, 0, 0)
+		_drawn_as[u] = Transform3D(Basis.IDENTITY, Vector3(at.x, 0.0, at.y))
 		_held_at[u] = -1.0
+		_blow[u] = 0
 
 
 ## Unit `id` was hit: it flashes from `now`.
@@ -239,6 +301,7 @@ func draw(alpha: float, now: float, delta: float, effects: BattleEffects, far: b
 	var ease_gait := minf(1.0, GAIT_EASE * delta)
 	var ease_bar := minf(1.0, BAR_EASE * delta)
 	var ease_aim := minf(1.0, AIM_EASE * delta)
+	var ease_bank := 1.0 - exp(-BANK_EASE * delta)
 	for u: int in _count:
 		var dying := _death_at[u] >= 0.0
 		var fade := clampf((now - _death_at[u]) / DEATH_SECONDS, 0.0, 1.0) if dying else 0.0
@@ -258,11 +321,11 @@ func draw(alpha: float, now: float, delta: float, effects: BattleEffects, far: b
 		var moved := at.distance_to(_shown[u])
 		_shown[u] = at
 		var state := _sim.unit_state(id)
-		var aiming := _rigged[t] == 1 and state == BattleArmy.ATTACKING and not dying
+		var aiming := _aims[t] == 1 and state == BattleArmy.ATTACKING and not dying
 		var walking := moved > WALKING and lift == 0.0 and not dying and not aiming
 		_gait[u] = move_toward(_gait[u], 1.0 if walking and _aim[u] == 0.0 else 0.0, ease_gait)
-		if _rigged[t] == 1:
-			_aim[u] = move_toward(_aim[u], 1.0 if aiming and _gait[u] == 0.0 else 0.0, ease_aim)
+		if _aims[t] == 1:
+			_aim[u] = move_toward(_aim[u], 1.0 if aiming and _gait[u] == 0.0 and _bank[u] == 0.0 else 0.0, ease_aim)
 		_phase[u] = fmod(_phase[u] + moved / _stride[t], 2.0)
 		var facing := Vector2.ZERO
 		var target := _sim.unit_target(id)
@@ -271,24 +334,39 @@ func draw(alpha: float, now: float, delta: float, effects: BattleEffects, far: b
 		else:
 			var heading := _sim.unit_heading(id)
 			facing = Vector2(heading.x, heading.y)
+		var was := _yaw[u]
 		if facing.length_squared() > 0.0001 and not dying:
 			_yaw[u] = lerp_angle(_yaw[u], atan2(facing.x, facing.y), turn)
+		if _hovers[t] == 1 and delta > 0.0:
+			if aiming or _aim[u] > 0.0 or dying:
+				_bank[u] = move_toward(_bank[u], 0.0, _bank_max[t] * ease_aim)
+			else:
+				var turned := -angle_difference(was, _yaw[u]) / delta
+				var banking := clampf(turned * BANK_GAIN, -_bank_max[t], _bank_max[t])
+				_bank[u] = lerpf(_bank[u], banking, ease_bank)
 		var flash := 0.0
 		if _flash_at[u] >= 0.0:
 			var since := now - _flash_at[u]
 			flash = 1.0 - since / HIT_SECONDS if since >= 0.0 and since < HIT_SECONDS else 0.0
 		var size := 1.0 - fade * fade
-		var basis := Basis(Vector3.UP, _yaw[u]).scaled(Vector3.ONE * maxf(size, 0.01))
+		var basis := Basis(Vector3.UP, _yaw[u] + _aim_yaw[t] * _aim[u]).scaled(Vector3.ONE * maxf(size, 0.01))
 		var origin := Vector3(at.x, lift - DEATH_SINK * fade, at.y)
-		var custom := Color(_phase[u], _gait[u] * _hop[t], flash, fade)
+		var custom := Color(Rig.BANK_BASE + _bank[u] if _hovers[t] == 1 else _phase[u], _gait[u] * _hop[t], flash, fade)
 		if _aim[u] > 0.0:
 			var fire := clampf((now - _fired_at[u]) / _fire_seconds[t], 0.0, 1.0) if _fired_at[u] >= 0.0 else 1.0
-			custom = Color(fire, -_aim[u], flash, fade)
+			custom = Color(fire + 2.0 * ((_shots[u] + 1) % 2), -_aim[u], flash, fade)
 		_state[u] = custom
+		_drawn_as[u] = Transform3D(basis, origin)
 		_buffers[t].put(_drawn[t], basis, origin, Color.WHITE, custom)
-		if _held_at[u] >= 0.0 and (_rigged[t] == 0 or _aim[u] >= AIM_READY or not aiming):
+		if _blow[u] == 1:
+			_blow[u] = 0
+			if _held_at[u] < 0.0:
+				_fired_at[u] = now
+				_shots[u] += 1
+		if _held_at[u] >= 0.0 and (_aims[t] == 0 or _aim[u] >= AIM_READY or not aiming):
 			_held_at[u] = -1.0
 			_fired_at[u] = now
+			_shots[u] += 1
 			var from := _muzzle_at(u, basis, origin)
 			effects.bolt(from, _held_to[u], _held_color[u], now, 0.0, _held_impact[u], _held_building[u], 0)
 			if _muzzles[t] != null:
@@ -315,10 +393,13 @@ func drawn() -> int:
 	return total
 
 
-## Unit `u`'s muzzle in the world, drawn with `basis` at `origin`: its type's `muzzle` socket posed
-## by the state it was last drawn in, or its middle.
+## Unit `u`'s muzzle in the world, drawn with `basis` at `origin`: its type's `muzzle` socket, or
+## on an odd shot its `muzzle_2` where it has one, posed by the state it was last drawn in, or its
+## middle.
 func _muzzle_at(u: int, basis: Basis, origin: Vector3) -> Vector3:
 	var socket := _muzzles[_type[u]]
+	if _shots[u] % 2 == 0 and _sockets[_type[u]].has("muzzle_2"):
+		socket = _sockets[_type[u]]["muzzle_2"]
 	if socket == null:
 		return Vector3(origin.x, _middle[_type[u]], origin.z)
 	return origin + basis * Rig.posed(socket.position, socket.rig, socket.rig2, _state[u])
@@ -343,9 +424,13 @@ func _resize(capacity: int) -> void:
 	_throw_from.resize(capacity)
 	_bar.resize(capacity)
 	_aim.resize(capacity)
+	_bank.resize(capacity)
+	_shots.resize(capacity)
+	_drawn_as.resize(capacity)
 	_fired_at.resize(capacity)
 	_state.resize(capacity)
 	_held_at.resize(capacity)
+	_blow.resize(capacity)
 	_held_to.resize(capacity)
 	_held_building.resize(capacity)
 	_held_impact.resize(capacity)
@@ -353,12 +438,46 @@ func _resize(capacity: int) -> void:
 
 
 ## Whether any part of a mesh has the surface flag `flag`: Surf.BOB for a hovering or flying
-## unit's, Surf.RIG for a rigged one's.
+## unit's.
 static func _has_flag(mesh: Mesh, flag: int) -> bool:
 	var arrays := mesh.surface_get_arrays(0)
 	var uv2s: PackedVector2Array = arrays[Mesh.ARRAY_TEX_UV2]
 	for uv2: Vector2 in uv2s:
 		if (roundi(uv2.y) & flag) != 0:
+			return true
+	return false
+
+
+## The yaw a type turns by at full aim so that its aimed `muzzle` (on Rig.AIM, posed aimed) points
+## ahead: minus its level direction's angle off +Z, or 0 for none, or within AIM_YAW_VERTICAL of
+## vertical.
+static func _muzzle_yaw(muzzle: LowPolyMesh.Socket) -> float:
+	if muzzle == null or (roundi(muzzle.rig.w) != Rig.AIM and roundi(muzzle.rig2.w) != Rig.AIM):
+		return 0.0
+	var ahead := Rig.posed_direction(muzzle.direction, muzzle.rig, muzzle.rig2, Color(1, -1, 0, 0)).normalized()
+	if absf(ahead.y) > cos(AIM_YAW_VERTICAL):
+		return 0.0
+	return -atan2(ahead.x, ahead.z)
+
+
+## Whether any part of a mesh is rigged on `channel`, as its own joint or its parent's.
+static func _has_channel(mesh: Mesh, channel: int) -> bool:
+	var arrays := mesh.surface_get_arrays(0)
+	for slot: int in [Mesh.ARRAY_CUSTOM1, Mesh.ARRAY_CUSTOM2]:
+		if arrays[slot] == null:
+			return false
+		var joints: PackedFloat32Array = arrays[slot]
+		for i: int in range(3, joints.size(), 4):
+			if roundi(joints[i]) == channel:
+				return true
+	return false
+
+
+## Whether any part of a mesh is rigged on a channel that reads the aim (Rig.AIMING), as its own
+## joint or its parent's.
+static func _aiming(mesh: Mesh) -> bool:
+	for channel: int in Rig.AIMING:
+		if _has_channel(mesh, channel):
 			return true
 	return false
 
