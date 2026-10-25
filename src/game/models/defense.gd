@@ -72,8 +72,6 @@ static var ION_ORB := _glow(MaterialKit.ENERGY, Surf.PULSE | Surf.BOB)
 static var ION_CURRENT := Parts.current(MaterialKit.ENERGY, 0.8)
 static var ION_ARC := Parts.spark(MaterialKit.ENERGY)
 static var ION_HOLO := Surf.make(MaterialKit.Layer.GLOW, MaterialKit.ENERGY, 1.0, Surf.HOLO)
-## A muzzle's flash: a yellow flare, there and gone.
-static var FLARE := Surf.make(MaterialKit.Layer.GLOW, MaterialKit.HAZARD, 1.0, Surf.UNLIT | Surf.FLICKER)
 static var ARC_PULSE := _glow(MaterialKit.ARC_BLUE, Surf.PULSE)
 static var ARC_BLINK := _glow(MaterialKit.ARC_BLUE, Surf.BLINK)
 static var ARC_SPARK := Parts.spark(MaterialKit.ARC_BLUE.lightened(0.35))
@@ -200,12 +198,17 @@ const MORTAR_CANISTER_HEIGHT := 0.52
 ## muzzle brakes'.
 const FLAK_RISE := 0.65
 const FLAK_RADAR_RAISE := 0.25
+## The flak cannon's radar mast on the head: its foot's height on the carriage's top and how far
+## back of the head's centre, and how tall it stands before FLAK_RADAR_RAISE.
+const FLAK_MAST_FOOT := 0.37
+const FLAK_MAST_BACK := 0.3
+const FLAK_MAST := 0.2
 const FLAK_BORE := 0.11
 const FLAK_BRAKE := 0.16
 ## From L7 the height between the two rows of barrels, and the targeting ring's height over the
 ## deck.
 const FLAK_ROW := 0.22
-const FLAK_RING_LIFT := 1.6
+const FLAK_RING_LIFT := 1.95
 ## The shield generator from L5, by level from L5: the plinth's height, and how much higher the orb
 ## floats, the pylons growing with it; the field ring's and the L7 hovering ring's distance out
 ## from the orb, and the hovering ring's drop under its centre.
@@ -907,10 +910,11 @@ static func build_shield_generator(p: Parts, level: int) -> void:
 ## The head stands high on a bell mount that keeps growing taller every level: to L6 a red
 ## carriage (the tier's plate from L5) between armour packs, cream to the Gold tier and red above,
 ## with fat barrels angled 50 degrees up, one a side and two a side from L3, each with a muzzle
-## brake (gold from the Gold tier), and a big radar on a fat mast beside it. L5 (Chrome): chrome
-## plinth, mount, carriage and barrels, and a glowing cyan ammo belt feeding the carriage from
-## the crate. L6 a second crate on the near corner with its belt into the near armour pack, and a
-## bigger chrome radar. L7 (Obsidian): a taller plinth with glowing violet vein panels on its faces the
+## brake (gold from the Gold tier), and a big radar on a fat mast on the carriage's back. The
+## carriage, its packs, barrels and radar turn on the drum as one head. L5 (Chrome): chrome
+## plinth, mount, carriage and barrels, and a glowing cyan ammo belt feeding the drum from the
+## crate. L6 a second crate on the near corner with its belt into the drum, and a bigger chrome
+## radar. L7 (Obsidian): a taller plinth with glowing violet vein panels on its faces the
 ## camera sees, the mount and carriage obsidian veined violet, four barrels a side in two rows of
 ## two tipped with violet crystal shells, the belts violet, and a targeting ring hovering over the
 ## guns, turning.
@@ -937,13 +941,18 @@ static func build_flak_cannon(p: Parts, level: int) -> void:
 	var tilt := Vector3(40.0 if fat else 38.0, yaw, 0)
 	var centre := Vector3(0, deck, 0)
 	Parts.drum(m, 0.44, 0.1, 0.03, 20, centre, Parts.GUNMETAL)
+	# The head turns on the drum: the carriage, its armour packs, the barrels and the radar on its
+	# back, one moving part built about the drum's centre. It scans slowly and aims in battle
+	# (BuildingView), each shot kicking it back along its barrels; a muzzle socket at every barrel's
+	# end, the sides in turn.
+	var head := p.moving(centre, Motion.swing(Vector3.UP, 15.0, 9.0))
 	# The carriage: red to the Gold tier, between cream armour packs; the tier's plate above, between
 	# red ones.
-	m.box_chamfered(Vector3(0.66, 0.54, 0.8), 0.07, centre + Vector3(0, 0.1, 0), _by_tier(p.tier, ARMOUR, Parts.CHROME, Parts.OBSIDIAN),
+	head.box_chamfered(Vector3(0.66, 0.54, 0.8), 0.07, Vector3(0, 0.1, 0), _by_tier(p.tier, ARMOUR, Parts.CHROME, Parts.OBSIDIAN),
 		heading)
-	m.box(Vector3(0.36, 0.05, 0.02), _at(centre, Vector3(0, 0.5, 0.401), heading), _by_tier(p.tier, ION, LASER, LASER), heading)
+	head.box(Vector3(0.36, 0.05, 0.02), LowPolyMesh.turn(Vector3(0, 0.5, 0.401), heading), _by_tier(p.tier, ION, LASER, LASER), heading)
 	if level >= 4:
-		m.box_chamfered(Vector3(0.7, 0.07, 0.84), 0.02, centre + Vector3(0, 0.56, 0),
+		head.box_chamfered(Vector3(0.7, 0.07, 0.84), 0.02, Vector3(0, 0.56, 0),
 			GOLD if p.tier >= Parts.Tier.GOLD else Parts.HULL_MID, heading)
 	var per_side := 1 if level < 3 else (2 if level < 7 else 4)
 	# From L7 the four barrels a side stand in two rows of two, so the quad shows.
@@ -953,44 +962,37 @@ static func build_flak_cannon(p: Parts, level: int) -> void:
 	var spacing := 2.0 * FLAK_BRAKE + 0.02 if fat else 0.13
 	var pack := 0.08 + spacing * columns
 	var first := 0.37 + spacing * 0.5 if fat else 0.41
-	# The barrels recoil together, kicking back `kick` from where they rest and easing out again;
-	# their muzzles blink and flare. The recoil takes BLINK's period, 1.2 s, at phase 0, and both
-	# run on the one animation clock (Motion.clock(), the shaders' anim_time), so each muzzle
-	# flashes on its barrel's kick.
 	var along := LowPolyMesh.turn(Vector3.UP, tilt)
-	var kick := 0.06
-	var guns := p.moving(centre, Motion.slide(-along, kick, 1.2, 0.0, Motion.Ease.RECOIL))
-	var breech := -along * kick
-	var flare := 0
 	var barrel := BARREL if p.tier < Parts.Tier.CHROME else Parts.CHROME_ROUND
 	var shell := LASER_BLINK if level < 7 else CRYSTAL_BLINK
 	for side: float in [-1.0, 1.0]:
-		m.box_chamfered(Vector3(pack, 0.38 + FLAK_ROW * (rows - 1), 0.56), 0.04,
-			_at(centre, Vector3(side * (0.33 + pack * 0.5), 0.12, 0), heading), _by_tier(p.tier, SHELL, ARMOUR, ARMOUR), heading)
+		head.box_chamfered(Vector3(pack, 0.38 + FLAK_ROW * (rows - 1), 0.56), 0.04,
+			LowPolyMesh.turn(Vector3(side * (0.33 + pack * 0.5), 0.12, 0), heading), _by_tier(p.tier, SHELL, ARMOUR, ARMOUR), heading)
 		for k: int in per_side:
-			var root := _at(breech, Vector3(side * (first + spacing * (k % columns)), 0.4 + FLAK_ROW * (k / columns), 0.05),
+			var root := LowPolyMesh.turn(Vector3(side * (first + spacing * (k % columns)), 0.4 + FLAK_ROW * (k / columns), 0.05),
 				heading)
 			var length := 1.05
-			guns.prism(bore, bore, length, 16, root, barrel, tilt)
+			head.prism(bore, bore, length, 16, root, barrel, tilt)
 			# A muzzle brake: gunmetal, gold from the Gold tier.
 			var brake := GOLD if p.tier >= Parts.Tier.GOLD else Parts.GUNMETAL
 			if fat:
-				guns.tube(bore * 0.5, FLAK_BRAKE, 0.2, 16, _at(root, Vector3(0, length - 0.16, 0), tilt), brake, tilt)
+				head.tube(bore * 0.5, FLAK_BRAKE, 0.2, 16, _at(root, Vector3(0, length - 0.16, 0), tilt), brake, tilt)
 			else:
-				guns.tube(0.04, 0.085, 0.16, 16, _at(root, Vector3(0, length - 0.12, 0), tilt), brake, tilt)
-			guns.orb(bore * 0.85, 12, 6, _at(root, Vector3(0, length + 0.05, 0), tilt), shell)
-			guns.cone(bore, bore * 2.6, 8, _at(root, Vector3(0, length + 0.08, 0), tilt),
-				FLARE.phased(flare / (2.0 * per_side)), tilt)
-			flare += 1
+				head.tube(0.04, 0.085, 0.16, 16, _at(root, Vector3(0, length - 0.12, 0), tilt), brake, tilt)
+			head.orb(bore * 0.85, 12, 6, _at(root, Vector3(0, length + 0.05, 0), tilt), shell)
+			var muzzle := k * 2 + (0 if side < 0.0 else 1)
+			head.socket("muzzle" if muzzle == 0 else "muzzle_%d" % (muzzle + 1), _at(root, Vector3(0, length + 0.1, 0), tilt), along)
 		if level >= 3:
-			m.prism(0.18, 0.18, 0.2, 16, _at(centre, Vector3(side * (0.33 + pack), 0.22, -0.12), heading),
+			head.prism(0.18, 0.18, 0.2, 16, LowPolyMesh.turn(Vector3(side * (0.33 + pack), 0.22, -0.12), heading),
 				SHELL_MID, heading + Vector3(0, 0, -90 * side))
-	var mast_foot := Parts.around(0.92, 135.0, top)
-	var mast := deck + 0.45 - top + FLAK_RADAR_RAISE
-	_mast(m, mast_foot, mast, _by_tier(p.tier, Parts.GUNMETAL, Parts.CHROME_ROUND, Parts.CHROME_ROUND))
-	var radar := p.moving(mast_foot + Vector3(0, mast, 0), Motion.spin(Vector3.UP, Parts.DISH_RATE))
+	# The radar rides the head on a mast standing on the carriage's back, its dish turning over the
+	# barrels' breeches, small enough that the guns still show over it when the head faces away.
+	var mast_foot := LowPolyMesh.turn(Vector3(0, FLAK_MAST_FOOT, -FLAK_MAST_BACK), heading)
+	var mast := FLAK_MAST + FLAK_RADAR_RAISE
+	_mast(head, mast_foot, mast, _by_tier(p.tier, Parts.GUNMETAL, Parts.CHROME_ROUND, Parts.CHROME_ROUND))
+	var radar := p.riding(head, centre + mast_foot + Vector3(0, mast, 0), Motion.spin(Vector3.UP, Parts.DISH_RATE))
 	var face := Vector3(70, 0, 0)
-	var dish := 1.5 if level < 6 else 1.8
+	var dish := 1.1 if level < 6 else 1.3
 	radar.lathe(PackedVector2Array([
 		Vector2(0.06, 0) * dish, Vector2(0.32, 0.1) * dish, Vector2(0.3, 0.13) * dish, Vector2(0, 0.04) * dish,
 	]), 24, Vector3(0, 0.12, -0.08), _by_tier(p.tier, SHELL, Parts.CHROME_ROUND, Parts.CHROME_ROUND), face)
@@ -1003,16 +1005,17 @@ static func build_flak_cannon(p: Parts, level: int) -> void:
 		return
 	# Glowing ammo belts feeding the guns from the crates: cyan, violet from the Obsidian tier.
 	var belt := VIOLET_CURRENT if p.tier >= Parts.Tier.OBSIDIAN else ION_CURRENT
+	# They run into the drum the head turns on.
 	_belt(m, Parts.around(1.42, 315.0, Parts.PAD_HEIGHT + 0.32), Parts.around(0.98, 330.0, top + 0.1),
-		_at(centre, Vector3(0, 0.18, 0.4), heading), belt)
+		Parts.around(0.42, 330.0, deck + 0.05), belt)
 	if level >= 6:
 		_crate(m, Parts.around(1.42, 45.0, Parts.PAD_HEIGHT))
 		_belt(m, Parts.around(1.42, 45.0, Parts.PAD_HEIGHT + 0.32), Parts.around(0.98, 55.0, top + 0.1),
-			_at(centre, Vector3(-(0.33 + pack), 0.24, 0), heading), belt)
+			Parts.around(0.42, 55.0, deck + 0.05), belt)
 	if level >= 7:
 		_plinth_panels(m, 1.15, plinth)
 		# Veins on the carriage's side and up the mount's neck, where the camera sees them.
-		m.box(Vector3(0.02, 0.34, 0.6), _at(centre, Vector3(-0.34, 0.2, 0), heading), VEIN_PANEL, heading)
+		head.box(Vector3(0.02, 0.34, 0.6), LowPolyMesh.turn(Vector3(-0.34, 0.2, 0), heading), VEIN_PANEL, heading)
 		var low := 0.32
 		var high := rise - 0.1
 		m.lathe(PackedVector2Array([Vector2(_neck(low, rise) + 0.012, low), Vector2(_neck(high, rise) + 0.012, high)]), 20,
@@ -1027,7 +1030,7 @@ static func build_flak_cannon(p: Parts, level: int) -> void:
 		var housing := Parts.around(0.86, 15.0, top)
 		m.box_chamfered(Vector3(0.3, 0.16, 0.3), 0.04, housing, Parts.GOLD_TRIM, Vector3(0, 75, 0))
 		m.orb(0.15, 16, 6, housing + Vector3(0, 0.26, 0), Parts.CORE_GLOW)
-		_crown(m, mast_foot + Vector3(0, mast - 0.2, 0), 0.13, 5)
+		_crown(head, mast_foot + Vector3(0, mast - 0.2, 0), 0.13, 5)
 
 
 ## A glowing ammo belt from a crate's lid `from` over the plinth's edge at `over` to `to` on the

@@ -55,6 +55,10 @@ const DEFENCE_MUZZLES: Array[String] = ["muzzle", "muzzle_2", "muzzle_3", "muzzl
 const MISSILE_TUBES: Array[String] = ["muzzle", "muzzle_2", "muzzle_3", "muzzle_4", "muzzle_5", "muzzle_6", "muzzle_7",
 	"muzzle_8", "muzzle_9", "muzzle_10", "muzzle_11", "muzzle_12", "muzzle_13", "muzzle_14", "muzzle_15", "muzzle_16",
 	"muzzle_17", "muzzle_18", "muzzle_19", "muzzle_20"]
+## The flak cannon's barrels, as many as its four a side from L7: its shots leave them in turn,
+## the sides alternating, as many as the model has.
+const FLAK_BARRELS: Array[String] = ["muzzle", "muzzle_2", "muzzle_3", "muzzle_4", "muzzle_5", "muzzle_6", "muzzle_7",
+	"muzzle_8"]
 const TWIN: Array[String] = ["muzzle", "muzzle_2"]
 const ONE: Array[String] = ["muzzle"]
 
@@ -77,7 +81,7 @@ const TABLE := {
 		"trail": Trail.GLOW, "flash": 0.35, "flash_shape": Flash.RING, "sockets": ONE, "impact": Impact.SPLASH,
 		"impact_size": 0.8, "light": 1.2, "recoil": 0.08},
 	"flak_cannon": {"kind": Kind.TRACER, "color": FLAK_YELLOW, "width": 0.09, "length": 0.5, "speed": 35.0,
-		"burst": 2, "burst_gap": 0.06, "flash": 0.22, "sockets": DEFENCE_MUZZLES, "impact": Impact.AIR_BURST,
+		"burst": 2, "burst_gap": 0.06, "flash": 0.22, "sockets": FLAK_BARRELS, "impact": Impact.AIR_BURST,
 		"impact_size": 0.8, "recoil": 0.06},
 	"arc_tower": {"kind": Kind.LIGHTNING, "color": MaterialKit.ARC_BLUE, "flash": 0.35, "flash_shape": Flash.RING,
 		"sockets": ONE, "impact": Impact.SPARKS, "impact_size": 0.35, "light": 0.6},
