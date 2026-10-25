@@ -251,7 +251,7 @@ upload; nothing is allocated a frame:
 | `UNIT_HIT` | by the unit's record: a blow (the brawler's), landing `PUNCH_DELAY` (60 ms) later at the fist that throws it (`muzzle`, or `muzzle_2` on an odd blow by its drawn state's parity, `BattleUnits.socket_point`): a ring `PUNCH_RING` (1.5) times its record's impact size, sparks, a short white flash and dust, the building flashed and shaken; the breacher's charge going off at the building's near face, its fireball standing off it by its radius (its record's blast, with debris); any other a shot through `BattleUnits.shoot` (**Units**) aimed at the building's near face (`HIT_FACE`, 0.48 of its footprint from its centre towards the unit, `HIT_HEIGHT` up; a bomb lower), flashing and shaking the building when it arrives |
 | `SHOT` | the defence's record's projectile from its next muzzle socket, held until its head faces the unit (**Aim and muzzles**), or from its centre `MUZZLE_SHARE` of its height up when it has no socket, to the unit, flashing it on arrival; a shot that stuns (the EMP tower's) leaves the unit crackling yellow for the defence's `stun_ms` from when its pulse arrives |
 | `SHELL`, `SHELL_LAND` | the record's projectile (the mortar's plasma, the orbital cannon's ball) on an arc landing where the sim aimed it when it lands; its impact as wide as the splash |
-| `HOLD` | a violet pull round the gravity well, half its range, and its vortex beam from it to each unit of its targets' class in its reach, held `hold_ms`, with a ring on the unit |
+| `HOLD` | a violet pull round the gravity well, half its range, and its vortex from it to each unit of its targets' class in its reach, held `hold_ms` (**Vortices**) |
 | `DETONATE`, `THROW` | the trap sprung (**The field and the buildings**); the thrown units' flights |
 | `REVEAL` | the sentry shown, fading in over 0.3 s (**Aim and muzzles**), in a shimmer of energy rings and wisps |
 | `FALL` | the building's collapse and rubble, or the wall's strip with chunks and dust |
@@ -274,7 +274,30 @@ The primitives (`BattleEffects`), none with a shadow or an outline:
   across its flight, growing as it goes.
 - **Beams** (64): a six-sided unlit rod with FLOW, stretched between the two ends and thinning to
   nothing: at once for a streak (`STREAK_SECONDS`, 0.12 s), after a hold for a beam (the record's
-  `hold`, or the vortex's `hold_ms`).
+  `hold`).
+- **Vortices** (`MAX_VORTICES` 24, two instances each, one draw): the gravity well's hold, from
+  its core to each held unit (`BattleEffects.vortex`). One mesh in two parts, which its own small
+  shader (`VORTEX_SHADER`: unshaded, alpha-blended) picks between by the instance's custom data x:
+  - the sheath: a soft violet tube whose alpha falls from about 0.5 at the core's edge to nothing
+    at its rim, pulsing `VORTEX_SWELL` (15%) at `VORTEX_PULSE` (1.5 Hz);
+  - the strands: a pale core and a double helix of two strands the same way round it,
+    `VORTEX_TURNS` (3) turns over the beam's length, banded lilac and violet with the bands wider
+    than their gaps, turning at `VORTEX_SPIN` so the bands scroll from the unit to the well.
+
+  Every sheath takes the low instances and every strand the ones after, so no sheath is drawn over
+  a strand. A vortex fades in over `VORTEX_FADE_IN` (0.15 s) and out over `VORTEX_FADE_OUT` (0.3 s),
+  at its hold's end, or at once when its unit dies or its well falls (`end_vortices`).
+
+  While it holds, a violet ring tightens round the unit every 0.5 s, and a thick violet ring
+  slides down the beam to the well every `VORTEX_SLIDE_STEP` (0.3 s), narrowing as it goes. The
+  rings are worked out from the vortex's own clock each frame into a list of their own
+  (`VORTEX_RINGS`, 4, a vortex; one more draw), so they stop the moment it starts to fade and
+  never take the EMP pulses' places. The shader collapses the part an instance does not draw to a
+  point in `vertex()`, so it costs no fragments. A unit's death ends only its vortices; its well
+  glows on while it holds any other. An EMP burst does not release a hold (the sim keeps
+  `hold_until`), so a disabled well's vortices run on to their hold's end. Each well holding anything, once however many it holds, glows
+  round its plinth (a pale violet decal `WELL_RIM` (0.8) of its footprint across, pulsing) and
+  swirls at its mouth (a ring 0.75 across, every 0.6 s).
 - **Lightning** (`MAX_ARCS` 96): the LIGHTNING surface on a kinked strip from the tower to the
   unit, `ARC_MAIN` (1.3) times as thick, and two thinner branches forking off it towards the
   target, for `ARC_SECONDS`, tinted `ARC_TINT`.
@@ -339,7 +362,7 @@ timed by `BattleUnits.death_seconds`), `hold` (a beam's).
 | flak cannon | yellow tracers, two a shot | an air burst at the unit |
 | arc tower | lightning with two branches, a ring flash at the coil | blue sparks |
 | cloaked sentry | short red laser bolts | red sparks |
-| gravity well | a violet vortex beam to each air unit it holds | a ring on the unit |
+| gravity well | a twisting double-helix vortex to each air unit it holds, rings sliding along it to the well, its plinth glowing | a ring tightening round the unit |
 | EMP tower | a yellow pulse ring travelling to the unit | EMP arcs, then the stun crackle |
 | railgun | a cyan streak, instant, fading in 0.12 s | cyan sparks |
 | ion beam | a white-cyan beam held 0.2 s, a ring flash at the lens | a burn |

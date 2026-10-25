@@ -664,8 +664,11 @@ strip. Each battle is surrendered and left before the next.
 - `scenarios/anim_defences.gd`: every type with a targets class (the guns and the traps) at
   level 1 beside a level 1 Metal Silo, a Hover Tank (a Gunship for an air defence) deployed by
   the silo, two cells from the defence, three ticks into `<type>-fire` (8, 50 ms; the plasma mortar 10 at 150 ms, the orbital cannon
-  12 at 200 ms, the gravity well and the grav trap 8 at 100 ms), framed with `frame_span` on the
-  defence's head and the unit and cropped, and for a defence `<type>-impact` (8, 50 ms; the
+  12 at 200 ms, the grav trap 8 at 100 ms, the gravity well, at level 5 so it holds 2.5 s, 24 at
+  100 ms), framed with `frame_span` on the defence's head and the unit and cropped; then
+  `gravity_well-release` (8, 80 ms, from 6 ticks before its hold ends: the vortex fading out),
+  and later `gravity_well-three` (16, 100 ms: the well holding three gunships at once, a vortex to
+  each and its glow and swirl once; it checks all three are held); and for a defence `<type>-impact` (8, 50 ms; the
   missile battery 10 at 60 ms, the plasma mortar 10 at 120 ms, the orbital cannon 12 at 200 ms,
   the gravity well 8 at 150 ms), close on the unit (camera size 6, cropped) from its next shot (a
   new projectile in the defence's colour): the projectile arriving and its impact; then

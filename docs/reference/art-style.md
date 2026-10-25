@@ -1139,6 +1139,9 @@ saturated like the models, built in code with `LowPolyMesh` on the kit's surface
 - **Debris** is lit plate in the hull's dark greys, gunmetal, orange or the walls' colour.
 - **Light** is faked: an additive glow decal on the ground under a flash or a blast, its colour
   the weapon's warmed towards the blast's core; no light node.
+- **The gravity well's vortex** is a soft violet tube round a double helix banded lilac and
+  violet, its bands scrolling towards the well, with bold violet rings sliding down it: a pull,
+  not a flat line.
 - **Missiles and bombs** are small models: a white hull with a red nose and gunmetal fins, an
   orange casing with a hazard band.
 
