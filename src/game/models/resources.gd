@@ -211,10 +211,9 @@ static var CRYSTAL_BEAM := Surf.make(MaterialKit.Layer.GLOW, HOT_CRYSTAL, 1.0, S
 ## The sparks where the beam cuts, and the L4 pylons' lamps, which blink in a chase.
 static var CUT_SPARK := Surf.make(MaterialKit.Layer.GLOW, MaterialKit.HAZARD, 1.0, Surf.UNLIT | Surf.FLICKER)
 static var CRYSTAL_LAMP := Surf.make(MaterialKit.Layer.GLOW, MaterialKit.CRYSTAL, 1.0, Surf.UNLIT | Surf.BLINK, true)
-static var LEG := Surf.make(MaterialKit.Layer.PLATE, MaterialKit.HULL_MID)
 ## The conveyor belt: grating running up towards the hopper.
 static var BELT := Surf.make(MaterialKit.Layer.GRATING, MaterialKit.GUNMETAL, 3.0, Surf.FLOW, false, true, 0.7)
-static var STACK := Surf.make(MaterialKit.Layer.PIPE, MaterialKit.HULL_MID, 2.0, Surf.LIT, true)
+static var STACK := Surf.make(MaterialKit.Layer.PIPE, MaterialKit.HULL_LIGHT, 2.0, Surf.LIT, true)
 static var SOOT := Surf.make(MaterialKit.Layer.FLAT, MaterialKit.INK)
 static var ENGINE_VENT := Surf.make(MaterialKit.Layer.VENT, MaterialKit.HULL_DARK, 2.0)
 static var ROCK := Surf.make(MaterialKit.Layer.ROCK, MaterialKit.ROCK_LIT)
@@ -222,29 +221,40 @@ static var DRILL_BIT := Surf.make(MaterialKit.Layer.PIPE, MaterialKit.HULL_LIGHT
 static var ARMOUR := Surf.make(MaterialKit.Layer.PLATE, MaterialKit.HULL_DARK)
 static var PYLON_ARMOUR := Surf.make(MaterialKit.Layer.PLATE, MaterialKit.HULL_MID)
 
-## The metal extractor's drill axis, its derrick's legs (degrees around the axis, meeting
-## LEG_TOP from the axis under the crown), the derrick's height by level, and the share of the
-## legs' height the drill's top drive reaches (low enough that its sweep clears the legs).
-const DRILL := Vector3(-0.3, 0, -0.3)
+## The metal extractor's drill axis, through the middle of its drill housing, the main mass: a
+## chamfered block HOUSING_WIDTH across, its height by level (from L6 taller each level: the rig grows
+## in its housing, not in a taller lattice), banded in the metal accent BELT_HEIGHT tall (BELT_TALL
+## from L6, on the taller housing). On its
+## roof the derrick: three legs LEG_WIDTH across (degrees around the axis), from LEG_FOOT out on the
+## roof to LEG_TOP under the crown block, DERRICK tall (DERRICK_TALL from L6), and the solid crown
+## block, CROWN_WIDTH across and CROWN_HEIGHT tall; and the height over the roof the drill's top
+## drive reaches, sitting on the chuck, low enough that its sweep clears the legs.
+const DRILL := Vector3(-0.2, 0, -0.2)
+const HOUSING_WIDTH := 1.2
+const HOUSING_HEIGHTS := [0.7, 0.75, 0.8, 0.85, 0.9, 1.15, 1.3, 1.45, 1.6, 1.75]
+const BELT_HEIGHT := 0.2
+const BELT_TALL := 0.32
 const DERRICK_LEGS := [80.0, 200.0, 320.0]
-const DERRICK_HEIGHTS := [1.65, 1.75, 1.95, 2.05, 2.15, 2.75, 2.95, 3.3, 3.5, 3.8]
-const LEG_TOP := 0.22
-const DRIVE_TOP := 0.75
-const BRACE := 0.42
-## The second ring of braces from L6, higher up the legs.
-const UPPER_BRACE := 0.7
-## Its hoppers (the second from L4, each fed by a conveyor from the collar), the height of a
-## hopper's rim, and the exhaust stacks on its engine house by level:
-## [x, z, height above the roof].
-const HOPPERS := [Vector3(-0.82, 0, 0.8), Vector3(0.55, 0, 0.95)]
-const HOPPER_RIM := 0.72
-const ENGINE_HOUSE := Vector3(0.8, 0, 0.05)
-const STACKS := [[0.95, -0.15, 0.7], [0.98, 0.25, 0.85], [0.62, -0.2, 0.55]]
+const LEG_FOOT := 0.48
+const LEG_TOP := 0.26
+const LEG_WIDTH := 0.22
+const DERRICK := 0.85
+const DERRICK_TALL := 1.0
+const CROWN_WIDTH := 0.8
+const CROWN_HEIGHT := 0.3
+const DRIVE_TOP := 0.58
+## The one hopper, fed by a conveyor out of the housing's front, the height of its rim, and the ore
+## tub beside it from L4; the one exhaust stack on the housing's right side and its radius.
+const HOPPER := Vector3(-0.6, 0, 0.98)
+const HOPPER_RIM := 0.55
+const ORE_TUB := Vector3(0.05, 0, 1.0)
+const STACK_SPOT := Vector3(0.62, 0, -0.42)
+const STACK_RADIUS := 0.18
 ## The walking beam on the derrick's crown: its pin's height over the crown block's foot, its
 ## length, and its swing. It lies across the camera's view (ACROSS) and rocks about the
 ## horizontal axis square to it (ROCKER_AXIS), so it is seen in profile.
-const ROCKER_PIN := 0.62
-const ROCKER_LENGTH := 0.9
+const ROCKER_PIN := 0.78
+const ROCKER_LENGTH := 1.12
 const ACROSS := Vector3(0.70710678, 0, -0.70710678)
 const ROCKER_AXIS := Vector3(0.70710678, 0, 0.70710678)
 ## The L7 pumpjack on the right corner, its pin's height over the pad and its walking beam's
@@ -254,26 +264,26 @@ const PUMPJACK_PIN := 0.7
 const PUMPJACK_LENGTH := 0.62
 ## The L9 collar hovering round the derrick, this far under the crown block's foot.
 const COLLAR_DROP := 0.4
-## The L10 ore hauler's track over the first hopper's conveyor, across the camera's view: where
-## its middle is at either end, along the line from the drill to that hopper (the near end inside
-## the derrick, between its legs, over the drill's auger; the far end over the hopper), and how
-## high; and how far the track lies to the side of the belt's line, away from the derrick's leg it
-## passes.
-const HAULER_NEAR := 0.66
+## The L10 ore hauler's track from over the housing's front edge out over the hopper, along the
+## line from the drill to the hopper: how far out along it each end is, how high over the housing's
+## roof the near end and how far under it the far end (high over the hopper, clear of the housing's
+## front edge and the ore floating over the hopper), and how far the track lies to the side of
+## that line, away from the derrick's front leg.
+const HAULER_NEAR := 0.62
 const HAULER_FAR := 1.2
-const HAULER_NEAR_HEIGHT := 1.3
-const HAULER_FAR_HEIGHT := 1.55
-const HAULER_ASIDE := 0.05
+const HAULER_NEAR_LIFT := 0.3
+const HAULER_FAR_DROP := 0.1
+const HAULER_ASIDE := 0.15
 ## Seconds for a round trip, drill to hopper and back, and the hauler's size, so it reads at the
 ## gameplay zoom.
 const HAULER_PERIOD := 5.0
 const HAULER_SCALE := 1.35
-## The L10 antimatter core on the engine house's roof, clear of its stacks.
-const HOUSE_CORE := Vector3(0.62, 0, 0.27)
+## The L10 antimatter core on the housing's roof, on its front corner clear of the legs.
+const HOUSE_CORE := Vector3(0.2, 0, 0.2)
 
-## The high levels' own: the L8 ore crystals hovering over the hoppers, metal like all the ore; the
+## The high levels' own: the L8 ore crystals hovering over the hopper, metal like all the ore; the
 ## L9 collar, obsidian with veins across its top and a violet rim, bobbing together; and the
-## crystal inlays on the engine house.
+## crystal inlays on the housing.
 static var FLOATING_ORE := Surf.make(MaterialKit.Layer.CRYSTAL, MaterialKit.METAL, 1.0, Surf.GLOSSY | Surf.PULSE | Surf.BOB)
 static var HOVER_RING := Surf.make(MaterialKit.Layer.OBSIDIAN, Parts.OBSIDIAN_TINT, 1.0, Surf.GLOSSY | Surf.BOB, true, true, 0.7)
 static var HOVER_VEINS := Surf.make(MaterialKit.Layer.VEINS, MaterialKit.ANTIMATTER, 1.0, Surf.UNLIT | Surf.FLOW | Surf.BOB, true, true,
@@ -281,95 +291,111 @@ static var HOVER_VEINS := Surf.make(MaterialKit.Layer.VEINS, MaterialKit.ANTIMAT
 static var HOVER_RIM := Surf.make(MaterialKit.Layer.GLOW, Parts.CORE_GLOW_TINT, 1.0, Surf.UNLIT | Surf.PULSE | Surf.BOB, true, true,
 	0.7)
 static var INLAY := Surf.make(MaterialKit.Layer.CRYSTAL, MaterialKit.CRYSTAL, 1.0, Surf.UNLIT | Surf.PULSE)
+## The hopper's ore glowing across its whole top, pulsing.
+static var ORE_GLOW := Surf.make(MaterialKit.Layer.GLOW, MaterialKit.METAL, 1.0, Surf.UNLIT | Surf.PULSE, true)
 ## The L10 ore hauler's thrusters, pulsing.
 static var HAULER_THRUST := Surf.make(MaterialKit.Layer.GLOW, MaterialKit.ENERGY, 1.0, Surf.UNLIT | Surf.PULSE, true)
-## The Crown tier's antimatter core where it is the model's crown (the extractor's crown and engine
-## house): the glow layer in a light violet, unlit and steady, so it is the brightest thing on the
+## The Crown tier's antimatter core where it is the model's crown (the extractor's crown and housing):
+## the glow layer in a light violet, unlit and steady, so it is the brightest thing on the
 ## model where CORE_GLOW's pulse would dim it.
 const CORE_LIGHT := Color("c9a2ff")
 static var BRIGHT_CORE := Surf.make(MaterialKit.Layer.GLOW, CORE_LIGHT, 1.0, Surf.UNLIT, true)
 
 
-## A drill rig: a tripod derrick over a spinning drill head with a walking beam rocking on its
-## crown, a conveyor running pulsing ore up into a hopper with a metal accent strip and
-## glowing ore, and an engine house with exhaust stacks puffing smoke. L2 adds a stack and
-## armour, L3 a bigger derrick with braces and a winch, L4 a second hopper and a third stack,
-## L5 gold trim.
+## A drill rig: a fat drill housing banded in the metal accent, a squat tripod derrick of fat
+## cream legs on its roof under a solid crown block with a walking beam rocking on it, the drill
+## string spinning out of the roof up into the crown, a conveyor running pulsing ore out of the
+## housing up into one hopper whose whole top glows with ore, and one fat exhaust stack puffing
+## smoke. L2 adds an armour skirt round the housing's foot, L3 a winch on the crown, L4 an ore tub
+## beside the hopper, L5 gold caps on the crown, the hopper's rim and the stack; the housing grows
+## each level.
 ##
-## L6 (Chrome): a taller derrick in chrome, cyan strips up its legs and a second ring of braces, its
-## crown block clad in chrome; chrome hoppers, each tipping ore down a cyan-lit chute into a tub. L7
-## a taller derrick still and a pumpjack on the right corner, its walking beam rocking out of step
-## with the crown's. L8 (Obsidian): a taller derrick, still chrome, its strips violet veins;
-## obsidian over the hoppers, the chutes' tubs, the pumpjack's frame and the engine house, crystal
-## inlays on the house, the drill's kelly veined violet, and an ore crystal hovering over each
-## hopper. The ore is the metal accent at every level, as on the silos. L9 an obsidian collar
-## hovering round the derrick under its crown. L10 (Crown): gold filigree on the braces, the crown
-## block, the hoppers and the engine house, the antimatter core glowing on a gold mount over the
-## crown and in a gold housing on the engine house's roof, and an ore hauler shuttling glowing ore
-## from the drill to the first hopper over its conveyor as the escort.
+## L6 (Chrome): a taller housing and derrick in chrome, cyan strips up the legs; the hopper chrome,
+## tipping ore down a cyan-lit chute into the tub. L7 a taller housing still and a pumpjack on the
+## right corner, its walking beam rocking out of step with the crown's. L8 (Obsidian): an obsidian
+## housing keeping its metal belt under a violet vein, crystal inlays on its front, the strips
+## violet veins, the drill's kelly veined violet, an obsidian hopper and tub, and an ore crystal
+## hovering over the hopper. L9 an obsidian collar hovering round the derrick under its crown. L10
+## (Crown): gold filigree round the housing, the crown block and the hopper, the antimatter core
+## glowing on a gold mount on the crown and in a gold housing on the housing's roof, and an ore
+## hauler shuttling glowing ore from over the housing down to the hopper as the escort.
 static func build_metal_extractor(p: Parts, level: int) -> void:
 	var m := p.body
 	var gold := p.tier >= Parts.Tier.GOLD
 	var obsidian := p.tier >= Parts.Tier.OBSIDIAN
 	var crown_tier := p.tier >= Parts.Tier.CROWN
-	var height: float = DERRICK_HEIGHTS[level - 1]
+	var chrome := p.tier >= Parts.Tier.CHROME
+	var housing_height: float = HOUSING_HEIGHTS[level - 1]
 	Parts.foundation(m, 3)
 	var ground := Parts.PAD_HEIGHT
-	m.lathe(PackedVector2Array([
-		Vector2(0.48, 0), Vector2(0.48, 0.12), Vector2(0.42, 0.18), Vector2(0.3, 0.18),
-		Vector2(0.3, 0.1), Vector2(0, 0.1),
-	]), 24, DRILL + Vector3(0, ground, 0), Parts.GOLD_ROUND if gold else Parts.HULL_DARK_ROUND)
+	var housing := DRILL + Vector3(0, ground, 0)
+	var roof := housing.y + housing_height
 
-	# The derrick: three legs on foot plates leaning in to a crown block.
-	var leg_width := 0.1 if level < 3 else (0.14 if level < 6 else 0.16)
-	var leg := Parts.CHROME if p.tier >= Parts.Tier.CHROME else LEG
-	var crown := DRILL + Vector3(0, height - 0.04, 0)
-	var feet: Array[Vector3] = []
-	var tops: Array[Vector3] = []
+	# The drill housing: the main mass, its metal belt round its upper half.
+	var shell := Parts.HULL_LIGHT
+	if obsidian:
+		shell = Parts.OBSIDIAN
+	elif chrome:
+		shell = Parts.CHROME
+	var w := HOUSING_WIDTH
+	m.box_chamfered(Vector3(w, housing_height, w), 0.08, housing, shell)
+	var belt_height := BELT_TALL if level >= 6 else BELT_HEIGHT
+	var belt := housing + Vector3(0, housing_height * 0.55 - belt_height * 0.5, 0)
+	m.box_chamfered(Vector3(w + 0.03, belt_height, w + 0.03), 0.06, belt, METAL_ACCENT)
+	if obsidian:
+		m.box(Vector3(w + 0.04, 0.06, w + 0.04), belt + Vector3(0, belt_height * 0.5 - 0.03, 0), Parts.VEINS)
+	m.box(Vector3(0.04, 0.24, 0.46), housing + Vector3(w * 0.5, 0.12, 0.25), ENGINE_VENT)
+	if level >= 2:
+		m.box_chamfered(Vector3(w + 0.06, 0.18, w + 0.06), 0.04, housing, Parts.OBSIDIAN if obsidian else ARMOUR)
+	if level >= 8:
+		for k: int in 2:
+			m.prism(0.08, 0.08, 0.04, 4, housing + Vector3(-0.3 + 0.6 * k, housing_height * 0.82, w * 0.5 + 0.005),
+				INLAY.phased(k * 0.5), Vector3(90, 0, 0))
+	if level >= 10:
+		m.box(Vector3(w + 0.05, 0.12, w + 0.05), housing + Vector3(0, 0.22, 0), Parts.FILIGREE)
+		# The antimatter core in a gold housing on the roof's front corner, a pulsing violet ring round it.
+		var core := DRILL + HOUSE_CORE + Vector3(0, roof, 0)
+		m.prism(0.16, 0.13, 0.08, 16, core, Parts.GOLD_ROUND)
+		m.orb(0.15, 16, 6, core + Vector3(0, 0.22, 0), BRIGHT_CORE)
+		Parts.torus(m, 0.17, 0.035, 16, 6, core + Vector3(0, 0.16, 0), Parts.CORE_GLOW)
+
+	# The derrick on the roof: three fat legs leaning in to a solid crown block.
+	var height := DERRICK_TALL if level >= 6 else DERRICK
+	var crown := DRILL + Vector3(0, roof + height, 0)
+	var leg := Parts.CHROME if chrome else Parts.HULL_LIGHT
 	for degrees: float in DERRICK_LEGS:
-		var foot := DRILL + Parts.around(0.95, degrees, ground)
-		var top := DRILL + Parts.around(LEG_TOP, degrees, height)
-		feet.append(foot)
-		tops.append(top)
-		m.box_chamfered(Vector3(0.24, 0.06, 0.24), 0.02, foot, Parts.HULL_DARK, Vector3(0, 90.0 - degrees, 0))
-		m.strut(foot, top, leg_width, leg)
+		var foot := DRILL + Parts.around(LEG_FOOT, degrees, roof)
+		var top := DRILL + Parts.around(LEG_TOP, degrees, crown.y)
+		Parts.beam(m, foot, top, LEG_WIDTH, leg, 0.05)
 		if level >= 6:
 			# A light strip up the leg's outer face.
-			var out := Parts.around(leg_width * 0.5 + 0.015, degrees, 0)
-			m.strut(foot.lerp(top, 0.06) + out, foot.lerp(top, 0.86) + out, 0.05, _rig_strip(p.tier))
-	if level >= 3:
-		# Braces from leg to leg, BRACE of the way up.
-		for k: int in 3:
-			var a := feet[k].lerp(tops[k], BRACE)
-			var b := feet[(k + 1) % 3].lerp(tops[(k + 1) % 3], BRACE)
-			m.strut(a, b, 0.08, Parts.FILIGREE if crown_tier else LEG)
-	if level >= 6:
-		for k: int in 3:
-			var a := feet[k].lerp(tops[k], UPPER_BRACE)
-			var b := feet[(k + 1) % 3].lerp(tops[(k + 1) % 3], UPPER_BRACE)
-			m.strut(a, b, 0.07, Parts.FILIGREE if crown_tier else leg)
-	m.box_chamfered(Vector3(0.6, 0.26, 0.6), 0.05, crown, Parts.CHROME if p.tier >= Parts.Tier.CHROME else Parts.HULL_LIGHT)
-	m.box(Vector3(0.62, 0.07, 0.62), crown + Vector3(0, 0.07, 0), METAL_ACCENT)
+			var out := Parts.around(LEG_WIDTH * 0.5 + 0.01, degrees, 0)
+			m.strut(foot.lerp(top, 0.1) + out, foot.lerp(top, 0.85) + out, 0.06, _rig_strip(p.tier))
+	m.box_chamfered(Vector3(CROWN_WIDTH, CROWN_HEIGHT, CROWN_WIDTH), 0.06, crown, Parts.CHROME if chrome else Parts.HULL_LIGHT)
+	m.box_chamfered(Vector3(CROWN_WIDTH + 0.03, 0.12, CROWN_WIDTH + 0.03), 0.04, crown + Vector3(0, 0.06, 0), METAL_ACCENT)
+	var crown_top := crown.y + CROWN_HEIGHT
 	if level >= 10:
-		m.box(Vector3(0.62, 0.05, 0.62), crown + Vector3(0, 0.17, 0), Parts.FILIGREE)
+		m.box(Vector3(CROWN_WIDTH + 0.04, 0.1, CROWN_WIDTH + 0.04), crown + Vector3(0, 0.18, 0), Parts.FILIGREE)
 	if level >= 5:
-		m.box_chamfered(Vector3(0.64, 0.06, 0.64), 0.02, crown + Vector3(0, 0.26, 0),
-			Parts.GOLD_TRIM if gold else Parts.HULL_MID)
+		m.box_chamfered(Vector3(CROWN_WIDTH + 0.04, 0.08, CROWN_WIDTH + 0.04), 0.03, Vector3(crown.x, crown_top, crown.z),
+			Parts.GOLD_TRIM)
+		crown_top += 0.08
 	if level >= 3:
 		# The winch on the crown's back corner, along the rocker's axis, clear of its post.
-		Parts.pipe(m, crown + Vector3(-0.27, 0.36, -0.27), crown + Vector3(-0.1, 0.36, -0.1), 0.08, Parts.GUNMETAL)
+		Parts.pipe(m, Vector3(crown.x, crown_top, crown.z) + Vector3(-0.3, 0.08, -0.3),
+			Vector3(crown.x, crown_top, crown.z) + Vector3(-0.14, 0.08, -0.14), 0.08, Parts.GUNMETAL)
+	var lamp := Vector3(crown.x, crown_top, crown.z) + ROCKER_AXIS * 0.28
 	if level >= 10:
 		# The crown: the antimatter core on a gold mount where the landing light stood.
-		m.ring(0.04, 0.11, 0.05, 12, crown + Vector3(0.14, 0.26, 0.14), Parts.GOLD_ROUND)
-		m.orb(0.12, 12, 6, crown + Vector3(0.14, 0.42, 0.14), BRIGHT_CORE)
+		m.ring(0.04, 0.11, 0.05, 12, lamp, Parts.GOLD_ROUND)
+		m.orb(0.12, 12, 6, lamp + Vector3(0, 0.16, 0), BRIGHT_CORE)
 	else:
-		Parts.landing_light(m, crown + Vector3(0.14, 0.26, 0.14), 0.09, METAL_GLOW)
-	# The walking beam's post: an A-frame along the beam on the crown, a pin through its head.
+		Parts.landing_light(m, lamp, 0.1, METAL_GLOW)
+	# The walking beam's post: a chamfered column on the crown, a pin through its head.
 	var pin := crown + Vector3(0, ROCKER_PIN, 0)
-	var crown_top := crown.y + (0.32 if level >= 5 else 0.26)
-	for side: float in [-1.0, 1.0]:
-		Parts.beam(m, Vector3(crown.x, crown_top, crown.z) + ACROSS * 0.2 * side, pin, 0.06, LEG, 0.02)
-	Parts.pipe(m, pin - ROCKER_AXIS * 0.08, pin + ROCKER_AXIS * 0.08, 0.05, Parts.GUNMETAL, 12)
+	m.box_chamfered(Vector3(0.16, pin.y - 0.04 - crown_top, 0.16), 0.04, Vector3(crown.x, crown_top, crown.z), Parts.GUNMETAL,
+		Vector3(0, 45, 0))
+	Parts.pipe(m, pin - ROCKER_AXIS * 0.1, pin + ROCKER_AXIS * 0.1, 0.05, Parts.GUNMETAL, 12)
 	_rocker(p.moving(pin, Motion.swing(ROCKER_AXIS, 12.0, 2.0)), gold)
 	if level >= 9:
 		# The obsidian collar hovering round the derrick under its crown, bobbing.
@@ -378,69 +404,49 @@ static func build_metal_extractor(p: Parts, level: int) -> void:
 		m.lathe(PackedVector2Array([Vector2(0.64, 0.062), Vector2(0.52, 0.062)]), 24, collar, HOVER_VEINS)
 		m.lathe(PackedVector2Array([Vector2(0.665, 0.01), Vector2(0.665, 0.05)]), 24, collar, HOVER_RIM)
 
-	# The hoppers, each with a conveyor from the collar up over its rim.
-	for k: int in 2 if level >= 4 else 1:
-		var hopper: Vector3 = HOPPERS[k]
-		var heading := (hopper - DRILL).normalized()
-		_hopper(m, hopper + Vector3(0, ground, 0), gold, 0.5 * k, level, p.tier)
-		_belt(m, DRILL + heading * 0.32 + Vector3(0, ground + 0.2, 0),
-			hopper - heading * 0.2 + Vector3(0, ground + HOPPER_RIM + 0.14, 0), 0.5 * k, NUGGET)
+	# The hopper, fed by a conveyor out of the housing's front; from L4 the ore tub beside it.
+	var hopper := HOPPER + Vector3(0, ground, 0)
+	_hopper(m, hopper, gold, level, p.tier)
+	_belt(m, Vector3(hopper.x, ground + 0.42, DRILL.z + w * 0.5 + 0.02),
+		Vector3(hopper.x, ground + HOPPER_RIM + 0.12, hopper.z - 0.22), 0.0, NUGGET)
+	if level >= 4:
+		var tub := ORE_TUB + Vector3(0, ground, 0)
+		m.box_chamfered(Vector3(0.34, 0.22, 0.26), 0.05, tub, _rig_armour(p.tier, Parts.HULL_LIGHT))
+		m.box(Vector3(0.28, 0.04, 0.2), tub + Vector3(0, 0.2, 0), METAL_ORE.phased(0.25))
+		m.box_chamfered(Vector3(0.36, 0.07, 0.28), 0.02, tub + Vector3(0, 0.15, 0), Parts.GOLD_TRIM if gold else METAL_ACCENT)
+	if level >= 6:
+		# The chute from the hopper's right face down into the tub, its rails lit.
+		_chute(m, hopper + Vector3(0.3, HOPPER_RIM - 0.2, 0), ORE_TUB + Vector3(-0.12, ground + 0.24, 0), _rig_strip(p.tier),
+			NUGGET.phased(0.5))
 
-	# The engine house and its stacks.
-	var house := ENGINE_HOUSE + Vector3(0, ground, 0)
-	m.box_chamfered(Vector3(0.66, 0.5, 0.8), 0.06, house, Parts.HULL_LIGHT)
-	m.box(Vector3(0.4, 0.24, 0.04), house + Vector3(0, 0.12, 0.4), ENGINE_VENT)
-	m.box_chamfered(Vector3(0.7, 0.08, 0.84), 0.03, house + Vector3(0, 0.5, 0), Parts.GOLD_TRIM if gold else Parts.HULL_MID)
-	if level >= 2:
-		m.box_chamfered(Vector3(0.72, 0.18, 0.86), 0.04, house, Parts.OBSIDIAN if obsidian else ARMOUR)
-	if level >= 8:
-		# Obsidian plates on the house's ends, a vein along each, and crystal inlays on its front.
-		for end: float in [-1.0, 1.0]:
-			m.box_chamfered(Vector3(0.74, 0.26, 0.08), 0.03, house + Vector3(0, 0.2, end * 0.41), Parts.OBSIDIAN)
-			m.box(Vector3(0.6, 0.04, 0.09), house + Vector3(0, 0.31, end * 0.41), Parts.VEINS)
-		for k: int in 2:
-			m.prism(0.07, 0.07, 0.04, 4, house + Vector3(0.37, 0.3, -0.18 + 0.36 * k), INLAY.phased(k * 0.5), Vector3(0, 0, -90))
-	if level >= 10:
-		m.box(Vector3(0.71, 0.05, 0.85), house + Vector3(0, 0.42, 0), Parts.FILIGREE)
-		# The antimatter core in a gold housing on the roof, a pulsing violet ring round it.
-		var core := HOUSE_CORE + Vector3(0, house.y + 0.58, 0)
-		m.prism(0.16, 0.13, 0.08, 16, core, Parts.GOLD_ROUND)
-		m.orb(0.15, 16, 6, core + Vector3(0, 0.22, 0), BRIGHT_CORE)
-		Parts.torus(m, 0.17, 0.035, 16, 6, core + Vector3(0, 0.16, 0), Parts.CORE_GLOW)
-	var stacks := 1 + (1 if level >= 2 else 0) + (1 if level >= 4 else 0)
-	# Two puffs a stack to L5, where three stacks fill the Base budget; Parts.puffs' full column of
-	# four from the Chrome tier, whose budget has room for them.
-	var puffs := 4 if p.tier >= Parts.Tier.CHROME else 2
-	for k: int in stacks:
-		var stack: Array = STACKS[k]
-		var stack_height: float = stack[2]
-		_stack(m, Vector3(stack[0], house.y + 0.58, stack[1]), stack_height, gold, k / 3.0, puffs)
+	# The stack on the housing's right side, puffing two puffs to L5 and Parts.puffs' full column of
+	# four from the Chrome tier.
+	_stack(m, STACK_SPOT + Vector3(0, ground, 0), housing_height + 0.5, gold, 0.0, 4 if chrome else 2)
 
-	var pivot := DRILL + Vector3(0, ground + 0.1, 0)
-	_drill(p.moving(pivot, Motion.spin(Vector3.UP, 3.0)), crown.y - pivot.y,
-		ground + DRIVE_TOP * (height - ground) - pivot.y, gold, Parts.VEINS if obsidian else Parts.GUNMETAL)
+	var pivot := Vector3(DRILL.x, roof, DRILL.z)
+	_drill(p.moving(pivot, Motion.spin(Vector3.UP, 3.0)), crown.y - pivot.y, DRIVE_TOP,
+		Parts.VEINS if obsidian else Parts.GUNMETAL)
 	if level >= 7:
 		_pumpjack(p, p.tier)
 	if level >= 10:
-		_ore_hauler(p)
+		_ore_hauler(p, roof)
 
 
-## The L10 ore hauler: a squat hover-hauler shuttling (a slide) on a track climbing over the first
-## hopper's conveyor, from inside the derrick over the drill's auger, where it loads, up to over
-## the hopper, where it tips; it lingers at either end, as the slide eases. Built facing along its
-## track towards the hopper: a chamfered hull banded in gold filigree under a violet core lamp, an
-## open gold-lipped bucket at its front heaped with glowing ore, and two thrusters glowing under it.
-static func _ore_hauler(p: Parts) -> void:
-	var hopper: Vector3 = HOPPERS[0]
-	var along := (hopper - DRILL).normalized()
+## The L10 ore hauler: a squat hover-hauler shuttling (a slide) on a track from over the housing's
+## front edge, where it loads, out over the hopper, where it tips; it lingers at either end,
+## as the slide eases. Built facing along its track towards the hopper: a chamfered hull banded in
+## gold filigree under a violet core lamp, an open gold-lipped bucket at its front heaped with
+## glowing ore, and two thrusters glowing under it.
+static func _ore_hauler(p: Parts, roof: float) -> void:
+	var along := (HOPPER - DRILL).normalized()
 	var aside := Vector3(-along.z, 0, along.x) * HAULER_ASIDE
-	var near := DRILL + along * HAULER_NEAR + aside + Vector3(0, HAULER_NEAR_HEIGHT, 0)
-	var far := DRILL + along * HAULER_FAR + aside + Vector3(0, HAULER_FAR_HEIGHT, 0)
+	var near := DRILL + along * HAULER_NEAR + aside + Vector3(0, roof + HAULER_NEAR_LIFT, 0)
+	var far := DRILL + along * HAULER_FAR + aside + Vector3(0, roof - HAULER_FAR_DROP, 0)
 	var s := p.moving((near + far) * 0.5, Motion.slide(far - near, near.distance_to(far) * 0.5, HAULER_PERIOD))
 	var heading := Vector3(0, rad_to_deg(atan2(along.x, along.z)), 0)
 	var z := HAULER_SCALE
 	s.box_chamfered(Vector3(0.26, 0.13, 0.26) * z, 0.035 * z, LowPolyMesh.turn(Vector3(0, -0.05, -0.06) * z, heading),
-		Parts.HULL_MID, heading)
+		Parts.HULL_LIGHT, heading)
 	s.box(Vector3(0.27, 0.035, 0.27) * z, LowPolyMesh.turn(Vector3(0, 0.0, -0.06) * z, heading), Parts.FILIGREE, heading)
 	s.box_chamfered(Vector3(0.16, 0.05, 0.12) * z, 0.02 * z, LowPolyMesh.turn(Vector3(0, 0.08, -0.1) * z, heading),
 		Parts.HULL_LIGHT, heading)
@@ -477,32 +483,26 @@ static func _rig_strip(tier: int) -> Surf:
 	return Parts.VEINS if tier >= Parts.Tier.OBSIDIAN else Parts.CYAN_STRIP
 
 
-## A square hopper on four legs, a metal accent strip round its rim and glowing ore heaped in it.
-## From L6 the bin is chrome (obsidian from the Obsidian tier) and tips ore down a lit chute into a
-## tub on the pad; from L8 an ore crystal hovers over the heap; at L10 gold filigree bands the bin.
-static func _hopper(m: LowPolyMesh, pos: Vector3, gold: bool, phase: float, level: int, tier: int) -> void:
+## The hopper standing on `pos`: a square bin 0.7 across on four legs, a metal accent band round
+## its rim (gold from the Gold tier) and the ore glowing across its whole top under a heap. The bin
+## is cream, chrome from L6 (obsidian from the Obsidian tier); from L8 an ore crystal hovers over
+## the heap; at L10 gold filigree bands the bin.
+static func _hopper(m: LowPolyMesh, pos: Vector3, gold: bool, level: int, tier: int) -> void:
 	for corner: Vector2 in [Vector2(-1, -1), Vector2(1, -1), Vector2(-1, 1), Vector2(1, 1)]:
-		m.box_chamfered(Vector3(0.07, 0.32, 0.07), 0.02, pos + Vector3(corner.x * 0.17, 0, corner.y * 0.17), Parts.GUNMETAL)
-	var bin := pos + Vector3(0, HOPPER_RIM - 0.46, 0)
+		m.box_chamfered(Vector3(0.14, 0.24, 0.14), 0.03, pos + Vector3(corner.x * 0.2, 0, corner.y * 0.2), Parts.GUNMETAL)
+	var bin := pos + Vector3(0, HOPPER_RIM - 0.4, 0)
 	m.lathe(PackedVector2Array([
-		Vector2(0.12, 0), Vector2(0.42, 0.34), Vector2(0.42, 0.46), Vector2(0.36, 0.46),
-		Vector2(0.36, 0.38), Vector2(0, 0.38),
-	]), 4, bin, _rig_armour(tier, Parts.HULL_MID), Vector3(0, 45, 0))
-	m.lathe(PackedVector2Array([Vector2(0.43, 0), Vector2(0.43, 0.08), Vector2(0.36, 0.08)]), 4,
-		bin + Vector3(0, 0.36, 0), Parts.GOLD_TRIM if gold else METAL_ACCENT, Vector3(0, 45, 0))
-	m.pyramid(0.48, 0.14, bin + Vector3(0, 0.38, 0), METAL_ORE.phased(phase))
+		Vector2(0.16, 0), Vector2(0.49, 0.28), Vector2(0.49, 0.4), Vector2(0.44, 0.4),
+	]), 4, bin, _rig_armour(tier, Parts.HULL_LIGHT), Vector3(0, 45, 0))
+	m.lathe(PackedVector2Array([Vector2(0.44, 0.36), Vector2(0, 0.36)]), 4, bin, ORE_GLOW, Vector3(0, 45, 0))
+	m.lathe(PackedVector2Array([Vector2(0.505, 0), Vector2(0.505, 0.12), Vector2(0.44, 0.12)]), 4,
+		bin + Vector3(0, 0.29, 0), Parts.GOLD_TRIM if gold else METAL_ACCENT, Vector3(0, 45, 0))
+	m.pyramid(0.46, 0.14, bin + Vector3(0, 0.36, 0), METAL_ORE)
 	if level >= 10:
-		m.lathe(PackedVector2Array([Vector2(0.43, 0), Vector2(0.43, 0.06)]), 4, bin + Vector3(0, 0.27, 0), Parts.FILIGREE,
+		m.lathe(PackedVector2Array([Vector2(0.5, 0), Vector2(0.5, 0.1)]), 4, bin + Vector3(0, 0.16, 0), Parts.FILIGREE,
 			Vector3(0, 45, 0))
-	if level >= 6:
-		# The chute from the bin's front face down towards the camera into a tub, its rails lit.
-		_chute(m, bin + Vector3(0, 0.12, 0.2), Vector3(pos.x, Parts.PAD_HEIGHT + 0.24, pos.z + 0.48), _rig_strip(tier),
-			NUGGET.phased(phase))
-		var tub := Vector3(pos.x, Parts.PAD_HEIGHT, pos.z + 0.52)
-		m.box_chamfered(Vector3(0.3, 0.2, 0.22), 0.04, tub, _rig_armour(tier, Parts.HULL_MID))
-		m.box(Vector3(0.24, 0.04, 0.16), tub + Vector3(0, 0.18, 0), METAL_ORE.phased(phase + 0.25))
 	if level >= 8:
-		m.orb(0.1, 4, 2, bin + Vector3(0, 0.74, 0), FLOATING_ORE.phased(phase))
+		m.orb(0.1, 4, 2, bin + Vector3(0, 0.7, 0), FLOATING_ORE)
 
 
 ## A chute from `from` down to `to`: a trough between two lit rails, ore sliding down it.
@@ -535,17 +535,19 @@ static func _belt(m: LowPolyMesh, from: Vector3, to: Vector3, phase: float, nugg
 		m.box_chamfered(Vector3(0.12, 0.08, 0.12), 0.03, from.lerp(to, t) + LowPolyMesh.turn(Vector3(0, 0.05, 0), rot),
 			nugget.phased(fposmod(phase + t, 1.0)), rot + Vector3(0, 30 * t, 0))
 	var foot := Vector3(middle.x, Parts.PAD_HEIGHT, middle.z)
-	m.box(Vector3(0.08, middle.y - foot.y, 0.08), foot, Parts.GUNMETAL)
+	m.box_chamfered(Vector3(Parts.STRUCTURAL_MIN, middle.y - foot.y, Parts.STRUCTURAL_MIN), 0.03, foot, Parts.GUNMETAL)
 
 
-## An exhaust stack: a collar, a ribbed pipe, a lipped mouth with soot inside, and `puffs` puffs of
-## smoke rising from it, climbing, drifting and fading on phases from `phase` (Parts.puffs).
+## An exhaust stack STACK_RADIUS round: a collar, a ribbed pipe, a lipped mouth with soot inside, and
+## `puffs` puffs of smoke rising from it, climbing, drifting and fading on phases from `phase`
+## (Parts.puffs).
 static func _stack(m: LowPolyMesh, pos: Vector3, height: float, gold: bool, phase: float, puffs: int) -> void:
-	m.prism(0.14, 0.13, 0.08, 16, pos - Vector3(0, 0.04, 0), Parts.HULL_DARK_ROUND)
-	m.prism(0.09, 0.09, height, 16, pos, STACK)
-	m.ring(0.07, 0.12, 0.08, 16, pos + Vector3(0, height, 0), Parts.GOLD_ROUND if gold else Parts.HULL_DARK_ROUND)
-	m.disc(0.07, 16, pos + Vector3(0, height + 0.04, 0), SOOT)
-	Parts.puffs(m, pos + Vector3(0, height + 0.08, 0), phase, puffs)
+	var r := STACK_RADIUS
+	m.prism(r + 0.05, r + 0.04, 0.12, 16, pos, Parts.HULL_DARK_ROUND)
+	m.prism(r, r, height, 16, pos, STACK)
+	m.ring(r - 0.03, r + 0.04, 0.12, 16, pos + Vector3(0, height, 0), Parts.GOLD_ROUND if gold else Parts.HULL_DARK_ROUND)
+	m.disc(r - 0.03, 16, pos + Vector3(0, height + 0.06, 0), SOOT)
+	Parts.puffs(m, pos + Vector3(0, height + 0.12, 0), phase, puffs)
 
 
 ## The walking beam rocking on its pin, built along ACROSS: a beam with a horse head over the
@@ -553,23 +555,19 @@ static func _stack(m: LowPolyMesh, pos: Vector3, height: float, gold: bool, phas
 static func _rocker(s: LowPolyMesh, gold: bool) -> void:
 	var yaw := Vector3(0, 135, 0)
 	var half := ROCKER_LENGTH * 0.5
-	s.box_chamfered(Vector3(0.08, 0.08, ROCKER_LENGTH), 0.02, Vector3(0, -0.04, 0), Parts.GOLD_TRIM if gold else Parts.HULL_LIGHT, yaw)
-	s.box_chamfered(Vector3(0.1, 0.22, 0.12), 0.03, ACROSS * (half - 0.04) + Vector3(0, -0.16, 0), METAL_ACCENT, yaw)
-	s.box_chamfered(Vector3(0.14, 0.16, 0.18), 0.03, ACROSS * -(half - 0.08) + Vector3(0, -0.14, 0), Parts.GUNMETAL, yaw)
+	s.box_chamfered(Vector3(0.14, 0.12, ROCKER_LENGTH), 0.03, Vector3(0, -0.06, 0), Parts.GOLD_TRIM if gold else Parts.HULL_LIGHT, yaw)
+	s.box_chamfered(Vector3(0.16, 0.28, 0.16), 0.04, ACROSS * (half - 0.06) + Vector3(0, -0.22, 0), METAL_ACCENT, yaw)
+	s.box_chamfered(Vector3(0.2, 0.2, 0.22), 0.04, ACROSS * -(half - 0.1) + Vector3(0, -0.2, 0), Parts.GUNMETAL, yaw)
 
 
-## The drill string that spins round the collar: a ribbed bit, auger flights, a square kelly
-## `length` tall up into the crown on `kelly`, and a finned round top drive whose top is at
-## `drive_top`.
-static func _drill(s: LowPolyMesh, length: float, drive_top: float, gold: bool, kelly: Surf) -> void:
+## The drill string that spins out of the housing's roof: a ribbed chuck, a square kelly `length`
+## tall up into the crown on `kelly`, and a finned round top drive whose top is at `drive_top`.
+static func _drill(s: LowPolyMesh, length: float, drive_top: float, kelly: Surf) -> void:
 	s.lathe(PackedVector2Array([
 		Vector2(0.04, -0.04), Vector2(0.18, 0.08), Vector2(0.27, 0.16), Vector2(0.27, 0.24),
 		Vector2(0.16, 0.3), Vector2(0, 0.3),
 	]), 16, Vector3.ZERO, DRILL_BIT)
-	for k: int in 3:
-		s.box_chamfered(Vector3(0.44, 0.05, 0.16), 0.02, Vector3(0, 0.36 + 0.14 * k, 0),
-			Parts.GOLD_TRIM if gold else Parts.HULL_LIGHT, Vector3(10, 60 * k, 0))
-	s.box_chamfered(Vector3(0.12, length - 0.2, 0.12), 0.03, Vector3(0, 0.2, 0), kelly)
+	s.box_chamfered(Vector3(0.14, length - 0.2, 0.14), 0.03, Vector3(0, 0.2, 0), kelly)
 	var drive := Vector3(0, drive_top - 0.28, 0)
 	s.lathe(PackedVector2Array([
 		Vector2(0.15, 0), Vector2(0.15, 0.24), Vector2(0.12, 0.28), Vector2(0, 0.28),
@@ -591,7 +589,7 @@ static func _pumpjack(p: Parts, tier: int) -> void:
 	m.box_chamfered(Vector3(0.3, 0.08, 0.72), 0.03, base, Parts.HULL_DARK, yaw)
 	var pin := base + Vector3(0, PUMPJACK_PIN, 0)
 	for side: float in [-1.0, 1.0]:
-		Parts.beam(m, base + Vector3(0, 0.08, 0) + ROCKER_AXIS * 0.12 * side, pin + ROCKER_AXIS * 0.06 * side, 0.06, frame, 0.02)
+		Parts.beam(m, base + Vector3(0, 0.08, 0) + ROCKER_AXIS * 0.14 * side, pin + ROCKER_AXIS * 0.08 * side, Parts.STRUCTURAL_MIN, frame, 0.03)
 	Parts.pipe(m, pin - ROCKER_AXIS * 0.1, pin + ROCKER_AXIS * 0.1, 0.045, Parts.GUNMETAL, 12)
 	var motor := base + ACROSS * -0.22 + Vector3(0, 0.08, 0)
 	m.box_chamfered(Vector3(0.24, 0.22, 0.2), 0.04, motor, Parts.HULL_LIGHT, yaw)
