@@ -20,9 +20,9 @@ extends Node3D
 ## AIM_IDLE_SECONDS, eases it back into its idle Motion (idle_aim), which it then follows again. The
 ## aim turns the head about +Y: an idle Motion that turns it about +Y too (a scan) gives way to the
 ## aim, any other (the orbital cannon's elevation) runs on under it. Each shot kicks the head back
-## along its muzzle (fired, RECOIL): the head's pose is its aim's yaw, then its idle Motion, then
-## the kick. A moving part that rides another (Parts.riding) is carried by it. A defence whose
-## muzzle is on its body, or that has none, never aims. socket_point() and socket_direction() give
+## along its muzzle by its type's weapon record's `recoil` (fired, Weapons): the head's pose is its
+## aim's yaw, then its idle Motion, then the kick. A moving part that rides another (Parts.riding)
+## is carried by it. A defence whose muzzle is on its body, or that has none, never aims. socket_point() and socket_direction() give
 ## a socket where it is now, in the world. While an EMP burst has the building disabled
 ## (set_disabled) every moving part holds its pose, and on waking snaps back to the clock's; a
 ## cloaked defence fades in when it is revealed (set_reveal).
@@ -51,14 +51,8 @@ const LABEL_OVER_DRONE := 0.5
 ## in seconds of battle, and how close (radians) it comes to the swing before following it again.
 const AIM_IDLE_SECONDS := 2.5
 const AIM_SETTLED := 0.02
-## How far (world units) a shot kicks an aiming head back along its muzzle, per type, and for any
-## other type; the kick takes RECOIL_SECONDS of battle on Motion.recoil's wave, out fast and back
-## slowly.
-const RECOIL := {
-	"laser_turret": 0.18, "missile_battery": 0.1, "plasma_mortar": 0.25, "flak_cannon": 0.2,
-	"cloaked_sentry": 0.1, "railgun": 0.35, "ion_beam": 0.075, "orbital_cannon": 0.45,
-}
-const RECOIL_DEFAULT := 0.125
+## How long a shot's kick takes, in seconds of battle, on Motion.recoil's wave, out fast and back
+## slowly (its reach is the type's weapon record's, fired()).
 const RECOIL_SECONDS := 0.25
 ## A revealed defence's fade in (set_reveal): MaterialKit.reveal's steps, its outlines showing from
 ## the second.
@@ -123,11 +117,12 @@ var _aim_yaw: float = 0.0
 var _aim_wait: float = 0.0
 ## Whether the aiming head's idle Motion turns it about +Y (a scan the aim takes over), the way its
 ## muzzle faces in its own space (the kick's), the battle's clock as the last aim call gave it, and
-## when the head last fired (fired).
+## when the head last fired and how far that shot kicks it (fired).
 var _aim_turns: bool = true
 var _muzzle_direction := Vector3.FORWARD
 var _now: float = 0.0
 var _fired_at: float = -INF
+var _kick_reach: float = 0.0
 ## The step of the reveal's fade the bodies show (set_reveal), -1 for none.
 var _reveal_step: int = -1
 
@@ -377,7 +372,7 @@ func _aim_pose(time: float) -> Transform3D:
 		turn = turn * idle.basis
 	var kick := recoil_share()
 	if kick > 0.0:
-		origin -= (turn * _muzzle_direction) * float(RECOIL.get(building_type, RECOIL_DEFAULT)) * kick
+		origin -= (turn * _muzzle_direction) * _kick_reach * kick
 	return Transform3D(turn, origin)
 
 
@@ -437,13 +432,15 @@ func _aim_wanted(point: Vector3) -> float:
 	return atan2(point.x - at.x, point.z - at.z) - _aim_heading
 
 
-## The aiming head fired at `now` on the battle's clock: it kicks back along its muzzle by its
-## type's RECOIL over RECOIL_SECONDS. BattleView calls it as a shot leaves a muzzle (_muzzle).
-func fired(now: float) -> void:
+## The aiming head fired at `now` on the battle's clock: it kicks back along its muzzle by `reach`
+## (world units, its type's Weapons record's `recoil`) over RECOIL_SECONDS. BattleView calls it as
+## a shot leaves a muzzle (_muzzle).
+func fired(now: float, reach: float) -> void:
 	if _aim_index < 0 or _disabled:
 		return
 	_now = now
 	_fired_at = now
+	_kick_reach = reach
 	_pose_aim()
 
 

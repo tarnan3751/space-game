@@ -6,8 +6,8 @@ extends RefCounted
 ## hits what and when; a record decides only how it looks: the projectile (`kind`, its colour and
 ## size, its speed or arc, a burst of several for one hit, its trail), the flash at the muzzle,
 ## the sockets a shot leaves in turn, the impact where it lands and the fake light under it (a
-## glow decal on the ground, no light node), the kick its gun takes (a hint the aim lanes may
-## read), and how a unit of the type dies (timed by BattleUnits.death_seconds).
+## glow decal on the ground, no light node), the kick an aiming defence's head takes on a shot
+## (BuildingView.fired), and how a unit of the type dies (timed by BattleUnits.death_seconds).
 ##
 ## Presentation only, so it lives in code rather than in data/: the server never reads it. Every
 ## type in the catalog that attacks, springs, shields or self-destructs has an entry (the
@@ -73,30 +73,32 @@ const TABLE := {
 	# The defences.
 	"laser_turret": {"kind": Kind.LASER, "color": MaterialKit.DEFENCE, "width": 0.1, "length": 1.1, "speed": 40.0,
 		"flash": 0.24, "sockets": DEFENCE_MUZZLES, "impact": Impact.SPARKS, "impact_size": 0.45, "light": 0.5,
-		"recoil": 0.04},
+		"recoil": 0.18},
 	"missile_battery": {"kind": Kind.MISSILE, "color": FLAME_ORANGE, "width": 1.8, "speed": 9.0, "arc": 0.25,
 		"trail": Trail.SMOKE, "flash": 0.18, "sockets": MISSILE_TUBES, "impact": Impact.BLAST_M,
-		"impact_size": 1.0, "light": 0.9, "recoil": 0.03},
+		"impact_size": 1.0, "light": 0.9, "recoil": 0.1},
 	"plasma_mortar": {"kind": Kind.PLASMA, "color": PLASMA_VIOLET, "width": 0.4, "length": 0.5, "arc": 0.35,
 		"trail": Trail.GLOW, "flash": 0.35, "flash_shape": Flash.RING, "sockets": ONE, "impact": Impact.SPLASH,
-		"impact_size": 0.8, "light": 1.2, "recoil": 0.08},
+		"impact_size": 0.8, "light": 1.2, "recoil": 0.25},
 	"flak_cannon": {"kind": Kind.TRACER, "color": FLAK_YELLOW, "width": 0.09, "length": 0.5, "speed": 35.0,
 		"burst": 2, "burst_gap": 0.06, "flash": 0.22, "sockets": FLAK_BARRELS, "impact": Impact.AIR_BURST,
-		"impact_size": 0.8, "recoil": 0.06},
+		"impact_size": 0.8, "recoil": 0.2},
 	"arc_tower": {"kind": Kind.LIGHTNING, "color": MaterialKit.ARC_BLUE, "flash": 0.35, "flash_shape": Flash.RING,
 		"sockets": ONE, "impact": Impact.SPARKS, "impact_size": 0.35, "light": 0.6},
 	"cloaked_sentry": {"kind": Kind.LASER, "color": MaterialKit.DEFENCE, "width": 0.08, "length": 0.6,
-		"speed": 40.0, "flash": 0.12, "sockets": TWIN, "impact": Impact.SPARKS, "impact_size": 0.3, "light": 0.3},
+		"speed": 40.0, "flash": 0.12, "sockets": TWIN, "impact": Impact.SPARKS, "impact_size": 0.3, "light": 0.3,
+		"recoil": 0.1},
 	"gravity_well": {"kind": Kind.VORTEX, "color": MaterialKit.ANTIMATTER, "width": 0.18, "sockets": ONE},
 	"emp_tower": {"kind": Kind.PULSE, "color": MaterialKit.HAZARD, "width": 0.5, "speed": 14.0, "flash": 0.3,
 		"flash_shape": Flash.RING, "sockets": ONE, "impact": Impact.EMP, "impact_size": 0.35, "light": 0.5},
 	"railgun": {"kind": Kind.STREAK, "color": MaterialKit.ENERGY, "width": 0.12, "flash": 0.3, "sockets": ONE,
-		"impact": Impact.SPARKS, "impact_size": 0.35, "light": 0.5, "recoil": 0.12},
+		"impact": Impact.SPARKS, "impact_size": 0.35, "light": 0.5, "recoil": 0.35},
 	"ion_beam": {"kind": Kind.BEAM, "color": ION_WHITE, "width": 0.18, "hold": 0.2, "flash": 0.32,
-		"flash_shape": Flash.RING, "sockets": ONE, "impact": Impact.BURN, "impact_size": 0.4, "light": 0.7},
+		"flash_shape": Flash.RING, "sockets": ONE, "impact": Impact.BURN, "impact_size": 0.4, "light": 0.7,
+		"recoil": 0.075},
 	"orbital_cannon": {"kind": Kind.BALL, "color": MaterialKit.CRYSTAL, "width": 0.6, "length": 0.7, "arc": 0.35,
 		"trail": Trail.GLOW, "flash": 0.6, "sockets": ONE, "impact": Impact.BLAST_L, "impact_size": 1.6,
-		"light": 1.8, "recoil": 0.15},
+		"light": 1.8, "recoil": 0.45},
 	"shield_generator": {"kind": Kind.SHIELD, "color": MaterialKit.ENERGY},
 	# The traps.
 	"proximity_mine": {"kind": Kind.MINE, "color": MaterialKit.HAZARD, "impact": Impact.BLAST_M, "impact_size": 1.0,
@@ -122,14 +124,14 @@ const TABLE := {
 		"flash_shape": Flash.RING, "sockets": ["eye"], "impact": Impact.BURN, "impact_size": 0.3, "light": 0.4,
 		"death": Death.CRASH},
 	"siege_walker": {"kind": Kind.BOLT, "color": MaterialKit.ARMY, "width": 0.14, "length": 0.5, "speed": 24.0,
-		"flash": 0.3, "sockets": TWIN, "impact": Impact.BLAST_S, "impact_size": 0.5, "light": 0.6, "recoil": 0.1,
+		"flash": 0.3, "sockets": TWIN, "impact": Impact.BLAST_S, "impact_size": 0.5, "light": 0.6,
 		"death": Death.WRECK},
 	"hover_tank": {"kind": Kind.SHELL, "color": MaterialKit.ARMY, "width": 0.2, "length": 0.4, "speed": 18.0,
 		"arc": 0.12, "flash": 0.35, "sockets": ONE, "impact": Impact.BLAST_M, "impact_size": 1.0, "light": 0.9,
-		"recoil": 0.12, "death": Death.WRECK},
+		"death": Death.WRECK},
 	"titan": {"kind": Kind.SHELL, "color": MaterialKit.ARMY, "width": 0.26, "length": 0.5, "speed": 18.0,
 		"arc": 0.1, "flash": 0.45, "sockets": TWIN, "impact": Impact.BLAST_L, "impact_size": 1.5, "light": 1.3,
-		"recoil": 0.15, "death": Death.WRECK},
+		"death": Death.WRECK},
 	"gunship": {"kind": Kind.TRACER, "color": FLAK_YELLOW, "width": 0.06, "length": 0.35, "speed": 30.0,
 		"burst": 3, "burst_gap": 0.07, "flash": 0.12, "sockets": TWIN, "impact": Impact.BLAST_S, "impact_size": 0.5,
 		"light": 0.5, "death": Death.CRASH},
@@ -164,7 +166,8 @@ class Weapon:
 	var impact_size := 0.3
 	## The glow decal's radius under a blast or a flash (0 for none).
 	var light := 0.0
-	## How far the gun kicks back on a shot (world units), for the aim lanes.
+	## How far an aiming defence's head kicks back along its muzzle on a shot (world units,
+	## BuildingView.fired); 0, no kick. A unit's kick is its rig's (Rig.SLIDE, AIM), not this.
 	var recoil := 0.0
 	var death: Death = Death.NONE
 	## A beam's hold (seconds of battle).

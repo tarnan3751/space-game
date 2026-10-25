@@ -1004,9 +1004,9 @@ cannon's uplink ring and the flak cannon's radar ride the part that aims.
 composed: the aim's yaw about +Y through its pivot, then its idle Motion, then a kick. An idle Motion
 that turns it about +Y (a scan: a SWING or SPIN whose axis is +Y, not -Y) gives way to the aim, which starts
 from where the scan has it and eases back into it once the target is gone; any other idle (the
-orbital cannon's elevation about its trunnion) keeps running under the aim. `BuildingView.fired(now)`
-kicks it back along its muzzle's direction by its type's `RECOIL` (0.075 for the ion beam to 0.45 for
-the orbital cannon, world units) over `RECOIL_SECONDS` (0.25 s of battle) on `Motion.recoil`, the
+orbital cannon's elevation about its trunnion) keeps running under the aim. `BuildingView.fired(now,
+reach)` kicks it back along its muzzle's direction by its type's weapon record's `recoil`
+(`Weapons`; 0.075 for the ion beam to 0.45 for the orbital cannon, world units) over `RECOIL_SECONDS` (0.25 s of battle) on `Motion.recoil`, the
 RECOIL ease's wave, out fast and back slowly: the kick follows a shot, never a clock. The aiming
 parts: the laser turret's head, the missile battery's launcher, the plasma mortar's barrel and
 cheeks, the flak cannon's head, the cloaked sentry's lid, the railgun's rail assembly, the ion beam's

@@ -1242,8 +1242,8 @@ func units_brought() -> PackedStringArray:
 
 
 ## Where a shot leaves building `id`: its next muzzle socket (its weapon record's sockets in turn, as
-## many as its model has), kicking an aiming head back (BuildingView.fired), or its centre
-## MUZZLE_SHARE of its height up when it has none.
+## many as its model has), kicking an aiming head back by the record's `recoil` (BuildingView.fired),
+## or its centre MUZZLE_SHARE of its height up when it has none.
 func _muzzle(id: int) -> Vector3:
 	var view: BuildingView = _views.get(id)
 	var sockets := _weapons[id].sockets
@@ -1254,7 +1254,7 @@ func _muzzle(id: int) -> Vector3:
 		_next_muzzle[id] = k + 1
 		# Read before the kick, which moves the socket back: the shot leaves where the muzzle was.
 		var at := view.socket_point(sockets[k])
-		view.fired(_clock)
+		view.fired(_clock, _weapons[id].recoil)
 		return at
 	var centre: Vector2 = _centres.get(id, Vector2.ZERO)
 	return Vector3(centre.x, _muzzles.get(id, 1.0), centre.y)

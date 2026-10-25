@@ -83,7 +83,7 @@ Calls the coordinator made that the owner may reverse, each a data or model chan
 halftone's numbers; the hologram cadet on the colonist (the box figure stays rejected); the
 jet flames in fixed fire colours at every tier; the vault door on the front face; the raised
 early walls; the structural minimum of 0.14; the rival-neutral violet holograms; the deaths'
-timings; the kick amplitudes (`BuildingView.RECOIL`); the kinds and colours in `weapons.gd`.
+timings; the kick amplitudes (the `recoil` of the defences' records in `weapons.gd`); the kinds and colours in `weapons.gd`.
 
 ## 5. Left for later
 

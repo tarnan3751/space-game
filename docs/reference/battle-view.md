@@ -319,7 +319,8 @@ A record: `kind` (the projectile: `BOLT`, `LASER`, `TRACER`, `PLASMA`, `BALL`, `
 drawn for one hit of the sim; only the first tells its target), `trail` (none, smoke, glow),
 `flash` and `flash_shape` (star or ring), `sockets` (taken in turn, one a shot), `impact` (sparks,
 ring, blast small, medium or big, air burst, splash, burn, EMP) and `impact_size`, `light` (the
-glow decal's radius), `recoil` (a hint for the aim lanes), `death` (none, wreck, crash, blast,
+glow decal's radius), `recoil` (how far an aiming defence's head kicks back on a shot, world units:
+the one source of the kick, **Aim and muzzles**; a unit's kick is its rig's), `death` (none, wreck, crash, blast,
 timed by `BattleUnits.death_seconds`), `hold` (a beam's).
 
 | Type | Attacks with | Impact |
@@ -384,9 +385,12 @@ direction; `BuildingView` collects them from its model's root and moving parts
   point is measured from its pivot, against the way its muzzle faces as built. An idle Motion that
   is not a scan about +Y (the orbital cannon's elevation) runs on under the aim. Yaw only: no head
   pitches towards an air unit.
-- **Kick**: as a shot leaves a muzzle socket (`_muzzle`) the view calls `BuildingView.fired(now)`
-  on the battle's clock, and the aiming part kicks back along its muzzle by its type's
-  `BuildingView.RECOIL` over `RECOIL_SECONDS` (0.25 s), then eases back; the head's pose is its
+- **Kick**: as a shot leaves a muzzle socket (`_muzzle`) the view calls `BuildingView.fired(now,
+  reach)` on the battle's clock with its type's weapon record's `recoil` (**Weapons**: the laser
+  turret 0.18, the missile battery 0.1, the plasma mortar 0.25, the flak cannon 0.2, the cloaked
+  sentry 0.1, the railgun 0.35, the ion beam 0.075, the orbital cannon 0.45 world units; 0, no
+  kick, for a type with none), and the aiming part kicks back along its muzzle by it over
+  `RECOIL_SECONDS` (0.25 s), then eases back; the head's pose is its
   aim's yaw, its idle Motion, then the kick. `recoil_share()` says how far into its kick it is.
 - **EMP**: while a defence is disabled (`BattleSim.building_disabled`) every one of its moving parts
   holds its pose, its aim included; when a step finds it awake, `_woke(id)` takes its grey off and
