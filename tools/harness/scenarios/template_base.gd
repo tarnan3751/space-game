@@ -4,8 +4,8 @@ extends HarnessScenario
 ## and finished; no two footprints overlapping and all inside the grid; every wall
 ## (PlacementController.PAINT_TYPE) joined to another (each is part of a fence); every resource
 ## at its cap; every drone free, on the ring too; every moving part moving (a node's pose changing,
-## a part folded into its body unheld, BuildingModels.hold, and carrying a motion that moves); the
-## save written to
+## a part folded into its body unheld, BuildingModels.hold, and carrying a motion that moves), but
+## for the aiming parts whose idle is still by design (_idles); the save written to
 ## the run's own file, user://base.json untouched. Screenshots: the whole base at the widest zoom
 ## in a WIDE window, then each band, framed on its buildings but the walls, with the fence under
 ## it (the Command Center's with the first category's), in even parts
@@ -107,6 +107,10 @@ func run(main: MainScript) -> void:
 			func(node: Node) -> bool: return node.has_meta(BuildingModels.MOVE_META)))
 		folding.append_array(view.find_children("*", "Node3D", true, false).filter(
 			func(node: Node) -> bool: return node.has_meta(BuildingModels.FOLDS_META)))
+	# An aiming part whose idle Motion is still (a swing of zero degrees: the railgun's rails, the
+	# orbital cannon's mount and the tower riding it) moves only as it aims in battle.
+	var still := turning.filter(func(mover: Node3D) -> bool: return not _idles(mover))
+	turning = turning.filter(func(mover: Node3D) -> bool: return _idles(mover))
 	# A part may hold still for a while (a hammer's hold) or come back to its first pose on a
 	# whole period, so each is sampled every few frames over a second and a half and passes once
 	# any sample differs from its first pose.
@@ -118,8 +122,8 @@ func run(main: MainScript) -> void:
 		for i: int in turning.size():
 			if not (turning[i] as Node3D).transform.is_equal_approx(poses[i]):
 				moved[i] = true
-	check(moved.size() > 0 and moved.size() == turning.size(), "%d of %d moving parts moved within %.1f s"
-		% [moved.size(), turning.size(), MOVE_SAMPLE_SECONDS])
+	check(moved.size() > 0 and moved.size() == turning.size(), "%d of %d moving parts moved within %.1f s (%d aiming parts still at idle by design)"
+		% [moved.size(), turning.size(), MOVE_SAMPLE_SECONDS, still.size()])
 	var held := folding.filter(func(model: Node3D) -> bool:
 		var value: Variant = (model.get_child(0) as MeshInstance3D).get_instance_shader_parameter(BuildingModels.HOLD_PARAMETER)
 		return typeof(value) == TYPE_FLOAT and value != 0.0)
@@ -160,6 +164,20 @@ func run(main: MainScript) -> void:
 					return part.has_point(main.base_view.world_to_cell(mover.global_position))):
 				await main.get_tree().create_timer(1.0).timeout
 				await screenshot(name + "-later")
+
+
+## Whether a moving part's node moves at idle: its Motion moves (a spin at a rate, a swing or a slide
+## of some amplitude), or it rides a part that does (BuildingModels.RIDES_META, an index among its
+## model's moving nodes).
+func _idles(mover: Node3D) -> bool:
+	var motion: Motion = mover.get_meta(BuildingModels.MOVE_META)
+	if (motion.rate if motion.kind == Motion.Kind.SPIN else motion.amplitude) != 0.0:
+		return true
+	if not mover.has_meta(BuildingModels.RIDES_META):
+		return false
+	var movers := mover.get_parent().get_children().filter(
+		func(node: Node) -> bool: return node.has_meta(BuildingModels.MOVE_META))
+	return _idles(movers[int(mover.get_meta(BuildingModels.RIDES_META))] as Node3D)
 
 
 ## The camera size at which `part`, `height` tall, fills FILL of the screen; BAND_ZOOM at the

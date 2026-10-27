@@ -684,11 +684,11 @@ the ring too; that the base was saved to the run's own file while `user://base.j
 modification time stayed the same; that every moving part of every model that is a node (carrying
 `BuildingModels.MOVE_META`) moves: sampled every four frames for 1.5 seconds, a part
 passes once any sample differs from its first pose, so a hammer's hold or a period that divides
-the gap cannot hide it; and that no model's folded parts are held (`BuildingModels.hold`) and each
-carries a motion that moves (its spin's rate or its swing's or slide's amplitude, decoded with
-`Motion.from_channels`). The node
-check fails on five parts that never move at idle (aiming parts and pitching riders whose idle
-Motion is a swing of zero degrees), as it did before the fold. Once the "Template base" toast has faded (2.5 seconds after the press),
+the gap cannot hide it, but for the aiming parts that are still at idle by design (an idle Motion
+of a zero swing, slide or spin, carried by none that moves: the railgun's rails, the orbital
+cannon's mount and the tower riding it), which move only as they aim in battle; and that no model's
+folded parts are held (`BuildingModels.hold`) and each carries a motion that moves (its spin's rate
+or its swing's or slide's amplitude, decoded with `Motion.from_channels`). Once the "Template base" toast has faded (2.5 seconds after the press),
 rendered only (headless it logs that it skipped), it measures the whole base in a 1600x900
 window at the widest zoom (camera size 44) and at the start zoom (24), each held 2.1 seconds and
 then sampled every frame for three seconds through `Performance.get_monitor`: the most draw
