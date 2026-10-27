@@ -343,16 +343,6 @@ static func dish_post(m: LowPolyMesh, foot: Vector3, height: float, surface: Sur
 	return foot + Vector3(0, height, 0)
 
 
-## A lamp post standing on `foot`, its bulb's centre `height` up: a pole LAMP_POLE_WIDTH across on
-## `pole` (LAMP_POLE, never inked, unless a caller gives its own) and a bulb of LAMP_BULB_RADIUS
-## on `bulb`, which carries the outline. Returns the bulb's centre.
-static func lamp_post(m: LowPolyMesh, foot: Vector3, height: float, bulb: Surf, pole: Surf = LAMP_POLE) -> Vector3:
-	m.prism(LAMP_POLE_WIDTH * 0.5, LAMP_POLE_WIDTH * 0.5, height, 8, foot, pole)
-	var at := foot + Vector3(0, height, 0)
-	m.orb(LAMP_BULB_RADIUS, 12, 6, at, bulb)
-	return at
-
-
 # --- Effects shared by the model files (docs/reference/art-style.md, **Animation**) ----
 
 ## A crackling arc's radius: its segments are three-sided tubes about 0.03 across.
