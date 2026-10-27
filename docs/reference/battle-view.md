@@ -507,10 +507,10 @@ million primitives and about 2.1 to 2.4 ms of render CPU a frame, 110 to 120 fps
 machine (the same as before the pass, measured alternately), against the maxed base's ceilings
 (`art-style.md`, **Cost**: 1,600, 2.1 million, 6 ms). The units in their near versions would have
 been 2.40 million primitives (2.12 million without their shadows). The sim's step averages about
-0.2 to 0.4 ms a tick over the battle; the longest is a tick of four full path searches
-(`battle.md`, **Determinism and performance**), the reach maps being built at setup so the first
-tick no longer pays for them: 2.3 to 3.3 ms in the `battle` scenario (the faster of two runs per
-tick), about 2.6 to 4.8 ms in this scenario's single run, depending on the machine's load. The frame's process time at its slowest is about 10 ms.
+0.2 to 0.4 ms a tick over the battle; the longest is a deploy wave's tick with the searches'
+budget of cells spent (`battle.md`, **Determinism and performance**): 1.24 to 1.28 ms in the
+`battle` scenario (the faster of two runs per tick); this scenario's single run, measured at 2.6
+to 4.8 ms before the budget in cells, has not been measured again. The frame's process time at its slowest is about 10 ms.
 Each unit type is three draws (its body, its outline and the body's shadow), each effect kind one
 while it has anything to draw (the bolts two, core and sheath; at most about a dozen more than
 before the weapons pass with every kind live at once), a sprung trap its own view's draws while it

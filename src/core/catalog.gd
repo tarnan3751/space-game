@@ -79,12 +79,13 @@ var unit_order: PackedStringArray = PackedStringArray()
 ## Ability ids in abilities.json order, the making menu's order.
 var ability_order: PackedStringArray = PackedStringArray()
 ## rules.battle (all 0 or "" when the rules have none): the battle's length in seconds, the wall
-## type, the build-menu category whose types are traps, and the extra path cost of entering a
-## wall cell, in field units.
+## type, the build-menu category whose types are traps, the extra path cost of entering a wall
+## cell, in field units, and the cells the ground searches may settle in a tick.
 var battle_seconds: int = 0
 var wall_type: String = ""
 var trap_category: String = ""
 var wall_cost_units: int = 0
+var search_cells: int = 0
 ## rules.expedition (docs/reference/expeditions.md), {} when the rules have none: scan_seconds,
 ## margin, jitter, spacing, wall_gap_cells, slack_pct and the bands, every number an int. The
 ## cooldown between two scans, 0 without the rules.
@@ -537,6 +538,10 @@ func _read_battle(battle: Variant) -> PackedStringArray:
 		problems.append("rules.battle.wall_cost_units must be whole and non-negative")
 	else:
 		wall_cost_units = int(rules.get("wall_cost_units", 0))
+	if not _is_whole(rules.get("search_cells")) or int(rules["search_cells"]) < 1:
+		problems.append("rules.battle.search_cells must be a whole number of at least 1")
+	else:
+		search_cells = int(rules["search_cells"])
 	wall_type = str(rules.get("wall", ""))
 	if rules.has("wall") and not _buildings.has(wall_type):
 		problems.append("rules.battle.wall names unknown type '%s'" % wall_type)

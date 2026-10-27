@@ -103,9 +103,10 @@ centre.
 4. The falls of the first half are passed on: the field frees the cells and lifts the deploy
    zone, the reach maps forget the building, its loot share is taken. (The units' fallback
    counts drop the moment a building falls.)
-5. **The unit phase, second half** (`BattleArmy.aim_and_act`), units in id order: every unit
+5. **The unit phase, second half** (`BattleArmy.aim_and_act`): the ground search left in flight
+   last tick goes on first (**Pathing**, **Budget**); then, units in id order, every unit
    wanting a target, the newly deployed included, gets one (**Targeting**), so its search sees
-   the falls of this tick's first half, and acts on it at once. A target that falls in this
+   the falls of this tick's first half, and acts on it at once, or waits for its search. A target that falls in this
    half is noticed by the units on it in the next tick's first half; its falls are passed on
    in turn.
 6. The unit buckets are rebuilt.
@@ -150,10 +151,29 @@ each, a row's span in reach found by an integer square root. The maps live side 
 array of the pathing's own. The search runs on the field grown by a border of closed cells, so a
 step needs no bounds check; a cell keeps its order there, so ties break as on the field.
 
-**Budget.** At most `BattleArmy.PATHS_PER_TICK` = 4 searches run a tick; units waiting are
-served in id order. Units asking the same map from the same cell in a tick share one search, so
-a stack deployed on one cell costs one. A search reaches at most every cell once (2,304 on
-48×48).
+**Budget.** The ground searches settle at most `rules.battle.search_cells` cells a tick between
+them (300 in the shipped data, about 0.45 ms on the development Mac), one search in flight at a
+time:
+
+- The search left in flight last tick goes on first.
+- Then the units wanting a target are served in id order. A unit takes a search this tick has
+  finished from its cell on its map; units asking the same map from the same cell in a tick
+  share one search, so a stack deployed on one cell costs one. Else, while nothing is in flight
+  and the budget lasts, it begins one.
+- A search the budget cuts short stays in flight and goes on next tick; the unit that began it,
+  and every unit after it that needs a new search, waits (IDLE). When it finishes, every unit
+  asking that map from that cell that tick takes it.
+- A search in flight sees the field as it is when it settles each cell. A fall between two of
+  its ticks opens cells, which only the cells it has not settled yet reach, and takes counts off
+  the maps, so its path stays walkable and it goes on. A pick that falls between its slices stays
+  its goal: the unit takes it and drops it in the next tick's first half, as any fallen target
+  is, and searches again. The path is cut at a wall as the field stands when the search
+  finishes.
+- A search in flight whose set has nothing standing left (its last defence fell, say) is dropped
+  at the start of the next second half, before it settles anything more; the units that asked
+  for it ask again and find nothing without a search, or take their fallback set.
+- A search reaches at most every cell once (2,304 on 48×48), so one crosses the field in about
+  eight ticks; most settle under a hundred cells and finish in the tick they begin.
 
 Paths are searched again only when the target falls, when a thrown unit lands, and after a
 fall for a unit that found nothing; never per tick.
@@ -265,7 +285,12 @@ nothing reads a clock or draws a random number. The hash covers the abilities' s
 is left and used, every swarm (point, end, heal, radius, carry), every strike on its way (point,
 landing tick, damage, radius) and every building's disabled timer. A battle stepped tick by tick,
 fed its commands live, or replayed from its logged commands gives the same result
-(`test_battle_sim.gd`, and with abilities `test_battle_abilities.gd`). Until the reach maps were
+(`test_battle_sim.gd`, and with abilities `test_battle_abilities.gd`). The hash covers the ground
+search in flight too: whether there is one, its start, its map and the cells it has settled. The
+search budget in cells (**Pathing**, **Budget**) replaced a budget of four searches a tick on
+2026-10-27, which moved when units start walking, so a replay recorded before then does not
+reproduce either; none exists outside a base's local raid log, which is never replayed. The
+battle rules carry no version yet (`project_overview.md` §3.2). Until the reach maps were
 built at setup, a map first built in a pass where a unit had just felled a building counted every
 cell in that building's reach one low (the fall was left out, then taken off again), so a replay
 recorded before then whose first build of a map fell in that window does not reproduce; none
@@ -288,18 +313,37 @@ counted, 250 walls, 21 traps), with the machine shared with other runs (load ave
 Most of the worst case is the unit phase (walking, attack cooldowns and about 530 path searches),
 then the defences' nearest-unit searches.
 
-**A tick's cost** is flat but for the searches. The reach maps are built at setup, about 0.5 to
-1.3 ms each on the template base, so a six-map army (the `battle` scenario's) adds about 5.5 ms
-to a setup of about 5.4 ms; the first tick, which used to build them, costs 1.5 to 1.7 ms. A
-search costs about 15 µs and about 1.6 µs a cell it settles, 0.5 to 0.75 ms for a group deployed
-far from the buildings, so a tick's ceiling is `PATHS_PER_TICK` full searches: 2.3 to 3.3 ms on
-the Mac (the `battle` scenario checks its slowest tick under 3.5 ms), about 8 to 16 ms on a phone
-three to five times slower. Measured headless, the faster of two runs per tick, load average 5 to
-9. If the phone measurement needs it, the next lever is the search budget, lowered or counted in
-settled cells instead of searches: a rule change, since it moves when units start walking. Two
-other levers are not built yet: idle defences sleeping while the unit buckets their range touches
-are empty, and per-segment walking state, so a walking unit does not recompute its segment every
-tick.
+**A tick's cost** is flat but for the targets units choose. The reach maps are built at setup,
+about 0.5 to 1.3 ms each on the template base, so a six-map army (the `battle` scenario's) adds
+about 5.5 ms to a setup of about 5.4 ms. A ground search costs about 15 µs and 1.44 to 1.57 µs a
+cell it settles; one from a deploy cell settles at most about 350 cells on the template base and
+560 on an outpost, and late in a battle one crossing the field to the last buildings 1,000 to
+1,400. An air unit's pick reads its set's members, about 25 µs. Measured on 2026-10-27, headless,
+the faster of two runs per tick, load average 7 to 14:
+
+- Before the search budget in cells, the slowest ticks were a group of Jet Troopers choosing a
+  target together (165 µs each when the pick read every building), the battle's last tick (each
+  unit noticing the last fall searched the whole field for nothing, up to four times 2,304
+  cells, about 16 ms) and four searches crossing the field (up to 6.5 ms): 2.3 to 3.3 ms in the
+  `battle` scenario; with `tools/sim_battles.gd` (five seeds, `max_tick_ms`) 1.1 to 3.8 ms on the
+  template base and 11 to 19 ms on the outposts at Command Center 1 and 5.
+- With it, the searches' share of a tick is at most 300 cells, about 0.45 ms: the `battle`
+  scenario's slowest tick is 1.24 to 1.28 ms (tick 40, a deploy wave of 93 units; the scenario
+  checks it under 2.0 ms), `max_tick_ms` 0.86 to 1.38 ms on the template base, 0.90 to 1.52 ms on
+  the CC 1 outpost and 0.99 to 1.41 ms on the CC 5 one. A phone three to ten times slower puts
+  that at 4 to 15 ms.
+
+What the budget costs is waiting: on the 48×48 field a whole ground army deployed on 26 cells at
+once waits, between its units, about as many unit-ticks as before on the template base and two
+and a half to four times as many on a sparse outpost, where the last groups start walking 2 to
+3 s late rather than about 0.35 s. In `tools/sim_battles.gd`'s five seeds the stars did not
+change; destruction did on some: on the template base at level 8 two of five moved (61% to 55%,
+5% to 18%), on the Command Center 5 outpost one (88% to 85%), on the Command Center 1 outpost none
+(all 100%). A tick of scripted deploys (a setup's commands, applied in `step()`) costs about 8 µs
+a unit with its first move, so a wave of 260 at once is 1.5 to 2 ms; the view sends deploys live
+through `command()`, outside the step. Two other levers are not built yet: idle defences sleeping while
+the unit buckets their range touches are empty, and per-segment walking state, so a walking unit
+does not recompute its segment every tick.
 
 ## Tools
 

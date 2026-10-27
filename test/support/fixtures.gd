@@ -18,7 +18,9 @@ extends RefCounted
 ##   wall      1x1: 10 metal, instant, max 25
 ##
 ## Battle fixtures (docs/reference/battle.md): every non-trap type above has hp; rules.battle is
-## 60 s, loot 50% of each resource, wall "wall", traps the "traps" category, wall cost 8000.
+## 60 s, loot 50% of each resource, wall "wall", traps the "traps" category, wall cost 8000, search
+## cells 1000 (a search on the 20x20 field settles at most 400, so a few at once fit a tick; the
+## budget tests set a smaller one on the catalog).
 ## The 1x1 battle types, each hp 300 at level 1 (Fixtures.battle_catalog):
 ##   turret  ground, damage 10, range 3, every 1000 ms     tower  both, damage 5, range 4, 500 ms
 ##   mortar  ground, damage 20, range 6, 2000 ms, splash 1000, shell 1000 ms

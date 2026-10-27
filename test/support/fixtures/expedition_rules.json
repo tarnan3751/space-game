@@ -18,7 +18,8 @@
     "loot_pct": { "metal": 50, "crystal": 50, "antimatter": 50 },
     "wall": "wall",
     "trap_category": "traps",
-    "wall_cost_units": 8000
+    "wall_cost_units": 8000,
+    "search_cells": 1000
   },
   "expedition": {
     "scan_seconds": 60,

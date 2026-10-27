@@ -29,7 +29,8 @@ A non-whole number stays a float and fails validation wherever an int is require
     "loot_pct": { "metal": 20, "crystal": 20, "antimatter": 5 },
     "wall": "barrier_wall",
     "trap_category": "traps",
-    "wall_cost_units": 8000
+    "wall_cost_units": 8000,
+    "search_cells": 300
   },
   "expedition": {
     "scan_seconds": 10800, "margin": 4, "jitter": 2, "spacing": 1, "wall_gap_cells": 2, "slack_pct": 125,
@@ -62,7 +63,7 @@ A non-whole number stays a float and fails validation wherever an int is require
 | `categories` | The build-menu categories in tab order, each `{ "id", "name" }` (the name defaults to the id). Every type but the Command Center belongs to one. `core`, the Command Center's category, is never listed. |
 | `grid` | `width` and `height` in cells, both positive. |
 | `army` | `housing`: the building type whose `capacity` houses the army; `research`: the building type that researches unit and ability levels; `foundry`: the building type that makes the abilities, whose `capacity` caps their stock. Each names a type in `buildings.json`; `housing` and `research` are required once `units.json` lists a unit, `foundry` once `abilities.json` lists an ability. |
-| `battle` | Optional; the battle sim's rules (`battle.md`). `seconds`: the battle's length, at least 1. `loot_pct`: `{resource: percent}`, 0–100, of the defender's stored amount a raid can take (a resource left out gives none). `wall`: the wall type, the `wall` class. `trap_category`: the category whose types are traps, the `trap` class. `wall_cost_units`: the extra path cost, in field units, of walking into a wall cell, which decides when a ground unit breaks through a wall rather than walk round it. Without the section the catalog has no battle rules and a battle refuses to set up. |
+| `battle` | Optional; the battle sim's rules (`battle.md`). `seconds`: the battle's length, at least 1. `loot_pct`: `{resource: percent}`, 0–100, of the defender's stored amount a raid can take (a resource left out gives none). `wall`: the wall type, the `wall` class. `trap_category`: the category whose types are traps, the `trap` class. `wall_cost_units`: the extra path cost, in field units, of walking into a wall cell, which decides when a ground unit breaks through a wall rather than walk round it. `search_cells`: the cells the ground units' path searches may settle in a tick between them, at least 1; a search it cuts short goes on next tick (`battle.md`, **Pathing**). Without the section the catalog has no battle rules and a battle refuses to set up. |
 | `expedition` | Optional; the sector and the outpost generator (`expeditions.md`). `scan_seconds` (whole): the cooldown from one scan to the next. `margin` (at least 1, and less than half the grid): the free cells between every outpost footprint and the field's edge. `jitter`: how far the outpost's centre may move on each axis. `spacing`: the free cells kept between footprints outside the compound. `wall_gap_cells` (at least 1): one gap's width in a wall ring. `slack_pct` (at least 100): the compound's and the middle band's area as a percent of what their buildings take. `bands`, in field order, each `{ "id", "fields", "cc_offset", "level_offset", "density_pct", "loot_pct", "wall_gaps", "deposits", "hazards" }`: `fields` (at least 1) of the sector's fields are in the band, so the field count is their sum; the outpost's Command Center is the player's plus `cc_offset` (any whole number, clamped to the levels); its levels are the highest its Command Center allows plus `level_offset` (0 or less); `density_pct` of each type's `max_count`, rounded half up; `loot_pct` of the player's storage capacity as the loot target; `wall_gaps` openings in each wall ring; `deposits` storages outside the walls, with `hazards` defences each. The shipped bands are easy (Command Center −1, levels −1, 60%, 15% loot, two gaps, two deposits, no hazards), even (+0, 80%, 25%, one gap, one deposit, one hazard) and hard (+1, 85%, 40%, closed, one deposit, two hazards), two fields each. Without the section the catalog has no fields. A block with any error is reported and not kept. |
 | `premium` | Reserved, and read by no code: the premium currency's id and how many minutes of a timer one unit of it would skip. The retune's timers were chosen with that price in mind (the longest, the Command Center's 66 hours to level 10, is 396 at 10 minutes a unit); nothing is sold until PvP exists (`docs/vision.md` §5). |
 | `menu_order` | The build menu's types in order: every type except `command_center`, exactly once. Within a category, this is the order the HUD lists them. |
@@ -260,8 +261,8 @@ ticks.
   `fire_ms` or a battle field negative or not whole; `shell_ms` above 0 with a `fire_ms` below
   50 (the battle holds a shell until it lands, sized by the fire rate); a `cost`, `produces` or `storage` entry naming an unknown
   resource or holding a non-whole number.
-- `rules.battle` not an object; its `seconds` below 1 or not whole; `wall_cost_units` negative
-  or not whole; `wall` naming an unknown type; `trap_category` not one of `rules.categories`;
+- `rules.battle` not an object; its `seconds` or `search_cells` below 1 or not whole;
+  `wall_cost_units` negative or not whole; `wall` naming an unknown type; `trap_category` not one of `rules.categories`;
   `loot_pct` not an object, naming an unknown resource, or holding a percent outside 0–100.
 - `units.json` missing or not an object; `rules.army` not an object, naming an unknown type, or
   without `housing` and `research` while there are units.

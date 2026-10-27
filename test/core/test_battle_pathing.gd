@@ -1,6 +1,6 @@
 extends TestCase
-## Ground pathing: round buildings, round or through walls, no corner cutting, and the search
-## budget.
+## Ground pathing: round buildings, round or through walls, no corner cutting, the air pick, and
+## the search budget in cells with a search in flight.
 
 const Fixtures := preload("res://test/support/fixtures.gd")
 
@@ -81,7 +81,7 @@ func test_a_map_is_right_when_a_building_falls_in_the_tick_it_would_be_built() -
 		commands)
 	while not sim.is_over():
 		sim.step()
-	assert_eq(sim.state_hash(), 2032000496, "the battle as it plays with every map right")
+	assert_eq(sim.state_hash(), 4102097120, "the battle as it plays with every map right")
 	var pathing := sim.pathing
 	var layout := sim.layout
 	var wrong := 0
@@ -218,18 +218,66 @@ func test_a_shut_in_target_waits_for_a_gap() -> void:
 	assert_eq(sim.unit_target(1), 1, "a gap opened: the turret")
 
 
-func test_searches_are_budgeted_and_shared() -> void:
-	var commands := []
-	for i: int in 6:
-		commands.append(Fixtures.deploy(0, "melee", 0, i * 3))
-	var sim := Fixtures.battle([["command_center", 15, 9]], {"melee": 6}, commands)
-	sim.step()
-	assert_eq(sim.pathing.searches, BattleArmy.PATHS_PER_TICK)
-	assert_eq(sim.unit_state(5), BattleArmy.IDLE, "the fifth waits its turn")
-	assert_eq(sim.unit_state(4), BattleArmy.WALKING)
-	sim.step()
-	assert_eq(sim.pathing.searches, 6)
-	assert_eq(sim.unit_state(6), BattleArmy.WALKING)
+func test_a_search_in_slices_is_the_whole_search() -> void:
+	# begin() and advance() a few cells at a time give the path, the pick and the cells settled of
+	# one find(), on a field that does not change between the slices.
+	var buildings := [["command_center", 15, 9], ["academy", 4, 15], ["turret", 16, 2]]
+	for y: int in range(3, 17):
+		buildings.append(["wall", 10, y])
+	var pathing := _pathing(buildings)
+	var wrong := 0
+	for set_id: int in [BattlePathing.SET_HQ, BattlePathing.SET_ANY, BattlePathing.SET_DEFENSE]:
+		var m := pathing.map_for(set_id, 500)
+		for start: int in [_cell(0, 0), _cell(3, 10), _cell(19, 19), _cell(12, 18)]:
+			var before := pathing.settled
+			var whole := pathing.find(start, m)
+			var whole_found := pathing.found
+			var whole_cells := pathing.settled - before
+			for slice: int in [1, 3, 17]:
+				before = pathing.settled
+				pathing.begin(start, m)
+				var slices := 0
+				while pathing.searching:
+					var used := pathing.advance(slice)
+					if used > slice:
+						wrong += 1
+					slices += 1
+				if pathing.path != whole or pathing.found != whole_found or pathing.settled - before != whole_cells:
+					wrong += 1
+				if whole_cells > slice and slices < 2:
+					wrong += 1
+	assert_eq(wrong, 0, "every sliced search is its whole search")
+
+
+func test_searches_share_a_budget_of_cells() -> void:
+	# Three units far from the only building on the 48x48 field, at 200 cells a tick: no tick
+	# settles more, the searches finish one after another in id order, and each path is the one a
+	# whole search gives on the field as it stands.
+	var catalog := Fixtures.battle_catalog(Vector2i(48, 48))
+	catalog.search_cells = 200
+	var commands := [Fixtures.deploy(0, "melee", 0, 0), Fixtures.deploy(0, "melee", 0, 12),
+		Fixtures.deploy(0, "melee", 12, 0)]
+	var setup := Fixtures.battle_setup([["command_center", 38, 38]], {"melee": 3}, commands)
+	var sim := BattleSim.create(catalog, setup)
+	var walking_at := PackedInt32Array([-1, -1, -1])
+	var over := 0
+	while walking_at.has(-1) and sim.tick < 200:
+		var before := sim.pathing.settled
+		sim.step()
+		if sim.pathing.settled - before > 200:
+			over += 1
+		for u: int in 3:
+			if walking_at[u] < 0 and sim.unit_state(u + 1) == BattleArmy.WALKING:
+				walking_at[u] = sim.tick
+	assert_eq(over, 0, "no tick settles more than its budget")
+	assert_true(walking_at[0] > 1, "the first search takes more than a tick: %s" % walking_at)
+	assert_true(walking_at[0] <= walking_at[1] and walking_at[1] <= walking_at[2], "in id order: %s" % walking_at)
+	var whole := BattleSim.create(catalog, setup)
+	var m := whole.pathing.map_for(BattlePathing.SET_ANY, 500)
+	for u: int in 3:
+		var at := Vector2i(commands[u]["cell"][0], commands[u]["cell"][1])
+		assert_eq(sim.army._paths[u], whole.pathing.find(at.y * 48 + at.x, m), "unit %d's path" % (u + 1))
+	# Six on one cell share one search.
 	commands = []
 	for i: int in 6:
 		commands.append(Fixtures.deploy(0, "melee", 0, 0))
@@ -237,6 +285,101 @@ func test_searches_are_budgeted_and_shared() -> void:
 	sim.step()
 	assert_eq(sim.pathing.searches, 1, "one cell, one type: one search")
 	assert_eq(sim.unit_state(6), BattleArmy.WALKING)
+
+
+func test_a_search_in_flight_goes_on_over_a_fall() -> void:
+	# At 10 cells a tick, a hunter's search across the 48x48 field for the only turret has settled
+	# the cells beside a silo when four raiders fell it: the search goes on over the opened field
+	# to the standing turret, by a path every step of which is walkable on the field as it then
+	# stands, and the battle replays to the same hash at every tick.
+	var catalog := Fixtures.battle_catalog(Vector2i(48, 48))
+	catalog.search_cells = 10
+	var commands := []
+	for i: int in 4:
+		commands.append(Fixtures.deploy(0, "raider", 2, 28))
+	commands.append(Fixtures.deploy(0, "hunter", 0, 24))
+	var setup := Fixtures.battle_setup([["silo", 5, 27], ["turret", 40, 10]], {"raider": 4, "hunter": 1}, commands)
+	var sim := BattleSim.create(catalog, setup)
+	var twin := BattleSim.create(catalog, setup)
+	var pathing := sim.pathing
+	var differ := 0
+	var fell_in_flight := false
+	var beside_settled := false
+	while sim.unit_state(5) != BattleArmy.WALKING and sim.tick < 1000:
+		var standing := not sim.is_destroyed(1)
+		sim.step()
+		twin.step()
+		if sim.state_hash() != twin.state_hash():
+			differ += 1
+		if standing and sim.is_destroyed(1):
+			fell_in_flight = pathing.searching and pathing.map_set(pathing.search_map) == BattlePathing.SET_DEFENSE
+			for cell: Vector2i in [Vector2i(4, 27), Vector2i(4, 28), Vector2i(5, 26), Vector2i(6, 26),
+					Vector2i(7, 27), Vector2i(7, 28), Vector2i(5, 29), Vector2i(6, 29)]:
+				if pathing._done[pathing._grown(cell.y * 48 + cell.x)] == pathing._search_stamp:
+					beside_settled = true
+			var before := sim.state_hash()
+			pathing._search_settled += 1
+			assert_true(sim.state_hash() != before, "the hash covers the search in flight")
+			pathing._search_settled -= 1
+	assert_true(fell_in_flight, "the silo fell while the hunter's search was in flight")
+	assert_true(beside_settled, "with cells beside the silo already settled")
+	assert_eq(sim.unit_state(5), BattleArmy.WALKING)
+	assert_eq(sim.unit_target(5), 2, "the standing turret")
+	var path := sim.army._paths[4]
+	var bad := 0
+	for k: int in path.size():
+		if sim.field.kind[path[k]] == BattleField.BUILDING:
+			bad += 1
+		if k == 0:
+			continue
+		var dx := path[k] % 48 - path[k - 1] % 48
+		var dy := path[k] / 48 - path[k - 1] / 48
+		if absi(dx) > 1 or absi(dy) > 1:
+			bad += 1
+		elif dx != 0 and dy != 0 and (sim.field.kind[path[k - 1] + dx] != BattleField.FREE
+				or sim.field.kind[path[k - 1] + dy * 48] != BattleField.FREE):
+			bad += 1
+	assert_eq(bad, 0, "every step walkable on the changed field")
+	while not sim.is_over():
+		sim.step()
+		twin.step()
+		if sim.state_hash() != twin.state_hash():
+			differ += 1
+	assert_eq(differ, 0, "the same hash at every tick")
+	var replay := setup.duplicate(true)
+	replay["commands"] = sim.result()["commands"]
+	assert_eq(JSON.stringify(BattleSim.run(catalog, replay)), JSON.stringify(sim.result()), "the replay")
+
+
+func test_a_search_in_flight_is_dropped_when_its_set_has_nothing_standing() -> void:
+	# At 5 cells a tick, a hunter's search for the only turret is in flight when four melee fell
+	# the turret: the search is dropped rather than settling every cell it reaches for nothing,
+	# and the hunter takes the Command Center.
+	var catalog := Fixtures.battle_catalog(Vector2i(48, 48))
+	catalog.search_cells = 5
+	var commands := []
+	for i: int in 4:
+		commands.append(Fixtures.deploy(0, "melee", 7, 10))
+	commands.append(Fixtures.deploy(0, "hunter", 0, 47))
+	var sim := BattleSim.create(catalog, Fixtures.battle_setup([["turret", 10, 10], ["command_center", 40, 40]],
+		{"melee": 4, "hunter": 1}, commands))
+	var pathing := sim.pathing
+	var in_flight_at_fall := false
+	var defence_search_after := 0
+	while not sim.is_destroyed(1) and sim.tick < 1000:
+		in_flight_at_fall = pathing.searching and pathing.map_set(pathing.search_map) == BattlePathing.SET_DEFENSE
+		sim.step()
+	assert_true(sim.is_destroyed(1), "the turret fell")
+	assert_true(in_flight_at_fall, "with the hunter's search for it in flight")
+	for i: int in 3:
+		if pathing.searching and pathing.map_set(pathing.search_map) == BattlePathing.SET_DEFENSE:
+			defence_search_after += 1
+		sim.step()
+		if pathing.searching and pathing.map_set(pathing.search_map) == BattlePathing.SET_DEFENSE:
+			defence_search_after += 1
+	assert_eq(defence_search_after, 0, "the search for a defence is dropped")
+	_step_until(sim, func() -> bool: return sim.unit_state(5) == BattleArmy.WALKING)
+	assert_eq(sim.unit_target(5), 2, "the hunter takes the Command Center")
 
 
 func test_no_search_runs_when_nothing_stands() -> void:

@@ -134,9 +134,11 @@ in one second at most (`Catalog.apply_dev_cheats`; `-- --no-cheats` for the real
   zoom; a battle on it with a full army 974 and 2.0 million, `docs/reference/art-style.md`,
   **Cost**), but no phone has run them: the measurement needs a device and stays with the owner
   (`docs/reference/testing-tools.md`, **Measuring on a phone**), and it decides whether the Crown
-  robots stay and what the unit budgets are. The sim's slowest tick, 5 to 10 ms on the Mac, varying
-  by run, when a large group first searches, is over the 5 ms a tick proxy and parked for the next
-  core batch.
+  robots stay and what the unit budgets are. The sim's slowest tick is about 1 to 1.5 ms on the
+  Mac since the search budget in cells (§3.1), under the 5 ms a tick proxy. A tick of scripted
+  deploys still costs about 8 µs a unit, 1.5 to 2 ms for a wave of 260 in one tick; the view sends
+  deploys live, outside the step, so only a setup's commands pay it (`docs/reference/battle.md`,
+  **Determinism and performance**).
 - **The balance is modelled, not played**: the retune (`docs/plans/retune.md`) sets the pace
   from a model of maxing each Command Center level (four raids a day, builders busy 75% of the
   time) and the beatability of the expedition fields from scripted attacks without abilities;
@@ -409,10 +411,25 @@ any of them can be reversed as a data or model change.
   recorded: a capacity that belongs to a building family shows in that family's panels, not the top
   bar.
 
+- **The search budget in cells** (the coordinator, 2026-10-27, for the phone's frame; the owner
+  asked for performance across the codebase for a 2021 mid-range phone; `docs/reference/battle.md`,
+  **Pathing**): the ground units' path searches settle at most `rules.battle.search_cells` = 300
+  cells a tick between them, one search in flight at a time, cut short and going on next tick,
+  the waiting units served in id order, replacing four searches a tick. A search in flight goes
+  on over a fall rather than starting again, which could starve while buildings fall every few
+  ticks. It bounds the searches' share of a tick to about 0.45 ms on the Mac and moves when units
+  start walking: a whole army deployed on many cells of a sparse outpost at once waits 2 to 3 s
+  for its last groups' paths. Two refactors with it change nothing a battle does: an air unit's
+  pick reads its set's members rather than every building, and a search for a set with nothing
+  standing is not run. Reversible as data (`search_cells`).
+
 ### 3.2 Open
 
 - **Economy validation on the server.** Either port the small economy rules to TypeScript,
   checked against shared golden test cases, or run headless Godot for that too. Decide in step 5.
 - **The name.** "Space Game" is a placeholder.
+- **Versioning the battle rules** (Milestone 3): a battle's result depends on the sim's rules
+  (the search budget in cells changed when units start walking), and nothing in a raid says which
+  rules played it; the server will need to know before it replays a raid.
 - **The phone measurement** itself: the target and the procedure are recorded
   (`docs/reference/testing-tools.md`, **Measuring on a phone**); it needs a device in hand.

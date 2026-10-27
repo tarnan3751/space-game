@@ -171,8 +171,8 @@ to its landing in a second copy, which must show the defence's hull lowered), ru
 to the end and logged (battle seconds and ticks,
 destruction, stars, loot, and the wall time of the run, which the scenario reads as the
 performance budget's measure, never the sim); each tick's step is timed in both runs and the
-faster kept, and the slowest tick must be under 3.5 ms (`TICK_BUDGET_MS`, four full path searches
-with room to spare), logged rather than failed while the average tick says the machine is loaded
+faster kept, and the slowest tick must be under 2.0 ms (`TICK_BUDGET_MS`, the searches' 300 cells
+a tick and a deploy wave with room to spare), logged rather than failed while the average tick says the machine is loaded
 (over 0.4 ms); the same setup run again must repeat its result and hash, and the result applied with `raid_result` to a copy of the game's base given the
 army and the strike must spend the units deployed and the strike and bring the loot home up to
 storage. `main.state` itself
@@ -253,8 +253,9 @@ in a 1600×900 window, as `template_base` measures the base: the draw calls, pri
 CPU a frame against the same ceilings (1,600, 2.1 million, 6 ms), with the slowest frame's process
 time, the frame rate and the units drawn. At tick 200, through the abilities bar (two of each
 ability brought): the orbital strike cast on the nearest defence (its marker, its blast, the
-defence's hull down after it lands), an EMP burst on the next (disabled in the sim and dimmed), a
-repair swarm on a living unit (its dome), the cards counting down. Then the top bar checked against
+defence's hull down after it lands), an EMP burst on the standing defence farthest from the army
+(disabled in the sim and dimmed), a repair swarm on a living unit (its dome), the cards counting
+down. Then the top bar checked against
 the sim, the speed button to 2x, at tick 1,000 End, Keep fighting, End again and End battle, the
 result panel in the deploy bar's place, and Return. Screenshots: tick 0, the smear, tick 200, the
 strike's marker and blast, the EMP, the swarm, tick 1,000, the confirmation, the result panel and

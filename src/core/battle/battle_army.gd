@@ -23,8 +23,6 @@ const STUNNED := 4
 const HELD := 5
 
 const TICK_MS := 50
-## Ground searches a tick at most; units waiting for one are served in id order.
-const PATHS_PER_TICK := 4
 ## No unit's reach is shorter than this, so a cell orthogonally next to a footprint is in reach.
 const MIN_REACH := 500
 ## Unit buckets for the defences' nearest-unit search: cells per side.
@@ -90,6 +88,8 @@ var _layout: BattleLayout
 var _field: BattleField
 var _width: int = 0
 var _pathing: BattlePathing
+## The cells the ground searches may settle in a tick (rules.battle.search_cells).
+var _search_cells: int = 0
 ## This tick's shared searches: the cell and map asked, and what they gave.
 var _share_count: int = 0
 var _share_cell: PackedInt32Array = PackedInt32Array()
@@ -98,11 +98,12 @@ var _share_target: PackedInt32Array = PackedInt32Array()
 var _share_path: Array[PackedInt32Array] = []
 
 
-func _init(layout: BattleLayout, field: BattleField, pathing: BattlePathing) -> void:
+func _init(layout: BattleLayout, field: BattleField, pathing: BattlePathing, search_cells: int) -> void:
 	_layout = layout
 	_field = field
 	_width = field.width
 	_pathing = pathing
+	_search_cells = search_cells
 	_down.resize(layout.count)
 	_down.fill(0)
 	_standing.resize(BattlePathing.SET_ANY_HIDDEN + 1)
@@ -230,12 +231,25 @@ func act(tick: int, combat: BattleCombat, events: BattleEvents) -> void:
 
 
 ## The unit phase's second half: every unit that wants a target, in id order and unless
-## stunned, gets one (a ground unit through BattlePathing, at most PATHS_PER_TICK searches, units
-## of one type on one cell sharing a search; an air unit by straight distance) and acts on it at
-## once. A target that falls in this half is noticed next tick.
+## stunned, gets one (a ground unit through BattlePathing, an air unit by straight distance) and
+## acts on it at once. A target that falls in this half is noticed next tick.
+##
+## The ground searches settle at most _search_cells cells a tick between them, one in flight at a
+## time: the search left in flight last tick goes on first, then the units waiting are served in
+## id order, each taking a search this tick has finished from its cell on its map, or else
+## beginning one while nothing is in flight and the budget lasts. A search the budget cuts short
+## goes on next tick, and the units asking for it wait; one whose set has nothing standing left is
+## dropped instead, since it could only settle every cell it reaches for nothing, and the units
+## that asked for it ask again.
 func aim_and_act(tick: int, combat: BattleCombat, events: BattleEvents) -> void:
 	_share_count = 0
-	var budget := PATHS_PER_TICK
+	var budget := _search_cells
+	if _pathing.searching and _standing[_pathing.map_set(_pathing.search_map)] == 0:
+		_pathing.abandon()
+	if _pathing.searching:
+		budget -= _pathing.advance(budget)
+		if not _pathing.searching:
+			_share_search()
 	for u: int in count:
 		if _wants[u] == 0 or state[u] == DEAD or stun_until[u] > tick:
 			continue
@@ -420,9 +434,10 @@ func _aim_air(u: int) -> void:
 	cooldown[u] = 0
 
 
-## Gives a ground unit a target and a path, from this tick's shared searches or a new one while
-## the budget lasts; returns the budget left. The path stops short of the first wall it would
-## walk through, and that wall becomes the target.
+## Gives a ground unit a target and a path, from this tick's finished searches or a new one
+## while nothing is in flight and the budget lasts; returns the budget left. A unit whose search
+## is cut short, or that finds one in flight, waits. With no candidate of its set standing it
+## finds nothing without a search, which would have settled every cell it can reach.
 func _aim_ground(u: int, budget: int) -> int:
 	var t := unit_type[u]
 	var m := _pathing.map_for(_set_for(t), _t_reach[t])
@@ -432,11 +447,16 @@ func _aim_ground(u: int, budget: int) -> int:
 		if _share_cell[i] == cell and _share_map[i] == m:
 			share = i
 			break
+	if share < 0 and _standing[_pathing.map_set(m)] == 0:
+		share = _share(cell, m, -1, PackedInt32Array())
 	if share < 0:
-		if budget <= 0:
+		if budget <= 0 or _pathing.searching:
 			return budget
-		budget -= 1
-		share = _search(cell, m)
+		_pathing.begin(cell, m)
+		budget -= _pathing.advance(budget)
+		if _pathing.searching:
+			return budget
+		share = _share_search()
 	_wants[u] = 0
 	var aim := _share_target[share]
 	if aim < 0:
@@ -450,20 +470,21 @@ func _aim_ground(u: int, budget: int) -> int:
 	return budget
 
 
-## A search from `cell` on map `m`, kept for the units that ask the same this tick; returns its
-## place. With no candidate of the map's set standing it finds nothing without searching, which a
-## search would have done only after settling every cell it can reach.
-func _search(cell: int, m: int) -> int:
-	var path := PackedInt32Array()
-	var aim := -1
-	if _standing[_pathing.map_set(m)] > 0:
-		path = _pathing.find(cell, m)
-		aim = _pathing.found
+## Keeps the search just finished for the units that ask the same this tick; returns its place.
+## Its path stops short of the first wall it would walk through, as the field stands now, and
+## that wall becomes the target.
+func _share_search() -> int:
+	var path := _pathing.path
+	var aim := _pathing.found
 	for k: int in range(1, path.size()):
 		if _field.kind[path[k]] == BattleField.WALL:
 			aim = _field.building[path[k]] - 1
 			path = path.slice(0, k)
 			break
+	return _share(_pathing.search_cell, _pathing.search_map, aim, path)
+
+
+func _share(cell: int, m: int, aim: int, path: PackedInt32Array) -> int:
 	var i := _share_count
 	_share_count += 1
 	if i == _share_cell.size():

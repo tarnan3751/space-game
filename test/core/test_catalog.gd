@@ -603,6 +603,7 @@ func test_battle_rules_and_classes() -> void:
 	assert_eq(catalog.battle_seconds, 60)
 	assert_eq(catalog.wall_type, "wall")
 	assert_eq(catalog.wall_cost_units, 8000)
+	assert_eq(catalog.search_cells, 1000)
 	assert_eq(catalog.loot_pct("metal"), 50)
 	assert_eq(catalog.loot_pct("gold"), 0)
 	var classes := {
@@ -634,6 +635,8 @@ func test_validation_reports_bad_battle_rules() -> void:
 			rules["battle"]["seconds"] = 0,
 		"rules.battle.wall_cost_units must be whole and non-negative": func(rules: Dictionary, _buildings: Dictionary) -> void:
 			rules["battle"]["wall_cost_units"] = -1,
+		"rules.battle.search_cells must be a whole number of at least 1": func(rules: Dictionary, _buildings: Dictionary) -> void:
+			rules["battle"]["search_cells"] = 0,
 		"rules.battle.wall names unknown type 'fence'": func(rules: Dictionary, _buildings: Dictionary) -> void:
 			rules["battle"]["wall"] = "fence",
 		"rules.battle.trap_category must be one of rules.categories": func(rules: Dictionary, _buildings: Dictionary) -> void:

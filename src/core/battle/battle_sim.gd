@@ -386,6 +386,7 @@ func state_hash() -> int:
 		h = BattleMath.mix(h, layout.destroyed[b])
 		h = BattleMath.mix(h, layout.revealed[b])
 	h = army.hash_into(h)
+	h = pathing.hash_into(h)
 	h = combat.hash_into(h)
 	h = abilities.hash_into(h)
 	for r: int in _loot.size():
@@ -436,7 +437,7 @@ func _setup(setup: Dictionary) -> String:
 	field = BattleField.new(catalog.grid_size)
 	field.place_all(layout)
 	pathing = BattlePathing.new(field, layout, catalog.wall_cost_units)
-	army = BattleArmy.new(layout, field, pathing)
+	army = BattleArmy.new(layout, field, pathing, catalog.search_cells)
 	error = army.setup(catalog, army_data, level_data)
 	if error != "":
 		return error

@@ -259,14 +259,16 @@ func test_the_hash_at_every_tick_is_pinned() -> void:
 	# battle does may, under a brief that says so. Building the reach maps at setup left them as
 	# they were: no map of these battles was first built in the window that miscounted one
 	# (test_battle_pathing's test_a_map_is_right_when_a_building_falls_in_the_tick_it_would_be_built).
+	# The search budget in cells (rules.battle.search_cells, 1000 in the fixtures), with the search
+	# in flight in the hash, moved them.
 	var sim := BattleSim.create(Fixtures.battle_catalog(), _rich_setup())
 	var chain := 2166136261
 	while not sim.is_over():
 		sim.step()
 		chain = BattleMath.mix(chain, sim.state_hash())
-	assert_eq([sim.tick, sim.state_hash(), chain], [1200, 2555368207, 1486836163], "the rich battle")
+	assert_eq([sim.tick, sim.state_hash(), chain], [1200, 1676693407, 453181675], "the rich battle")
 	var big := BattleSim.run(Fixtures.battle_catalog(Vector2i(48, 48)), _big_setup())
-	assert_eq([big["ticks"], big["hash"]], [1154, 296948820], "the big battle")
+	assert_eq([big["ticks"], big["hash"]], [1152, 3451092085], "the big battle")
 
 
 ## A battle with every kind of unit and defence on the 20x20 fixture field.

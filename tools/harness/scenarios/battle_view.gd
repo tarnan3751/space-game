@@ -19,7 +19,7 @@ extends HarnessScenario
 ## primitives and render CPU time a frame against the Cost ceilings, the slowest frame's process
 ## time, the frame rate and the units drawn. At tick 200, through the abilities bar (two of each
 ## ability brought, ABILITIES_EACH): the orbital strike on the nearest defence, its marker, its bolt
-## from the sky, its blast and its smoke a few ticks after shot and the defence's hull down; an EMP burst on the next, disabled in the sim
+## from the sky, its blast and its smoke a few ticks after shot and the defence's hull down; an EMP burst on the standing defence farthest from the army, disabled in the sim
 ## and dimmed; a repair swarm on a living unit, its dome shot; the Ranger's card selected again.
 ## The top bar is checked against the sim; the speed
 ## button takes the battle to 2x; at tick 1,000 End asks (a real touch beside it, the kept Ranger
@@ -321,7 +321,7 @@ func run(main: MainScript) -> void:
 
 
 ## Through the abilities bar: the strike cast on a standing defence (its marker, then its blast,
-## the defence's hull down after it lands), an EMP burst on another (it dims, disabled in the sim),
+## the defence's hull down after it lands), an EMP burst on the farthest (it dims, disabled in the sim),
 ## and a repair swarm on a living unit (its dome); each card counts down, and selecting an ability
 ## lets the unit type go and hides the red zone.
 func _cast_abilities(main: MainScript, view: BattleView, hud: BattleHud) -> void:
@@ -357,8 +357,10 @@ func _cast_abilities(main: MainScript, view: BattleView, hud: BattleHud) -> void
 	await screenshot("strike-after")
 	check(view.sim.is_destroyed(target) or view.sim.building_hp(target) < hp, "the strike landed: hull %d of %d"
 		% [view.sim.building_hp(target), hp])
-	# The EMP burst.
-	var turret: int = defences[1]
+	# The EMP burst, on the standing defence farthest from the army, chosen now: one near it can
+	# fall to the units while the strike lands.
+	defences = _standing_defences(main, view)
+	var turret: int = defences[defences.size() - 1]
 	hud.ability_card("emp_burst").pressed.emit()
 	at = _centre(main, view, turret)
 	_frame(main, CLOSE_ZOOM, at)

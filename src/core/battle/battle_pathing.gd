@@ -9,6 +9,13 @@ extends RefCounted
 ## from which a candidate building is in reach. Ties are settled by the heap's order, cost then
 ## cell index, so the result is the same everywhere.
 ##
+## A search can be run in slices: begin() starts it and advance() settles at most a given number
+## of cells, so BattleArmy can spread one over several ticks under rules.battle.search_cells. One
+## search is in flight at a time, since the buffers are shared. A search in flight sees the field
+## and the maps as they are when it settles each cell: a fall between two slices opens cells
+## (which only the cells not yet settled reach) and takes counts off the maps, so the path is
+## still walkable and the search goes on. abandon() drops it, for a set left with nothing standing.
+##
 ## "In reach" comes from a reach map: per cell, how many standing candidates of a set (SET_*)
 ## lie within a reach of that cell's centre. One map per (set, reach) pair is built the first
 ## time it is asked for (BattleArmy asks for every one its ground units can need at setup, so no
@@ -38,10 +45,17 @@ const DIAGONAL := 1414
 const DX := [1, -1, 0, 0, 1, 1, -1, -1]
 const DY := [0, 0, 1, -1, 1, -1, 1, -1]
 
-## Searches run, for the budget and the tests.
+## Searches begun, and cells settled by every search, for the tests and the tools.
 var searches: int = 0
-## The building the last find() picked, -1 when it found none.
+var settled: int = 0
+## The building the last finished search picked, -1 when it found none, and its path. While a
+## search is in flight, `found` is its pick so far.
 var found: int = -1
+var path: PackedInt32Array = PackedInt32Array()
+## A search in flight: begun and not finished; its start cell (on the field) and map.
+var searching: bool = false
+var search_cell: int = -1
+var search_map: int = -1
 
 var _field: BattleField
 var _layout: BattleLayout
@@ -78,6 +92,12 @@ var _seen: PackedInt32Array = PackedInt32Array()
 var _done: PackedInt32Array = PackedInt32Array()
 var _heap: PackedInt64Array = PackedInt64Array()
 var _heap_size: int = 0
+## The search in flight's stamp (the cells it has seen and settled carry it), the cells it has
+## settled, and its goal so far: the cell, -1 for none yet, and its cost.
+var _search_stamp: int = 0
+var _search_settled: int = 0
+var _goal: int = -1
+var _goal_cost: int = -1
 
 
 func _init(field: BattleField, layout: BattleLayout, wall_cost: int) -> void:
@@ -232,35 +252,77 @@ func nearest(px: int, py: int, set_id: int) -> int:
 ## indices from `start` to that cell, and in `found` the candidate: the nearest in reach of that
 ## cell, then the lowest id. When several cells tie for the cheapest, the one whose candidate has
 ## the lowest id wins. Empty (and found -1) when there is none. Walls on the path are walked
-## through at their cost; the caller decides to break them.
+## through at their cost; the caller decides to break them. The whole search at once, begin()
+## and advance() with no limit: never while a search is in flight.
 func find(start: int, m: int) -> PackedInt32Array:
+	begin(start, m)
+	advance(_pcells)
+	return path
+
+
+## Starts a search from `start` on map `m`; advance() runs it. Never while one is in flight.
+func begin(start: int, m: int) -> void:
 	searches += 1
-	var stamp := searches
+	_search_stamp = searches
+	searching = true
+	search_cell = start
+	search_map = m
+	_search_settled = 0
+	_goal = -1
+	_goal_cost = -1
+	found = -1
+	path = PackedInt32Array()
+	var first := _grown(start)
+	_heap_size = 0
+	_seen[first] = _search_stamp
+	_cost[first] = 0
+	_parent[first] = -1
+	_push_key(first)
+
+
+## Drops the search in flight: nothing is in flight after it, and it found nothing.
+func abandon() -> void:
+	searching = false
+	found = -1
+	path = PackedInt32Array()
+
+
+## Runs the search in flight until it is done or has settled `cells` more cells; returns how many
+## it settled. When it is done, `searching` is false and `found` and `path` hold its result. A
+## search ends the moment nothing is left to settle at or below its goal's cost, so one that has
+## settled its last cell is not left in flight for the next slice.
+func advance(cells: int) -> int:
+	var stamp := _search_stamp
 	var kind := _kind
 	var reach := _reach
 	var step_to := _step_to
 	var side_x := _side_x
 	var side_y := _side_y
 	var pcells := _pcells
+	var m := search_map
 	var offset := m * pcells
-	var first := _grown(start)
-	_heap_size = 0
-	_seen[first] = stamp
-	_cost[first] = 0
-	_parent[first] = -1
-	_push_key(first)
-	var goal := -1
-	var goal_cost := -1
-	found = -1
-	while _heap_size > 0:
-		var key := _pop()
+	var goal := _goal
+	var goal_cost := _goal_cost
+	var used := 0
+	var done := false
+	while true:
+		if _heap_size == 0:
+			done = true
+			break
+		var key := _heap[0]
 		var cell := key % pcells
 		var cost := key / pcells
 		if goal >= 0 and cost > goal_cost:
+			done = true
 			break
 		if _done[cell] == stamp:
+			_pop()
 			continue
+		if used >= cells:
+			break
+		_pop()
 		_done[cell] = stamp
+		used += 1
 		if reach[offset + cell] > 0:
 			# A map is current after every fall passed on; one this tick has not passed on yet
 			# leaves a count with nothing standing behind it, and the search goes on.
@@ -291,15 +353,30 @@ func find(start: int, m: int) -> PackedInt32Array:
 				_cost[next] = next_cost
 				_parent[next] = cell
 				_push_key(next_cost * pcells + next)
-	var path := PackedInt32Array()
-	if goal < 0:
-		return path
-	var at := goal
-	while at >= 0:
-		path.append(_shrunk(at))
-		at = _parent[at]
-	path.reverse()
-	return path
+	_goal = goal
+	_goal_cost = goal_cost
+	_search_settled += used
+	settled += used
+	if done:
+		searching = false
+		if goal >= 0:
+			var at := goal
+			while at >= 0:
+				path.append(_shrunk(at))
+				at = _parent[at]
+			path.reverse()
+	return used
+
+
+## Mixes the search in flight into a state hash (BattleSim.state_hash): whether there is one, its
+## start, its map and the cells it has settled.
+func hash_into(h: int) -> int:
+	h = BattleMath.mix(h, 1 if searching else 0)
+	if searching:
+		h = BattleMath.mix(h, search_cell)
+		h = BattleMath.mix(h, search_map)
+		h = BattleMath.mix(h, _search_settled)
+	return h
 
 
 ## A field cell's index in the grown grid, and back.

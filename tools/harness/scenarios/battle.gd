@@ -22,10 +22,10 @@ const LEVEL := 8
 const ABILITIES := {"orbital_strike": 1}
 const ABILITY_LEVEL := 5
 const STRIKE_TICK := 40
-## The slowest tick's budget, four full path searches (BattleArmy.PATHS_PER_TICK) with room to
-## spare, and the average tick above which the machine counts as loaded (about 0.13 ms on the
-## development Mac when it is not).
-const TICK_BUDGET_MS := 3.5
+## The slowest tick's budget, the searches' 300 cells (rules.battle.search_cells, about 0.45 ms)
+## and a deploy wave's 93 units (about 1.25 ms together) with room to spare, and the average tick
+## above which the machine counts as loaded (about 0.13 ms on the development Mac when it is not).
+const TICK_BUDGET_MS := 2.0
 const LOADED_AVERAGE_MS := 0.4
 
 

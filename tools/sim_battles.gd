@@ -28,8 +28,11 @@ extends SceneTree
 ## Each unit is deployed at a tick in the first three seconds of its wave; then, for each ability
 ## brought (none by default), a tick from 3 to 8 seconds and a cell: a swarm on one of the deploy
 ## points, a burst or a strike on a defence's cell. Without --out the CSV goes to stdout; a
-## summary line (the stars and the mean destruction) goes to stderr. The ms column is wall time,
-## read here, in the tool, never in the sim: it is how the performance budget is measured.
+## summary line (the stars and the mean destruction) goes to stderr. The ms column is the wall time
+## of the battle's first run, stepped tick by tick with each step timed (a little more than a bare
+## BattleSim.run), and max_tick_ms its slowest tick, each tick the faster of two runs (as the battle
+## scenario times them, so a moment the machine spent elsewhere does not count), both read here,
+## in the tool, never in the sim: they are how the performance budget is measured.
 
 const DEFAULT_ARMY := "ranger:100,brawler:40,jet_trooper:20,hover_tank:5,gunship:2"
 const STRATEGIES := ["random", "edge", "two_edges", "waves"]
@@ -79,7 +82,7 @@ func _init() -> void:
 	var header := PackedStringArray(["seed", "ticks", "destruction", "stars"])
 	for res: String in catalog.resources:
 		header.append("loot_" + res)
-	header.append_array(PackedStringArray(["deployed", "abilities", "ms"]))
+	header.append_array(PackedStringArray(["deployed", "abilities", "ms", "max_tick_ms"]))
 	lines.append(",".join(header))
 	var star_counts := [0, 0, 0, 0]
 	var destruction_sum := 0
@@ -105,9 +108,14 @@ func _init() -> void:
 		var commands := _commands(seed_value, strategy, army, levels, probe, cells, catalog, abilities,
 			defences)
 		var setup := _setup(seed_value, army, levels, abilities, ability_levels, defender, commands)
+		var ticks := PackedInt32Array()
 		var started := Time.get_ticks_usec()
-		var result := BattleSim.run(catalog, setup)
+		var result := _timed_run(catalog, setup, ticks)
 		var ms := (Time.get_ticks_usec() - started) / 1000
+		_timed_run(catalog, setup, ticks)
+		var slowest := 0
+		for t: int in ticks.size():
+			slowest = maxi(slowest, ticks[t])
 		var deployed := 0
 		var deployed_dict: Dictionary = result["deployed"]
 		for unit: Variant in deployed_dict:
@@ -124,7 +132,7 @@ func _init() -> void:
 		var loot: Dictionary = result["loot"]
 		for res: String in catalog.resources:
 			row.append(str(loot[res]))
-		row.append_array(PackedStringArray([str(deployed), str(used), str(ms)]))
+		row.append_array(PackedStringArray([str(deployed), str(used), str(ms), "%.3f" % (slowest / 1000.0)]))
 		lines.append(",".join(row))
 	printerr("sim_battles: %s, %d seeds: stars 0/1/2/3 %d/%d/%d/%d, mean destruction %d%%" % [
 		strategy, seeds, star_counts[0], star_counts[1], star_counts[2], star_counts[3],
@@ -142,6 +150,21 @@ func _init() -> void:
 		file.store_string(text)
 		print("sim_battles: %d battles written to %s" % [seeds, out])
 	quit(0)
+
+
+## Runs a battle to its end tick by tick, as BattleSim.run does, keeping in `ticks` each tick's
+## step time in microseconds, the lower of this run's and what is there; returns the result.
+func _timed_run(catalog: Catalog, setup: Dictionary, ticks: PackedInt32Array) -> Dictionary:
+	var sim := BattleSim.create(catalog, setup)
+	while not sim.is_over():
+		var at := Time.get_ticks_usec()
+		sim.step()
+		var spent := Time.get_ticks_usec() - at
+		if sim.tick > ticks.size():
+			ticks.append(spent)
+		elif spent < ticks[sim.tick - 1]:
+			ticks[sim.tick - 1] = spent
+	return sim.result()
 
 
 ## --key=value user arguments.
