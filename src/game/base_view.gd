@@ -215,6 +215,14 @@ var _wall_signature: PackedInt64Array = PackedInt64Array()
 ## construction drone by building id, which leaves over the new view's site.
 var _stale: Array[int] = []
 var _leaving: Dictionary[int, ConstructionDrone] = {}
+## What the last full sync matched: the state, its buildings_revision, the selection and the
+## drag; and the buildings busy then, whose labels count down. While all four stand, a sync
+## only counts those labels down.
+var _synced: BaseState = null
+var _synced_revision: int = -1
+var _synced_selected: int = 0
+var _synced_dragging: int = 0
+var _busy: Array[int] = []
 ## The state the pending wall rebuild reads; null when none is pending.
 var _walls_state: BaseState = null
 ## NOISE_SIZE x NOISE_SIZE heights in [0, 1], wrapping.
@@ -304,8 +312,21 @@ func is_grid_shown() -> bool:
 	return strength > 0.0
 
 
-## Creates, updates and removes building views to match the state.
+## Creates, updates and removes building views to match the state. With no building changed
+## since the last (its buildings_revision), the same selection and the same drag, only the busy
+## buildings' labels are counted down: what else a view shows comes from the buildings.
 func sync(state: BaseState) -> void:
+	if state == _synced and state.buildings_revision == _synced_revision and selected_id == _synced_selected \
+			and dragging_id == _synced_dragging:
+		for id: int in _busy:
+			var busy: BuildingState = state.buildings[id]
+			views[id].show_status(busy.level, true, busy.target_level, state.seconds_left(id))
+		return
+	_synced = state
+	_synced_revision = state.buildings_revision
+	_synced_selected = selected_id
+	_synced_dragging = dragging_id
+	_busy.clear()
 	for id: int in views:
 		var stale: bool = not state.buildings.has(id)
 		if not stale:
@@ -333,6 +354,8 @@ func sync(state: BaseState) -> void:
 			add_child(view)
 			views[id] = view
 		view.show_status(building.level, building.is_busy(), building.target_level, state.seconds_left(id))
+		if building.is_busy():
+			_busy.append(id)
 		if id == dragging_id:
 			continue
 		view.position = cell_to_world(building.cell, view.footprint_size)
@@ -386,6 +409,9 @@ func clear() -> void:
 	views.clear()
 	selected_id = 0
 	dragging_id = 0
+	# The last full sync's state goes with the views, so it is freed and the next sync is full.
+	_synced = null
+	_busy.clear()
 
 
 func _build_ground() -> void:
