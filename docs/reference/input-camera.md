@@ -312,8 +312,12 @@ states**). The nodes carrying `BuildingModels.MOVE_META` (a `Motion` each) are c
 in `setup`; while the building is finished and idle, `_process` sets each one's transform from
 `Motion.transform_at(Motion.clock(), rest)`, without allocating, on the clock the shaders' effects
 run on (`art-style.md`, **Animation**, **One clock**); during an upgrade they hold their last
-pose and on resuming snap to the clock's (the surface effects keep running); a view with nothing
-to move turns processing off in `_ready`, so walls and traps cost nothing per frame.
+pose and on resuming snap to the clock's (the surface effects keep running). Those nodes are only
+the parts that need the view's state (an aiming head, what rides it, a marching figure): the idle
+parts are folded into the body and moved by the shaders, held through `BuildingModels.hold` while
+the building is busy or disabled, set once a change (`art-style.md`, **Folded parts**). A view with
+no moving node turns processing off in `_ready`, so walls, traps and a building whose parts all
+folded cost nothing per frame.
 
 While the building is busy a `ConstructionDrone` works over the site (`art-style.md`,
 **Construction drone**): `show_status` creates one the first time it reports `busy` with none
@@ -332,7 +336,8 @@ of the finished model, and it frees itself after its climb. `drone()` returns th
 `BuildingModels.create(type, level, size, tier)` returns a `Node3D` holding the static body and its
 ink outline, and up to three moving parts, four at the Crown tier (the model table in `art-style.md` names each
 type's: dishes, radars and gyro rings that spin, heads and launchers that scan, press arms,
-doors and cranes that slide) with their outlines, each under a pivot node carrying `MOVE_META`:
+doors and cranes that slide): the idle ones folded into the body and its outline, the rest with
+their outlines each under a pivot node carrying `MOVE_META`:
 at most eight `MeshInstance3D` (ten at Crown), half of them at most outlines that cast no shadow
 (`art-style.md`, **Animation**).
 The models are built in code, one per type and level of the 33-type roster, each type's in its

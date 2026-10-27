@@ -300,8 +300,8 @@ every model in it has its footprint's corners and its top on the screen and outs
 button. The frame rate is only meaningful when
 nothing else is loading the machine.
 In both modes it checks every model, built for its level's tier (`BuildingModels.tier_of`): one
-body `MeshInstance3D` and up to `Parts.max_moving(tier)` more (the moving parts: three, four at
-Crown), each with an outline instance beside it on `MaterialKit.ink()` that casts
+body `MeshInstance3D` and up to `Parts.max_moving(tier)` more (the moving parts that stay nodes:
+three at most, four at Crown; the folded ones are in the body), each with an outline instance beside it on `MaterialKit.ink()` that casts
 no shadow, unless every vertex of it carries a flag that is never outlined (`Surf.NO_OUTLINE`:
 FLICKER, JITTER, HOLO); no vertex's kit layer (`UV2.x`) beyond the kit's last; the body
 triangles, every surface counted, within the budget for its footprint and tier
@@ -309,7 +309,8 @@ triangles, every surface counted, within the budget for its footprint and tier
 for 3x3, 5,000 for 4x4 and 5x5, 250 for a wall piece, rising at Chrome, Obsidian and Crown); its
 reach in x and z within half its footprint plus
 0.15 units (`EXTENT_SLACK`): the static body's bounds, and each moving part's reach over its
-whole motion, at the model's scale. A SPIN part's vertices sweep circles about its axis (each
+whole motion, at the model's scale, a part folded into the body read back from its vertices'
+`CUSTOM0` and `CUSTOM3` (`Motion.from_channels`). A SPIN part's vertices sweep circles about its axis (each
 reaches its circle's centre's offset plus its radius from the pivot, so the part reaches the
 pivot's x plus that in x and the pivot's z plus that in z);
 a SWING part's bounds are turned every 5 degrees from -amplitude to +amplitude, both ends
@@ -385,8 +386,9 @@ building, a unit's near version and a figure at the base camera's closest, size 
 version at 20, where the battle swaps it in) and at the widest, 44 (`wide=`). The moving parts are
 posed as `Motion.transform_at` poses them, turned or shifted rather than sampled on the clock: at
 rest and every 10 degrees of a spin's turn or a swing's range, both ends, a slide at five poses. A
-rider is posed only with its carrier at rest, BOB is not applied, and a part that spins in the
-shaders (`Surf.SPIN`, the gunship's rotors) is read as static body and never posed: the pairs of
+rider is posed only with its carrier at rest, BOB is not applied, and a part that moves in the
+shaders (`Surf.MOVE`: a building's idle part folded into its body, the gunship's rotors) is read
+back as a moving part of its own, its pivot and Motion decoded from `CUSTOM0` and `CUSTOM3`: the pairs of
 moving parts, BOB and riders carried are `model_clash`'s. A triangle is seen when, from one of
 sixteen headings at the camera's pitch, it faces the camera and a ray from one of four points on it
 towards the camera meets nothing opaque; the unseen ones are counted by kind (`ground`, `onpart`,
@@ -416,14 +418,14 @@ k/8, FLICKER sparks, a FLOW pipe on the pipe layer, a FLOW_U disc on the hazard 
 an arc of UNLIT, FLICKER and JITTER strips between two posts, and a HOLO prism on a pedestal,
 plain and with the pedestal ghost-tinted. The second row: moving parts that SPIN about Y, SWING
 about X (SMOOTH), SLIDE along X (HAMMER) and along Z (RECOIL), and a turning cluster of FLICKER
-sparks, which has no outline. The scenario moves the moving parts itself, each frame, with
-`Motion.transform_at` at `Motion.clock()`, as `BuildingView` does (it poses them from the tree's
-`process_frame`, before `main.gd` ticks the clock, so it ticks it first). In both modes it checks each part's surface count
+sparks, which has no outline. Each moves on the clock alone, so each is folded into its body and
+outline and the shaders move it (`docs/reference/art-style.md`, **Folded parts**). In both modes it checks each part's surface count
 (two for a hologram, its second on `MaterialKit.holo()` and never overridden), the flag bits on
 every vertex, UV2 stored uncompressed, at most eight instances, the outlines (the BOB orb's
 carries UV2 and colour, the arc's holds its posts only, the spark cluster has none), that a
 phase read back from the mesh decodes as the shaders do (0.5 exactly, every k/8 within half a
-1/254 step), and that every moving part moves in ten frames. Rendered, it frames the rig at camera size 10, waits half
+1/254 step), and that every moving part is folded: no node of its own, `FOLDS_META` on its root,
+its kind and easing on its body's vertices and, but for the sparks, its outline's. Rendered, it frames the rig at camera size 10, waits half
 a second and ten frames, screenshots it at 0.0, 0.3 and 0.9 seconds, and checks that each part's
 region of the screen (1.5 units square round it) changed between the first two shots, or between
 any two for the flickering parts, which can be off in two shots, and for the PULSE orb, whose
@@ -434,13 +436,14 @@ the field, the base's own views hidden, a row of ten swatches across the screen,
 cube and a drum beside it (the surface's smooth version where it has one), in the order Base
 hull-light, plate, gunmetal, gold trim, chrome, cyan strip, obsidian, veins, filigree, core glow,
 and before them a 3x3 pad with the four escorts (`Parts.escort_drone`, `escort_skiff`,
-`escort_troopers`, `escort_guard`) orbiting it, which the scenario moves itself as the effects rig
-does, and left of the pad the shared effects: a lightning arc between two posts on `Parts.spark`
+`escort_troopers`, `escort_guard`) orbiting it, folded into the pad's body and moved by the shaders,
+and left of the pad the shared effects: a lightning arc between two posts on `Parts.spark`
 (the slow LIGHTNING crackle) beside a cluster of point sparks on plain FLICKER (the fast one), and
 right of it a stack with `Parts.puffs` rising from its mouth. It logs each swatch by index with
 its layer and flags and checks that every swatch's layer is within the kit, that each escort is at
 most 300 body triangles (the troopers, two colonists, 3,000) and reaches no further round the pad
-than its extent (1.65), and that the escorts move. Rendered, it frames the row and the pad at the
+than its extent (1.65), and that the escorts are folded (no node of their own, one motion each on
+the pad body's vertices). Rendered, it frames the row and the pad at the
 closest zoom (camera size 10) and screenshots them, then again 0.3 and 1.0 seconds later, so FLOW,
 PULSE, the flickers and the orbits show.
 
@@ -678,10 +681,14 @@ that every type is there at its count for the top Command Center level (`max_cou
 lie inside the grid (on a `BaseGrid` of its own); that every wall has another wall beside it,
 so each is part of a fence; that every resource is at its cap; that every drone is free, on
 the ring too; that the base was saved to the run's own file while `user://base.json`'s
-modification time stayed the same; and that every moving part of every model (each node
-carrying `BuildingModels.MOVE_META`) moves: sampled every four frames for 1.5 seconds, a part
+modification time stayed the same; that every moving part of every model that is a node (carrying
+`BuildingModels.MOVE_META`) moves: sampled every four frames for 1.5 seconds, a part
 passes once any sample differs from its first pose, so a hammer's hold or a period that divides
-the gap cannot hide it. Once the "Template base" toast has faded (2.5 seconds after the press),
+the gap cannot hide it; and that no model's folded parts are held (`BuildingModels.hold`) and each
+carries a motion that moves (its spin's rate or its swing's or slide's amplitude, decoded with
+`Motion.from_channels`). The node
+check fails on five parts that never move at idle (aiming parts and pitching riders whose idle
+Motion is a swing of zero degrees), as it did before the fold. Once the "Template base" toast has faded (2.5 seconds after the press),
 rendered only (headless it logs that it skipped), it measures the whole base in a 1600x900
 window at the widest zoom (camera size 44) and at the start zoom (24), each held 2.1 seconds and
 then sampled every frame for three seconds through `Performance.get_monitor`: the most draw
@@ -787,7 +794,8 @@ strip. Each battle is surrendered and left before the next.
   before its next shot, checked to kick back at least 0.3 of its travel and no more often than
   it fires. Then `emp-freeze` (16, 250 ms): a level 6 missile battery aiming when an EMP Burst
   lands on it, checked that no moving part moves while it is disabled and that they move again
-  once it wakes; and `reveal` (8, 60 ms): a cloaked sentry as the unit comes within its range,
+  once it wakes (the launcher's muzzle socket, and its radar, folded into the body, by the clock it
+  is drawn at: the body's hold while set, else the clock); and `reveal` (8, 60 ms): a cloaked sentry as the unit comes within its range,
   checked to show every step of its fade in and end as itself. Before those, per pitching
   defence (at level 1, and the laser turret, flak cannon and ion beam at their top level too),
   `<type>-<level>-pitch` (16, 300 ms; the orbital cannon's 700 ms; size 9, cropped): a unit

@@ -337,12 +337,17 @@ hologram cadet, a colonist built on `Surf.HOLO | Surf.BOB | Surf.MARCH` flags in
 before the first part, builds a far version: below 1, every round part takes that share of its sides (at least `MIN_SIDES`, 6, never
 more than asked) and of a dome's or an orb's rings (at least `MIN_RINGS`, 2), and smooth parts
 share normals up to 65 degrees (`FAR_SMOOTH_COS`), so the fewer sides still shade as a curve (the
-battle's units at the wider zooms, **Units**). `spin`, kept the same way, is a part tag: while it is
-(pivot x, y, z, radians a second) with a non-zero rate, the parts added get the `SPIN` flag and the
-spin in a `CUSTOM0` channel (four floats a vertex, on the body and the outline; `format()` gives the
-flags `add_surface_from_arrays` takes for it), and the shaders turn them about the vertical line
-through the pivot on the clock (**Surface effects**), so a rotor is part of its model's one mesh
-(the gunship's, **Units**). A mesh with no spinning part carries no `CUSTOM0`. `rig` and `rig2`,
+battle's units at the wider zooms, **Units**). `set_motion(pivot, motion)`, kept the same way, is a
+part tag: while a `Motion` is set, the parts added get the `MOVE` flag and the motion about the
+pivot in `CUSTOM0` and `CUSTOM3` (four floats a vertex each, on the body and the outline; `format()`
+gives the flags `add_surface_from_arrays` takes for them), and the shaders move them on the clock
+as `BuildingView` would move a moving part's node (**Moving parts**, **Folded parts**), so a rotor
+is part of its model's one mesh (the gunship's, **Units**); `set_motion(Vector3.ZERO, null)` ends
+it. `stamp_motion(arrays, pivot, motion)` does the same to a part's surface arrays built on their
+own, its pivot at the origin, and `append_arrays(into, more)` merges surface arrays whose custom
+channels differ, zeros for the vertices that lack one; `body_mesh(opaque, holo)` and
+`outline_mesh(arrays)` build the meshes from arrays (`to_mesh()` and `to_outline_mesh()` are them
+on the mesh's own). A mesh with no moving part carries neither channel. `rig` and `rig2`,
 kept the same way, tag the parts added next with a rig channel (**Rig**): the part's own joint and
 the one it hangs from, each (pivot x, y, z, channel), made with `Rig.part(channel, pivot)`; the
 parts get the `RIG` flag and the two joints in `CUSTOM1` and `CUSTOM2` (four floats a vertex each,
@@ -380,7 +385,8 @@ when nothing is outlined), for a caller that merges meshes itself, as `WallMesh`
   axis, a whole number of repeats around (about one per world unit at their widest radius), so
   bands wrap without a seam, and V from the distance along the profile; caps and discs are polar
   (V the radius). UV2 is (layer, flags); the vertex colour is the tint, its alpha the phase;
-  CUSTOM0, when a part spins, the spin; CUSTOM1 and CUSTOM2, when a part is rigged, its joints.
+  CUSTOM0 and CUSTOM3, when a part moves, its pivot and motion; CUSTOM1 and CUSTOM2, when a part
+  is rigged, its joints.
 - **Smoothing**: a smooth part's faces that meet at under 40° share normals, averaged by position
   within the part and weighted by corner angle; caps, discs and sharper edges (chamfers, 45°;
   box corners, 90°) stay hard. A 16- to 24-sided cylinder shades as a curve; an 8-sided one
@@ -395,11 +401,13 @@ of its own (`walls.gd`); `MODELS` gives each type the footprint its
 models are built for and its level count. `Parts` holds the model while it is built: `tier`, the
 level's theme (**Tiers**), set before the builder runs; `body` (a `LowPolyMesh`), up to three
 moving parts, four at Crown (`moving(pivot, motion)`, **Animation**), and the shared helpers. A
-model is a `Node3D` with the body's `MeshInstance3D` and its outline's beside it, and a `Node3D`
-per moving part at its pivot carrying `MOVE_META` (its `Motion`), with the part's mesh and its
-outline under it. That is at most **eight** `MeshInstance3D`, ten at Crown: the body and its
-moving parts, each with an outline (`OUTLINE_META`, no shadow); a moving part made only of
-parts that are never outlined has no outline instance. Meshes are built once per type, level
+model is a `Node3D` with the body's `MeshInstance3D` and its outline's beside it, its idle moving
+parts folded into both (**Folded parts**), and a `Node3D` per moving part that needs the view's
+state (an aiming head, what rides it, a marching figure) at its pivot carrying `MOVE_META` (its
+`Motion`), with the part's mesh and its outline under it. That is at most **eight**
+`MeshInstance3D`, ten at Crown: the body and its moving parts, each with an outline
+(`OUTLINE_META`, no shadow); a moving part made only of parts that are never outlined has no
+outline instance. Meshes are built once per type, level
 and tier and cached; `BuildingModels.instantiate(parts)` assembles an uncached model from parts a caller
 built itself (the `effects` rig), and `meshes_of(parts)` and `assemble(meshes)` split that in two
 for a caller that keeps its own cache (`UnitModels`, **Units**). The contract any model keeps, built or imported:
@@ -755,7 +763,7 @@ contract: origin on the ground under the unit's middle, +Y up, facing +Z; a hove
 unit is built at its height over that point. One cell is one unit. A unit has no moving part
 (`MAX_MOVING` is 0), so the battle draws every unit of a type from one MultiMesh of its body and
 one of its outline (`battle-view.md`, **Units**); what turns is a part tagged with
-`LowPolyMesh.spin`, which the shaders spin, what moves is a part tagged with `LowPolyMesh.rig`,
+`LowPolyMesh.set_motion`, which the shaders spin, what moves is a part tagged with `LowPolyMesh.rig`,
 which the shaders turn (**Rig**: every unit's legs, arms, wheels, guns, bank and bay doors), and
 the hop, the lean, the aim, the bank, the hit flash and the death are the battle's per-instance
 data (**Surface effects**; `battle-view.md`, **Units**). A unit's muzzles, bay and exhausts are
@@ -850,7 +858,8 @@ sockets (**Sockets**), which the battle fires its shots from.
   drone's arms are; round their tips a thin ring glows in the tier's glow (PULSE, `ROTOR_RING`
   0.08 wide, 0.012 tall) in place of a blur disc, so the body shows through the turning rotor, and
   a cap of the tier's trim covers the hub. The rotors are parts of the body tagged with
-  `LowPolyMesh.spin` (each its hub's pivot and ±9 radians a second), not moving parts.
+  `LowPolyMesh.set_motion` (a `Motion.spin` about +Y through its hub, ±9 radians a second), not
+  moving parts.
 - **Budget** (a study value; step 5 fixes the real one after the phone measurement): the body
   and moving parts' triangles at most 1,800 for the infantry, 2,200 for the dune runner, the
   skimmer and the hover tank, 3,000 for the siege walker, 2,600 for the gunship and the bomber and
@@ -868,7 +877,7 @@ sockets (**Sockets**), which the battle fires its shots from.
 | `siege_walker` | a cream chamfered hull with a chest band (orange to Gold, the tier's trim above) on two digitigrade legs (gunmetal hip joints under orange caps, thighs of the tier's panels with orange plates, knee joints with caps of the tier's trim, cream shins, hull-mid feet with toe caps of the tier's trim), two big gun arms (a cream pod with an orange top plate, twin 0.042 gunmetal barrels out of a shared shroud, muzzles in the tier's glow), the colonist pilot sunk behind a glass windscreen and a dashboard, a block behind it carrying the deck plate, a mast with a lamp of the tier's glow blinking; the legs step on the heavy hip and knee channels, each gun pod recoils 0.15 in turn (`SLIDE_L`, `SLIDE_R`), the socket between its muzzles `muzzle` on the left arm and `muzzle_2` on the right | 1.50 tall, 0.98 wide | 2,850 (2,860 from Gold) |
 | `hover_tank` | a cream hull 0.8 by 1.2 floating 0.22 up over a glowing underside, its deck plate round the turret, orange skirts 0.14 tall flared 20° out with three glowing vents each (PULSE), their lowest edge 0.18 up, two gunmetal thrusters on the rear corners angled out with glowing mouths; a tall turret (a drum 0.25 tall) on a ring of the tier's trim with a cap of the tier's trim, an orange mantlet, one fat barrel (0.09) with collars of the tier's trim at its middle and muzzle and a glowing bore, and a hatch (0.13) with the pilot sunk behind a small windscreen of the same radius; it bobs and banks, the barrel and mantlet recoil 0.25 (`SLIDE`), the bore its `muzzle`, the thrusters' mouths `exhaust` and `exhaust_2` | 1.42 long, 0.98 wide, 0.95 tall | 2,072 (2,082 from Gold) |
 | `titan` | a giant biped: hull-mid thighs and cream shins under orange plates (the plate layer at two repeats a unit), gunmetal knee joints with caps of the tier's trim, big dark feet with toe caps of the tier's trim; a cream bridge with an orange rear block capped in the tier's trim, two colonists seated behind a wide glass windscreen and a gunmetal dashboard, two huge cannon arms (cream housings with orange top plates, fat gunmetal barrels, collars of the tier's trim, glowing bores) and an antenna mast with a lamp of the tier's glow blinking; the legs step on the heavy channels, the cannons recoil 0.25 in turn (`SLIDE_L`, `SLIDE_R`), the bores `muzzle` (left) and `muzzle_2` | 2.46 tall, 1.82 wide | 4,276 |
-| `gunship` | a cream chamfered fuselage with a dark belly band and its deck plate on the roof, a nose with the pilot sunk behind a glass windscreen, a gunmetal twin chin gun (two 0.04 barrels, glowing muzzles), hull-mid stub wings carrying a cream nacelle at each tip with a band of the tier's glow and a cap of the tier's trim, a tail boom (the hull, the tier's trim from Obsidian) with orange fins; two counter-rotating rotors (`LowPolyMesh.spin`, 9 radians a second), each a sunk gunmetal hub under a trim cap, three dark blades and a glowing ring round their tips; its lowest point 1.22 up, bobbing and banking; the chin gun's muzzles `muzzle` (left) and `muzzle_2`, the nacelles' backs `exhaust` (right) and `exhaust_2` | 1.60 across the rotors, 1.40 long | 2,434 (2,444 from Gold) |
+| `gunship` | a cream chamfered fuselage with a dark belly band and its deck plate on the roof, a nose with the pilot sunk behind a glass windscreen, a gunmetal twin chin gun (two 0.04 barrels, glowing muzzles), hull-mid stub wings carrying a cream nacelle at each tip with a band of the tier's glow and a cap of the tier's trim, a tail boom (the hull, the tier's trim from Obsidian) with orange fins; two counter-rotating rotors (`LowPolyMesh.set_motion`, 9 radians a second), each a sunk gunmetal hub under a trim cap, three dark blades and a glowing ring round their tips; its lowest point 1.22 up, bobbing and banking; the chin gun's muzzles `muzzle` (left) and `muzzle_2`, the nacelles' backs `exhaust` (right) and `exhaust_2` | 1.60 across the rotors, 1.40 long | 2,434 (2,444 from Gold) |
 | `bomber` | a cream centre body with its deck plate along the top, two wings swept 34° (`veined`) with leading edges of the tier's trim and orange winglets, two cream engines sunk in the wing roots with intake rings of the tier's trim, dark intakes and exhausts and flame cones in the tier's glow; six orange bombs on show: two under a gunmetal rack in the bay, one under each wing outboard of its engine and one on a pylon under each wingtip; two bay doors of the tier's hull closed flat under the bay's bombs, swinging down to hang open as it aims (`BAY_L`, `BAY_R`); the pilot sunk behind a small windscreen; its lowest point 1.59 up, bobbing and banking; `bay` under the rack, `exhaust` and `exhaust_2` at the engines' tails | 1.83 span, 0.93 long | 2,528 (2,538 from Gold) |
 
 "Cream" in the table is the tier's hull (`hull()`), "hull mid" its panels (`panel()`). The counts
@@ -884,13 +893,16 @@ hub, sunk in its nacelle (a mount).
 ## Animation
 
 Three ways for a model to move: **surface effects**, which the shaders animate from `anim_time` per
-part, **moving parts**, nodes `BuildingView` moves, and the **rig**, parts of one mesh the shaders
-turn by a battle instance's state (**Rig**). What each costs in draws:
+part, **moving parts**, which the shaders move when they move on the clock alone (folded into the
+body, **Folded parts**) and `BuildingView` moves as nodes when they need its state, and the **rig**,
+parts of one mesh the shaders turn by a battle instance's state (**Rig**). What each costs in draws:
 
 - The shader effects (PULSE, BLINK, FLICKER, FLOW, FLOW_U, BOB, JITTER, LIGHTNING, RISE) add no
   draw: they are flags on parts of meshes that are drawn anyway.
-- A moving part is two more instances, its body and its outline: two draws, plus the body's draw
-  into the shadow map.
+- A folded moving part adds no draw: two more vec4 attributes a vertex on its model's whole body
+  and outline, and a turn or a slide in `vertex()`.
+- A moving part that stays a node is two more instances, its body and its outline: two draws, plus
+  the body's draw into the shadow map.
 - A rigged part adds no draw: two more vec4 attributes a vertex and two turns in `vertex()`
   (**Rig**).
 - A HOLO part puts one more surface on its mesh: one more draw, in the transparent pass, for each
@@ -905,11 +917,14 @@ The shaders use `anim_time`, never `TIME`, whose zero is the engine's first draw
 falls anywhere from a fraction of a second to seconds after the ticks' zero. Moving parts are
 posed at `Motion.clock()`, the same value, so the two agree to within a frame: a part and its
 surface effects keep step (the flak cannon's muzzles flash on the barrels' kick). A model with no
-`main.gd` above it (a HUD preview) poses its parts at 0.
+`main.gd` above it (a HUD preview) poses its parts at 0, its folded ones held at 0
+(`BuildingModels.hold`, **Folded parts**). The harness can hold the clock at a value
+(`Motion.fix_clock`, `HarnessScenario.fix_clock`), so two runs draw the same poses.
 
 While a building is busy (constructing an upgrade) its moving parts hold their last pose and on
-resuming snap to the clock's (the view is normally replaced when the work finishes); its surface
-effects keep running, since they come from `anim_time` with no per-instance state. That is
+resuming snap to the clock's (the view is normally replaced when the work finishes), the folded
+ones through their hold (**Folded parts**); its surface effects keep running, since they come from
+`anim_time` with no per-instance state. That is
 intended, but for a figure marching on the clock (`MARCH`, **Rig**): its legs would step on while
 its round holds, so a moving part with one (`BuildingModels.MARCH_META`, set when any of its parts
 carries the flag) is hidden while the building is busy and shows again when it is idle: the
@@ -923,8 +938,9 @@ its part and a hologram moves like any other part. A part's phase (`Surf.phase`,
 its cycle by phase times the period. It is stored in the vertex colour's alpha, 8 bits, in 1/254
 steps: `LowPolyMesh` writes (round(phase × 254) + 0.25) / 255, the same byte whether the store
 rounds or truncates, and `surf_phase()` in `effects.gdshaderinc` reads round(alpha × 255) / 254,
-so 0.5 (a FLOW part standing still) is exact. There are no per-instance uniforms: every instance
-of a mesh animates alike, but for the battle's MultiMesh instances, whose custom data
+so 0.5 (a FLOW part standing still) is exact. The one per-instance uniform is a folded part's hold,
+`move_hold` (**Folded parts**): every instance of a mesh animates alike, but for that and for the
+battle's MultiMesh instances, whose custom data
 (`INSTANCE_CUSTOM`) carries their own state: x a gait's phase in steps, y its share, z a hit
 flash, w a fade (`battle-view.md`, **Units**); while a rigged unit aims, y is minus the aim's share
 and x the fire phase instead (**Rig**), and the gait shows nothing. The toon and ink shaders apply the gait
@@ -949,7 +965,7 @@ development Mac by the `battle_view` scenario's shots).
 | `JITTER` | 256 | each vertex jumps up to 0.04 in a pseudo-random direction (a hash of its position and the time step), 20 times a second; corners shared by faces move together. With UNLIT and FLICKER, a crackling arc: build it of short segments so there are corners to shake |
 | `HOLO` | 512 | a hologram (below) |
 | `LIGHTNING` | 1024 | with FLICKER and JITTER, a lightning arc's slow crackle, one speed on every arc: on or off 7 times a second (`LIGHTNING_FLICKER_RATE`), on about 60 % of the time (`LIGHTNING_ON`), and a new shake 5 times a second (`LIGHTNING_JITTER_RATE`) instead of a spark's 24 and 20. `Parts.spark()` carries it, so every arc built on it crackles alike; point sparks (welding, cutting, flares, grids, the construction drone's) are made without it and keep the fast rates |
-| `SPIN` | 4096 | the part turns about the vertical line (model +Y) through its pivot at its rate, radians a second on the clock, both per vertex in `CUSTOM0` (`LowPolyMesh.spin`), as `Motion.spin` turns a moving part; its normals turn with it. A part of the model's one mesh, so it costs no draw: the gunship's rotors |
+| `MOVE` | 4096 | the part moves about its pivot as its `Motion` says, on the clock or at its instance's hold: it spins, swings or slides, eased, its pivot and motion per vertex in `CUSTOM0` and `CUSTOM3` (**Folded parts**), exactly as `Motion.transform_at` poses a node; its normals turn with it. A part of the model's one mesh, so it costs no draw: a building's idle parts, the gunship's rotors |
 | `RIG` | 8192 | the part turns with a rig channel about its joints, both per vertex in `CUSTOM1` and `CUSTOM2` (`LowPolyMesh.rig`), by the battle instance's state (**Rig**); its normals turn with it. A part of the model's one mesh, so it costs no draw: the ranger's legs, arms and rifle |
 | `MARCH` | 16384 | with `RIG`, at a zero instance state (a building's model, the gallery, a card): the rig walks on the clock instead, as at the gait's x = 2 fract(`MARCH_RATE` 0.6 × `anim_time`) and y = 1, a full stride of 1.2 steps a second; under a battle's instance state it does nothing (**Rig**). The hangar's patrolling trooper and the academy's hologram cadet |
 | `RISE` | 2048 | the part climbs 0.7 along world Y (`RISE_HEIGHT`) over 3 s (`RISE_PERIOD`) from its phase, drifting (0.12, 0, 0.08) world units sideways by the top (`RISE_DRIFT`), then starts again. A hologram-surface effect: on HOLO, `holo.gdshader` fades the part in over the first 12 % of the climb and out over its top half, so the restart never shows; the toon shader has no transparency, so on an opaque part the snap back shows. Rising smoke (`Parts.puffs`) |
@@ -992,7 +1008,53 @@ at -amplitude and kicks out to +amplitude: point the axis the way the part kicks
 each one's transform every frame from `Motion.transform_at(Motion.clock(), rest)`, with no
 allocation; while it is busy the parts hold their last pose, and so they do in battle while an EMP
 burst has the building disabled, snapping back to the clock's when it wakes. A view with no moving
-part does no work per frame.
+node does no work per frame.
+
+**Folded parts.** A moving part that moves on the clock alone is not a node: with no socket (no
+`muzzle` or `trunnion`), riding no part and ridden by none, and with nothing rigged (`RIG`, whose
+joints are in the part's own space while the shaders move a part before they rig it), a marching
+figure among them (`BuildingModels._folds`), it is folded into its model's body. Its own body arrays, hologram arrays
+and outline arrays, built in its own space as any moving part's are, its outline's normals averaged
+within the part alone, are moved by its pivot into the model's space, stamped with its Motion
+(`LowPolyMesh.stamp_motion`, the `MOVE` flag) and appended to the body's opaque surface, its
+hologram surface and the outline: the outline arrays verbatim, so the ink at a joint stays as the
+node's was. The shaders move it (`effect_move` in `effects.gdshaderinc`), so it costs no draw and no
+CPU a frame. What stays a node: the aiming heads (the part with the `muzzle`, or the one it rides),
+the parts that ride them (the flak cannon's radar, the ion beam's rings, the orbital cannon's halo),
+and the rigged parts, today only the marching figures (the hangar's trooper, the academy's cadet).
+On the template base 198 of its 257 moving parts fold, 59 stay nodes; over every level of every
+type, 292 of 417.
+
+- **Encoding.** Per vertex, `CUSTOM0` is (pivot x, y, z, code) with the code (kind × 4 + easing) × 2
+  + phase, the phase 0 to 1 and the kinds and easings in `Motion`'s order (SPIN, SWING, SLIDE;
+  LINEAR, SMOOTH, HAMMER, RECOIL); `CUSTOM3` is (axis × magnitude, period): a spin's radians a
+  second, a swing's amplitude in radians, a slide's in units, and the swing's or slide's period in
+  seconds. Both are full floats (`ARRAY_CUSTOM_RGBA_FLOAT`); `Motion.channel0`, `channel3` and
+  `from_channels` encode and decode them. The vertex colour's alpha stays the surface phase.
+  `effect_move` ports `Motion.wave`, `Motion.recoil` included, and turns as Godot's `Basis(axis,
+  angle)` turns, so a folded part stands where its node would at the same clock (the
+  `anim_identity` scenario compares two trees' shots at fixed clocks). A part's FLICKER and JITTER
+  act in its own space before it moves, its BOB and RISE in the model's after, as on a node.
+- **Bounds and height.** The body's and the outline's `custom_aabb` grow by each folded part's
+  sweep (a ball about the pivot for a turn, both ends for a slide), so a part is never culled as it
+  moves; the model's root carries `FOLDS_META`, the static body's top, which `top_of` and so
+  `site_height` read, so the drone, the timer label and the battle's muzzle heights stand where
+  they did.
+- **The hold.** The toon, ink and hologram shaders each declare `instance uniform float move_hold`:
+  0 is live; any other value is the `anim_time` at which the folded parts hold their pose, while
+  their surface effects run on. `BuildingModels.hold(root, time)` sets it on the model's body and
+  outline instances (a negative time releases them), once a change, never a frame: `BuildingView`
+  holds them at the clock while the building is busy or disabled and releases them to the clock's
+  pose when it is neither, and `ModelPreview` holds them at 0. A view created busy (a building
+  loaded mid-upgrade) holds its folded parts at the clock at setup, where its nodes stand at rest.
+  Instance uniforms work in the Compatibility renderer since Godot 4.4 but are unverified on the
+  phone; if they failed there, a held idle would keep moving while held, nothing worse.
+- **Cost.** A body with a folded part carries `CUSTOM0` and `CUSTOM3` on every vertex, 32 bytes a
+  vertex for each unique mesh, and its vertices without the flag skip the motion: 21 MB more video
+  memory on the maxed base (**Cost**), accepted for now. Two levers wait on the phone measurement,
+  which decides: `CUSTOM3` as half floats (after a check that the period and phase stay sub-pixel),
+  or the folded parts in a second surface of the body, so only their vertices carry the channels, at
+  about three more draws a folded building (its body, outline and shadow) instead of three a part.
 
 **Riders.** `Parts.riding(on, pivot, motion)` makes a moving part that rides another, `on`: built
 as `moving()` builds one, its pivot in the model's space with `on` at rest, and counted with the
@@ -1148,13 +1210,13 @@ saturated like the models, built in code with `LowPolyMesh` on the kit's surface
 ### Budget and checks
 
 A building is at most eight instances, ten at Crown: the body, its outline, and up to three
-moving parts (four at Crown) with their outlines. The `model_gallery` scenario checks every model
+moving parts (four at Crown) with their outlines; a folded moving part adds none. The `model_gallery` scenario checks every model
 against it (**Models**), and a
 moving part's reach over its whole motion against the extent (**Modelling vocabulary and
 budgets**): a spin's circle about its axis, its radius added to the pivot's x and to its z in
 turn (the extent is per axis, so a round off the centre along a diagonal is not over-counted), a
 swing's bounds every 5 degrees from -amplitude to +amplitude, both ends included, a slide's at both
-ends; a rider's with its carrier at rest, and an aiming part's for its idle Motion only (in battle
+ends, a folded part's decoded from its vertices' `CUSTOM0` and `CUSTOM3`; a rider's with its carrier at rest, and an aiming part's for its idle Motion only (in battle
 a long barrel turned onto an axis may reach past its footprint). It also checks, per type and level, the body triangles against the footprint's and the tier's
 budget (**Modelling vocabulary and budgets**) and the model's top, the body's bounds and every
 moving part's over its whole motion, against the height cap, 7 units for the Command Center and
@@ -1688,17 +1750,20 @@ and before most of the upgrade pass's batches, it was 527, 680 and 566 (76, 83 a
 with two pages and 121 models it was 552 and 275 (565 and 217 before the Cadet Academy's
 levels moved rows between the pages; 362 and 158 before the animation pass, when nine types had
 one spinner each; 381 and 177 with the build bar, 375 and 171 before the environment, 294 and
-157 before the kit): every moving part is two more draws and a shadow draw, and every mesh with
-holograms one more. The render thread's CPU time on the development Mac is about 1.5 to 2.0 ms a
+157 before the kit): every moving part was then two more draws and a shadow draw, as one that stays
+a node still is (a folded one is none, **Folded parts**), and every mesh with holograms one more. The render thread's CPU time on the development Mac is about 1.5 to 2.0 ms a
 frame on page 1 and 1.4 to 1.5 ms on page 2, measured with the gallery's own line over two runs
 (on three pages, 0.7 to 0.9, 0.9 to 1.3 and 0.9 to 1.1 ms; with two pages and 121 models, 1.2 to
 1.5 ms on page 1, 74 of the 121 models, and 0.4 to 0.7 ms on page 2).
 
 **The maxed base**, the template base at the Command Center 10 counts (113 buildings and 250
-walls, 240 moving parts), measured by the `template_base` scenario in a 1600×900 window on the
-development Mac (`tools/harness/README.md`): 1,140 draw calls and 1.71 million primitives a frame
-at the widest zoom (camera size 44), 935 and 1.48 million at the start zoom (24), against a
-fresh base's 48 draw calls and 0.13 million; the render thread's CPU time 2.3 ms a frame at the
+walls, 257 moving parts, of which 198 are folded into their bodies, **Folded parts**), measured by
+the `profile` scenario in a 1600×900 window on the development Mac (`tools/harness/README.md`):
+615 draw calls and 1.65 million primitives a frame at the widest zoom (camera size 44), 549 and
+1.46 million at the start zoom (24), 247 and 0.78 million at the closest (10). The figures that
+follow, from the `template_base` scenario, predate the fold: 1,140 draw calls and 1.71 million
+primitives at the widest zoom, 935 and 1.48 million at the start zoom, against a fresh base's 48
+draw calls and 0.13 million; the render thread's CPU time 2.3 ms a frame at the
 widest zoom and 3.0 ms at the start, at 63 and 88 fps, on a machine loaded with other runs (an
 earlier count of 112 buildings measured 1.5 and 1.3 ms, 231 and 263 fps, on a quiet one: the
 frame rate is only as good as the machine is quiet). The scenario checks
@@ -1707,7 +1772,16 @@ render CPU, with room for a loaded machine), so a regression shows. The upgrade 
 about 1,200 draw calls at the widest zoom before the merged walls and the scenery
 (`docs/plans/upgrade-pass.md`, §9); measured with both, it is 1,140. The primitives count every
 pass, the outlines and the shadow map's included. Phones are unmeasured for the maxed base: that
-measurement, still parked, decides whether the Crown robots stay.
+measurement, still parked, decides whether the Crown robots stay. Folding the idle moving parts
+into their bodies (**Folded parts**) took the `profile` scenario's maxed base from 1,198 draw calls
+to 615 at camera size 44, 980 to 549 at 24 and 357 to 247 at 10; the frame from 6.7 to 7.7 ms to
+4.9 to 5.1, the render thread's CPU from 2.2 to 1.5 ms and `BuildingView`'s from 0.38 to 0.13 ms a
+frame, the primitives the same at 44 and up to 5 % more at 10 (the folded parts' sweep keeps their
+bodies from being culled at the screen's edge), for 21 MB more video memory (86.5 to 107.4 MB), the
+two motion channels on every vertex of every body with a folded part. Leaving the remaining moving
+nodes unposed while their building is off the screen was tried and left out: `BuildingView`'s
+0.12 to 0.13 ms at size 10 only fell to 0.11 ms (and rose at 44), the 34 views' `_process` calls
+themselves being the cost.
 
 The render thread's CPU time does not move with the shadow's filter (0, 2 or 4 measure the same
 within the gallery's run-to-run noise), since PCF costs on the GPU: 13 shadow taps a fragment near a shadow edge (fewer where the first taps

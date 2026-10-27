@@ -300,7 +300,8 @@ side, the key light from `main.gd`'s direction and colour with no shadow, and an
 no ambient and linear tonemapping. The models keep the world's toon materials; their outlines take
 a copy of the ink material whose `ink_px` is scaled by 720 / 160, so the line is as many pixels on
 the texture as it is on a 720p screen. A moving part stands where `Motion.transform_at(0)` puts
-it. It renders one model a frame, and only while the panel is open: a frame puts the model in front
+it, a part folded into the body held at clock 0 (`BuildingModels.hold`, `art-style.md`, **Folded
+parts**). It renders one model a frame, and only while the panel is open: a frame puts the model in front
 of the camera and has the viewport draw once (`UPDATE_ONCE`), the next reads the image back into
 an `ImageTexture`, caches it by type and hands it to the card. Opening the panel, and selecting a
 tab while it is open, moves that tab's types to the front of the queue, so the visible cards fill

@@ -130,9 +130,10 @@ in one second at most (`Catalog.apply_dev_cheats`; `-- --no-cheats` for the real
   no abilities); the server will hold the base
   later and nothing below `main.gd` changes.
 - **Phones are unmeasured.** The phone target is fixed (§3.1) and the maxed base and a full battle
-  meet its Mac proxies (the template base 1,140 draw calls and 1.7 million primitives at the widest
-  zoom; a battle on it with a full army 974 and 2.0 million, `docs/reference/art-style.md`,
-  **Cost**), but no phone has run them: the measurement needs a device and stays with the owner
+  meet its Mac proxies (the template base in the profile scenario 1,198 draw calls at the widest
+  zoom before its idle parts moved into the shaders, 615 after, and 1.65 million primitives; a
+  battle on it with a full army 974 and 2.0 million, `docs/reference/art-style.md`, **Cost**), but
+  no phone has run them: the measurement needs a device and stays with the owner
   (`docs/reference/testing-tools.md`, **Measuring on a phone**), and it decides whether the Crown
   robots stay and what the unit budgets are. The sim's slowest tick is about 1 to 1.5 ms on the
   Mac since the search budget in cells (§3.1), under the 5 ms a tick proxy. A tick of scripted
@@ -422,6 +423,22 @@ any of them can be reversed as a data or model change.
   for its last groups' paths. Two refactors with it change nothing a battle does: an air unit's
   pick reads its set's members rather than every building, and a search for a set with nothing
   standing is not run. Reversible as data (`search_cells`).
+
+- **Idle building parts move in the vertex shader** (the coordinator, 2026-10-27, the performance
+  pass; `docs/reference/art-style.md`, **Folded parts**): a building's moving part that moves on the
+  clock alone (no socket, riding nothing and ridden by nothing, no marching figure) is folded into
+  its body and outline at build time and moved by the shaders from per-vertex motion data (`CUSTOM0`,
+  `CUSTOM3`) with `Motion`'s exact math, at the same pose at the same clock as the node it replaces;
+  the rotor of the gunship moved onto the same path. What stays a node is what needs the view's
+  state: the aiming heads and what rides them, and the marching figures (198 of the template base's
+  257 moving parts fold, 59 stay). Busy and EMP-disabled buildings hold their folded parts through a
+  per-instance shader uniform (`move_hold`), set once a change. On the Mac the maxed base fell from
+  1,198 draw calls to 615 at the widest zoom and its frame from about 7 ms to 5, for 21 MB more video
+  memory; moving parts were two thirds of the draw calls, the first thing a phone would have broken
+  on. Instance uniforms are unverified on the phone: if they fail there, a held idle keeps moving,
+  nothing worse. The video memory is accepted for now; the phone measurement decides between two
+  follow-ups: `CUSTOM3` as half floats (with a precision check), or the folded parts in a second body
+  surface (about three more draws a folded building, the channels on their vertices only).
 
 ### 3.2 Open
 
