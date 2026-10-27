@@ -2646,6 +2646,13 @@ func _make_theme() -> Theme:
 	ui.set_stylebox("panel", &"BattlePanel", _shape(PANEL, 12))
 	_label_variation(ui, &"BattleFigure", 28, TEXT, 0, DISPLAY_FONT)
 	_label_variation(ui, &"BattleDim", 17, TEXT_DIM, 0)
+	_label_variation(ui, &"BattleAmount", 20, TEXT, 0)
+	_button_variation(ui, &"BattleBarButton", CARD, 12, DISPLAY_FONT, 24, 0)
+	# End stops the battle: the defence's red, ink text.
+	_button_variation(ui, &"EndButton", MaterialKit.DEFENCE, 12, DISPLAY_FONT, 24, 0, INK)
+	# Both disabled once the battle is over: the dark family's dim text, whatever a skin gave Button.
+	for type: StringName in [&"BattleBarButton", &"EndButton"]:
+		ui.set_color("font_disabled_color", type, Color(TEXT, DISABLED_ALPHA))
 	return ui
 
 

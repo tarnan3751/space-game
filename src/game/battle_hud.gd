@@ -6,8 +6,9 @@ extends CanvasLayer
 ##
 ## - Top left, a panel: the time left (seconds_left), the destruction and the three stars, each
 ##   gold once won and dark until.
+## - Top centre, a pill: the loot taken so far per resource, each with its icon on a coin.
 ## - Top right: the speed button (1x, 2x: BattleView.speed) and End, which asks before it
-##   surrenders; under them, the loot taken so far per resource, each with its icon.
+##   surrenders.
 ## - Along the bottom, the deploy bar: a card per unit type the attacker brought, its picture
 ##   (ModelPreview, the unit at the attacker's level's tier), its name and how many are left; a
 ##   press selects it (BattleView.select_unit) or, pressed again, lets it go. The first type is
@@ -28,7 +29,8 @@ const PICTURE_SIZE := Vector2(64, 64)
 const STAR_SIZE := Vector2(36, 36)
 const RESULT_STAR_SIZE := Vector2(64, 64)
 const RESULT_PICTURE_SIZE := Vector2(48, 48)
-const ICON_SIZE := Vector2(28, 28)
+## A resource's icon on its coin, in the loot pill (its silhouette HudIcon.COIN_INSET of it, 28 px).
+const ICON_SIZE := Vector2(40, 40)
 ## A star not won yet: dark, but clear of the panel under it.
 const UNEARNED := MaterialKit.HULL_DARK
 const CARD_GAP := 10
@@ -36,8 +38,10 @@ const CARD_GAP := 10
 const BAR_GAP := 16
 ## The dim behind the End confirmation, which takes every touch while it is open.
 const BACKDROP := Color(0.106, 0.102, 0.18, 0.35)
-const SPEED_SIZE := Vector2(88, 52)
-const END_SIZE := Vector2(120, 52)
+const SPEED_SIZE := Vector2(96, 64)
+const END_SIZE := Vector2(140, 64)
+## Between speed and End, so a miss on the toggle does not land on End.
+const END_GAP := 24
 ## The refused deploys' toasts. A card run out is let go on the next refresh, so a tap never meets
 ## `none_left`; a smear can, when a frame steps several ticks and the type runs out between two
 ## of them, before the refresh: that is the toast it keeps.
@@ -229,7 +233,7 @@ func toast_text() -> String:
 
 # --- Building -----------------------------------------------------------------------
 
-## The time, destruction and stars at the top left; speed and End, and the loot under them, at
+## The time, destruction and stars at the top left; the loot at the top centre; speed and End at
 ## the top right.
 func _build_top() -> void:
 	var left := PanelContainer.new()
@@ -257,39 +261,36 @@ func _build_top() -> void:
 	for k: int in 3:
 		_stars.append(_star(stars, STAR_SIZE))
 
-	var right := VBoxContainer.new()
-	right.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	right.alignment = BoxContainer.ALIGNMENT_BEGIN
-	right.add_theme_constant_override("separation", 10)
-	_root.add_child(right)
-	right.set_anchors_preset(Control.PRESET_TOP_RIGHT)
-	right.grow_horizontal = Control.GROW_DIRECTION_BEGIN
-	right.offset_right = -Hud.MARGIN
-	right.offset_left = -Hud.MARGIN
-	right.offset_top = Hud.MARGIN
+	var loot := PanelContainer.new()
+	loot.theme_type_variation = &"BattlePanel"
+	loot.mouse_filter = Control.MOUSE_FILTER_STOP
+	_root.add_child(loot)
+	loot.set_anchors_preset(Control.PRESET_CENTER_TOP)
+	loot.grow_horizontal = Control.GROW_DIRECTION_BOTH
+	loot.offset_top = Hud.MARGIN
+	var row := HBoxContainer.new()
+	row.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	row.add_theme_constant_override("separation", 18)
+	loot.add_child(row)
+	for res: String in _catalog.resources:
+		_loot[res] = _resource_row(row, res, "0", ICON_SIZE, &"BattleAmount")
+		_shown_loot[res] = 0
+
 	var buttons := HBoxContainer.new()
 	buttons.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	buttons.alignment = BoxContainer.ALIGNMENT_END
-	buttons.add_theme_constant_override("separation", 12)
-	right.add_child(buttons)
-	_speed_button = _button("1x", SPEED_SIZE, &"BarButton")
+	buttons.add_theme_constant_override("separation", END_GAP)
+	_root.add_child(buttons)
+	buttons.set_anchors_preset(Control.PRESET_TOP_RIGHT)
+	buttons.grow_horizontal = Control.GROW_DIRECTION_BEGIN
+	buttons.offset_right = -Hud.MARGIN
+	buttons.offset_left = -Hud.MARGIN
+	buttons.offset_top = Hud.MARGIN
+	_speed_button = _button("1x", SPEED_SIZE, &"BattleBarButton")
 	_speed_button.pressed.connect(_on_speed)
 	buttons.add_child(_speed_button)
-	_end_button = _button("End", END_SIZE, &"BarButton")
+	_end_button = _button("End", END_SIZE, &"EndButton")
 	_end_button.pressed.connect(_on_end)
 	buttons.add_child(_end_button)
-	var loot := PanelContainer.new()
-	loot.mouse_filter = Control.MOUSE_FILTER_STOP
-	loot.size_flags_horizontal = Control.SIZE_SHRINK_END
-	right.add_child(loot)
-	var rows := VBoxContainer.new()
-	rows.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	rows.add_theme_constant_override("separation", 2)
-	loot.add_child(rows)
-	_label(rows, "Loot", &"CardCount")
-	for res: String in _catalog.resources:
-		_loot[res] = _resource_row(rows, res, "0")
-		_shown_loot[res] = 0
 
 
 ## The deploy bar along the bottom: a card per unit type brought, in sorted order.
@@ -542,7 +543,7 @@ func _show_result(result: Dictionary) -> void:
 	_result_lines.add_child(loot_row)
 	var loot: Dictionary = result.get("loot", {})
 	for res: String in _catalog.resources:
-		_resource_row(loot_row, res, Format.short(int(loot.get(res, 0))))
+		_resource_row(loot_row, res, Format.short(int(loot.get(res, 0))), ICON_SIZE, &"BattleAmount")
 	var deployed: Dictionary = result.get("deployed", {})
 	if deployed.is_empty():
 		_label(_result_lines, "No units deployed", &"CardCount").horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
@@ -749,19 +750,20 @@ func _picture(parent: Control, picture_size: Vector2) -> TextureRect:
 	return picture
 
 
-## A resource's icon (HudIcon) beside `text` in its colour, in a row under `parent`; returns the
-## label.
-func _resource_row(parent: Control, res: String, text: String) -> Label:
+## A resource's icon (HudIcon) in its colour on a trough coin `coin_size` across, beside `text` in
+## `variation`, in a row under `parent`; returns the label.
+func _resource_row(parent: Control, res: String, text: String, coin_size: Vector2, variation: StringName) -> Label:
 	var row := HBoxContainer.new()
 	row.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	row.add_theme_constant_override("separation", 6)
 	parent.add_child(row)
 	var icon := HudIcon.new()
 	icon.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	icon.custom_minimum_size = ICON_SIZE
+	icon.custom_minimum_size = coin_size
 	icon.color = Color.from_string(_catalog.resource_color(res), Hud.TEXT)
+	icon.coin = Hud.TROUGH
 	icon.show_icon(res, false)
 	row.add_child(icon)
-	var label := _label(row, text, &"MeterText")
-	label.add_theme_color_override("font_color", Color.from_string(_catalog.resource_color(res), Hud.TEXT))
+	var label := _label(row, text, variation)
+	label.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 	return label
