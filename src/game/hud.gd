@@ -80,9 +80,10 @@ const CARD := Color("3b3670")
 const CARD_DISABLED := Color("2e2b55")
 const TEXT := Color("f4f2ff")
 const TEXT_DIM := Color("9a95c4")
+## The selected and the safe: the selected tab and card, Train, Done, Scan, Keep fighting.
 const ACCENT := Color("58e8ff")
+## Commit and spend: Build, Place, Upgrade, Attack. Raid and battle take MaterialKit.ARMY's orange.
 const GOLD := Color("ffc13b")
-const GOLD_PRESSED := Color("e0a52a")
 const TROUGH := Color("17162a")
 ## The info panel's note when an upgrade is refused, and a research card's lab level the lab
 ## does not have yet.
@@ -112,16 +113,25 @@ const MARGIN := 16
 const BORDER := 3
 ## Round a button's text: its minimum size, not its text, sets how big it is.
 const BUTTON_MARGIN := 6.0
-const TAB_SIZE := Vector2(140, 48)
-const CLOSE_SIZE := Vector2(48, 48)
+## A pressed button or card: its fill this much lighter, the shape and its content sunk this far
+## onto its shadow.
+const PRESSED_LIGHTEN := 0.15
+const PRESSED_SINK := 4.0
+## A panel's inner edge: a line this light just inside its ink border.
+const EDGE_LIGHT := Color("f4f2ff", 0.12)
+## The bottom panels' top band, a shade lighter than the rest, down to the gap under the tabs.
+const MENU_BAND := 74.0
+const MENU_BAND_LIGHTEN := 0.06
+const TAB_SIZE := Vector2(160, 56)
+const CLOSE_SIZE := Vector2(56, 56)
 const CARD_SIZE := Vector2(200, 176)
 ## The building's picture at the top of a card (ModelPreview), shown at this size.
 const PREVIEW_SIZE := Vector2(84, 84)
 ## The category stripe along a card's top, inside its border.
 const STRIPE_HEIGHT := 6
-const BUILD_SIZE := Vector2(128, 64)
+const BUILD_SIZE := Vector2(136, 72)
 ## The Expedition button, bottom left, and the badge of open fields on its corner.
-const EXPEDITION_SIZE := Vector2(176, 64)
+const EXPEDITION_SIZE := Vector2(184, 72)
 const BADGE_SIZE := Vector2(30, 30)
 const METER_SIZE := Vector2(220, 36)
 ## A meter's icon sits over the left end of its trough, which starts this far in.
@@ -162,8 +172,9 @@ const ABILITY_COLORS := {
 }
 ## A unit level with no train_cost, shared so a lookup builds none.
 const _NO_COST := {}
-## The info panel's Train button, beside Close.
-const ACTION_SIZE := Vector2(112, 44)
+## The info panel's Train button, and its Close beside it.
+const ACTION_SIZE := Vector2(112, 56)
+const INFO_CLOSE_SIZE := Vector2(96, 56)
 ## A unit card in the army panel, and its picture (ModelPreview) at the top.
 const TRAIN_CARD_SIZE := Vector2(200, 140)
 const PICTURE_SIZE := Vector2(48, 48)
@@ -414,9 +425,11 @@ func refresh(state: BaseState, selected_id: int, placing: bool, ghost_ok: bool, 
 	_expedition_badge.visible = open_fields > 0
 	_show_expedition()
 	_place_bar.visible = placing
+	# Place commits a spend (gold); Done only ends painting (the safe cyan).
 	var place_text := "Done" if painting else "Place"
 	if _place_button.text != place_text:
 		_place_button.text = place_text
+		_place_button.theme_type_variation = &"ConfirmButton" if painting else &"CommitButton"
 	_place_button.disabled = not ghost_ok and not painting
 	_info_panel.visible = not placing and has_selection and _army_page == ArmyPage.NONE
 	if _menu_open:
@@ -1552,6 +1565,7 @@ func _build_menu() -> void:
 	_menu.offset_right = 0.0
 	_menu.offset_top = 0.0
 	_menu.offset_bottom = 0.0
+	_menu.draw.connect(_draw_edge.bind(_menu, true))
 	_menu_inset = MarginContainer.new()
 	_menu_inset.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	_menu.add_child(_menu_inset)
@@ -1731,6 +1745,7 @@ func _build_army_panel() -> void:
 	_army.offset_right = 0.0
 	_army.offset_top = 0.0
 	_army.offset_bottom = 0.0
+	_army.draw.connect(_draw_edge.bind(_army, true))
 	_army_inset = MarginContainer.new()
 	_army_inset.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	_army.add_child(_army_inset)
@@ -2021,6 +2036,7 @@ static func show_ability_glyph(glyph: HudIcon, catalog: Catalog, ability: String
 ## Cancel and Place on a panel at the bottom centre.
 func _build_place_bar() -> void:
 	var panel := PanelContainer.new()
+	panel.draw.connect(_draw_edge.bind(panel, false))
 	_root.add_child(panel)
 	_anchor_bottom(panel)
 	var row := HBoxContainer.new()
@@ -2030,7 +2046,7 @@ func _build_place_bar() -> void:
 	var cancel := _button("Cancel", Vector2(170, 72), &"BarButton")
 	cancel.pressed.connect(func() -> void: cancel_pressed.emit())
 	row.add_child(cancel)
-	_place_button = _button("Place", Vector2(170, 72), &"ConfirmButton")
+	_place_button = _button("Place", Vector2(170, 72), &"CommitButton")
 	_place_button.pressed.connect(func() -> void: confirm_pressed.emit())
 	row.add_child(_place_button)
 	_place_bar = panel
@@ -2039,6 +2055,7 @@ func _build_place_bar() -> void:
 func _build_info_panel() -> void:
 	var panel := PanelContainer.new()
 	panel.custom_minimum_size = Vector2(460, 0)
+	panel.draw.connect(_draw_edge.bind(panel, false))
 	_root.add_child(panel)
 	_anchor_bottom(panel)
 	var column := VBoxContainer.new()
@@ -2054,7 +2071,7 @@ func _build_info_panel() -> void:
 	_action_button = _button("Train", ACTION_SIZE, &"ConfirmButton")
 	_action_button.pressed.connect(_on_action_pressed)
 	header.add_child(_action_button)
-	var close := _button("Close", Vector2(96, 44))
+	var close := _button("Close", INFO_CLOSE_SIZE)
 	close.pressed.connect(func() -> void: close_pressed.emit())
 	header.add_child(close)
 
@@ -2166,7 +2183,9 @@ static func _make_stripe() -> ImageTexture:
 # --- Theme -----------------------------------------------------------------------
 
 ## The comic theme: Lilita One by default, Bangers where a variation says so; flat fills
-## with a 3 px ink border and a flat ink shadow; text in the UI palette.
+## with a 3 px ink border and a flat ink shadow; text in the UI palette. White text takes an ink
+## outline only over a bright fill or over the world; text on a dark panel or card, and ink text,
+## take none.
 func _make_theme() -> Theme:
 	var ui := Theme.new()
 	ui.default_font = BODY_FONT
@@ -2220,39 +2239,42 @@ func _make_theme() -> Theme:
 	ui.set_type_variation(&"CardStripe", &"Panel")
 	ui.set_stylebox("panel", &"CardStripe", stripe)
 
-	# Buttons: a card unless a variation says otherwise. None takes focus.
-	_button_shapes(ui, &"Button", CARD, CARD, 12)
+	# Buttons: a card unless a variation says otherwise. None takes focus. Gold commits a spend,
+	# the army's orange starts a raid, cyan is the selected or the safe choice; each carries ink
+	# text, and only white text on a dark fill is left without an outline.
+	_button_shapes(ui, &"Button", CARD, 12)
 	ui.set_stylebox("focus", "Button", StyleBoxEmpty.new())
 	for item: String in BUTTON_TEXT_COLORS:
 		ui.set_color(item, "Button", TEXT)
 	ui.set_color("font_disabled_color", "Button", Color(TEXT, DISABLED_ALPHA))
 	ui.set_color("font_outline_color", "Button", INK)
-	_button_variation(ui, &"BuildButton", GOLD, GOLD_PRESSED, 12, DISPLAY_FONT, 30, 4)
-	_button_variation(ui, &"ExpeditionButton", ACCENT, ACCENT.darkened(0.15), 12, DISPLAY_FONT, 30, 0, INK)
-	_button_variation(ui, &"UpgradeButton", GOLD, GOLD_PRESSED, 12, BODY_FONT, 20, 3)
-	_button_variation(ui, &"ConfirmButton", ACCENT, ACCENT.darkened(0.15), 12, DISPLAY_FONT, 22, 0, INK)
-	_button_variation(ui, &"BarButton", CARD, CARD, 12, DISPLAY_FONT, 22, 0)
-	_button_variation(ui, &"DebugButton", CARD, CARD, 12, DISPLAY_FONT, 20, 0)
-	_button_variation(ui, &"CloseButton", CARD, CARD, 12, DISPLAY_FONT, 28, 3)
-	_button_variation(ui, &"TabButton", CARD, CARD, 10, DISPLAY_FONT, 24, 3)
-	# The selected tab: cyan in every state, ink text with no outline.
-	_button_variation(ui, &"TabSelected", ACCENT, ACCENT, 10, DISPLAY_FONT, 24, 0, INK)
+	_button_variation(ui, &"BuildButton", GOLD, 12, DISPLAY_FONT, 30, 0, INK)
+	_button_variation(ui, &"ExpeditionButton", MaterialKit.ARMY, 12, DISPLAY_FONT, 30, 0, INK)
+	_button_variation(ui, &"UpgradeButton", GOLD, 12, BODY_FONT, 24, 0, INK)
+	_button_variation(ui, &"CommitButton", GOLD, 12, DISPLAY_FONT, 24, 0, INK)
+	_button_variation(ui, &"ConfirmButton", ACCENT, 12, DISPLAY_FONT, 24, 0, INK)
+	_button_variation(ui, &"BarButton", CARD, 12, DISPLAY_FONT, 24, 0)
+	_button_variation(ui, &"DebugButton", CARD, 12, DISPLAY_FONT, 20, 0)
+	_button_variation(ui, &"CloseButton", CARD, 12, DISPLAY_FONT, 28, 0)
+	_button_variation(ui, &"TabButton", CARD, 10, DISPLAY_FONT, 24, 0)
+	# The selected tab: cyan in every state, ink text.
+	_button_variation(ui, &"TabSelected", ACCENT, 10, DISPLAY_FONT, 24, 0, INK)
 	for item: String in ["normal", "hover", "pressed", "hover_pressed"]:
 		ui.set_stylebox(item, &"TabSelected", _shape(ACCENT, 10, BUTTON_MARGIN))
 
-	_label_variation(ui, &"CardName", 20, TEXT, 2)
-	_label_variation(ui, &"CardCost", 18, TEXT, 0)
-	_label_variation(ui, &"CardCount", 16, TEXT_DIM, 0)
-	_label_variation(ui, &"CardReason", 15, TEXT_DIM, 0)
-	_label_variation(ui, &"QueueName", 16, TEXT, 0)
-	_label_variation(ui, &"HousingText", 16, TEXT, 0)
-	_label_variation(ui, &"CardWarning", 15, WARNING, 0)
-	_label_variation(ui, &"MeterText", 18, TEXT, 2, _meter_font())
-	_label_variation(ui, &"InfoTitle", 24, TEXT, 0, DISPLAY_FONT)
-	_label_variation(ui, &"InfoDetail", 17, TEXT, 0)
-	_label_variation(ui, &"InfoNote", 17, WARNING, 0)
-	_label_variation(ui, &"ToastText", 18, TEXT, 0)
-	_label_variation(ui, &"BadgeText", 17, TEXT, 2)
+	_label_variation(ui, &"CardName", 22, TEXT, 0)
+	_label_variation(ui, &"CardCost", 20, TEXT, 0)
+	_label_variation(ui, &"CardCount", 19, TEXT_DIM, 0)
+	_label_variation(ui, &"CardReason", 19, TEXT_DIM, 0)
+	_label_variation(ui, &"QueueName", 19, TEXT, 0)
+	_label_variation(ui, &"HousingText", 19, TEXT, 0)
+	_label_variation(ui, &"CardWarning", 17, WARNING, 0)
+	_label_variation(ui, &"MeterText", 20, TEXT, 2.5, _meter_font())
+	_label_variation(ui, &"InfoTitle", 30, TEXT, 0, DISPLAY_FONT)
+	_label_variation(ui, &"InfoDetail", 19, TEXT, 0)
+	_label_variation(ui, &"InfoNote", 19, WARNING, 0)
+	_label_variation(ui, &"ToastText", 19, TEXT, 0)
+	_label_variation(ui, &"BadgeText", 19, TEXT, 2)
 
 	# The card strip's scroll bar: a dim grabber on an ink track.
 	var track := _flat(Color(INK, 0.6), 4)
@@ -2265,20 +2287,21 @@ func _make_theme() -> Theme:
 
 
 ## `outline`: the ink round the text, in pixels; 0 for none.
-static func _button_variation(ui: Theme, variation: StringName, fill: Color, pressed: Color, radius: int,
-		font: Font, font_size: int, outline: int, text: Color = TEXT) -> void:
+static func _button_variation(ui: Theme, variation: StringName, fill: Color, radius: int, font: Font,
+		font_size: int, outline: float, text: Color = TEXT) -> void:
 	ui.set_type_variation(variation, &"Button")
-	_button_shapes(ui, variation, fill, pressed, radius)
+	_button_shapes(ui, variation, fill, radius)
 	ui.set_font("font", variation, font)
 	ui.set_font_size("font_size", variation, font_size)
-	ui.set_constant("outline_size", variation, outline * OUTLINE_PER_PX)
+	ui.set_constant("outline_size", variation, roundi(outline * OUTLINE_PER_PX))
 	for item: String in BUTTON_TEXT_COLORS:
 		ui.set_color(item, variation, text)
 
 
-## Every state but focus: hover a shade lighter, pressed sunk onto its shadow, disabled in the
-## card-disabled fill.
-static func _button_shapes(ui: Theme, type: StringName, fill: Color, pressed: Color, radius: int) -> void:
+## Every state but focus: hover a shade lighter, pressed lighter still and sunk onto its shadow,
+## disabled in the card-disabled fill.
+static func _button_shapes(ui: Theme, type: StringName, fill: Color, radius: int) -> void:
+	var pressed := fill.lightened(PRESSED_LIGHTEN)
 	ui.set_stylebox("normal", type, _shape(fill, radius, BUTTON_MARGIN))
 	ui.set_stylebox("hover", type, _shape(fill.lightened(0.08), radius, BUTTON_MARGIN))
 	ui.set_stylebox("pressed", type, _shape(pressed, radius, BUTTON_MARGIN, true))
@@ -2287,12 +2310,12 @@ static func _button_shapes(ui: Theme, type: StringName, fill: Color, pressed: Co
 
 
 ## `outline`: the ink round the text, in pixels; 0 for none.
-static func _label_variation(ui: Theme, variation: StringName, font_size: int, color: Color, outline: int,
+static func _label_variation(ui: Theme, variation: StringName, font_size: int, color: Color, outline: float,
 		font: Font = null) -> void:
 	ui.set_type_variation(variation, &"Label")
 	ui.set_font_size("font_size", variation, font_size)
 	ui.set_color("font_color", variation, color)
-	ui.set_constant("outline_size", variation, outline * OUTLINE_PER_PX)
+	ui.set_constant("outline_size", variation, roundi(outline * OUTLINE_PER_PX))
 	if font != null:
 		ui.set_font("font", variation, font)
 
@@ -2311,7 +2334,7 @@ static func _meter_font() -> FontVariation:
 
 ## The comic shape: a flat fill, a 3 px ink border, round corners and a flat ink shadow
 ## offset 4 px down and right, with `margin` round its content. Sunk (pressed), the shape and
-## its content move 2 px onto the shadow, which stays where it was: 2 px from the shape.
+## its content move PRESSED_SINK px down and right, onto the shadow, which stays where it was.
 static func _shape(fill: Color, radius: int, margin: float = 12.0, sunk: bool = false) -> StyleBoxFlat:
 	var box := StyleBoxFlat.new()
 	box.bg_color = fill
@@ -2323,16 +2346,66 @@ static func _shape(fill: Color, radius: int, margin: float = 12.0, sunk: bool = 
 	box.shadow_offset = Vector2(4, 4)
 	box.set_content_margin_all(margin)
 	if sunk:
-		box.shadow_offset = Vector2(2, 2)
-		box.expand_margin_left = -2.0
-		box.expand_margin_top = -2.0
-		box.expand_margin_right = 2.0
-		box.expand_margin_bottom = 2.0
-		box.content_margin_left = margin + 2.0
-		box.content_margin_top = margin + 2.0
-		box.content_margin_right = margin - 2.0
-		box.content_margin_bottom = margin - 2.0
+		box.shadow_size = 0
+		box.expand_margin_left = -PRESSED_SINK
+		box.expand_margin_top = -PRESSED_SINK
+		box.expand_margin_right = PRESSED_SINK
+		box.expand_margin_bottom = PRESSED_SINK
+		box.content_margin_left = margin + PRESSED_SINK
+		box.content_margin_top = margin + PRESSED_SINK
+		box.content_margin_right = margin - PRESSED_SINK
+		box.content_margin_bottom = margin - PRESSED_SINK
 	return box
+
+
+## A panel's cel edge, drawn over its shape as one triangle array (HudIcon.Pen): a light line just
+## inside its ink border, and on a bottom panel (`menu`: the build panel's and the army panel's
+## shape, its border along the top only) a band a shade lighter across its top, down to MENU_BAND.
+func _draw_edge(panel: Control, menu: bool) -> void:
+	var pen := HudIcon.Pen.new()
+	var inside := Rect2(Vector2.ZERO, panel.size).grow(-BORDER)
+	if menu:
+		# Inside a border along the top only, the shape's top corners (radius 16) are 16 across
+		# and 13 down.
+		var band := Rect2(Vector2(0, BORDER), Vector2(panel.size.x, MENU_BAND - BORDER))
+		pen.add_fill(_round_rect(band, Vector2(16, 16 - BORDER), true),
+			Color(PANEL.lightened(MENU_BAND_LIGHTEN), PANEL.a), false)
+		var line := Rect2(Vector2(0, BORDER + 0.5), Vector2(panel.size.x, 0))
+		pen.add_stroke(_round_rect(line, Vector2(16, 16 - BORDER - 0.5), true), 1.0, EDGE_LIGHT, false)
+	else:
+		pen.add_stroke(_round_rect(inside.grow(-0.5), Vector2.ONE * (12 - BORDER - 0.5), false), 1.0, EDGE_LIGHT, true)
+	pen.draw(panel)
+
+
+## The outline of `rect` with its corners rounded by `radius` (across, down), clockwise from its
+## left side; with `top_only` its bottom corners stay square, and a rect with no height gives only
+## its top edge.
+static func _round_rect(rect: Rect2, radius: Vector2, top_only: bool) -> PackedVector2Array:
+	var points := PackedVector2Array()
+	var steps := 6
+	var corners := [
+		[rect.position + radius, PI],
+		[Vector2(rect.end.x - radius.x, rect.position.y + radius.y), 1.5 * PI],
+	]
+	for corner: Array in corners:
+		var centre: Vector2 = corner[0]
+		var from: float = corner[1]
+		for i: int in steps + 1:
+			var angle := from + 0.5 * PI * i / steps
+			points.append(centre + Vector2(cos(angle), sin(angle)) * radius)
+	if rect.size.y <= 0.0:
+		return points
+	if top_only:
+		points.append(rect.end)
+		points.append(Vector2(rect.position.x, rect.end.y))
+		return points
+	for corner: Array in [[rect.end - radius, 0.0], [Vector2(rect.position.x + radius.x, rect.end.y - radius.y), 0.5 * PI]]:
+		var centre: Vector2 = corner[0]
+		var from: float = corner[1]
+		for i: int in steps + 1:
+			var angle := from + 0.5 * PI * i / steps
+			points.append(centre + Vector2(cos(angle), sin(angle)) * radius)
+	return points
 
 
 ## A plain rounded fill, for the scroll bar.
