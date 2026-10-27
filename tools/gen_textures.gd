@@ -3,7 +3,9 @@ extends SceneTree
 ## painted from (docs/reference/art-style.md, **The material kit**), saved as
 ## assets/textures/kit/<index>_<name>.png; the field texture the buildable ground and the terrain's
 ## marks are drawn from, assets/textures/field.png (**The field**); and the rock texture the
-## terrain's steep faces are drawn from, assets/textures/terrain_rock.png (**Environment**). Run it
+## terrain's steep faces are drawn from, assets/textures/terrain_rock.png (**Environment**); and the
+## HUD's halftone console skin, five 9-slice shapes saved as assets/textures/kit/hud_<name>.png
+## (docs/reference/hud.md, **Skins**). Run it
 ## after an import (tools/gates.sh does one), from the project root:
 ##
 ##   $GODOT --headless --path . -s res://tools/gen_textures.gd
@@ -83,6 +85,30 @@ const HAZARD_YELLOW := Color("ffd60a")
 ## along world z, so image y is world z): the rock's plates and the dust's pebbles are shaded from
 ## it. The field texture is not: the ground shader lights its lean.
 const SUN := Vector2(-0.5, 0.866)
+## The HUD's skin B shapes (Hud._skin_b): each [name, size, corner radius, top right chamfer, top
+## band, lower band, halftone, light line's mix towards white]. A shape has a 3 px ink border, a
+## 1 px light line inside it, a top band and a lower band meeting in a hard edge at HUD_BAND of its
+## height, the lower band carrying a dot screen, and a flat ink shadow HUD_SHADOW down and right,
+## outside its size. The bright button is near-white for the HUD to tint (a StyleBoxTexture's
+## modulate); the others are drawn in their own fills (Hud.PANEL, Hud.CARD, Hud.CARD_DISABLED).
+const HUD_SHAPES := [
+	["panel", Vector2i(96, 324), 16.0, 0.0, Color("2c2952"), Color("262348"), true, 0.12],
+	["card", Vector2i(200, 200), 12.0, 0.0, Color("443f7c"), Color("3b3670"), true, 0.12],
+	["card_disabled", Vector2i(200, 200), 12.0, 0.0, Color("2e2b55"), Color("2e2b55"), false, 0.0],
+	["button", Vector2i(96, 64), 10.0, 0.0, Color("443f7c"), Color("3b3670"), true, 0.12],
+	["button_bright", Vector2i(96, 64), 10.0, 14.0, Color(1, 1, 1), Color(0.86, 0.86, 0.86), true, 1.0],
+]
+const HUD_BORDER := 3.0
+const HUD_SHADOW := 4
+const HUD_SHADOW_ALPHA := 0.6
+const HUD_BAND := 0.4
+## The dot screen: rows HUD_DOT_PITCH / 2 apart, dots HUD_DOT_PITCH apart along a row, every other
+## row offset by half (a screen turned 45 degrees), each HUD_DOT_RADIUS across and darkening the band
+## by HUD_DOT_DARKEN. The HUD tile-fits each shape's 9-slice middle on both axes, so where a
+## control's middle is not a whole number of tiles the dots are scaled a little.
+const HUD_DOT_PITCH := 8
+const HUD_DOT_RADIUS := 1.6
+const HUD_DOT_DARKEN := 0.1
 
 var _rgb := PackedColorArray()
 var _mask := PackedFloat32Array()
@@ -108,6 +134,10 @@ func _initialize() -> void:
 	_draw_terrain_rock()
 	if not _save(ROCK_PATH):
 		return
+	for shape: Array in HUD_SHAPES:
+		_draw_hud_shape(shape)
+		if not _save(OUT_DIR.path_join("hud_%s.png" % shape[0])):
+			return
 	quit(0)
 
 
@@ -128,6 +158,71 @@ func _save(path: String) -> bool:
 		return false
 	print("gen_textures: %s" % path)
 	return true
+
+
+# --- The HUD's shapes ---------------------------------------------------------------
+
+## One of HUD_SHAPES, into RGB and the mask, which is its alpha: each pixel sampled 4 x 4, every
+## sample the shadow, the ink border, the light line or a band (a dot of the screen or not), its
+## colour weighted by its alpha.
+func _draw_hud_shape(shape: Array) -> void:
+	var box_size: Vector2i = shape[1]
+	var radius: float = shape[2]
+	var chamfer: float = shape[3]
+	var top: Color = shape[4]
+	var low: Color = shape[5]
+	var dots: bool = shape[6]
+	var line_mix: float = shape[7]
+	_begin(box_size.x + HUD_SHADOW, box_size.y + HUD_SHADOW, 0)
+	var box := Rect2(Vector2.ZERO, Vector2(box_size))
+	var band := box_size.y * HUD_BAND
+	for y: int in _height:
+		for x: int in _width:
+			var color_sum := Vector3.ZERO
+			var alpha_sum := 0.0
+			for sample: int in 16:
+				var p := Vector2(x + (sample % 4 + 0.5) / 4.0, y + (sample / 4 + 0.5) / 4.0)
+				var color := INK
+				var alpha := 1.0
+				if _in_shape(p, box, radius, chamfer, 0.0):
+					if _in_shape(p, box, radius, chamfer, HUD_BORDER):
+						color = top if p.y < band else low
+						if p.y >= band and dots and _on_dot(p):
+							color = color.darkened(HUD_DOT_DARKEN)
+						if not _in_shape(p, box, radius, chamfer, HUD_BORDER + 1.0):
+							color = color.lerp(Color.WHITE, line_mix)
+				elif _in_shape(p - Vector2(HUD_SHADOW, HUD_SHADOW), box, radius, chamfer, 0.0):
+					alpha = HUD_SHADOW_ALPHA
+				else:
+					alpha = 0.0
+				color_sum += Vector3(color.r, color.g, color.b) * alpha
+				alpha_sum += alpha
+			var i := y * _width + x
+			_mask[i] = alpha_sum / 16.0
+			var rgb := color_sum / maxf(alpha_sum, 0.0001)
+			_rgb[i] = Color(rgb.x, rgb.y, rgb.z) if alpha_sum > 0.0 else INK
+
+
+## Whether `p` lies inside `box` shrunk by `inset`: its corners rounded by `radius`, its top right
+## cut at 45 degrees `chamfer` along each side when that is above 0, both shrunk with it.
+func _in_shape(p: Vector2, box: Rect2, radius: float, chamfer: float, inset: float) -> bool:
+	var rect := box.grow(-inset)
+	if not rect.has_point(p):
+		return false
+	if chamfer > 0.0 and (rect.end.x - p.x) + (p.y - rect.position.y) < chamfer - inset * (sqrt(2.0) - 1.0):
+		return false
+	var r := maxf(radius - inset, 0.0)
+	var corner := Vector2(clampf(p.x, rect.position.x + r, rect.end.x - r), clampf(p.y, rect.position.y + r, rect.end.y - r))
+	return p.distance_to(corner) <= r
+
+
+## Whether `p` falls on a dot of the HUD's screen.
+func _on_dot(p: Vector2) -> bool:
+	var row := floori(p.y / (HUD_DOT_PITCH / 2.0))
+	var centre_y := (row + 0.5) * HUD_DOT_PITCH / 2.0
+	var shift := HUD_DOT_PITCH / 2.0 if row % 2 == 1 else 0.0
+	var centre_x := floorf((p.x - shift) / HUD_DOT_PITCH) * HUD_DOT_PITCH + HUD_DOT_PITCH / 2.0 + shift
+	return p.distance_to(Vector2(centre_x, centre_y)) <= HUD_DOT_RADIUS
 
 
 # --- Layers ------------------------------------------------------------------------

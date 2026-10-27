@@ -44,6 +44,9 @@ signal expedition_pressed
 ## What the army panel shows: nothing (closed or closing), a producer's training, the lab's
 ## research, or the Foundry's making.
 enum ArmyPage { NONE, TRAIN, RESEARCH, MAKE }
+## The menu family's look (docs/reference/hud.md, **Skins**): A, the comic console (the default);
+## B, the halftone console, its shapes drawn from textures; C, the pulp page, cream and ink.
+enum Look { A, B, C }
 
 const ERROR_TEXT := {
 	BaseState.ERR_BLOCKED: "That spot is taken",
@@ -119,6 +122,12 @@ const PRESSED_LIGHTEN := 0.15
 const PRESSED_SINK := 4.0
 ## A panel's inner edge: a line this light just inside its ink border.
 const EDGE_LIGHT := Color("f4f2ff", 0.12)
+## Skin B: a pressed button's squash, and its shapes' textures (tools/gen_textures.gd), their
+## corners and edges kept whole in a 9-slice SLICE wide, plus the shadow drawn outside the shape.
+const SQUASH := Vector2(1.04, 0.96)
+const SKIN_B_TEXTURES := "res://assets/textures/kit/hud_%s.png"
+const SLICE := 20.0
+const SLICE_SHADOW := 4.0
 ## The bottom panels' top band, a shade lighter than the rest, down to the gap under the tabs.
 const MENU_BAND := 74.0
 const MENU_BAND_LIGHTEN := 0.06
@@ -230,6 +239,9 @@ const HOUSING_MIN_FILL := 2.0
 
 ## The dev cheats are on (main.gd): every meter shows, full, reading "∞" instead of amount / cap.
 var cheats: bool = false
+## The skin the theme is built in: set before setup, or through set_skin, which restyles a HUD
+## already built.
+static var skin: Look = Look.A
 var _catalog: Catalog
 var _theme: Theme
 ## Holds every part but the build panel; positioned on the safe area.
@@ -413,8 +425,10 @@ class CardArt:
 	func _draw() -> void:
 		var pen := HudIcon.Pen.new()
 		var inside := Rect2(Vector2.ZERO, size).grow(-Hud.BORDER)
-		pen.add_stroke(Hud._round_rect(inside.grow(-0.5), Vector2.ONE * (12 - Hud.BORDER - 0.5), false), 1.0,
-			Hud.EDGE_LIGHT, true)
+		# Skin B's card texture has its own.
+		if Hud.skin != Hud.Look.B:
+			pen.add_stroke(Hud._round_rect(inside.grow(-0.5), Vector2.ONE * (12 - Hud.BORDER - 0.5), false), 1.0,
+				Hud.EDGE_LIGHT, true)
 		var stripe := Rect2(inside.position, Vector2(inside.size.x, Hud.STRIPE_HEIGHT))
 		pen.add_fill(Hud._round_rect(stripe, Vector2(12 - Hud.BORDER, Hud.STRIPE_HEIGHT), true), tint, false)
 		var centre := plinth_centre()
@@ -1783,7 +1797,7 @@ func _build_menu() -> void:
 ## `_refresh_entries` fills them. The card's drawn parts (CardArt) are one triangle array under the
 ## picture; its content sinks with it when pressed.
 func _build_entry(type: String) -> Button:
-	var button := _button("", CARD_SIZE)
+	var button := _button("", CARD_SIZE, &"CardButton")
 	# PASS, so a drag that starts on a card reaches the ScrollContainer and scrolls the
 	# strip; the panel behind still stops the touch from reaching the world.
 	button.mouse_filter = Control.MOUSE_FILTER_PASS
@@ -1898,7 +1912,8 @@ func _card_body(button: Button) -> Control:
 ## button redraws whenever its state changes, so its draw signal says when.
 static func _sink(button: Button, body: Control) -> void:
 	var mode := button.get_draw_mode()
-	var pressed := mode == BaseButton.DRAW_PRESSED or mode == BaseButton.DRAW_HOVER_PRESSED
+	# Skin B squashes instead (_squash).
+	var pressed := skin != Look.B and (mode == BaseButton.DRAW_PRESSED or mode == BaseButton.DRAW_HOVER_PRESSED)
 	body.position = Vector2.ONE * PRESSED_SINK if pressed else Vector2.ZERO
 
 
@@ -2139,7 +2154,7 @@ func _strip(parent: Control, height: float) -> HBoxContainer:
 ## card, so a drag on it scrolls the strip; its content takes no touch.
 func _build_army_card(unit: String, card_size: Vector2, ability: bool = false) -> ArmyCard:
 	var card := ArmyCard.new()
-	card.button = _button("", card_size)
+	card.button = _button("", card_size, &"CardButton")
 	card.button.mouse_filter = Control.MOUSE_FILTER_PASS
 	var stripe := Panel.new()
 	stripe.mouse_filter = Control.MOUSE_FILTER_IGNORE
@@ -2377,7 +2392,17 @@ func _button(text: String, min_size: Vector2, variation: StringName = &"") -> Bu
 	button.theme_type_variation = variation
 	button.custom_minimum_size = min_size
 	button.focus_mode = Control.FOCUS_NONE
+	button.draw.connect(_squash.bind(button))
 	return button
+
+
+## Skin B's press: a button squashes SQUASH about its centre while it is pressed (a toggle, a tab,
+## never does). The button redraws whenever its state changes, so its draw signal says when.
+static func _squash(button: Button) -> void:
+	var mode := button.get_draw_mode()
+	var pressed := mode == BaseButton.DRAW_PRESSED or mode == BaseButton.DRAW_HOVER_PRESSED
+	button.pivot_offset = button.size / 2.0
+	button.scale = SQUASH if skin == Look.B and pressed and not button.toggle_mode else Vector2.ONE
 
 
 ## Pins a control to the bottom centre; it grows upward to fit its content.
@@ -2509,6 +2534,8 @@ func _make_theme() -> Theme:
 	_button_variation(ui, &"TabSelected", ACCENT, 10, DISPLAY_FONT, 24, 0, INK)
 	for item: String in ["normal", "hover", "pressed", "hover_pressed"]:
 		ui.set_stylebox(item, &"TabSelected", _shape(ACCENT, 10, BUTTON_MARGIN))
+	# The build and army cards: a button's shape, which a skin may change.
+	ui.set_type_variation(&"CardButton", &"Button")
 
 	_label_variation(ui, &"CardName", 22, TEXT, 0)
 	_label_variation(ui, &"CardCost", 20, TEXT, 0)
@@ -2546,7 +2573,83 @@ func _make_theme() -> Theme:
 	ui.set_stylebox("grabber", "HScrollBar", _flat(TEXT_DIM, 4))
 	ui.set_stylebox("grabber_highlight", "HScrollBar", _flat(TEXT, 4))
 	ui.set_stylebox("grabber_pressed", "HScrollBar", _flat(ACCENT, 4))
+	if skin == Look.B:
+		_skin_b(ui)
 	return ui
+
+
+## Restyles the HUD in `new_skin`: the theme built again and given to every part that holds it, and
+## what the parts draw themselves drawn again. The harness shoots the skins this way.
+func set_skin(new_skin: Look) -> void:
+	skin = new_skin
+	_theme = _make_theme()
+	for holder: Control in [_root, _menu, _army]:
+		holder.theme = _theme
+	for type: String in _cards:
+		_cards[type].art.queue_redraw()
+	for panel: Control in [_menu, _army, _info_panel, _place_bar]:
+		panel.queue_redraw()
+
+
+## Skin B, the halftone console: the menu family's shapes from the textures tools/gen_textures.gd
+## draws, two bands and a dot screen in an ink border with a light line and a shadow. The bottom
+## panels, the cards and the dark buttons in their own fills; the bright buttons from one white
+## texture tinted to their role, with a corner cut; anything disabled flat. Pressed, a shape is 15 %
+## lighter (and squashes, _squash).
+static func _skin_b(ui: Theme) -> void:
+	var menu := _texture_box("panel", Color.WHITE, 0.0)
+	menu.content_margin_left = MARGIN
+	menu.content_margin_right = MARGIN
+	menu.content_margin_top = 12
+	menu.content_margin_bottom = MARGIN
+	# Its sides, bottom and shadow lie off the screen: only its top edge shows, as skin A's.
+	menu.expand_margin_left = SLICE
+	menu.expand_margin_right = SLICE
+	menu.expand_margin_bottom = SLICE
+	ui.set_stylebox("panel", &"MenuPanel", menu)
+	var dark: Array[StringName] = [&"Button", &"CardButton", &"TabButton", &"CloseButton", &"BarButton"]
+	var bright := {&"BuildButton": GOLD, &"ExpeditionButton": MaterialKit.ARMY, &"UpgradeButton": GOLD,
+		&"CommitButton": GOLD, &"ConfirmButton": ACCENT, &"TabSelected": ACCENT}
+	for type: StringName in dark:
+		var texture := "card" if type == &"CardButton" else "button"
+		ui.set_stylebox("normal", type, _texture_box(texture, Color.WHITE, BUTTON_MARGIN))
+		ui.set_stylebox("hover", type, _texture_box(texture, Color.WHITE.lightened(0.08), BUTTON_MARGIN))
+		for item: String in ["pressed", "hover_pressed"]:
+			ui.set_stylebox(item, type, _texture_box(texture, _brighter(PRESSED_LIGHTEN), BUTTON_MARGIN))
+		ui.set_stylebox("disabled", type, _texture_box("card_disabled", Color.WHITE, BUTTON_MARGIN))
+	for type: StringName in bright:
+		var fill: Color = bright[type]
+		ui.set_stylebox("normal", type, _texture_box("button_bright", fill, BUTTON_MARGIN))
+		ui.set_stylebox("hover", type, _texture_box("button_bright", fill.lightened(0.08), BUTTON_MARGIN))
+		var pressed := fill if type == &"TabSelected" else fill.lightened(PRESSED_LIGHTEN)
+		for item: String in ["pressed", "hover_pressed"]:
+			ui.set_stylebox(item, type, _texture_box("button_bright", pressed, BUTTON_MARGIN))
+		ui.set_stylebox("disabled", type, _texture_box("card_disabled", Color.WHITE, BUTTON_MARGIN))
+
+
+## A skin B shape: the texture `shape`, tinted `tint`, its 9-slice's middle tile-fitted on both
+## axes (a whole number of tiles scaled to fit, so the dots rescale a little where the middle is
+## not a whole number of tiles), its shadow drawn outside the control's rect, `margin` round its
+## content.
+static func _texture_box(shape: String, tint: Color, margin: float) -> StyleBoxTexture:
+	var box := StyleBoxTexture.new()
+	box.texture = load(SKIN_B_TEXTURES % shape)
+	box.modulate_color = tint
+	box.texture_margin_left = SLICE
+	box.texture_margin_top = SLICE
+	box.texture_margin_right = SLICE + SLICE_SHADOW
+	box.texture_margin_bottom = SLICE + SLICE_SHADOW
+	box.expand_margin_right = SLICE_SHADOW
+	box.expand_margin_bottom = SLICE_SHADOW
+	box.axis_stretch_horizontal = StyleBoxTexture.AXIS_STRETCH_MODE_TILE_FIT
+	box.axis_stretch_vertical = StyleBoxTexture.AXIS_STRETCH_MODE_TILE_FIT
+	box.set_content_margin_all(margin)
+	return box
+
+
+## White made `amount` lighter than itself, for a texture's tint: a modulate past 1 brightens it.
+static func _brighter(amount: float) -> Color:
+	return Color(1.0 + amount, 1.0 + amount, 1.0 + amount)
 
 
 ## `outline`: the ink round the text, in pixels; 0 for none.
@@ -2625,6 +2728,9 @@ static func _shape(fill: Color, radius: int, margin: float = 12.0, sunk: bool = 
 ## inside its ink border, and on a bottom panel (`menu`: the build panel's and the army panel's
 ## shape, its border along the top only) a band a shade lighter across its top, down to MENU_BAND.
 func _draw_edge(panel: Control, menu: bool) -> void:
+	# Skin B's bottom panels carry their band and line in their texture.
+	if skin == Look.B and menu:
+		return
 	var pen := HudIcon.Pen.new()
 	var inside := Rect2(Vector2.ZERO, panel.size).grow(-BORDER)
 	if menu:
