@@ -75,6 +75,7 @@ The authoritative model of one player's base. One per player; `main.gd` holds on
 | `making: Dictionary[int, TrainingQueue]` | Making queues by Foundry building id; a queue's `units` hold ability ids. A queue stays when it empties. |
 | `raids: Array[Dictionary]` | The last `RAID_LOG_SIZE` (5) raids applied, newest last: `{"at": unix seconds, "battle", "result"}` as `raid_result` carried them (**Raids**). |
 | `sector: Sector` | The expedition sector: its seed, epoch, cleared fields, last scan and the snapshot its fields are laid out against (**Expeditions**; `expeditions.md`). |
+| `buildings_revision: int` | Counts the changes that can move what the buildings add up to (capacities, production rates, the builders, housing, the stock): one at the end of every `apply` that succeeds, whatever its op, and one for every completion `advance_to` processes (a building, a research, a unit trained, an ability made). Production paying out alone never moves it. Not saved: a new or loaded base starts at 0, so a reader caching on it (the HUD's counts, `BaseView.sync`) keys on the `BaseState` too. |
 | `signal changed` | Emitted after anything visible changed: by `apply` on success, by `advance_to` when a timer completed or a resource amount changed. |
 
 `BaseState.create_new(catalog, start_time)` lays out `catalog.start`: each listed building is
@@ -362,8 +363,10 @@ same state (`test_training.gd`, `test_ticks_of_one_second_equal_one_big_tick`). 
 therefore produces only after it completes, and an upgrade that completes mid-interval produces
 at the old rate before and the new rate after.
 
-`_accumulate(seconds)` pays production for a stretch at the current rates, resource by resource
-in catalog order:
+`_accumulate(seconds)` pays production for a stretch at the current rates, taken once from
+`production_rates()` (and the capacities once from `capacities()`, the first time a resource
+gains; nothing completes inside one call, so each value is what the per-resource query would
+return), resource by resource in catalog order:
 
 ```
 pending   = remainder + rate_per_hour * seconds      (resource-seconds)
@@ -381,7 +384,10 @@ are discarded.
 `production_per_hour(res)` sums the `produces` stat of every finished, idle building: a busy
 building (constructing or upgrading) does not produce. `capacity(res)` sums the `storage` stat of
 every finished building at its current level, busy or not, so storage keeps working during an
-upgrade. `seconds_left(id)` is `finish_at - now`, floored at 0.
+upgrade. `production_rates()` and `capacities()` return every resource's (the catalog's
+resources as keys, in their order) from one pass over the buildings each, the same integer sums;
+the HUD's meters and the sector's snapshot read them. `seconds_left(id)` is `finish_at - now`,
+floored at 0.
 
 ### Save and load
 

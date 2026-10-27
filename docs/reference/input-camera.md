@@ -35,18 +35,28 @@ material kit, `LowPolyMesh`, the shaders, the outlines, the view states, the wal
 5. The state is loaded or created (`_load_or_create`) and installed (`_set_state`: disconnects
    the old state's `changed`, connects the new one, hands it to the controller, cancels any
    placement and selection, clears and syncs the view).
-6. A 1 s `Timer` ticks: `state.advance_to(_now())`, `base_view.sync(state)`, the HUD refresh
-   (timer labels change every second), `sector_map.tick(state)` while the map is open (Scan's
-   countdown), and a save every `SAVE_EVERY_TICKS` (10) ticks.
-
-Every frame, `_process` advances the animation clock (`Motion.tick()`) and sets the shaders'
-`anim_time` global to it (`art-style.md`, **Animation**, **One clock**).
+6. A 1 s `Timer` ticks: `state.advance_to(_now())`, marks the view and the HUD for redrawing
+   (timer labels change every second), refits the HUD to the safe area (`hud.fit_safe_area()`,
+   `hud.md`, **Safe area**), `sector_map.tick(state)` while the map is open (Scan's countdown),
+   and a save every `SAVE_EVERY_TICKS` (10) ticks.
 
 `_now()` is the device clock (`Time.get_unix_time_from_system()`); the server will own time
-later. `state.changed` → `_on_state_changed`: sync the view, `placement.refresh()` (re-checks
-the ghost), refresh the HUD, and `sector_map.refresh(state)` while the map is open (a scan, a
-raid). The save is written on `NOTIFICATION_WM_CLOSE_REQUEST` and
+later. `state.changed` → `_on_state_changed`, which only marks the redraw too, the sector map's
+cards with it. The save is written on `NOTIFICATION_WM_CLOSE_REQUEST` and
 `NOTIFICATION_APPLICATION_PAUSED` too.
+
+**One redraw a frame.** Production fires `changed` on most ticks of a producing base, and a
+command fires it once per apply, so the redraw waits for the frame: every frame, `_process`
+advances the animation clock (`Motion.tick()`) and sets the shaders' `anim_time` global to it
+(`art-style.md`, **Animation**, **One clock**), then, if the tick or a change marked it, syncs
+the view (`base_view.sync`), re-checks the ghost (`placement.refresh()`) and refreshes the HUD,
+once however many changes came, and `sector_map.refresh(state)` while the map is open (a scan, a
+raid). Input runs before `_process`, so a command applied from a touch is drawn in the frame it
+was made; one applied later in the frame (a child's `_process`, the tick's `Timer`) is drawn in
+the next. `main.gd`'s `_process` also tells the HUD when the base is idle (a second after boot, no
+drag, `placement.is_dragging()`, nothing being placed, no battle, the sector map closed;
+`hud.prerender(on)`, called only when that changes), when the cards' pictures are made ahead
+(`hud.md`, **Pictures**); `open_battle` turns it off before the battle's HUD runs the preview.
 
 **The save path.** `save_path` is `user://base.json` unless a `--save-path=<file>` user
 argument (after `--` on the command line, read from `OS.get_cmdline_user_args()`) names
@@ -156,6 +166,7 @@ while a drag nears the screen's edge.
 | `selected_id` | The selected building, `0` for none. `select(id)` updates the view's selection tile and emits `selection_changed`; a change of selection ends a building drag in progress with no move (a second finger can press Close or Reset base). |
 | `placing_type` | The type being placed, `""` when not. `is_placing()`, `ghost_is_valid()`, `ghost_cell()` (the ghost's top-left cell, the brush's while painting). |
 | `is_painting()` | Placing the type `PAINT_TYPE` (`"barrier_wall"`): the ghost is a brush (**Painting walls**). |
+| `is_dragging()` | A finger is dragging: the camera, the ghost, a building or the wall brush. |
 | `signal selection_changed`, `signal placing_changed` | Selection changed; placement began, ended or the ghost moved. `main.gd` refreshes the HUD on the first and calls `hud.refresh_placing` on the second (`hud.md`, **Refresh**). |
 | `signal command_failed(error)` | A command returned an error code; the HUD shows it as a toast. |
 
@@ -242,7 +253,7 @@ the origin, cell (x, y) on world (x, z).
 | `world_to_cell(point)` | The cell under a ground point (floor). |
 | `footprint_cell_at(point, size)` | The top-left cell of a `size` footprint centred as closely as possible on a point (round). |
 | `area()` | The buildable area as a `Rect2` in world x/z; the camera's bounds. |
-| `sync(state)` | Makes `views` match `state.buildings`: frees views whose building is gone, changed type or has a new finished level (except the `dragging_id` view, which keeps its model until it is dropped), first handing a view's construction drone to the base view (`release_drone`) and, once the views are made, telling it to leave over the new view's site (`site_height()`), creates missing ones, pushes `show_status` to each, and for all but `dragging_id` sets the position, un-lifts, and shows the SELECTED tile on `selected_id`. Last it brings the merged wall mesh up to date (`_sync_walls`, **Walls**). |
+| `sync(state)` | Makes `views` match `state.buildings`: frees views whose building is gone, changed type or has a new finished level (except the `dragging_id` view, which keeps its model until it is dropped), first handing a view's construction drone to the base view (`release_drone`) and, once the views are made, telling it to leave over the new view's site (`site_height()`), creates missing ones, pushes `show_status` to each, and for all but `dragging_id` sets the position, un-lifts, and shows the SELECTED tile on `selected_id`. Last it brings the merged wall mesh up to date (`_sync_walls`, **Walls**). While the state, its `buildings_revision` (`core-economy.md`), `selected_id` and `dragging_id` all stand since the last full pass, a sync only counts the busy buildings' labels down (`show_status`) and returns; it builds no array or dictionary either way. |
 | `walls` | The `WallMesh` that draws every finished wall but the dragged one. |
 | `set_grid_highlight(on)`, `is_grid_shown()` | Shows the ground's cell lines (`GRID_LINES_PLACING`) or hides them (`GRID_LINES`, 0). `PlacementController._show_grid` derives it from its own mode: shown while placing (the ghost or the wall brush) or while a building is dragged to move it, hidden otherwise; a selection or the open build panel alone does not show it. |
 | `clear()` | Frees every view (used when the state is replaced). |
@@ -305,7 +316,7 @@ model while the level is 0) and that level's tier (`BuildingModels.tier_of`, whi
 the placement ghost call with the state's catalog); `building_level` records it, and `BaseView.sync` replaces the view when
 the finished level changes, so a building mid-upgrade shows its current level until the upgrade
 finishes. `show_status(level, busy, target_level, seconds_left)` is what `BaseView.sync` pushes
-each tick. `set_lifted(true)` raises the model by 0.35 while it is dragged or is the ghost. A
+each tick; the busy label's text is set only when its target or its seconds changed. `set_lifted(true)` raises the model by 0.35 while it is dragged or is the ghost. A
 selected or dragged view's outlines turn gold; the placement ghost keeps plain ink outlines, and
 its body takes the valid or invalid tint through `set_ghost(valid)` (`art-style.md`, **View
 states**). The nodes carrying `BuildingModels.MOVE_META` (a `Motion` each) are collected once
@@ -377,8 +388,9 @@ level's piece.
 
 `BaseView.sync` ends with `_sync_walls`: every wall view the mesh draws gets
 `BuildingView.set_merged(true)`, which hides its model but keeps the footprint tile, the label
-and the lift; then the walls drawn, each `(x, y, level)` packed into a `PackedInt64Array` in id
-order, are compared with the last rebuild's, and the mesh is rebuilt only when they differ (a
+and the lift; then the walls drawn, each `(x, y, level)` packed into an int in id order, are
+compared entry by entry with the last rebuild's, kept in one `PackedInt64Array` rewritten in place
+(no array built per sync), and the mesh is rebuilt only when they differ (a
 wall placed, moved, upgraded or lifted), never on the one-second tick alone. The rebuild is
 deferred to the end of the frame, so a fast paint stroke that places several walls in one drag
 event rebuilds once. The dragged wall (`dragging_id`) is the exception: the mesh skips it and

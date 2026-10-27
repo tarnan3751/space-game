@@ -410,7 +410,13 @@ state (an aiming head, what rides it, a marching figure) at its pivot carrying `
 outline instance. Meshes are built once per type, level
 and tier and cached; `BuildingModels.instantiate(parts)` assembles an uncached model from parts a caller
 built itself (the `effects` rig), and `meshes_of(parts)` and `assemble(meshes)` split that in two
-for a caller that keeps its own cache (`UnitModels`, **Units**). The contract any model keeps, built or imported:
+for a caller that keeps its own cache (`UnitModels`, **Units**). `parts_of(type, level, size, tier)`
+builds a model's parts uncached and `scale_of(type, size)` its scale; `mesh_data(parts)` works out
+every array of its meshes (the folding included) and `meshes_from(data)` makes the meshes from them:
+`meshes_of` is the two in turn. The first two and `mesh_data` read no cache, write none and make no
+resource or node, so `ModelPreview` runs them on a worker thread (`hud.md`, **Pictures**); for that,
+`Parts`' named surfaces are all made when the script loads and `UnitModels.glow`'s table is
+guarded by a mutex. The contract any model keeps, built or imported:
 origin at the footprint centre on the ground, +Y up, fitting inside `size × size` cells.
 
 The `model_gallery` harness scenario lays out every type and level and checks each, built for
@@ -1023,7 +1029,8 @@ CPU a frame. What stays a node: the aiming heads (the part with the `muzzle`, or
 the parts that ride them (the flak cannon's radar, the ion beam's rings, the orbital cannon's halo),
 and the rigged parts, today only the marching figures (the hangar's trooper, the academy's cadet).
 On the template base 198 of its 257 moving parts fold, 59 stay nodes; over every level of every
-type, 292 of 417.
+type, 292 of 417. The fold is computed in thread-safe array work (`BuildingModels.mesh_data`), and
+the meshes are made from its arrays on the main thread (`meshes_from`).
 
 - **Encoding.** Per vertex, `CUSTOM0` is (pivot x, y, z, code) with the code (kind × 4 + easing) × 2
   + phase, the phase 0 to 1 and the kinds and easings in `Motion`'s order (SPIN, SWING, SLIDE;
@@ -1740,8 +1747,8 @@ hologram fence and its shadow; earlier, 63 with the always-visible build bar it 
 those before the environment's curb, terrain outline and outcrops). The panel costs only while
 it is open: a fresh base with it open is 107 draw calls on a full tab (resources, army, defence)
 and 91 on traps, the cards' pictures included (110, 94 and 73 on a walls tab while it had five
-tabs; 100, 86 and 68 before the pictures). The pictures cost one 160×160 render per type, one a
-frame, the first time the panel opens, each read back into a 100 KB texture (about 3 MB for
+tabs; 100, 86 and 68 before the pictures). The pictures cost one 160×160 render per type, built off
+the main thread, in the base's idle frames after boot or the first time the panel opens, each read back into a 100 KB texture (about 3 MB for
 today's menu), and nothing per frame once every type is cached and the preview's viewport is
 freed (`hud.md`, **Pictures**). The model gallery lays out the 259 models (every level of every
 type, each modelled) over two pages of the 48×48 field, whose overviews are 1,097 and 946 draw

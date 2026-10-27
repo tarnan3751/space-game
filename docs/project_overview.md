@@ -332,8 +332,8 @@ any of them can be reversed as a data or model change.
   a badge of the open fields, opens the sector map, a full panel over the base: six field cards
   (the band as a word and a colour, the outpost's Command Center, the loot targets; a cleared field
   stamped and dimmed), Scan with its countdown, a hint to scan when the Command Center has grown,
-  each card with a thumbnail of its outpost (the six laid out one a frame when the map opens,
-  kept per epoch), and a field's detail with a minimap of its outpost and Attack (refused with no
+  each card with a thumbnail of its outpost (the six laid out on worker threads when the map
+  opens, kept per epoch), and a field's detail with a minimap of its outpost and Attack (refused with no
   units). The battle
   takes the field's seed for its landscape and its result is applied once through
   `PlacementController.raid_result` with the expedition key, with toasts, and the map opens again.

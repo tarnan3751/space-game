@@ -106,8 +106,8 @@ it, so a toast shows over it. The place bar and the info panel are anchored to t
 
 ## Top bar
 
-**Meters.** One per resource, 220×36 (`METER_SIZE`), hidden while `state.capacity(res)` is 0, so
-antimatter appears once something stores it. A trough (`TROUGH`, radius 10, its shadow) starts
+**Meters.** One per resource, 220×36 (`METER_SIZE`), hidden while the resource's capacity
+(`state.capacities()`, **Refresh**) is 0, so antimatter appears once something stores it. A trough (`TROUGH`, radius 10, its shadow) starts
 20 px in from the meter's left; inside its border a fill grows from the left to `amount /
 capacity` of the track (full at the cap), resized only on `refresh`. The fill is a `Control`
 with `clip_contents` holding a `TextureRect` that tiles a 16×16 stripe image across the whole
@@ -118,7 +118,7 @@ third. The trough's ink border is drawn again over the fill, so the fill's squar
 cover its round corners. The amount, `"750 / 1,000"` (`Format.short`: in full below a million,
 then `"1.2M"`, `"4M"`, `"12.5M"` and from a thousand million `"1.2B"`, one decimal cut and its `.0`
 dropped, so the widest text fits the label's 180 px; the cards and the info panel keep full
-numbers), sits centred on the
+numbers), set only when the amount or the capacity changed, sits centred on the
 part of the trough right of the icon, in Lilita One 18 px white with a 2 px ink outline. The
 resource's icon (a `HudIcon`, 40×40) sits over the trough's left end like a badge. With the dev
 cheats on (`Hud.cheats`, set by `main.gd`) every meter shows, full, reading `∞` (Lilita One has
@@ -185,7 +185,7 @@ their width), and in place of the renderer's antialiasing a 1 px feather that fa
 along every stroke and shadow. Fills are left hard, since their outlines cover their edges.
 
 **Drone ring.** `DroneRing`, 56×56, at the row's right end: one annular sector per drone
-(`state.builders_total()`; outer radius 26, inner 18), laid out symmetrically round the whole
+(`state.builders_total()`, kept with the capacities, **Refresh**; outer radius 26, inner 18), laid out symmetrically round the whole
 circle from the top, clockwise, with 6 degrees between neighbours, so a lone drone is a ring with
 a seam at the top. Each sector is a closed polygon, at least 8 steps per arc and one per 12
 degrees of a longer one, with a 2.5 px ink outline, over a 2 px ink offset shadow under the whole
@@ -198,11 +198,11 @@ drones are busy" toast and the cards' "No free drone" name the drones.
 
 ## Refresh
 
-`refresh(state, selected_id, placing, ghost_ok, painting)` is called by `main.gd` every tick,
-after every state change, and on every selection change; `painting` is
-`PlacementController.is_painting()`, which turns `Place` into `Done`. It refits the safe area if
-the device's changed (**Safe area**), updates the meters, the drone ring and the Expedition
-button's badge (the field count less the sector's cleared fields), then:
+`refresh(state, selected_id, placing, ghost_ok, painting)` is called by `main.gd` once in a
+frame after the tick or any state change (`main._process`, `input-camera.md`), and on every
+selection change; `painting` is `PlacementController.is_painting()`, which turns `Place` into
+`Done`. It updates the meters, the drone ring and the Expedition button's badge (the field count
+less the sector's cleared fields), each text set only when what it shows changed, then:
 
 - **placing** (painting included) → the build panel closes, Build hides and the place bar shows;
 - **a building selected** (`selected_id` in `state.buildings`) → the build panel closes and the
@@ -211,16 +211,28 @@ button's badge (the field count less the sector's cleared fields), then:
 
 The army panel belongs to the building it opened on: placing, a deselection or the selection of
 another building closes it. The cards are refreshed only while the build panel is open (and when
-it opens), and only the selected tab's. The army panel's content is rebuilt on `BaseState.changed`,
-which the HUD connects to itself from the state `refresh` is given (`_watch`; `main.gd`'s handler,
-connected first, has refreshed by then), and when it opens: the housing line, the cards, the
-queue (copied once by `queue_of` and kept until the next change) and the research line's words. A `refresh` while it is
-open, the one-second tick's included, only counts down (`_tick_army`): it reads the head's
-`training_status` and `training_seconds_left`, or `research_seconds_left`, none of which copies
-anything, and sets the head's or the research line's text only when the value it shows changed. So
-a tick with no state change copies nothing from the state and builds one short string, the new
-time left, while a countdown runs; a tick that changes the state (production paid, a unit trained)
-emits `changed` and rebuilds.
+it opens), and only the selected tab's, the buildings counted by type once for every card's
+"built / max". The army panel's content is rebuilt after `BaseState.changed`, which the HUD
+connects to itself from the state `refresh` is given (`_watch`): a change marks it stale, and the
+next `refresh` (`main.gd`'s, at the end of that frame) rebuilds it once however many changes came;
+and when it opens: the housing line, the cards, the queue (copied once by `queue_of` and kept
+until the next change; its entries set again only when the copy differs from the queue shown) and
+the research line's words. A `refresh` while it is open with nothing changed, the one-second
+tick's, only counts down (`_tick_army`): it reads the head's `training_status` and
+`training_seconds_left`, or `research_seconds_left`, none of which copies anything, and sets the
+head's or the research line's text only when the value it shows changed. So a tick with no state
+change copies nothing from the state and builds one short string, the new time left, while a
+countdown runs; a tick that changes the state (production paid, a unit trained) emits `changed`
+and rebuilds.
+
+What the buildings add up to, the capacities (`state.capacities()`), the builders' total and the
+busy ones, is read once and kept with the `BaseState` and its `buildings_revision`
+(`core-economy.md`) it was read at, until either moves; the production rates
+(`state.production_rates()`), which the meters' flash weighs a rise against, are read once per
+revision and only when a meter rises. So a refresh with no building changed reads none of them
+again. The info panel rebuilds its text only when the building, its level, its target, its
+seconds left, the state, its revision, the army's housing or the stock changed; its upgrade
+button's check (`state.check_upgrade`), which the resources move, runs on every refresh.
 
 `refresh_placing(state, selected_id, placing, ghost_ok, painting)` takes `placing_changed`,
 which fires when placement begins or ends and on every move of the ghost
@@ -292,8 +304,14 @@ emits `build_pressed(type)`; a drag across the strip scrolls it and presses noth
 Wall, the Defence tab's last card, is a card like any other, and placement paints it
 (`input-camera.md`).
 
-**Pictures.** `ModelPreview` renders each type's level 1 model (`BuildingModels.create`) into a
-160×160 texture once and keeps it for the session. It owns one `SubViewport` with a world of its
+**Pictures.** `ModelPreview` renders each type's level 1 model into a 160×160 texture once and
+keeps it for the session. The model is built for its picture alone, outside `BuildingModels`'
+cache, and freed after the readback, and it is built off the main thread: one `WorkerThreadPool`
+task at a time (`ModelPreview.PictureJob`) builds its parts (`BuildingModels.parts_of`) and every
+array of its meshes (`BuildingModels.mesh_data`, the idle moving parts folded in), which read no
+cache, write none and make no resource or node; the main thread only makes the meshes from those
+arrays (`meshes_from`, the kit's materials) and the nodes. The pictures come out byte for byte as a
+main-thread build makes them. It owns one `SubViewport` with a world of its
 own (`own_world_3d`), a transparent background and 4× MSAA: an orthographic camera at the world's
 angle (`IsoCamera.PITCH_DEG`, `YAW_DEG`) framing the model's bounds with 8 % to spare on each
 side, the key light from `main.gd`'s direction and colour with no shadow, and an environment with
@@ -301,21 +319,37 @@ no ambient and linear tonemapping. The models keep the world's toon materials; t
 a copy of the ink material whose `ink_px` is scaled by 720 / 160, so the line is as many pixels on
 the texture as it is on a 720p screen. A moving part stands where `Motion.transform_at(0)` puts
 it, a part folded into the body held at clock 0 (`BuildingModels.hold`, `art-style.md`, **Folded
-parts**). It renders one model a frame, and only while the panel is open: a frame puts the model in front
-of the camera and has the viewport draw once (`UPDATE_ONCE`), the next reads the image back into
-an `ImageTexture`, caches it by type and hands it to the card. Opening the panel, and selecting a
+parts**). It renders one model at a time, only while the panel is open or the base is idle (below):
+the frame that finds a build finished puts the model in front of the camera and has the viewport
+draw once (`UPDATE_ONCE`), the next reads the image back into an `ImageTexture`, caches it by
+type, hands it to the card and starts the next build. A build still running when the preview
+stops is staged when it runs again; leaving the tree waits for it. Opening the panel, and selecting a
 tab while it is open, moves that tab's types to the front of the queue, so the visible cards fill
 first. A card shows no picture, only its stripe, until its own is ready. Once every type is
 cached the viewport is freed and the node stops processing, so the panel costs nothing more per
 frame. A headless run draws nothing: the queue is gone through but no picture is made.
 
 Units' pictures are keyed `ModelPreview.unit_key(unit, tier)` and rendered from
-`UnitModels.create(unit, tier)` the same way, asked for with `request(keys)`, which puts them at
-the queue's front and builds the viewport again if it was freed. The army panel asks for its shown
+`UnitModels.build(unit, tier)` the same way, on the same worker thread (the task also works out the
+extent of the unit's body in the camera's plane, which frames it), asked for with `request(keys)`,
+which puts them at the queue's front and builds the viewport again if it was freed. A unit's
+model, too, is built for its picture alone, outside `UnitModels`' cache, and freed after the
+readback: the texture is all the picture keeps (the battle builds and caches its own meshes). The army panel asks for its shown
 cards' pictures (each unit at its researched level's tier, `UnitModels.tier_of`) when it opens
 and on each refresh, and the preview runs while the build panel or the army panel is open
 (`_run_preview`); a card is blank until its picture comes (`rendered`). The battle's deploy bar
 shares the preview (`Hud.preview()`).
+
+The pictures are also made ahead, in the base's idle frames: `main.gd` calls `prerender(on)`
+when the base turns idle (a second after boot, no drag, nothing being placed, no battle, the
+sector map closed) and when it stops being, and while it is idle the preview runs, one model at a
+time, every unit's picture at its researched tier first (asked for when it turns on), then the
+build cards' in their order. A panel opened after that finds its pictures made; opened before,
+it fills them as it always did. Opening a battle stops the prerender before the battle's HUD runs
+the preview for its deploy cards, so it never stops that run. On the Mac the boot's frames stay
+under 17 ms while they are made but for the preview viewport's first draw, about 40 ms once; the
+base at rest then holds the pictures' textures, about 5.6 MB of video memory, whether or not a
+panel opens.
 
 ## Info panel
 
@@ -371,7 +405,7 @@ containers take none. The close button slides it down and shows the building's i
 still selected. Hidden while closed.
 
 On the training page the header carries a second line under the title, the army's housing
-(`_refresh_housing`, rebuilt with the panel on every `BaseState.changed`): the army's figure
+(`_refresh_housing`, rebuilt with the panel after every `BaseState.changed`): the army's figure
 (`HudIcon` "army", 20×20, the army accent), "Housing 12 / 280" (16 px, `HousingText`:
 `housing_used()` / `housing_capacity()`, `Format.amount`) and after it a bar 120×14
 (`HOUSING_BAR_SIZE`), a meter's trough and ink frame round a flat fill in the army accent with the
@@ -450,14 +484,27 @@ the info panel's shape). Hidden until the Expedition button opens it. It reads `
 | Fields | A card per field of `state.sector_fields()` in a 3×2 grid (`GridContainer`, 16 apart), each filling its cell (360×200 at least): a stripe along its top in the band's colour; a 140×140 thumbnail of its outpost (the minimap's drawing, below, with the buildings as plain fills at that size); the band as a word in Bangers in that colour (easy `MaterialKit.ENERGY` cyan, even `ARMY` orange, hard `DEFENCE` red, any other the accent); "Rival colony · CC N", the outpost's Command Center level; the loot targets, each resource with a target above 0 as its `HudIcon` (28×28) and the amount in its colour ("No loot" when none has one). A cleared field's card is disabled (the disabled fill), its stripe and lines at 55 %, and stamped at its top right with a gold star (60×60, tilted, a lighter facet, ink outline and shadow, drawn as `HudIcon` draws). |
 | Detail | A field's card opens it (`show_field(index)`; a cleared field, or one that is not a field, opens nothing and returns false), with the field already laid out (below), or laid out then if it has not come yet. On the left the **minimap**, 480×480: the field (48×48 cells and one cell of margin) as a field-dark rounded square with an ink outline and a shadow, every building but the traps (hidden) a flat fill in its role's colour inset a little from its footprint, with an ink outline and a shadow: the Command Center violet (`ANTIMATTER`), defences red, storages (deposits among them) gold, other buildings cream (`HULL_LIGHT`), walls a plain grey fill (`HULL_MID`). Drawn with `HudIcon.Pen`, one triangle array, only when the field changes or the map resizes; under 6 px a cell (a card's thumbnail) the buildings are plain fills, which outlines would cover. On the right the field's band, outpost and loot again, what it holds ("N defences   N storages, N of them loot deposits outside the walls   N walls"; traps stay hidden), a legend of the five colours (each a swatch drawn the same way), and at the bottom **Back** (`BarButton`, 140×64), back to the fields, and **ATTACK** (`BuildButton`, 200×64), which emits `attack_pressed(index, field)`. |
 
-**Layouts.** The fields are laid out (`OutpostGenerator.generate`, up to 25 ms for a hard field,
-about 100 ms for the six at Command Center 10) one a frame in `_process` while the map is open,
-each card's thumbnail drawn as its field arrives, and kept for the sector's seed and epoch: a scan
-or another base (Reset, Template) lays them out again. Once all six are in, processing stops and
+**Layouts.** The fields are laid out (`OutpostGenerator.generate_field`, up to 25 ms for a hard
+field, about 100 ms for the six at Command Center 10) off the main thread: one `WorkerThreadPool`
+task per field (`SectorMap.LayoutJob`), started the frame after the map opens, handed the sector's
+seed, epoch, Command Center and a copy of its capacity (never the `BaseState`), and collected in
+`_process` as they finish, one a frame, each card's thumbnail drawn as its field arrives. The
+generator touches only its own state, its own `SeededRng` and the `Catalog`, which nothing writes
+after loading, so a layout is the same, byte for byte, as on the main thread. The fields are kept
+for the sector's seed and epoch: a scan or another base (Reset, Template) lays them out again, and
+a task of an older epoch is collected and dropped. The detail opened before its field arrived
+waits for that field's task, or lays the field out at once when none runs. Closing the map leaves
+the tasks to finish and be collected (none starts while it is closed); leaving the tree waits for
+every one, so quitting with tasks in flight is safe. Once all six are in, processing stops and
 nothing is laid out or drawn per frame.
 
-`open(state)` shows it on the fields; `refresh(state)` fills the cards and the hint (on
-`BaseState.changed` while it is open: a scan, a raid), and sends a detail whose field is no longer
+**Known cost.** The frame the map opens in costs about 13 ms on the Mac: `open()` about 2 ms, the
+panel's first layout and its `HudIcon.Pen` drawings in script about 6 ms, and the base drawn behind
+the panel about 5 ms. The levers (caching the drawings, not drawing the world behind the panel) are
+the UI pass's.
+
+`open(state)` shows it on the fields; `refresh(state)` fills the cards and the hint (after
+`BaseState.changed` while it is open, once in the frame, `main._process`: a scan, a raid), and sends a detail whose field is no longer
 open (cleared, or the epoch moved on) back to the fields; `tick(state)` (the one-second tick) sets
 Scan's countdown, its text only when the seconds changed; `close()` hides it and emits `closed`.
 
@@ -469,7 +516,7 @@ included.
 **Queries for the harness** (on `main.sector_map`): `is_open()`, `is_detail_open()`,
 `detail_index()` (-1 for none) and `detail_field()` (the field laid out); `card(index)` and
 `card_cleared(index)`, whether the stamp shows; `card_lines(index)`, the band, the outpost and each
-loot shown; `scan_button()`, `close_button()`, `back_button()`, `attack_button()`; `hint_shown()`;
+loot shown; `scan_button()`, `close_button()`, `attack_button()`; `hint_shown()`;
 `minimap()`, whose `drawn()` and `walls_drawn()` count what it draws; `card_thumbnail(index)`, a card's
 own (`Minimap` too); `layouts_done()`, whether all six fields are laid out.
 
@@ -482,10 +529,10 @@ safe area, the part of the screen clear of notches and the home indicator.
 coordinates (the viewport's visible rect: 1280×720 on a 16:9 screen under the `canvas_items`
 stretch), by setting its offsets. It pads the build panel's content, and the army panel's, by
 the same inset on the left, the right and the bottom, and sets their height for the screen's.
-`_fit_safe_area`
-fits it to the device (the rect is `Hud.safe_area(viewport)`, static, which `BattleHud` uses too) in `setup`, on `get_viewport().size_changed`, and on every `refresh` (the
-1 s tick's included), since turning a phone over moves the notch to the other side without a
-resize: `DisplayServer.get_display_safe_area()`, in screen pixels, is clipped to the window
+`fit_safe_area`
+fits it to the device (the rect is `Hud.safe_area(viewport)`, static, which `BattleHud` uses too) in `setup`, on `get_viewport().size_changed`, and once a second from `main.gd`'s
+tick (not on every `refresh`), since turning a phone over moves the notch to the other side
+without a resize: `DisplayServer.get_display_safe_area()`, in screen pixels, is clipped to the window
 (`window_get_position`, `window_get_size`), made relative to it, and scaled by the visible
 rect's size over the window's. It is applied only when it differs from the last rect fitted
 this way. On desktop the safe area is the screen's usable rect: while the window lies inside
@@ -519,7 +566,7 @@ the destruction, the stars and each card's count are kept as ints and formatted 
 moves, and the loot is read (`BattleSim.loot()` builds a dictionary) only after a building has
 fallen (`BattleView.falls()`), so a refresh with nothing changed allocates nothing. Queries for
 the harness: `card(unit)`, `card_count(unit)`, `card_picture(unit)`, `timer_text()`,
-`ability_card(ability)`, `ability_count(ability)`, `destruction_text()`, `stars_lit()`, `loot_text(res)`, `speed_button()`, `end_button()`,
+`ability_card(ability)`, `ability_count(ability)`, `destruction_text()`, `stars_lit()`, `speed_button()`, `end_button()`,
 `is_confirm_open()`, `confirm_end_button()`, `keep_button()`, `is_result_open()`,
 `result_lines()`, `return_button()`, `deploy_bar()`, `toast_text()`.
 
@@ -556,9 +603,8 @@ is the top bar's meter for a resource and `resource_fill(res)` its fill, whose p
 `place_button()` is the place bar's `Place` (or `Done`); `drones_panel()` is the `DroneRing`,
 whose `free_count()` and `total_count()` are the counts it shows; `reset_button()` and
 `template_button()` are the debug row's Reset base and Template base, and `practice_button()` its
-Practice raid (null in a release build). `train_card_picture(unit)` is a training card's picture
-(null until rendered); `ui_theme()` and `preview()` hand the theme and the pictures to the battle's
-HUD.
+Practice raid (null in a release build). `ui_theme()` and `preview()` hand the theme and the
+pictures to the battle's HUD.
 The army: `housing_text()`, `housing_bar()` and `housing_fill()` are the training header's
 housing line, its bar (hidden with no Hangar) and the bar's fill, whose parent is the track it
 grows across; `action_button()` is the info panel's Train, Make or Research and `info_detail()` its
