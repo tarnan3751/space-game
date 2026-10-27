@@ -14,8 +14,11 @@ extends CanvasLayer
 ##   press selects it (BattleView.select_unit) or, pressed again, lets it go. The first type is
 ##   selected at the start, cyan with an ink ring inside its border; a type that runs out is let go
 ##   and its card dimmed. Right of it, the abilities bar, the same for each ability brought.
-## - When the battle ends, the result panel: the stars, the destruction, the loot per resource, the
-##   units deployed by type, and Return, which leaves the battle (BattleView.leave).
+## - When the battle ends, the result panel, under the loot pill: a banner, gold for a victory and
+##   red for a defeat, the stars, the destruction, the loot per resource, the units deployed and
+##   the abilities used, each a picture with its count on a chip, and Return, which leaves the
+##   battle (BattleView.leave). It ends inside the safe area: what lies between the banner and
+##   Return scrolls when it would not fit.
 ## - A toast for a refused deploy.
 ##
 ## Everything sits inside the device's safe area (Hud.safe_area), the deploy bar with a column kept
@@ -28,8 +31,17 @@ extends CanvasLayer
 const CARD_SIZE := Vector2(124, 136)
 const PICTURE_SIZE := Vector2(64, 64)
 const STAR_SIZE := Vector2(36, 36)
-const RESULT_STAR_SIZE := Vector2(64, 64)
-const RESULT_PICTURE_SIZE := Vector2(48, 48)
+const RESULT_STAR_SIZE := Vector2(80, 80)
+const RESULT_PICTURE_SIZE := Vector2(64, 64)
+const RESULT_GLYPH_SIZE := Vector2(48, 48)
+## The result panel's width, a loot row's coin and Return.
+const RESULT_WIDTH := 720.0
+const RESULT_COIN := Vector2(40, 40)
+const RETURN_SIZE := Vector2(240, 72)
+## Between the loot pill and the result panel under it.
+const RESULT_GAP := 12
+## How far a count chip reaches past its picture's lower right corner.
+const CHIP_REACH := Vector2(12, 6)
 ## A resource's icon on its coin, in the loot pill (its silhouette HudIcon.COIN_INSET of it, 28 px).
 const ICON_SIZE := Vector2(40, 40)
 ## A star not won yet: dark, but clear of the panel under it.
@@ -71,6 +83,7 @@ var _timer: Label
 var _destruction: Label
 var _stars: Array[HudIcon] = []
 var _loot: Dictionary[String, Label] = {}
+var _loot_pill: PanelContainer
 var _speed_button: Button
 var _end_button: Button
 var _bar: PanelContainer
@@ -93,8 +106,9 @@ var _confirm_backdrop: ColorRect
 var _keep_button: Button
 var _confirm_end_button: Button
 var _result: PanelContainer
+var _result_banner: PanelContainer
+var _result_scroll: ScrollContainer
 var _result_title: Label
-var _result_stars: Array[HudIcon] = []
 var _result_lines: VBoxContainer
 var _return_button: Button
 var _toast: PanelContainer
@@ -214,7 +228,8 @@ func is_result_open() -> bool:
 	return _result.visible
 
 
-## The result panel's title, then every text under the stars in order.
+## The result panel's title, then every text under the banner in order (a count chip's "xN" before
+## the name under its picture).
 func result_lines() -> PackedStringArray:
 	var lines := PackedStringArray([_result_title.text])
 	for label: Node in _result_lines.find_children("*", "Label", true, false):
@@ -270,6 +285,7 @@ func _build_top() -> void:
 		_stars.append(_star(stars, STAR_SIZE))
 
 	var loot := PanelContainer.new()
+	_loot_pill = loot
 	loot.theme_type_variation = &"BattlePanel"
 	loot.mouse_filter = Control.MOUSE_FILTER_STOP
 	_root.add_child(loot)
@@ -441,24 +457,34 @@ func _build_confirm() -> void:
 	buttons.add_child(_confirm_end_button)
 
 
-## The result panel, centred, filled when the battle ends (_show_result).
+## The result panel, under the loot pill, filled when the battle ends (_show_result): the banner,
+## the middle in a scroll that scrolls only when it overflows, and Return (_fit_result).
 func _build_result() -> void:
 	_result = _centred_panel(_root)
+	_result.set_anchors_preset(Control.PRESET_CENTER_TOP)
+	_result.grow_vertical = Control.GROW_DIRECTION_END
+	_result.offset_left = 0
+	_result.offset_right = 0
+	_result.custom_minimum_size.x = RESULT_WIDTH
+	_result.draw.connect(_draw_edge.bind(_result))
 	var column := _result.get_child(0) as VBoxContainer
-	_result_title = _label(column, "", &"InfoTitle")
+	_result_banner = PanelContainer.new()
+	_result_banner.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	column.add_child(_result_banner)
+	_result_title = _label(_result_banner, "", &"BattleBanner")
 	_result_title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	var stars := HBoxContainer.new()
-	stars.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	stars.alignment = BoxContainer.ALIGNMENT_CENTER
-	stars.add_theme_constant_override("separation", 6)
-	column.add_child(stars)
-	for k: int in 3:
-		_result_stars.append(_star(stars, RESULT_STAR_SIZE))
+	_result_scroll = ScrollContainer.new()
+	_result_scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+	_result_scroll.get_v_scroll_bar().theme_type_variation = &"BattleScrollBar"
+	column.add_child(_result_scroll)
 	_result_lines = VBoxContainer.new()
 	_result_lines.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	_result_lines.add_theme_constant_override("separation", 6)
-	column.add_child(_result_lines)
-	_return_button = _button("Return", Vector2(200, 64), &"ConfirmButton")
+	_result_lines.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	_result_lines.add_theme_constant_override("separation", 10)
+	_result_scroll.add_child(_result_lines)
+	# A strip that wraps knows its height only once laid out, so the panel is fitted again then.
+	_result_lines.minimum_size_changed.connect(_fit_result, CONNECT_DEFERRED)
+	_return_button = _button("Return", RETURN_SIZE, &"BattleCommitButton")
 	_return_button.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
 	_return_button.pressed.connect(func() -> void: _view.leave())
 	column.add_child(_return_button)
@@ -551,59 +577,114 @@ func _show_result(result: Dictionary) -> void:
 	_speed_button.disabled = true
 	var stars := int(result.get("stars", 0))
 	_result_title.text = "Victory!" if stars > 0 else "Defeat"
-	for k: int in _result_stars.size():
-		_light(_result_stars[k], k < stars)
-	_label(_result_lines, "%d%% destruction" % int(result.get("destruction", 0)), &"InfoDetail") \
-		.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	var loot_row := HBoxContainer.new()
-	loot_row.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	loot_row.alignment = BoxContainer.ALIGNMENT_CENTER
-	loot_row.add_theme_constant_override("separation", 18)
-	_result_lines.add_child(loot_row)
+	_result_banner.theme_type_variation = &"BattleBannerVictory" if stars > 0 else &"BattleBannerDefeat"
+	# The stars over the destruction, beside the loot.
+	var top := HBoxContainer.new()
+	top.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	top.alignment = BoxContainer.ALIGNMENT_CENTER
+	top.add_theme_constant_override("separation", 48)
+	_result_lines.add_child(top)
+	var score := VBoxContainer.new()
+	score.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	score.add_theme_constant_override("separation", 0)
+	top.add_child(score)
+	var star_row := _row(score, 6)
+	for k: int in 3:
+		_light(_star(star_row, RESULT_STAR_SIZE), k < stars)
+	var destruction := _row(score, 8)
+	_label(destruction, "%d%%" % int(result.get("destruction", 0)), &"BattleResultFigure")
+	_label(destruction, "destruction", &"BattleDim").size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	var loot_rows := VBoxContainer.new()
+	loot_rows.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	loot_rows.alignment = BoxContainer.ALIGNMENT_CENTER
+	loot_rows.add_theme_constant_override("separation", 6)
+	top.add_child(loot_rows)
 	var loot: Dictionary = result.get("loot", {})
 	for res: String in _catalog.resources:
-		_resource_row(loot_row, res, Format.short(int(loot.get(res, 0))), ICON_SIZE, &"BattleAmount")
+		_resource_row(loot_rows, res, "+" + Format.short(int(loot.get(res, 0))), RESULT_COIN, &"BattleLoot")
 	var deployed: Dictionary = result.get("deployed", {})
-	if deployed.is_empty():
-		_label(_result_lines, "No units deployed", &"CardCount").horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	else:
-		_label(_result_lines, "Units deployed", &"CardCount").horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-		var units := HBoxContainer.new()
-		units.mouse_filter = Control.MOUSE_FILTER_IGNORE
-		units.alignment = BoxContainer.ALIGNMENT_CENTER
-		units.add_theme_constant_override("separation", 14)
-		_result_lines.add_child(units)
+	_heading("Units deployed" if not deployed.is_empty() else "No units deployed")
+	if not deployed.is_empty():
+		var units := _flow()
 		for unit: String in deployed:
-			var cell := VBoxContainer.new()
-			cell.mouse_filter = Control.MOUSE_FILTER_IGNORE
-			cell.add_theme_constant_override("separation", 0)
-			units.add_child(cell)
-			var picture := _picture(cell, RESULT_PICTURE_SIZE)
+			var picture := TextureRect.new()
+			picture.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+			picture.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
 			picture.texture = _preview.texture_of(_keys.get(unit, ""))
-			_label(cell, "%s x%d" % [_catalog.unit_name(unit), int(deployed[unit])], &"CardCost") \
-				.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+			_tally(units, picture, RESULT_PICTURE_SIZE, int(deployed[unit]), _catalog.unit_name(unit))
 	var used: Dictionary = result.get("abilities_used", {})
 	if not used.is_empty():
-		_label(_result_lines, "Abilities used", &"CardCount").horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-		var abilities := HBoxContainer.new()
-		abilities.mouse_filter = Control.MOUSE_FILTER_IGNORE
-		abilities.alignment = BoxContainer.ALIGNMENT_CENTER
-		abilities.add_theme_constant_override("separation", 14)
-		_result_lines.add_child(abilities)
+		_heading("Abilities used")
+		var abilities := _flow()
 		for ability: String in used:
-			var cell := VBoxContainer.new()
-			cell.mouse_filter = Control.MOUSE_FILTER_IGNORE
-			cell.add_theme_constant_override("separation", 0)
-			abilities.add_child(cell)
 			var glyph := HudIcon.new()
-			glyph.mouse_filter = Control.MOUSE_FILTER_IGNORE
-			glyph.custom_minimum_size = RESULT_PICTURE_SIZE
-			glyph.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
-			cell.add_child(glyph)
 			Hud.show_ability_glyph(glyph, _catalog, ability)
-			_label(cell, "%s x%d" % [_catalog.ability_name(ability), int(used[ability])], &"CardCost") \
-				.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+			_tally(abilities, glyph, RESULT_GLYPH_SIZE, int(used[ability]), _catalog.ability_name(ability))
 	_result.show()
+	_fit_result()
+
+
+## A centred heading in the result panel.
+func _heading(text: String) -> void:
+	_label(_result_lines, text, &"BattleHeading").horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+
+
+## A centred row in the result panel that wraps when its cells do not fit across.
+func _flow() -> HFlowContainer:
+	var flow := HFlowContainer.new()
+	flow.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	flow.alignment = FlowContainer.ALIGNMENT_CENTER
+	flow.add_theme_constant_override("h_separation", 24)
+	flow.add_theme_constant_override("v_separation", 8)
+	_result_lines.add_child(flow)
+	return flow
+
+
+## A cell of `flow`: `picture` (a picture or a glyph) `picture_size` across, its count `count` on a
+## chip at its lower right corner, and `title` under it.
+func _tally(flow: Control, picture: Control, picture_size: Vector2, count: int, title: String) -> void:
+	var cell := VBoxContainer.new()
+	cell.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	# Room under the picture for its chip, clear of the title.
+	cell.add_theme_constant_override("separation", int(CHIP_REACH.y) + 3)
+	flow.add_child(cell)
+	var holder := Control.new()
+	holder.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	holder.custom_minimum_size = picture_size
+	holder.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
+	cell.add_child(holder)
+	picture.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	holder.add_child(picture)
+	picture.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	var chip := PanelContainer.new()
+	chip.theme_type_variation = &"BattleChip"
+	chip.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	holder.add_child(chip)
+	chip.set_anchors_preset(Control.PRESET_BOTTOM_RIGHT)
+	chip.grow_horizontal = Control.GROW_DIRECTION_BEGIN
+	chip.grow_vertical = Control.GROW_DIRECTION_BEGIN
+	chip.offset_left = CHIP_REACH.x
+	chip.offset_right = CHIP_REACH.x
+	chip.offset_top = CHIP_REACH.y
+	chip.offset_bottom = CHIP_REACH.y
+	_label(chip, "x%d" % count, &"BattleChipText")
+	_label(cell, title, &"BattleCardName").horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+
+
+## A centred row of `separation` under `parent`.
+func _row(parent: Control, separation: int) -> HBoxContainer:
+	var row := HBoxContainer.new()
+	row.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	row.alignment = BoxContainer.ALIGNMENT_CENTER
+	row.add_theme_constant_override("separation", separation)
+	parent.add_child(row)
+	return row
+
+
+## A panel's light inner line, just inside its ink border, as the base HUD's panels have.
+func _draw_edge(panel: Control) -> void:
+	panel.draw_style_box(panel.get_theme_stylebox(&"edge", &"BattlePanel"),
+		Rect2(Vector2.ZERO, panel.size).grow(-Hud.BORDER))
 
 
 # --- Presses --------------------------------------------------------------------------
@@ -720,6 +801,24 @@ func _fit() -> void:
 	_scroll.custom_minimum_size.x = minf(_cards_width, maxf(room - abilities, CARD_SIZE.x))
 	_ability_bar.offset_left = Hud.MARGIN + _scroll.custom_minimum_size.x + margins + BAR_GAP
 	_ability_bar.offset_right = _ability_bar.offset_left
+	_fit_result()
+
+
+## The result panel RESULT_GAP under the loot pill, its middle as tall as its content up to what
+## leaves Return MARGIN above the safe area's bottom; past that the middle scrolls.
+func _fit_result() -> void:
+	if not _result.visible:
+		return
+	_result.offset_top = Hud.MARGIN + _loot_pill.get_combined_minimum_size().y + RESULT_GAP
+	var panel := _result.get_theme_stylebox(&"panel")
+	var column := _result.get_child(0) as VBoxContainer
+	var fixed := panel.get_margin(SIDE_TOP) + panel.get_margin(SIDE_BOTTOM) \
+		+ _result_banner.get_combined_minimum_size().y + _return_button.get_combined_minimum_size().y \
+		+ 2 * column.get_theme_constant(&"separation")
+	var room := _root.size.y - _result.offset_top - Hud.MARGIN - fixed
+	_result_scroll.custom_minimum_size.y = maxf(minf(_result_lines.get_combined_minimum_size().y, room), 0.0)
+	# Shrink to the new height too, not only grow.
+	_result.offset_bottom = _result.offset_top
 
 
 # --- Pieces -------------------------------------------------------------------------

@@ -37,8 +37,9 @@ extends HarnessScenario
 ## was deployed and something fell; `finished` brought the base back (its view and input in the
 ## tree, its HUD shown, the toast "Practice: nothing applied", the camera where it was), and the
 ## base's save is as it was but for its clock. Last, a practice battle bringing one of every unit
-## type and every ability: both bars end left of the Build column (the deploy bar scrolls), then
-## End and Return.
+## type and every ability: both bars end left of the Build column (the deploy bar scrolls); one of
+## each deployed and each ability cast, then End: the result panel lists them all and Return ends
+## inside the safe area (the panel's middle scrolls when it would not fit), then Return.
 
 ## Each ability brought, two of each.
 const ABILITIES_EACH := 2
@@ -268,8 +269,11 @@ func run(main: MainScript) -> void:
 		await frames(1)
 	await frames(4)
 	var lines := hud.result_lines()
-	check(lines.has("Abilities used") and lines.has("Orbital Strike x1") and lines.has("EMP Burst x1")
-		and lines.has("Repair Swarm x1"), "the result panel lists the abilities used")
+	# Each ability's name under its glyph, after the "x1" on its chip.
+	var listed := lines.has("Abilities used")
+	for name: String in ["Orbital Strike", "EMP Burst", "Repair Swarm"]:
+		listed = listed and lines.find(name) > 0 and lines[lines.find(name) - 1] == "x1"
+	check(listed, "the result panel lists the abilities used")
 	check(hud.is_result_open() and not hud.deploy_bar().visible, "the result panel replaces the deploy bar: %s"
 		% ", ".join(hud.result_lines()))
 	await screenshot("end")
@@ -327,9 +331,32 @@ func run(main: MainScript) -> void:
 		% [every.size(), three.size(), bar.end.x, abilities.position.x, abilities.end.x, column])
 	await screenshot("every-type")
 	main.battle.finished.connect(func(_setup: Dictionary, _result: Dictionary) -> void: _finished = true)
+	var cell := Vector2i(-1, -1)
+	for y: int in catalog.grid_size.y:
+		for x: int in catalog.grid_size.x:
+			if cell.x < 0 and not main.battle.is_masked(Vector2i(x, y)):
+				cell = Vector2i(x, y)
+	var refused := 0
+	for unit: String in every:
+		refused += 0 if main.battle.deploy(unit, cell) == "" else 1
+	for ability: String in three:
+		refused += 0 if main.battle.cast(ability, cell) == "" else 1
+	check(refused == 0, "one of every type deployed and every ability cast at %s (%d refused)" % [cell, refused])
 	main.battle_hud.end_button().pressed.emit()
 	main.battle_hud.confirm_end_button().pressed.emit()
-	await frames(2)
+	await frames(4)
+	var every_lines := main.battle_hud.result_lines()
+	var named := 0
+	for unit: String in every:
+		named += 1 if every_lines.has(catalog.unit_name(unit)) else 0
+	for ability: String in three:
+		named += 1 if every_lines.has(catalog.ability_name(ability)) else 0
+	var back := main.battle_hud.return_button().get_global_rect()
+	check(main.battle_hud.is_result_open() and named == every.size() + three.size()
+		and back.end.y <= safe.end.y,
+		"the result lists all %d types and abilities (%d) and Return ends at y %.0f, inside the safe area's %.0f"
+		% [every.size() + three.size(), named, back.end.y, safe.end.y])
+	await screenshot("result-every-type")
 	main.battle_hud.return_button().pressed.emit()
 	while not _finished:
 		await frames(1)

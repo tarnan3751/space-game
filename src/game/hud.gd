@@ -2673,6 +2673,41 @@ func _make_theme() -> Theme:
 	# The End confirmation: its title, and Keep fighting, the safe choice, in cyan.
 	_label_variation(ui, &"BattleTitle", 30, TEXT, 0, DISPLAY_FONT)
 	_button_variation(ui, &"BattleConfirmButton", ACCENT, 12, DISPLAY_FONT, 24, 0, INK)
+	# The result panel: its light inner line (`edge`, drawn by the panel), the banner gold for a
+	# victory and red for a defeat with its title in ink, the figures, the loot, the headings, the
+	# count chips on the pictures, and Return, gold.
+	var edge := StyleBoxFlat.new()
+	edge.draw_center = false
+	edge.border_color = EDGE_LIGHT
+	edge.set_border_width_all(1)
+	edge.set_corner_radius_all(12 - BORDER)
+	ui.set_stylebox("edge", &"BattlePanel", edge)
+	for banner: StringName in [&"BattleBannerVictory", &"BattleBannerDefeat"]:
+		var band := _shape(GOLD if banner == &"BattleBannerVictory" else MaterialKit.DEFENCE, 12, 4.0)
+		ui.set_type_variation(banner, &"PanelContainer")
+		ui.set_stylebox("panel", banner, band)
+	_label_variation(ui, &"BattleBanner", 48, INK, 0, DISPLAY_FONT)
+	_label_variation(ui, &"BattleResultFigure", 40, TEXT, 0, DISPLAY_FONT)
+	_label_variation(ui, &"BattleLoot", 24, TEXT, 0)
+	_label_variation(ui, &"BattleHeading", 19, TEXT_DIM, 0)
+	var chip := _flat(CARD_DISABLED, 10)
+	chip.border_color = INK
+	chip.set_border_width_all(roundi(CHIP_RING))
+	chip.content_margin_left = CHIP_PAD.x + CHIP_RING
+	chip.content_margin_right = CHIP_PAD.x + CHIP_RING
+	chip.content_margin_top = CHIP_PAD.y
+	chip.content_margin_bottom = CHIP_PAD.y
+	ui.set_type_variation(&"BattleChip", &"PanelContainer")
+	ui.set_stylebox("panel", &"BattleChip", chip)
+	_label_variation(ui, &"BattleChipText", 17, TEXT, 0)
+	_button_variation(ui, &"BattleCommitButton", GOLD, 12, DISPLAY_FONT, 24, 0, INK)
+	# The result's middle scrolls when it overflows: the card strip's bar, upright.
+	ui.set_type_variation(&"BattleScrollBar", &"VScrollBar")
+	ui.set_stylebox("scroll", &"BattleScrollBar", track)
+	ui.set_stylebox("scroll_focus", &"BattleScrollBar", track)
+	ui.set_stylebox("grabber", &"BattleScrollBar", _flat(TEXT_DIM, 4))
+	ui.set_stylebox("grabber_highlight", &"BattleScrollBar", _flat(TEXT, 4))
+	ui.set_stylebox("grabber_pressed", &"BattleScrollBar", _flat(ACCENT, 4))
 	return ui
 
 
