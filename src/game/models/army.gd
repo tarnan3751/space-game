@@ -198,9 +198,11 @@ const PATROL_RATE := 4.0 * 0.3 * Figures.COLONIST_HEIGHT * PATROL_SCALE * sin(Ri
 const ROOF_DISH_SWEEP := 35.0
 const ROOF_DISH_PERIOD := 4.0
 const CADET_RATE := 1.6
-const TROLLEY_TRAVEL := 0.24
+const TROLLEY_TRAVEL := 0.18
 const TROLLEY_PERIOD := 3.0
 const PRESS_STROKE := 0.22
+## The anvils' x, out past the hall's top band (its corner 0.584 out), so the heads clear it.
+const ANVIL_X := 0.92
 const PRESS_PERIOD := 1.5
 const TELESCOPE_NOD := 16.0
 const TELESCOPE_PERIOD := 4.0
@@ -273,7 +275,8 @@ static func build_hangar(p: Parts, level: int) -> void:
 	if level >= 10:
 		_crown_beacon(m, cab + Vector3(0.12, 0.6, -0.1), 0.62)
 	else:
-		_mast(m, cab + Vector3(0.12, 0.6, -0.1), 0.3 + 0.03 * level, GLOW)
+		# From 6 the bigger radar's sweep would reach the mast: it stands further back on the cab.
+		_mast(m, cab + (Vector3(0.2, 0.6, -0.18) if level >= 6 else Vector3(0.12, 0.6, -0.1)), 0.3 + 0.03 * level, GLOW)
 	if level >= 4:
 		# From 4 the radar turning on the cab's roof, clear of the mast, bigger from 6 (to 3 the
 		# big roof dish is the hangar's sweep, in its place).
@@ -511,9 +514,13 @@ static func _vault(p: Parts, back: Vector3, width: float, length: float, wall: f
 		rib = FILIGREE_ROUND
 	elif chrome and not obsidian:
 		rib = Parts.CYAN_STRIP
+	# The ribs run down the walls to the pad and stop there: their arc reaches past the half the roof
+	# takes by the angle at which their inner edge meets the pad, the wall's height below the axis.
+	var reach := rad_to_deg(asin(minf(1.0, wall / (radius - 0.02))))
 	for k: int in 3:
 		var rib_z := back.z + length * (0.18 + 0.32 * k)
-		m.ring(radius - 0.02, radius + 0.07, 0.14, 24, Vector3(back.x, axis.y, rib_z), rib, Vector3(90, 0, 0))
+		m.ring(radius - 0.02, radius + 0.07, 0.14, 24, Vector3(back.x, axis.y, rib_z), rib, Vector3(90, 0, 0),
+			180.0 - reach, 360.0 + reach)
 	if chrome:
 		m.box(Vector3(0.02, 0.07, length - 0.1), Vector3(back.x + width * 0.5 + 0.005, back.y + wall - 0.17, back.z + length * 0.5),
 			_glow(p.tier))
@@ -543,8 +550,9 @@ static func _vault(p: Parts, back: Vector3, width: float, length: float, wall: f
 		var x := -door * 0.5 + leaf * (i + 0.5)
 		leaves.box_chamfered(Vector3(leaf - 0.03, height, 0.08), 0.02, at + Vector3(x, 0, 0.04), Parts.VEINS if obsidian else DARK_PLATE)
 	leaves.box_chamfered(Vector3(door, 0.26, 0.1), 0.03, at + Vector3(0, 0, 0.05), Parts.HAZARD)
+	# The posts stop under the lintel, so their faces never share its planes.
 	for side: float in [-1.0, 1.0]:
-		m.box_chamfered(Vector3(0.16, height + 0.14, 0.16), 0.04, Vector3(back.x + side * post, back.y, z + 0.08),
+		m.box_chamfered(Vector3(0.16, height, 0.16), 0.04, Vector3(back.x + side * post, back.y, z + 0.08),
 			Parts.HAZARD)
 	m.box_chamfered(Vector3(door + 0.32, 0.14, 0.18), 0.04, Vector3(back.x, back.y + height, z + 0.09),
 		Parts.GOLD_TRIM if p.tier >= Parts.Tier.GOLD else ORANGE)
@@ -643,8 +651,9 @@ static func build_cadet_academy(p: Parts, level: int) -> void:
 	if level >= 6:
 		# A band of light between the window rows, over the door's posts; from the Obsidian tier
 		# vein strips down the front between the windows.
-		m.box(Vector3(2.4, 0.05, 0.02), Vector3(0, yard + 0.6, front + 0.005), _glow(p.tier))
-		m.box(Vector3(0.02, 0.05, 0.76), Vector3(1.305, yard + 0.6, -0.92), _glow(p.tier))
+		# A step proud of the windows it crosses, so their faces never share a plane.
+		m.box(Vector3(2.4, 0.05, 0.04), Vector3(0, yard + 0.6, front + 0.005), _glow(p.tier))
+		m.box(Vector3(0.04, 0.05, 0.76), Vector3(1.305, yard + 0.6, -0.92), _glow(p.tier))
 		if obsidian:
 			for x: float in [-1.04, -0.78, 0.61]:
 				m.box(Vector3(0.04, walls - 0.12, 0.02), Vector3(x, g + 0.03, front + 0.006), Parts.VEINS)
@@ -907,7 +916,8 @@ static func build_fabricator(p: Parts, level: int) -> void:
 				CYAN_LAMP.phased(Parts.chase(i, 5)))
 	# The loading dock, its crates and, from 7, the finished product.
 	m.box_chamfered(Vector3(0.8, 0.2, 0.9), 0.04, Vector3(0.85, g, 0.72), ARMOUR)
-	m.box(Vector3(0.8, 0.04, 0.1), Vector3(0.85, g + 0.2, 1.12), Parts.HAZARD)
+	# The dock's front stripe runs between the crane's legs, its ends inside them.
+	m.box(Vector3(0.42, 0.04, 0.1), Vector3(0.85, g + 0.2, 1.12), Parts.HAZARD)
 	if level >= 7:
 		_hover_tank(m, Vector3(0.85, g + 0.2, 0.66), p.tier)
 	else:
@@ -941,7 +951,8 @@ static func build_fabricator(p: Parts, level: int) -> void:
 		# Violet veins on the faces the camera sees, a violet band round the top.
 		m.box(Vector3(0.65, tall - 0.1, 0.02), furnace + Vector3(0, 0.05, 0.401), Parts.VEINS)
 		m.box(Vector3(0.02, tall - 0.1, 0.65), furnace + Vector3(0.401, 0.05, 0), Parts.VEINS)
-		m.lathe(PackedVector2Array([Vector2(0.58, 0), Vector2(0.58, 0.05)]), 4, furnace + Vector3(0, tall - 0.08, 0), VIOLET_RIB,
+		# A step proud of the vein panels, so their faces never share a plane.
+		m.lathe(PackedVector2Array([Vector2(0.6, 0), Vector2(0.6, 0.05)]), 4, furnace + Vector3(0, tall - 0.08, 0), VIOLET_RIB,
 			Vector3(0, 45, 0))
 	# Two fat stacks side by side.
 	var stacks: Array[Vector3] = [Vector3(0.65, 0, -1.06), Vector3(1.05, 0, -0.64)]
@@ -1065,9 +1076,11 @@ static func build_heavy_fabricator(p: Parts, level: int) -> void:
 	m.box(Vector3(0.2, 0.02, 0.72), mouth + Vector3(0, 0.06, 0.42), CRYSTAL_POUR if obsidian else POUR)
 	m.box(Vector3(0.08, 0.02, 0.72), mouth + Vector3(0, 0.07, 0.42), HOT_CRYSTAL_POUR if obsidian else HOT_POUR)
 	# The press arms, striking in turn.
-	_press_arm(p, Vector3(-0.15, g + 1.0, 0.1), Vector3(0.88, g, 0.85), 0.0)
+	# The anvils stand far enough out that the heads clear the hall's top band at the top of their
+	# stroke.
+	_press_arm(p, Vector3(-0.15, g + 1.0, 0.1), Vector3(ANVIL_X, g, 0.85), 0.0)
 	if level >= 2:
-		_press_arm(p, Vector3(-0.15, g + 1.0, -0.95), Vector3(0.88, g, -0.85), 0.5)
+		_press_arm(p, Vector3(-0.15, g + 1.0, -0.95), Vector3(ANVIL_X, g, -0.85), 0.5)
 	# Exhausts: one stack, a cluster of three at 3, taller and collared from 4, four at 5, each
 	# smoking (crystal-lit from the Obsidian tier).
 	var gold := p.tier >= Parts.Tier.GOLD
@@ -1086,7 +1099,7 @@ static func build_heavy_fabricator(p: Parts, level: int) -> void:
 		_stack(m, foot, stacks[i][1], height, gold, collar)
 		Parts.puffs(m, foot + Vector3(0, height, 0), 0.29 * i, 4, 8, 3, CRYSTAL_SMOKE if obsidian else Parts.SMOKE)
 	if level >= 7:
-		for anvil: Vector3 in [Vector3(0.88, g, 0.85), Vector3(0.88, g, -0.85)]:
+		for anvil: Vector3 in [Vector3(ANVIL_X, g, 0.85), Vector3(ANVIL_X, g, -0.85)]:
 			# A forge ring hovering round the press's ram over the head's path, clear of the hall's
 			# top.
 			var ring := anvil + Vector3(0, 1.16, 0)
@@ -1108,7 +1121,8 @@ static func _press_arm(p: Parts, shoulder: Vector3, anvil: Vector3, phase: float
 	var elbow := Vector3(anvil.x, shoulder.y + 1.0, anvil.z)
 	m.prism(0.26, 0.26, 0.46, 16, pivot + Vector3(0, 0, -0.23), Parts.GUNMETAL, Vector3(90, 0, 0))
 	Parts.beam(m, pivot, elbow, 0.36, ORANGE, 0.07)
-	Parts.pipe(m, shoulder + Vector3(0.2, 0.24, 0), elbow + Vector3(-0.1, -0.26, 0), 0.08, HULL_ROUND)
+	# The hydraulic line ends in the ram's wall, clear of the piston sliding inside it.
+	Parts.pipe(m, shoulder + Vector3(0.2, 0.24, 0), elbow + Vector3(-0.2, -0.26, 0), 0.08, HULL_ROUND)
 	m.prism(0.25, 0.25, 0.44, 16, elbow + Vector3(0, 0, -0.22), Parts.GUNMETAL, Vector3(90, 0, 0))
 	Parts.pipe(m, elbow, anvil + Vector3(0, 1.28, 0), 0.16, Parts.GUNMETAL)
 	# The head strikes the anvil's face (0.3 up) and lifts PRESS_STROKE twice over, its piston
@@ -1120,10 +1134,12 @@ static func _press_arm(p: Parts, shoulder: Vector3, anvil: Vector3, phase: float
 	head.box(Vector3(0.62, 0.08, 0.62), Vector3(0, 0.04, 0), Parts.GOLD_TRIM if p.tier >= Parts.Tier.GOLD else Parts.HAZARD)
 	m.box_chamfered(Vector3(0.6, 0.3, 0.6), 0.05, anvil, Parts.GUNMETAL)
 	m.box(Vector3(0.62, 0.06, 0.62), anvil + Vector3(0, 0.2, 0), Parts.HAZARD)
+	# The sparks fly from the anvil's hazard band, rooted in its face, clear of the head's strike.
 	for k: int in 6:
 		var degrees := 15.0 + 60.0 * k
 		var out := Parts.around(1.0, degrees, 0.5 + 0.2 * (k % 3))
-		m.cone(0.035, 0.16, 8, anvil + Parts.around(0.36, degrees, 0.3),
+		var face := 0.3 / maxf(absf(cos(deg_to_rad(degrees))), absf(sin(deg_to_rad(degrees))))
+		m.cone(0.035, 0.16, 8, anvil + Parts.around(face, degrees, 0.22),
 			(VIOLET_SPARK if p.tier >= Parts.Tier.CROWN else SPARK).phased(fposmod(phase + k / 6.0 + 0.04, 1.0)), Parts.facing(out))
 
 
@@ -1291,6 +1307,9 @@ static func _lab_tower(p: Parts, foot: Vector3, level: int) -> void:
 	# mast, towards the camera, so it never meets the dish's sweep.
 	var telescope := p.moving(centre, Motion.swing(across, TELESCOPE_NOD, TELESCOPE_PERIOD))
 	var aim := Vector3(-0.42, 0.8, 0.42).normalized()
+	if level >= 10:
+		# Leaning lower over the core beacon on the dome's crown, so its nod clears it.
+		aim = Vector3(-0.5, 0.71, 0.5).normalized()
 	Parts.pipe(telescope, aim * 0.35, aim * 1.25, 0.12, Parts.CHROME_ROUND)
 	telescope.ring(0.09, 0.16, 0.12, 16, aim * 1.1, ORANGE_ROUND, Parts.facing(aim))
 	if obsidian:
@@ -1549,8 +1568,9 @@ static func _vat(m: LowPolyMesh, foot: Vector3, radius: float, height: float, ti
 		var across := Vector3(-drift.z, 0, drift.x).normalized()
 		var ends := radius - BUBBLE_SIZE - 0.005
 		var middle := across * sqrt(ends * ends - drift.length_squared() * 0.25)
+		# The second a size smaller: half a cycle apart, they would otherwise be one shape twice.
 		for k: int in 2:
-			m.orb(BUBBLE_SIZE, 8, 2, foot + middle - drift * 0.5 + Vector3(0, start, 0),
+			m.orb(BUBBLE_SIZE * (1.0 - 0.15 * k), 8, 2, foot + middle - drift * 0.5 + Vector3(0, start, 0),
 				BUBBLE.phased(fposmod(0.37 * index + 0.5 * k, 1.0)))
 	var upper := band + lit
 	var top := height - upper
@@ -1671,7 +1691,8 @@ static func build_drydock(p: Parts, level: int) -> void:
 			m.disc(0.14, 16, Vector3(stern - 0.125, axis_y - 0.1, z), GLOW_PULSE.phased(0.25), -lie)
 	# The gantries, each with a welder reaching down to the hull. The first rides rails along
 	# the dock, where the hull's radius hardly changes, so its welder stays on the hull.
-	var tops: Array[float] = [1.95, 1.95, 2.3, 2.55, 2.75, 2.9, 3.05]
+	# To 2 high enough that the first gantry's cab rides clear of the bare ribs' tops.
+	var tops: Array[float] = [2.07, 2.07, 2.3, 2.55, 2.75, 2.9, 3.05]
 	var top := g + tops[clampi(level, 1, 7) - 1]
 	var rails: Array[float] = [-1.6, 1.6]
 	if level >= 3:
@@ -1735,10 +1756,12 @@ static func build_drydock(p: Parts, level: int) -> void:
 		else:
 			_weld(crane, spot, phase, CYAN_SPARK_ARC if chrome else SPARK_ARC)
 	# The control booth in the front corner.
-	var booth := Vector3(-1.45, g, 1.4)
+	# Far enough out that the first gantry's foot (to 2) clears it at the end of its slide, its mast
+	# on its outer end, clear of the welder bots' slide (from 6).
+	var booth := Vector3(-1.5, g, 1.4)
 	m.box_chamfered(Vector3(0.5, 0.45, 0.4), 0.05, booth, _plating(p.tier, Parts.HULL_LIGHT))
 	m.box_chamfered(Vector3(0.4, 0.16, 0.03), 0.01, booth + Vector3(0, 0.24, 0.2), Parts.GLASS)
-	_mast(m, booth + Vector3(0.12, 0.45, -0.08), 0.35, GLOW)
+	_mast(m, booth + Vector3(-0.12, 0.45, -0.08), 0.35, GLOW)
 	if level >= 6:
 		# Welder bots working along the hull's flank to the camera (+Z), clear of the gantries'
 		# beams and welders, sliding along it over its fat middle: from 6 one low, its torch up at
@@ -1770,7 +1793,8 @@ static func _engine_bank(m: LowPolyMesh, stern: Vector3, scale: float, tier: int
 		var bell := stern + spec * scale
 		m.prism(0.11, 0.16, 0.24, 16, bell + Vector3(-0.02, 0, 0), _plating(tier, Parts.GUNMETAL, true), out)
 		m.ring(0.16, 0.185, 0.06, 16, bell + Vector3(-0.2, 0, 0), _glow(tier), out)
-		m.disc(0.13, 16, bell + Vector3(-0.261, 0, 0), GLOW_PULSE.phased(0.25), out)
+		# The glow a step inside the bell's mouth, clear of its rim's plane.
+		m.disc(0.13, 16, bell + Vector3(-0.25, 0, 0), GLOW_PULSE.phased(0.25), out)
 	if level < 7:
 		return
 	# Gold fins: two up and out over the stern, two out to the sides and down.
@@ -1953,7 +1977,9 @@ static func build_alliance_beacon(p: Parts, level: int) -> void:
 			m.ring(radius - 0.01, radius + 0.06, 0.07, 24, Vector3(0, y - 0.13, 0), _glow(p.tier).phased(k / 8.0))
 	# The big dish facing out from the tower on a collar that turns about it, between the rings
 	# of lights at every level, so the dish circles the tower slowly; bigger from 5.
-	var collar := lerpf(base, crown_width, seat) * 1.42 + 0.1
+	# The collar a little wider than the rings of lights, so the dish's arm, rooted in it, clears the
+	# legs' outer edges as it turns.
+	var collar := lerpf(base, crown_width, seat) * 1.42 + 0.14
 	var dish := p.moving(Vector3(0, mount, 0), Motion.spin(Vector3.UP, BEACON_DISH_RATE))
 	dish.ring(collar - 0.12, collar, 0.12, 24, Vector3(0, -0.06, 0), Parts.CHROME_ROUND if chrome else HULL_ROUND)
 	Parts.beam(dish, Vector3(collar - 0.02, 0, 0), Vector3(collar + 0.2, 0, 0), 0.16, Parts.CHROME if chrome else Parts.GUNMETAL)
