@@ -156,7 +156,9 @@ The view stays on the field after the end, its last effects finishing, until `le
 `BattleUnits` draws every unit of a type from one MultiMesh of its body and one of its outline
 (`UnitModels.meshes(type, tier)`, in the tier of the attacker's level), with colours and custom
 data, sized to the type's count in the army; units not yet deployed or gone are left out with
-`visible_instance_count`. Each frame it writes one buffer a type and hands it to both. A unit has no
+`visible_instance_count`. Each frame it writes one buffer a type and hands it to both, while the
+type draws a unit or drew one the frame before (that last hand-over empties it): a type with none
+drawn two frames running, as every type once its army is gone, uploads nothing. A unit has no
 moving part (`UnitModels.MAX_MOVING` is 0); the gunship's rotors are spun by the shaders
 (`LowPolyMesh.spin`, `art-style.md`), and a rigged model's parts moved by them (the rig,
 `art-style.md`, **Rig**: legs, arms, wheels, guns, banks and bay doors).
@@ -243,8 +245,13 @@ moving part (`UnitModels.MAX_MOVING` is 0); the gunship's rotors are spun by the
 The events of each tick (`BattleEvents`, `battle.md`) become effects by the weapon record of the
 type that made them (**Weapons**), each primitive one MultiMesh of `BattleEffects`, fixed in size
 (`MAX_*`), an ended entry swapped with the last, an entry that starts later (a burst's later
-shots, a death's blast) drawn at no size until then, and a list left empty skipping its buffer
-upload; nothing is allocated a frame:
+shots, a death's blast) drawn at no size until then; nothing is allocated a frame. A list hands
+its buffer over only when what it draws changed: one empty since its last hand-over skips it; the
+lightning arcs, which stand still for their lives (their shader moves them), skip it until one is
+added or ends; the scorch marks, still for their first three quarters, until one is added or ends,
+and while one is still to start or shrinking and once more after; the health bars until one is
+added, dropped or moved; the shield domes until one is added or its pool moves, and while one
+flickers or fades and once more after:
 
 | Event | Drawn as |
 | --- | --- |
@@ -307,7 +314,7 @@ The primitives (`BattleEffects`), none with a shadow or an outline:
 - **Sparks** (96): ten rays facing the camera, flying out past their radius and gone by
   `SPARK_SECONDS`. **Debris** (192): lit chamfered chunks thrown on arcs under `DEBRIS_GRAVITY`,
   settling where they reach the ground and shrinking away over the last quarter of
-  `DEBRIS_SECONDS`. **Smoke puffs** (256): soft discs facing the camera (`Timed`'s CLOUD), opaque
+  `DEBRIS_SECONDS`. **Smoke puffs** (384): soft discs facing the camera (`Timed`'s CLOUD), opaque
   in the middle and gone at the rim by their vertex colours, on one shared unshaded alpha-blended
   material (no rim light or scan bands), tinted per instance and faded by the instance colour's
   alpha, rising as they swell and fade: trails, dust, an air burst's dark puffs, smoke columns,
@@ -517,7 +524,8 @@ before the weapons pass with every kind live at once), a sprung trap its own vie
 shows;
 the buildings cost what they cost in the base, less the traps and the walls' own views.
 
-Two costs are measured fine on the Mac and unmeasured on a phone: every effect MultiMesh uploads
-its whole buffer each frame whatever its visible count while it has anything in it (the bars 768
-instances of 20 floats, the bolts 384, the puffs 256, the impacts 256), and each unit type's buffer is uploaded twice, once for its body's
-MultiMesh and once for its outline's.
+Two costs are measured fine on the Mac and unmeasured on a phone: an effect MultiMesh that hands
+its buffer over (**Shots and impacts**: each frame while what it draws changes) uploads the whole
+buffer whatever its visible count (the bars 768 instances of 20 floats, the bolts and the puffs
+384, the impacts 256), and a unit type's buffer, while the type draws, is uploaded twice, once for
+its body's MultiMesh and once for its outline's.

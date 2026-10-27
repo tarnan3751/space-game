@@ -154,7 +154,7 @@ Rules, applied by the data brief and checked by the shipped-data tests:
 - Production per hour continues ×1.4 a level; silo storage ×1.8; vault ×2; Hangar and Beacon
   capacity +5 a level; hp, damage rise; `range_cells` and `fire_ms` stay per type.
 - Build times stay on the dev scale: 20–40 minutes at the top levels, the Command Center's as
-  above. The later retune stays parked.
+  above. The retune that followed set the real timers (`docs/plans/retune.md`).
 - The meters abbreviate from one million ("1.2M"); cards and the info panel keep full numbers.
 
 ## 6. The field

@@ -150,9 +150,9 @@ in one second at most (`Catalog.apply_dev_cheats`; `-- --no-cheats` for the real
   walls or another type at the top needs its layout reworked (`docs/reference/input-camera.md`).
 - **`capacity` is display-only on the Alliance Beacon**; on the Hangar it drives the army's
   housing and on the Nanite Foundry the ability stock's cap.
-- **Units do not articulate**: the battle walks them with a shader hop, lean and sway, every
-  model in its one static pose; limb-articulated walk cycles are a later polish item. The unit
-  budgets are study values until the phone measurement.
+- **The unit budgets are study values** until the phone measurement; the units articulate on the
+  vertex-shader rig (legs, arms, wheels, guns, banks and bay doors: `docs/reference/art-style.md`,
+  **Rig**), whose cost on a phone is unmeasured with the rest.
 
 ## 3. Decisions
 
