@@ -98,7 +98,7 @@ func run(main: MainScript) -> void:
 				names.append("%s %d" % [type, level])
 			row["views"] = views
 			say("page %d, %s row at y %d: %s" % [page_index + 1, row["category"], row["y"], ", ".join(names)])
-		_frame(main, main.base_view.cell_to_world(Vector2i(grid.x / 2, grid.y / 2), 0), OVERVIEW_SIZE)
+		zoom_to(main, OVERVIEW_SIZE, main.base_view.cell_to_world(Vector2i(grid.x / 2, grid.y / 2), 0))
 		await main.get_tree().create_timer(SETTLE_SECONDS).timeout
 		say("page %d overview: %d draw calls, %d fps, %.2f ms render CPU" % [page_index + 1,
 			Performance.get_monitor(Performance.RENDER_TOTAL_DRAW_CALLS_IN_FRAME),
@@ -126,7 +126,7 @@ func run(main: MainScript) -> void:
 				name += "-%d" % (part + 1) if parts > 1 else ""
 				var at := main.base_view.cell_to_world(Vector2i(low, row["y"]), 0) \
 					+ Vector3((high - low) * 0.5, 0, int(row["depth"]) * 0.5)
-				_frame(main, at, CLOSE_UP_SIZE)
+				zoom_to(main, CLOSE_UP_SIZE, at)
 				_check_clear_of_hud(main, shown, name)
 				await frames(2)
 				await screenshot(name)
@@ -136,7 +136,7 @@ func run(main: MainScript) -> void:
 			var size: int = first[2]
 			var cell := Vector2i(first[3], int(row["y"]) + (int(row["depth"]) - size) / 2)
 			var name := "page%d-row%d-%s-detail" % [page_index + 1, row_index + 1, row["category"]]
-			_frame(main, main.base_view.cell_to_world(cell, size), DETAIL_SIZE)
+			zoom_to(main, DETAIL_SIZE, main.base_view.cell_to_world(cell, size))
 			var row_views: Array[BuildingView] = row["views"]
 			_check_clear_of_hud(main, row_views.slice(0, 1), name)
 			await frames(2)
@@ -379,11 +379,3 @@ func _check_clear_of_hud(main: MainScript, views: Array[BuildingView], shot: Str
 				break
 	check(hidden.is_empty(), "%s: every model on the screen, clear of the Build button%s" % [shot,
 		"" if hidden.is_empty() else " (not: %s)" % ", ".join(hidden)])
-
-
-## Zooms the camera to an orthographic size and pans it onto a ground point, through the
-## same calls a pinch and a drag make.
-func _frame(main: MainScript, point: Vector3, size: float) -> void:
-	var centre := main.get_viewport().get_visible_rect().size * 0.5
-	main.camera.zoom_at(main.camera.size / size, centre)
-	main.camera.pan(centre, centre - main.camera.unproject_position(point))

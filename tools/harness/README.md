@@ -134,8 +134,23 @@ Helpers on `HarnessScenario`:
   the camera centred between them, sized so the strip's tile shows their projected span (the
   larger of its height and its width over the screen's aspect) plus `margin`, and at least
   `minimum` high; twice that for a strip that will crop (`crop`). Returns the size set.
+- `await frame_settled(main, size, world_pos, seconds, count)` — `frame_world`, then waits
+  `seconds` and `count` frames, so the window (a frame or more behind the scene) has caught up
+  before a shot.
+- `zoom_to(main, size, world_pos, share = Vector2(0.5, 0.5))` — zooms to `size` about the
+  screen's centre and pans `world_pos` to the screen's `share` (its centre by default) through
+  the calls a pinch and a drag make (`IsoCamera.zoom_at`, `pan`), so the size stays within the
+  camera's own zoom range, unlike `frame_world`.
+- `await shot_at(main, name, at, size)` — `zoom_to` on `at`, then the screenshot `name` six
+  frames later.
+- `await wait_seconds(main, seconds)` — waits `seconds` and 50 ms more, then two frames: a timed
+  HUD change (a panel sliding, a toast) has finished and drawn.
 - `tap_cell(main, cell)` — emits `WorldInput.tapped` at the screen position of a cell's
   centre, so `PlacementController` handles it exactly as a real tap.
+- `touch_screen(main, point, pressed)`, `await tap_screen(main, point)` — a finger down or up,
+  and a tap (down, two frames, up, two frames), at a point in the HUD's coordinates, through
+  `Input.parse_input_event` as a real touch arrives (mapped through the viewport's final
+  transform), so the HUD's controls take it before the world does.
 - `await open_build_menu(main)` — presses the HUD's Build button (unless the build panel is
   already open), waits for the panel to slide up and checks that it is open. A scenario that
   picks a building from the menu opens it this way first.

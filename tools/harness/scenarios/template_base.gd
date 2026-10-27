@@ -124,7 +124,7 @@ func run(main: MainScript) -> void:
 		await _measure(main, "widest", IsoCamera.MAX_ZOOM_SIZE)
 		await _measure(main, "start", IsoCamera.START_ZOOM_SIZE)
 	main.get_window().size = WIDE
-	await _shot(main, "whole", Vector3.ZERO, IsoCamera.MAX_ZOOM_SIZE)
+	await shot_at(main, "whole", Vector3.ZERO, IsoCamera.MAX_ZOOM_SIZE)
 	for band: String in catalog.categories:
 		# The band with the fence under it.
 		var box: Rect2i = (bands[band] as Rect2i).grow_side(SIDE_BOTTOM, 1)
@@ -136,7 +136,7 @@ func run(main: MainScript) -> void:
 			part.end.x = box.position.x + box.size.x * (i + 1) / parts
 			var name := "band-%s-%d" % [band, i + 1] if parts > 1 else "band-" + band
 			var at := main.base_view.cell_to_world(part.position, 0) + Vector3(part.size.x, 0, part.size.y) * 0.5
-			await _shot(main, name, at, _fit(main, part, height))
+			await shot_at(main, name, at, _fit(main, part, height))
 			if turning.any(func(mover: Node3D) -> bool:
 					return part.has_point(main.base_view.world_to_cell(mover.global_position))):
 				await main.get_tree().create_timer(1.0).timeout
@@ -156,24 +156,13 @@ func _fit(main: MainScript, part: Rect2i, height: float) -> float:
 	return maxf(BAND_ZOOM, main.camera.size * maxf(box.size.x / screen.x, box.size.y / screen.y) / FILL)
 
 
-## Centres the view on `at` at camera size `size`, then screenshots it once the window caught up.
-func _shot(main: MainScript, name: String, at: Vector3, size: float) -> void:
-	var centre := main.get_viewport().get_visible_rect().size * 0.5
-	main.camera.zoom_at(main.camera.size / size, centre)
-	main.camera.pan(centre, centre - main.camera.unproject_position(at))
-	await frames(6)
-	await screenshot(name)
-
-
 ## Centres the view on the field at camera size `size`, holds it SETTLE_SECONDS, then samples
 ## every frame for SAMPLE_SECONDS: the most draw calls and primitives in a frame, the render
 ## thread's CPU time a frame on average, the slowest frame's process time (Performance.TIME_PROCESS
 ## holds the slowest of the last second) and the frame rate at the end; says them and checks the
 ## first three against the ceilings.
 func _measure(main: MainScript, zoom: String, size: float) -> void:
-	var centre := main.get_viewport().get_visible_rect().size * 0.5
-	main.camera.zoom_at(main.camera.size / size, centre)
-	main.camera.pan(centre, centre - main.camera.unproject_position(Vector3.ZERO))
+	zoom_to(main, size, Vector3.ZERO)
 	var viewport_rid := main.get_viewport().get_viewport_rid()
 	RenderingServer.viewport_set_measure_render_time(viewport_rid, true)
 	await main.get_tree().create_timer(SETTLE_SECONDS).timeout

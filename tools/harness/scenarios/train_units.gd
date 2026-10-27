@@ -50,7 +50,7 @@ func run(main: MainScript) -> void:
 	check(housing_line in hud.info_detail().split("\n"), "its info panel reads %s" % housing_line)
 	await screenshot("info-train")
 	hud.action_button().pressed.emit()
-	await _wait(main, Hud.MENU_OPEN_SECONDS)
+	await wait_seconds(main, Hud.MENU_OPEN_SECONDS)
 	check(hud.is_training_open(), "Train opened the training panel")
 	check(hud.army_title() == "%s   Lv %d" % [catalog.display_name(PRODUCER), academy.level],
 		"the panel's title: %s" % hud.army_title())
@@ -67,7 +67,7 @@ func run(main: MainScript) -> void:
 
 	# Two Rangers and a Breacher; the first Ranger by a real touch on its card.
 	var crystal_before: int = state.resources["crystal"]
-	await _tap(main, hud.train_card("ranger").get_global_rect().get_center())
+	await tap_screen(main, hud.train_card("ranger").get_global_rect().get_center())
 	hud.train_card("ranger").pressed.emit()
 	hud.train_card("breacher").pressed.emit()
 	await frames(2)
@@ -94,7 +94,7 @@ func run(main: MainScript) -> void:
 	check(hud.toast_text() == "Refunded", "the toast reads %s" % hud.toast_text())
 	# Two seconds on (crystal tops up to its cap, so after the refund's check), the game's one-second tick counts the head down (the HUD's tick path).
 	advance(2)
-	await _wait(main, 1.0)
+	await wait_seconds(main, 1.0)
 	head_left = Format.duration(state.training_seconds_left(academy.id)) + " left"
 	check(hud.queue_head_status() == head_left, "the tick counted the head down to %s (expected %s)"
 		% [hud.queue_head_status(), head_left])
@@ -115,13 +115,13 @@ func run(main: MainScript) -> void:
 	await frames(4)
 	tap_cell(main, lab.cell + Vector2i.ONE)
 	_world_taps = 0
-	await _wait(main, Hud.MENU_CLOSE_SECONDS)
+	await wait_seconds(main, Hud.MENU_CLOSE_SECONDS)
 	check(main.placement.selected_id == lab.id and not hud.is_training_open() and not hud.army_panel().visible,
 		"selecting the Research Lab closed the training panel")
 	check(hud.action_button().is_visible_in_tree() and hud.action_button().text == "Research",
 		"its info panel offers Research")
 	hud.action_button().pressed.emit()
-	await _wait(main, Hud.MENU_OPEN_SECONDS)
+	await wait_seconds(main, Hud.MENU_OPEN_SECONDS)
 	check(hud.is_research_open() and hud.research_line() == "No research running",
 		"Research opened the research panel: %s" % hud.research_line())
 	shown.clear()
@@ -159,17 +159,17 @@ func run(main: MainScript) -> void:
 
 	# A tap on the panel's header reaches nothing behind it; one on a building above the panel
 	# selects that building and closes the panel.
-	await _tap(main, Vector2(screen.size.x * 0.5, hud.army_panel().get_global_rect().position.y + 30))
+	await tap_screen(main, Vector2(screen.size.x * 0.5, hud.army_panel().get_global_rect().position.y + 30))
 	check(_world_taps == 0 and hud.is_research_open() and main.placement.selected_id == lab.id,
 		"a tap on the panel's header reached nothing behind it")
 	var other := _building_above(main, hud.army_panel().get_global_rect().position.y, lab.id)
 	check(other != null, "a building shows above the panel")
 	if other != null:
-		await _tap(main, main.camera.unproject_position(main.base_view.cell_to_world(other.cell,
+		await tap_screen(main, main.camera.unproject_position(main.base_view.cell_to_world(other.cell,
 			catalog.size_of(other.type))))
 		check(_world_taps == 1 and main.placement.selected_id == other.id,
 			"a tap above the panel selected the %s (id %d)" % [other.type, other.id])
-		await _wait(main, Hud.MENU_CLOSE_SECONDS)
+		await wait_seconds(main, Hud.MENU_CLOSE_SECONDS)
 		check(not hud.is_research_open() and not hud.army_panel().visible, "and closed the research panel")
 		await screenshot("selected-outside")
 
@@ -211,7 +211,7 @@ func _fresh_academy(main: MainScript) -> void:
 	check(hud.action_button().is_visible_in_tree(), "its info panel offers Train")
 	check(Hud.NO_HANGAR in hud.info_detail().split("\n"), "with no Hangar its info panel reads: %s" % Hud.NO_HANGAR)
 	hud.action_button().pressed.emit()
-	await _wait(main, Hud.MENU_OPEN_SECONDS)
+	await wait_seconds(main, Hud.MENU_OPEN_SECONDS)
 	check(hud.is_training_open(), "Train opened the training panel")
 	check(hud.housing_text() == "No Hangar: build one to house units" and not hud.housing_bar().is_visible_in_tree(),
 		"with no Hangar the header reads: %s" % hud.housing_text())
@@ -220,7 +220,7 @@ func _fresh_academy(main: MainScript) -> void:
 		"the Breacher card is locked: %s" % hud.train_card_info("breacher"))
 	check(not hud.train_card("ranger").disabled, "the Ranger card is not")
 	_world_taps = 0
-	await _tap(main, hud.train_card("breacher").get_global_rect().get_center())
+	await tap_screen(main, hud.train_card("breacher").get_global_rect().get_center())
 	check(_world_taps == 0 and state.queue_of(academy.id).is_empty(),
 		"a touch on the locked card queued nothing and reached nothing behind it")
 	hud.train_card("ranger").pressed.emit()
@@ -231,16 +231,16 @@ func _fresh_academy(main: MainScript) -> void:
 
 	# The close button goes back to the info panel, the academy still selected.
 	hud.army_close_button().pressed.emit()
-	await _wait(main, Hud.MENU_CLOSE_SECONDS)
+	await wait_seconds(main, Hud.MENU_CLOSE_SECONDS)
 	check(not hud.is_training_open() and not hud.army_panel().visible and hud.action_button().is_visible_in_tree()
 		and main.placement.selected_id == academy.id, "the close button showed the info panel, the academy still selected")
 
 	# Build over the open panel closes it and opens the build panel.
 	hud.action_button().pressed.emit()
-	await _wait(main, Hud.MENU_OPEN_SECONDS)
+	await wait_seconds(main, Hud.MENU_OPEN_SECONDS)
 	check(hud.is_training_open(), "Train opened the training panel again")
 	hud.build_button().pressed.emit()
-	await _wait(main, Hud.MENU_OPEN_SECONDS)
+	await wait_seconds(main, Hud.MENU_OPEN_SECONDS)
 	check(hud.is_menu_open() and not hud.is_training_open() and not hud.army_panel().visible
 		and main.placement.selected_id == 0, "Build closed the training panel, cleared the selection and opened the build panel")
 
@@ -276,10 +276,7 @@ func _train_cost(state: BaseState, unit: String) -> int:
 func _focus(main: MainScript, building: BuildingState) -> void:
 	var size := main.state.catalog.size_of(building.type)
 	var at := main.base_view.cell_to_world(building.cell, size)
-	var screen := main.get_viewport().get_visible_rect().size
-	main.camera.zoom_at(main.camera.size / ZOOM, screen * 0.5)
-	var spot := screen * FOCUS
-	main.camera.pan(spot, spot - main.camera.unproject_position(at))
+	zoom_to(main, ZOOM, at, FOCUS)
 
 
 ## A building other than `skip` whose footprint's centre is on the screen above `top`, clear of
@@ -295,17 +292,3 @@ func _building_above(main: MainScript, top: float, skip: int) -> BuildingState:
 		if at.x > 100 and at.x < screen.x - 100 and at.y > 160 and at.y < top - 40:
 			return building
 	return null
-
-
-func _wait(main: MainScript, seconds: float) -> void:
-	await main.get_tree().create_timer(seconds + 0.05).timeout
-	await frames(2)
-
-
-func _tap(main: MainScript, point: Vector2) -> void:
-	for pressed: bool in [true, false]:
-		var touch := InputEventScreenTouch.new()
-		touch.position = main.get_viewport().get_final_transform() * point
-		touch.pressed = pressed
-		Input.parse_input_event(touch)
-		await frames(2)

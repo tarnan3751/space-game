@@ -85,6 +85,39 @@ func frame_span(main: MainScript, a: Vector3, b: Vector3, margin: float, minimum
 	return size
 
 
+## frame_world, then waits `seconds` and `count` frames, so the window (it shows a frame or more
+## behind the scene) has caught up before a shot.
+func frame_settled(main: MainScript, size: float, world_pos: Vector3, seconds: float, count: int) -> void:
+	frame_world(main, size, world_pos)
+	await main.get_tree().create_timer(seconds).timeout
+	await frames(count)
+
+
+## Zooms the camera to `size` about the screen's centre and pans `world_pos` to the screen's
+## `share` (its centre by default) through the calls a pinch and a drag make, so the size stays
+## within the camera's own zoom range (frame_world sets it directly).
+func zoom_to(main: MainScript, size: float, world_pos: Vector3, share: Vector2 = Vector2(0.5, 0.5)) -> void:
+	var screen := main.get_viewport().get_visible_rect().size
+	main.camera.zoom_at(main.camera.size / size, screen * 0.5)
+	var spot := screen * share
+	main.camera.pan(spot, spot - main.camera.unproject_position(world_pos))
+
+
+## Centres the view on `at` at camera size `size` (zoom_to), then screenshots it as `name` once the
+## window has caught up.
+func shot_at(main: MainScript, name: String, at: Vector3, size: float) -> void:
+	zoom_to(main, size, at)
+	await frames(6)
+	await screenshot(name)
+
+
+## Waits `seconds` and a little more, then two frames, so a timed change (a panel sliding, a
+## toast) has finished and drawn.
+func wait_seconds(main: MainScript, seconds: float) -> void:
+	await main.get_tree().create_timer(seconds + 0.05).timeout
+	await frames(2)
+
+
 ## Opens the build panel the way the player does: presses the Build button (unless the panel
 ## is already open), waits for the panel to slide up, and checks that it is open.
 func open_build_menu(main: MainScript) -> void:
@@ -101,3 +134,20 @@ func open_build_menu(main: MainScript) -> void:
 func tap_cell(main: MainScript, cell: Vector2i) -> void:
 	var screen_pos: Vector2 = main.camera.unproject_position(main.base_view.cell_to_world(cell, 1))
 	main.world_input.tapped.emit(screen_pos)
+
+
+## A finger down or up at `point`, in the HUD's coordinates: input events arrive in window pixels,
+## which the viewport maps back through its final transform (the canvas_items stretch).
+func touch_screen(main: MainScript, point: Vector2, pressed: bool) -> void:
+	var touch := InputEventScreenTouch.new()
+	touch.position = main.get_viewport().get_final_transform() * point
+	touch.pressed = pressed
+	Input.parse_input_event(touch)
+
+
+## A tap at `point`, in the HUD's coordinates, through the input as a finger makes it: down, two
+## frames, up, two frames.
+func tap_screen(main: MainScript, point: Vector2) -> void:
+	for pressed: bool in [true, false]:
+		touch_screen(main, point, pressed)
+		await frames(2)

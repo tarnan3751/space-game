@@ -122,9 +122,7 @@ func run(main: MainScript) -> void:
 	check(moved == escorts.size() and _movers.size() == escorts.size(),
 		"%d of %d escorts moved in 10 frames" % [moved, _movers.size()])
 
-	var centre := main.get_viewport().get_visible_rect().size * 0.5
-	main.camera.zoom_at(main.camera.size / ZOOM_SIZE, centre)
-	main.camera.pan(centre, centre - main.camera.unproject_position(down * 1.5))
+	zoom_to(main, ZOOM_SIZE, down * 1.5)
 	await main.get_tree().create_timer(SETTLE_SECONDS).timeout
 	await frames(SETTLE_FRAMES)
 	await screenshot("swatches")

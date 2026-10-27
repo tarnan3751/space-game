@@ -96,7 +96,9 @@ write a scenario; `scenarios/place_and_build.gd` is the example.
 A scenario can shoot motion as a frame strip (`strip(name, count, step_ms)`: consecutive frames
 composed into one PNG, the gaps and the repeated frames in the log, optionally cropped to the
 centre of the window) and frame a subject with `frame_world(main, size, world_pos)` or two with
-`frame_span`; the `anim_units`, `anim_defences`, `anim_base` and
+`frame_span` (`HarnessScenario`'s other framing, waiting and touch helpers, `frame_settled`,
+`zoom_to`, `shot_at`, `wait_seconds`, `touch_screen` and `tap_screen`, are listed in
+`tools/harness/README.md`); the `anim_units`, `anim_defences`, `anim_base` and
 `anim_effects` scenarios shoot every moving thing in the game that way, for the animation audit
 (`tools/harness/README.md`).
 

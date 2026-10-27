@@ -201,7 +201,7 @@ func _tier_name(tier: int) -> String:
 ## Frames the camera at `size` on `target`, checks that every unit showing is on the screen and
 ## clear of the HUD's buttons (Build, Template base, Reset base), and takes the screenshot `name`.
 func _shot(main: MainScript, size: float, target: Vector3, name: String) -> void:
-	await _frame(main, size, target)
+	await frame_settled(main, size, target, SETTLE_SECONDS, SETTLE_FRAMES)
 	var screen := Rect2(Vector2.ZERO, main.get_viewport().get_visible_rect().size)
 	# Centre the units showing a little left of and below the screen's middle, clear of the buttons
 	# along its top right and its bottom right, but never so far left that the row's first unit
@@ -342,14 +342,3 @@ func _update_movers() -> void:
 	var time := Motion.tick()
 	for i: int in _movers.size():
 		_movers[i].transform = _motions[i].transform_at(time, _rests[i])
-
-
-## Sets the camera to `size` (under its own closest zoom directly) with `target` at the screen's
-## centre, and lets the frame settle.
-func _frame(main: MainScript, size: float, target: Vector3) -> void:
-	var centre := main.get_viewport().get_visible_rect().size * 0.5
-	main.camera.zoom_at(main.camera.size / maxf(size, IsoCamera.MIN_ZOOM_SIZE), centre)
-	main.camera.size = size
-	main.camera.pan(centre, centre - main.camera.unproject_position(target))
-	await main.get_tree().create_timer(SETTLE_SECONDS).timeout
-	await frames(SETTLE_FRAMES)

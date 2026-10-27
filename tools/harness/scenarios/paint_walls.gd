@@ -294,9 +294,7 @@ static func _triangles(mesh: Mesh) -> int:
 func _close_up(main: MainScript, cell: Vector2i) -> void:
 	var camera: IsoCamera = main.camera
 	var focus := camera.focus
-	var centre := main.get_viewport().get_visible_rect().size * 0.5
-	camera.zoom_at(camera.size / CLOSE_UP_SIZE, centre)
-	camera.pan(centre, centre - _screen_of(main, cell))
+	zoom_to(main, CLOSE_UP_SIZE, main.base_view.cell_to_world(cell, 1))
 	await screenshot("painted-line-close")
 	_reset_camera(main, focus)
 

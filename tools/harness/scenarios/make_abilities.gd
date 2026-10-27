@@ -36,7 +36,7 @@ func run(main: MainScript) -> void:
 		"a tap selected the Foundry; its info panel offers Make and reads %s" % stock_line)
 	await screenshot("info-make")
 	hud.action_button().pressed.emit()
-	await _wait(main, Hud.MENU_OPEN_SECONDS)
+	await wait_seconds(main, Hud.MENU_OPEN_SECONDS)
 	check(hud.is_making_open(), "Make opened the making page")
 	for ability: String in catalog.ability_types():
 		check(hud.make_card(ability).is_visible_in_tree() and hud.make_card_info(ability) == "In stock 0",
@@ -68,7 +68,7 @@ func run(main: MainScript) -> void:
 		"the %s is made into the stock: %s" % [FIRST, hud.make_card_info(FIRST)])
 	await screenshot("made")
 	hud.army_close_button().pressed.emit()
-	await _wait(main, Hud.MENU_CLOSE_SECONDS)
+	await wait_seconds(main, Hud.MENU_CLOSE_SECONDS)
 	stock_line = "Stock 1 / %d" % state.foundry_capacity()
 	check(hud.info_detail().contains(stock_line), "the stock line reads %s" % stock_line)
 
@@ -77,9 +77,9 @@ func run(main: MainScript) -> void:
 	_focus(main, lab)
 	await frames(4)
 	tap_cell(main, lab.cell + Vector2i.ONE)
-	await _wait(main, Hud.MENU_CLOSE_SECONDS)
+	await wait_seconds(main, Hud.MENU_CLOSE_SECONDS)
 	hud.action_button().pressed.emit()
-	await _wait(main, Hud.MENU_OPEN_SECONDS)
+	await wait_seconds(main, Hud.MENU_OPEN_SECONDS)
 	check(hud.is_research_open(), "Research opened the research page")
 	for ability: String in catalog.ability_types():
 		check(hud.research_ability_card(ability).is_visible_in_tree(), "%s's research card shows: %s"
@@ -129,12 +129,4 @@ func _make_cost(state: BaseState, ability: String) -> int:
 func _focus(main: MainScript, building: BuildingState) -> void:
 	var size := main.state.catalog.size_of(building.type)
 	var at := main.base_view.cell_to_world(building.cell, size)
-	var screen := main.get_viewport().get_visible_rect().size
-	main.camera.zoom_at(main.camera.size / ZOOM, screen * 0.5)
-	var spot := screen * FOCUS
-	main.camera.pan(spot, spot - main.camera.unproject_position(at))
-
-
-func _wait(main: MainScript, seconds: float) -> void:
-	await main.get_tree().create_timer(seconds + 0.05).timeout
-	await frames(2)
+	zoom_to(main, ZOOM, at, FOCUS)

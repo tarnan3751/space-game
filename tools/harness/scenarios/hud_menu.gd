@@ -24,7 +24,7 @@ func run(main: MainScript) -> void:
 	check(not hud.is_menu_open() and hud.build_button().is_visible_in_tree(), "the panel starts closed, Build showing")
 	await screenshot("closed")
 	await _check_glint(main, hud)
-	await _tap(main, main.get_viewport().get_visible_rect().size * Vector2(0.4, 1.0) - Vector2(0, 100))
+	await tap_screen(main, main.get_viewport().get_visible_rect().size * Vector2(0.4, 1.0) - Vector2(0, 100))
 	check(_world_taps == 1, "a tap where the closed panel opens reached the world")
 	main.placement.select(0)
 
@@ -32,7 +32,7 @@ func run(main: MainScript) -> void:
 	await open_build_menu(main)
 	check(hud.tab_button(catalog.categories[0]).button_pressed, "the first tab is selected")
 	for category: String in catalog.categories:
-		await _tap(main, hud.tab_button(category).get_global_rect().get_center())
+		await tap_screen(main, hud.tab_button(category).get_global_rect().get_center())
 		var shown := PackedStringArray()
 		var expected := PackedStringArray()
 		for type: String in catalog.menu_order:
@@ -45,7 +45,7 @@ func run(main: MainScript) -> void:
 
 	# Every card's picture is rendered within a second of the panel opening. A headless run draws
 	# nothing, so it checks only that every type was gone through.
-	await _wait(main, 1.0)
+	await wait_seconds(main, 1.0)
 	check(hud.previews_done(), "the pictures are done a second after the panel opened")
 	if DisplayServer.get_name() != "headless":
 		var missing := PackedStringArray()
@@ -54,26 +54,26 @@ func run(main: MainScript) -> void:
 				missing.append(type)
 		check(missing.is_empty(), "every card has its picture (missing: %s)" % ", ".join(missing))
 	for category: String in catalog.categories:
-		await _tap(main, hud.tab_button(category).get_global_rect().get_center())
+		await tap_screen(main, hud.tab_button(category).get_global_rect().get_center())
 		await frames(2)
 		say("panel open on %s: %d draw calls" % [category, Performance.get_monitor(Performance.RENDER_TOTAL_DRAW_CALLS_IN_FRAME)])
 		await screenshot("pictures-" + category)
 
 	# A press on the selected tab scrolls its strip back to the start, animated.
 	var first: String = catalog.categories[0]
-	await _tap(main, hud.tab_button(first).get_global_rect().get_center())
+	await tap_screen(main, hud.tab_button(first).get_global_rect().get_center())
 	var strip := hud.entry_strip()
 	strip.scroll_horizontal = 300
 	await frames(2)
 	var scrolled := strip.scroll_horizontal
 	check(scrolled > 0, "the %s strip scrolled to %d" % [first, scrolled])
-	_touch(main, hud.tab_button(first).get_global_rect().get_center(), true)
+	touch_screen(main, hud.tab_button(first).get_global_rect().get_center(), true)
 	await frames(1)
-	_touch(main, hud.tab_button(first).get_global_rect().get_center(), false)
+	touch_screen(main, hud.tab_button(first).get_global_rect().get_center(), false)
 	await frames(2)
 	check(strip.scroll_horizontal > 0 and strip.scroll_horizontal < scrolled,
 		"the strip is on its way back (%d of %d)" % [strip.scroll_horizontal, scrolled])
-	await _wait(main, Hud.STRIP_RETURN_SECONDS)
+	await wait_seconds(main, Hud.STRIP_RETURN_SECONDS)
 	check(strip.scroll_horizontal == 0 and hud.tab_button(first).button_pressed,
 		"pressing the selected tab scrolled its strip back to %d, still selected" % strip.scroll_horizontal)
 
@@ -81,28 +81,28 @@ func run(main: MainScript) -> void:
 	# meter and on the drone ring stop there; the close button closes the panel.
 	var locked: String = Array(catalog.menu_order).filter(func(type: String) -> bool:
 		return int(catalog.level_stats(type, 1).get("requires_cc", 1)) > state.cc_level())[0]
-	await _tap(main, hud.tab_button(catalog.category_of(locked)).get_global_rect().get_center())
+	await tap_screen(main, hud.tab_button(catalog.category_of(locked)).get_global_rect().get_center())
 	check(hud.entry_button(locked).disabled and hud.entry_status(locked).begins_with("Needs Command Center"),
 		"%s is disabled: %s" % [locked, hud.entry_status(locked)])
 	for at: Vector2 in [hud.close_button().get_global_rect().get_center() - Vector2(120, 0),
 			hud.resource_panel("metal").get_global_rect().get_center(), hud.drones_panel().get_global_rect().get_center()]:
-		await _tap(main, at)
-	await _tap(main, hud.close_button().get_global_rect().get_center())
-	await _wait(main, Hud.MENU_CLOSE_SECONDS)
+		await tap_screen(main, at)
+	await tap_screen(main, hud.close_button().get_global_rect().get_center())
+	await wait_seconds(main, Hud.MENU_CLOSE_SECONDS)
 	check(not hud.is_menu_open() and not hud.close_button().is_visible_in_tree(), "the close button closed the panel")
 	check(_world_taps == 1, "no touch on the panel, a meter or the ring reached the world (%d did)" % (_world_taps - 1))
 
 	# Picking a card closes the panel and begins placing; the place bar takes Build's place.
 	await open_build_menu(main)
-	await _tap(main, hud.tab_button(catalog.category_of("metal_extractor")).get_global_rect().get_center())
+	await tap_screen(main, hud.tab_button(catalog.category_of("metal_extractor")).get_global_rect().get_center())
 	check(hud.entry_status("metal_extractor") == "0 / %d" % catalog.max_count("metal_extractor", state.cc_level()),
 		"Metal Extractor reads %s" % hud.entry_status("metal_extractor"))
 	var card_at := hud.entry_button("metal_extractor").get_global_rect().get_center()
-	_touch(main, card_at, true)
+	touch_screen(main, card_at, true)
 	await frames(2)
 	await screenshot("card-pressed")
-	_touch(main, card_at, false)
-	await _wait(main, Hud.MENU_CLOSE_SECONDS)
+	touch_screen(main, card_at, false)
+	await wait_seconds(main, Hud.MENU_CLOSE_SECONDS)
 	check(main.placement.placing_type == "metal_extractor" and not hud.is_menu_open(), "the card closed the panel, placing")
 	check(hud.place_button().is_visible_in_tree() and not hud.build_button().is_visible_in_tree(), "the place bar hid Build")
 	await screenshot("place-bar")
@@ -119,7 +119,7 @@ func run(main: MainScript) -> void:
 	check(absf(Motion.clock() - flash_at) < 0.05, "the purchase flashed the metal meter at %.2f s (now %.2f s)" % [flash_at, Motion.clock()])
 	await screenshot("purchase-flash")
 	say("flash shot %.2f s after the purchase" % (Motion.clock() - flash_at))
-	await _wait(main, Hud.MENU_CLOSE_SECONDS)
+	await wait_seconds(main, Hud.MENU_CLOSE_SECONDS)
 	_check_top_bar(hud, state)
 	check(hud.resource_fill("metal").size.x < metal_before, "the metal fill fell from %d px" % metal_before)
 	await screenshot("purchase")
@@ -215,23 +215,3 @@ func _refresh(main: MainScript) -> void:
 
 func _meter_shader(hud: Hud, res: String) -> ShaderMaterial:
 	return (hud.resource_fill(res).get_child(0) as CanvasItem).material as ShaderMaterial
-
-
-func _wait(main: MainScript, seconds: float) -> void:
-	await main.get_tree().create_timer(seconds + 0.05).timeout
-	await frames(2)
-
-
-func _tap(main: MainScript, point: Vector2) -> void:
-	for pressed: bool in [true, false]:
-		_touch(main, point, pressed)
-		await frames(2)
-
-
-## A finger down or up at `point`, in the HUD's coordinates: input events arrive in window
-## pixels, which the viewport maps back through its final transform (the canvas_items stretch).
-func _touch(main: MainScript, point: Vector2, pressed: bool) -> void:
-	var touch := InputEventScreenTouch.new()
-	touch.position = main.get_viewport().get_final_transform() * point
-	touch.pressed = pressed
-	Input.parse_input_event(touch)

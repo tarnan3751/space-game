@@ -154,22 +154,22 @@ func run(main: MainScript) -> void:
 		check(heights.y - heights.x > EDGE_SPREAD and heights.y <= EDGE_HIGHEST and full.y - full.x > BLEND_WANDER,
 			"%.1f out from the %s side the ground is %.2f to %.2f high, its relief full %.1f to %.1f out"
 			% [EDGE_OUT, side, heights.x, heights.y, full.x, full.y])
-	await _shot(main, "start", Vector3.ZERO, main.camera.size)
+	await shot_at(main, "start", Vector3.ZERO, main.camera.size)
 	var far := field.position + Vector2.ONE * EDGE_VIEW
-	await _shot(main, "far-sides", Vector3(far.x, 0.0, far.y), IsoCamera.START_ZOOM_SIZE)
+	await shot_at(main, "far-sides", Vector3(far.x, 0.0, far.y), IsoCamera.START_ZOOM_SIZE)
 	_check_edge_step(main)
-	await _shot(main, "closest-field", view.cell_to_world(Vector2i(13, 13), 1), IsoCamera.MIN_ZOOM_SIZE)
+	await shot_at(main, "closest-field", view.cell_to_world(Vector2i(13, 13), 1), IsoCamera.MIN_ZOOM_SIZE)
 	# Cells (16, 32) are a corner of the field texture's tiles, which are 4 cells square.
 	var tile_corner := field.position + Vector2(16, 32)
-	await _shot(main, "tile-corner", Vector3(tile_corner.x, 0.0, tile_corner.y), IsoCamera.MIN_ZOOM_SIZE)
-	await _shot(main, "tiles", view.cell_to_world(Vector2i(16, 30), 1), 12.0)
+	await shot_at(main, "tile-corner", Vector3(tile_corner.x, 0.0, tile_corner.y), IsoCamera.MIN_ZOOM_SIZE)
+	await shot_at(main, "tiles", view.cell_to_world(Vector2i(16, 30), 1), 12.0)
 	main.camera.bounds = field.grow(BaseView.TERRAIN_EXTENT - field.end.x)
 	var curb := field.end + Vector2.ONE * (BaseView.CURB_GAP + BaseView.CURB_WIDTH * 0.5)
 	for side: String in sides:
 		var out: Vector2 = sides[side]
-		await _shot(main, "edge-" + side, Vector3(out.x * curb.x, 0.0, out.y * curb.y), 16.0)
-	await _shot(main, "perimeter-side", Vector3(0.0, 0.0, curb.y), IsoCamera.MIN_ZOOM_SIZE)
-	await _shot(main, "perimeter-corner", Vector3(curb.x, 0.0, curb.y), IsoCamera.MIN_ZOOM_SIZE)
+		await shot_at(main, "edge-" + side, Vector3(out.x * curb.x, 0.0, out.y * curb.y), 16.0)
+	await shot_at(main, "perimeter-side", Vector3(0.0, 0.0, curb.y), IsoCamera.MIN_ZOOM_SIZE)
+	await shot_at(main, "perimeter-corner", Vector3(curb.x, 0.0, curb.y), IsoCamera.MIN_ZOOM_SIZE)
 	main.camera.bounds = field
 	main.get_window().size = WIDE
 	main.camera.zoom_at(main.camera.size / IsoCamera.MAX_ZOOM_SIZE, Vector2.ZERO)
@@ -178,40 +178,40 @@ func run(main: MainScript) -> void:
 		main.camera.nudge(Vector3.ZERO)
 		check(_ring_fills_view(view, main.camera, float(WIDE.x) / WIDE.y),
 			"the ring fills a %s view at the widest zoom focused on %s" % [WIDE, corner])
-	await _shot(main, "widest-wide", Vector3.ZERO, IsoCamera.MAX_ZOOM_SIZE)
+	await shot_at(main, "widest-wide", Vector3.ZERO, IsoCamera.MAX_ZOOM_SIZE)
 	_check_field_shade(main)
 	main.get_window().size = WIDER
 	main.camera.focus = Vector3(field.end.x, 0.0, field.end.y)
 	main.camera.nudge(Vector3.ZERO)
 	check(not _ring_fills_view(view, main.camera, float(WIDER.x) / WIDER.y),
 		"a %s view at the widest zoom focused on %s sees past the ring" % [WIDER, field.end])
-	await _shot(main, "widest-wider", Vector3(field.end.x, 0.0, field.end.y), IsoCamera.MAX_ZOOM_SIZE)
+	await shot_at(main, "widest-wider", Vector3(field.end.x, 0.0, field.end.y), IsoCamera.MAX_ZOOM_SIZE)
 	# The haze band lies across the lower left of the sky: the field's left corner in a wider window.
 	main.get_window().size = WIDEST
 	var left := Vector3(field.position.x, 0.0, field.end.y)
-	await _shot(main, "widest-haze", left, IsoCamera.MAX_ZOOM_SIZE)
+	await shot_at(main, "widest-haze", left, IsoCamera.MAX_ZOOM_SIZE)
 	say("haze shot in a %s window" % main.get_window().size)
 	main.get_window().size = WIDE
 	main.camera.bounds = field.grow(BaseView.TERRAIN_EXTENT - field.end.x)
-	await _shot(main, "crater", Vector3(view.craters[0].x, 0.0, view.craters[0].y), 24.0)
-	await _shot(main, "outcrop", view.outcrop_spots[0], 12.0)
+	await shot_at(main, "crater", Vector3(view.craters[0].x, 0.0, view.craters[0].y), 24.0)
+	await shot_at(main, "outcrop", view.outcrop_spots[0], 12.0)
 	# The first mesa's wall where it faces the camera (+x, +z), its foot and its rim.
 	var mesa := view.mesas[0]
 	var facing := Vector3(mesa.x, mesa.w * 0.5, mesa.y) + Vector3(1.0, 0.0, 1.0).normalized() * mesa.z
-	await _shot(main, "mesa", facing, IsoCamera.MIN_ZOOM_SIZE)
-	await _shot(main, "mesas", Vector3(mesa.x, mesa.w * 0.5, mesa.y), 24.0)
+	await shot_at(main, "mesa", facing, IsoCamera.MIN_ZOOM_SIZE)
+	await shot_at(main, "mesas", Vector3(mesa.x, mesa.w * 0.5, mesa.y), 24.0)
 	# Its foot where it faces the camera, half way out along the fillet, and the middle of its ledge.
 	var turn := PI * 0.25
 	var profile := view.mesa_profile(0, turn)
 	var out := Vector3(cos(turn), 0.0, sin(turn))
 	var foot := Vector3(mesa.x, 0.0, mesa.y) + out * (profile[BaseView.MESA_FILLET_TOP].x + profile[profile.size() - 1].x) * 0.5
-	await _shot(main, "mesa-foot", Vector3(foot.x, view.terrain_height(foot.x, foot.z), foot.z), IsoCamera.MIN_ZOOM_SIZE)
+	await shot_at(main, "mesa-foot", Vector3(foot.x, view.terrain_height(foot.x, foot.z), foot.z), IsoCamera.MIN_ZOOM_SIZE)
 	var ledge := view.mesa_ledges[0]
 	turn = ledge.x + ledge.y * 0.5
 	profile = view.mesa_profile(0, turn)
 	out = Vector3(cos(turn), 0.0, sin(turn))
 	var step := profile[BaseView.MESA_RIM + 2]
-	await _shot(main, "mesa-ledge", Vector3(mesa.x, step.y, mesa.y) + out * step.x, 12.0)
+	await shot_at(main, "mesa-ledge", Vector3(mesa.x, step.y, mesa.y) + out * step.x, 12.0)
 	main.camera.bounds = field
 
 
@@ -441,12 +441,3 @@ func _ring_fills_view(view: BaseView, camera: IsoCamera, aspect: float) -> bool:
 		if not (above and inside):
 			return false
 	return true
-
-
-## Centres the view on `at` at camera size `size`, then screenshots it once the window caught up.
-func _shot(main: MainScript, name: String, at: Vector3, size: float) -> void:
-	var centre := main.get_viewport().get_visible_rect().size * 0.5
-	main.camera.zoom_at(main.camera.size / size, centre)
-	main.camera.pan(centre, centre - main.camera.unproject_position(at))
-	await frames(6)
-	await screenshot(name)

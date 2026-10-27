@@ -35,9 +35,7 @@ func run(main: MainScript) -> void:
 	check(body.mesh.get_surface_count() == 2 and body.mesh.surface_get_material(1) == MaterialKit.holo(),
 		"the drone's body has its hologram rotors on a second surface")
 	check(view.is_processing(), "the view processes while the drone works")
-	var centre := main.get_viewport().get_visible_rect().size * 0.5
-	main.camera.zoom_at(main.camera.size / CLOSE_UP_SIZE, centre)
-	main.camera.pan(centre, centre - main.camera.unproject_position(view.position + Vector3(0, 1, 0)))
+	zoom_to(main, CLOSE_UP_SIZE, view.position + Vector3(0, 1, 0))
 
 	var positions: Array[Vector3] = [drone.drone_position()]
 	await _wait(main, 0.5)
@@ -123,6 +121,7 @@ func run(main: MainScript) -> void:
 	placement.select(dragged_id)
 	await frames(1)
 	var dragged: BuildingView = main.base_view.views[dragged_id]
+	var centre := main.get_viewport().get_visible_rect().size * 0.5
 	main.camera.pan(centre, centre - main.camera.unproject_position(dragged.position + Vector3(0, 1, 0)))
 	await _wait(main, 1.5)
 	# From the centre of the footprint's first cell to the next cell's: a move one cell along x.

@@ -113,30 +113,19 @@ func run(main: MainScript) -> void:
 		"the academy's %d outline vertices carry ink 1.00" % academy_inks.size())
 	var middle := across * (first + SPACING * (row.size() - 1 + ACADEMY_GAP / SPACING) * 0.5) + Vector3(0, 0.5, 0)
 
-	await _frame(main, 24.0, middle)
+	await frame_settled(main, 24.0, middle, SETTLE_SECONDS, SETTLE_FRAMES)
 	await screenshot("row-24")
-	await _frame(main, 10.0, middle)
+	await frame_settled(main, 10.0, middle, SETTLE_SECONDS, SETTLE_FRAMES)
 	await screenshot("row-10")
-	await _frame(main, 4.0, _figures[1].position + Vector3(0, 0.42, 0))
+	await frame_settled(main, 4.0, _figures[1].position + Vector3(0, 0.42, 0), SETTLE_SECONDS, SETTLE_FRAMES)
 	await screenshot("colonist-4")
-	await _frame(main, 4.0, _figures[4].position + Vector3(0, 0.46, 0))
+	await frame_settled(main, 4.0, _figures[4].position + Vector3(0, 0.46, 0), SETTLE_SECONDS, SETTLE_FRAMES)
 	await screenshot("automaton-4")
 	for node: Node3D in _figures:
 		node.rotation.y += PI
-	await _frame(main, 10.0, middle)
+	await frame_settled(main, 10.0, middle, SETTLE_SECONDS, SETTLE_FRAMES)
 	await screenshot("backs-10")
 	root.queue_free()
-
-
-## Sets the camera to `size` (under its own closest zoom directly) with `target` at the screen's
-## centre, and lets the frame settle.
-func _frame(main: MainScript, size: float, target: Vector3) -> void:
-	var centre := main.get_viewport().get_visible_rect().size * 0.5
-	main.camera.zoom_at(main.camera.size / maxf(size, IsoCamera.MIN_ZOOM_SIZE), centre)
-	main.camera.size = size
-	main.camera.pan(centre, centre - main.camera.unproject_position(target))
-	await main.get_tree().create_timer(SETTLE_SECONDS).timeout
-	await frames(SETTLE_FRAMES)
 
 
 ## The ink factor (1 - UV.x) of every outline vertex under `node`, in the order its outline

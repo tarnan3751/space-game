@@ -77,9 +77,7 @@ func run(main: MainScript) -> void:
 			moved += 1
 	check(moved == _movers.size() and moved == 5, "%d of %d moving parts moved in 10 frames" % [moved, _movers.size()])
 
-	var centre := main.get_viewport().get_visible_rect().size * 0.5
-	main.camera.zoom_at(main.camera.size / ZOOM_SIZE, centre)
-	main.camera.pan(centre, centre - main.camera.unproject_position(Vector3.ZERO))
+	zoom_to(main, ZOOM_SIZE, Vector3.ZERO)
 	# The window shows a frame or more behind the scene, and the first frames compile the rig's
 	# shaders: wait for both a settle and a run of frames before the first shot.
 	await main.get_tree().create_timer(SETTLE_SECONDS).timeout

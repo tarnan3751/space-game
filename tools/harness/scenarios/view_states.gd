@@ -11,15 +11,13 @@ func run(main: MainScript) -> void:
 	await main.get_tree().create_timer(2.1).timeout  # TIME_FPS then covers a settled second.
 	say("fresh base: %d draw calls, %d fps" % [Performance.get_monitor(Performance.RENDER_TOTAL_DRAW_CALLS_IN_FRAME),
 		Performance.get_monitor(Performance.TIME_FPS)])
-	var centre := main.get_viewport().get_visible_rect().size * 0.5
-	main.camera.zoom_at(main.camera.size / CLOSE_UP_SIZE, centre)
 	var cc_id := 0
 	for id: int in main.state.buildings:
 		if main.state.buildings[id].type == "command_center":
 			cc_id = id
 	var cc: BuildingState = main.state.buildings[cc_id]
 	var cc_view: BuildingView = main.base_view.views[cc_id]
-	main.camera.pan(centre, centre - main.camera.unproject_position(cc_view.position))
+	zoom_to(main, CLOSE_UP_SIZE, cc_view.position)
 	main.placement.select(cc_id)
 	check(_all_overridden(cc_view, true, MaterialKit.ink_selected()), "the selected building's outlines are gold")
 	check(not main.base_view.is_grid_shown(), "the grid is hidden with a building selected")

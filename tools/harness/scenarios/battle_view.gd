@@ -143,7 +143,7 @@ func run(main: MainScript) -> void:
 			n += 1
 	view.script_commands(commands)
 	var focus := main.base_view.cell_to_world(Vector2i(38, 14), 1)
-	_frame(main, CLOSE_ZOOM, focus)
+	zoom_to(main, CLOSE_ZOOM, focus)
 
 	# The Ranger's card selects it; a tap deploys one; a tap in the zone is refused with a toast.
 	hud.card("ranger").pressed.emit()
@@ -215,7 +215,7 @@ func run(main: MainScript) -> void:
 		await _measure(main, view)
 		view.speed = 1
 		main.get_window().size = window
-	_frame(main, CLOSE_ZOOM, focus)
+	zoom_to(main, CLOSE_ZOOM, focus)
 	await _until_tick(view, CLOSE_TICKS[1])
 	await screenshot("tick-%d" % CLOSE_TICKS[1])
 	await _cast_abilities(main, view, hud)
@@ -226,7 +226,7 @@ func run(main: MainScript) -> void:
 
 	hud.speed_button().pressed.emit()
 	check(view.speed == 2 and hud.speed_button().text == "2x", "the speed button runs the battle at 2x")
-	_frame(main, IsoCamera.MAX_ZOOM_SIZE, Vector3.ZERO)
+	zoom_to(main, IsoCamera.MAX_ZOOM_SIZE, Vector3.ZERO)
 	await _until_tick(view, LATE_TICK)
 	if not view.sim.is_over():
 		await screenshot("tick-%d" % LATE_TICK)
@@ -237,7 +237,7 @@ func run(main: MainScript) -> void:
 		# reaches nothing.
 		var units_now := view.sim.unit_count()
 		var beside: Vector2i = spots[0][0]
-		await _touch(main, _screen(main, view, beside))
+		await tap_screen(main, _screen(main, view, beside))
 		check(view.deploy_unit == "ranger" and view.sim.left_to_deploy("ranger") == KEPT
 			and view.sim.unit_count() == units_now and hud.is_confirm_open(),
 			"a touch beside the open confirmation deploys nothing (%d units)" % view.sim.unit_count())
@@ -342,7 +342,7 @@ func _cast_abilities(main: MainScript, view: BattleView, hud: BattleHud) -> void
 	check(view.cast_ability == "orbital_strike" and view.deploy_unit == "" and view.field.deploy_strength() == 0.0,
 		"the strike's card selects it, the unit let go and the red zone hidden")
 	var at := _centre(main, view, target)
-	_frame(main, CLOSE_ZOOM, at)
+	zoom_to(main, CLOSE_ZOOM, at)
 	var tick := view.sim.tick
 	view.input.tapped.emit(main.camera.unproject_position(at))
 	check(view.sim.left_to_use("orbital_strike") == ABILITIES_EACH - 1, "a tap cast the strike on the %s (id %d)"
@@ -363,7 +363,7 @@ func _cast_abilities(main: MainScript, view: BattleView, hud: BattleHud) -> void
 	var turret: int = defences[defences.size() - 1]
 	hud.ability_card("emp_burst").pressed.emit()
 	at = _centre(main, view, turret)
-	_frame(main, CLOSE_ZOOM, at)
+	zoom_to(main, CLOSE_ZOOM, at)
 	view.input.tapped.emit(main.camera.unproject_position(at))
 	await _until_tick(view, view.sim.tick + 2)
 	check(view.sim.left_to_use("emp_burst") == ABILITIES_EACH - 1 and view.sim.building_disabled(turret)
@@ -380,7 +380,7 @@ func _cast_abilities(main: MainScript, view: BattleView, hud: BattleHud) -> void
 	if unit != 0:
 		at = view.units.aim_point(unit)
 		at.y = 0.0
-		_frame(main, CLOSE_ZOOM, at)
+		zoom_to(main, CLOSE_ZOOM, at)
 		view.input.tapped.emit(main.camera.unproject_position(at))
 		await _until_tick(view, view.sim.tick + 4)
 	check(view.sim.left_to_use("repair_swarm") == ABILITIES_EACH - 1, "a tap cast the swarm on unit %d" % unit)
@@ -408,16 +408,6 @@ func _centre(_main: MainScript, view: BattleView, id: int) -> Vector3:
 	return view.building_centre(id)
 
 
-## A real touch at `point` (a press and a release), through the input events.
-func _touch(main: MainScript, point: Vector2) -> void:
-	for pressed: bool in [true, false]:
-		var touch := InputEventScreenTouch.new()
-		touch.position = main.get_viewport().get_final_transform() * point
-		touch.pressed = pressed
-		Input.parse_input_event(touch)
-		await frames(2)
-
-
 ## The screen point of `cell`'s centre on the battle's field.
 func _screen(main: MainScript, view: BattleView, cell: Vector2i) -> Vector2:
 	return main.camera.unproject_position(view.field.cell_to_world(cell, 1))
@@ -439,19 +429,12 @@ func _until_tick(view: BattleView, tick: int) -> void:
 		await frames(1)
 
 
-## Sets the camera to `size` with `target` at the screen's centre.
-func _frame(main: MainScript, size: float, target: Vector3) -> void:
-	var centre := main.get_viewport().get_visible_rect().size * 0.5
-	main.camera.zoom_at(main.camera.size / size, centre)
-	main.camera.pan(centre, centre - main.camera.unproject_position(target))
-
-
 ## The battle at the widest zoom over the field: held SETTLE_SECONDS, then sampled every frame for
 ## SAMPLE_SECONDS, as template_base measures the base; says the most draw calls and primitives in a
 ## frame, the render thread's CPU time a frame on average, the slowest frame's process time, the
 ## frame rate and the units drawn, and checks the first three against the ceilings.
 func _measure(main: MainScript, view: BattleView) -> void:
-	_frame(main, IsoCamera.MAX_ZOOM_SIZE, Vector3.ZERO)
+	zoom_to(main, IsoCamera.MAX_ZOOM_SIZE, Vector3.ZERO)
 	var viewport_rid := main.get_viewport().get_viewport_rid()
 	RenderingServer.viewport_set_measure_render_time(viewport_rid, true)
 	await main.get_tree().create_timer(SETTLE_SECONDS).timeout

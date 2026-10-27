@@ -374,6 +374,4 @@ func _screen_of(main: MainScript, cell: Vector2i) -> Vector2:
 
 ## The closest zoom, centred on `cell`, through the calls a pinch and a drag make.
 func _frame(main: MainScript, cell: Vector2i) -> void:
-	var centre := main.get_viewport().get_visible_rect().size * 0.5
-	main.camera.zoom_at(main.camera.size / CLOSE_UP_SIZE, centre)
-	main.camera.pan(centre, centre - _screen_of(main, cell))
+	zoom_to(main, CLOSE_UP_SIZE, main.base_view.cell_to_world(cell, 1))

@@ -212,11 +212,11 @@ func _poses(main: MainScript) -> void:
 		instance.multimesh = multimesh
 		root.add_child(instance)
 	var middle := Vector3(0, 0.4, 0)
-	await _frame(main, 24.0, middle)
+	await frame_settled(main, 24.0, middle, SETTLE_SECONDS, SETTLE_FRAMES)
 	await screenshot("poses-24")
-	await _frame(main, 8.0, middle)
+	await frame_settled(main, 8.0, middle, SETTLE_SECONDS, SETTLE_FRAMES)
 	await screenshot("poses-8")
-	await _frame(main, 4.0, across * (first + SPACING * 2.0) + middle)
+	await frame_settled(main, 4.0, across * (first + SPACING * 2.0) + middle, SETTLE_SECONDS, SETTLE_FRAMES)
 	await screenshot("poses-4")
 	root.queue_free()
 	for view: BuildingView in main.base_view.views.values():
@@ -254,9 +254,9 @@ func _battle(main: MainScript) -> void:
 
 	await _until(main, func() -> bool: return view.sim.tick >= WALK_TICK)
 	view.speed = 0
-	await _frame(main, 24.0, field_point)
+	await frame_settled(main, 24.0, field_point, SETTLE_SECONDS, SETTLE_FRAMES)
 	await screenshot("battle-walk-24")
-	await _frame(main, 10.0, field_point)
+	await frame_settled(main, 10.0, field_point, SETTLE_SECONDS, SETTLE_FRAMES)
 	await screenshot("battle-walk-10")
 	view.speed = 1
 
@@ -282,9 +282,9 @@ func _battle(main: MainScript) -> void:
 		var off := rad_to_deg(absf(angle_difference(atan2(facing.x, facing.z), atan2(to.x, to.z))))
 		say("the head faces %.1f degrees off its target" % off)
 		check(off <= AIM_TOLERANCE, "the head faces its target (%.1f degrees off, within %.0f)" % [off, AIM_TOLERANCE])
-	await _frame(main, 24.0, view.building_centre(TURRET) + Vector3(0.5, 1.0, 2.0))
+	await frame_settled(main, 24.0, view.building_centre(TURRET) + Vector3(0.5, 1.0, 2.0), SETTLE_SECONDS, SETTLE_FRAMES)
 	await screenshot("battle-shot-24")
-	await _frame(main, 10.0, view.building_centre(TURRET) + Vector3(0.5, 1.0, 2.0))
+	await frame_settled(main, 10.0, view.building_centre(TURRET) + Vector3(0.5, 1.0, 2.0), SETTLE_SECONDS, SETTLE_FRAMES)
 	await screenshot("battle-shot-10")
 	view.speed = 1
 
@@ -296,7 +296,7 @@ func _battle(main: MainScript) -> void:
 	await _until(main, func() -> bool: return _last_shooter != shooter and _last_shooter > 0)
 	if _last_shooter > 0:
 		view.speed = 0
-		await _frame(main, 6.0, view.units.aim_point(_last_shooter))
+		await frame_settled(main, 6.0, view.units.aim_point(_last_shooter), SETTLE_SECONDS, SETTLE_FRAMES)
 		await screenshot("battle-ranger-6")
 	view.speed = 1
 	main.get_tree().process_frame.disconnect(_on_frame)
@@ -356,14 +356,3 @@ func _until(main: MainScript, done: Callable) -> void:
 	while not done.call() and waited < MAX_WAIT_FRAMES:
 		await main.get_tree().process_frame
 		waited += 1
-
-
-## Sets the camera to `size` (under its own closest zoom directly) with `target` at the screen's
-## centre, and lets the frame settle.
-func _frame(main: MainScript, size: float, target: Vector3) -> void:
-	var centre := main.get_viewport().get_visible_rect().size * 0.5
-	main.camera.zoom_at(main.camera.size / maxf(size, IsoCamera.MIN_ZOOM_SIZE), centre)
-	main.camera.size = size
-	main.camera.pan(centre, centre - main.camera.unproject_position(target))
-	await main.get_tree().create_timer(SETTLE_SECONDS).timeout
-	await frames(SETTLE_FRAMES)
