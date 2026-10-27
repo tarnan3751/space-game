@@ -19,12 +19,15 @@ extends CanvasLayer
 ##   the abilities used, each a picture with its count on a chip, and Return, which leaves the
 ##   battle (BattleView.leave). It ends inside the safe area: what lies between the banner and
 ##   Return scrolls when it would not fit.
-## - A toast for a refused deploy.
+## - A toast for a refused deploy or cast, its left edge red for a refusal (ToastKind).
 ##
 ## Everything sits inside the device's safe area (Hud.safe_area), the deploy bar with a column kept
 ## clear at its right where the base's Build button stands. Layout containers take no touch, so
 ## the field under them gets it; the panels and buttons take theirs. Text is set only when what it
 ## shows changed, on the view's `stepped`.
+
+## A toast's kind, which colours its left edge: red for a refusal, cyan for anything else.
+enum ToastKind { INFO, REFUSAL }
 
 ## A deploy card and its picture; a star in the top panel and on the result panel; a deployed
 ## unit's picture there.
@@ -490,10 +493,11 @@ func _build_result() -> void:
 	column.add_child(_return_button)
 
 
-## Top centre, under the top panels; it takes no touch and hides once faded.
+## Top centre, under the top panels; it takes no touch and hides once faded. Its shape shows its
+## kind's edge round the body (BattleToastBody), which holds the text.
 func _build_toast() -> void:
 	_toast = PanelContainer.new()
-	_toast.theme_type_variation = &"Toast"
+	_toast.theme_type_variation = &"BattleToastInfo"
 	_toast.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	_toast.visible = false
 	_root.add_child(_toast)
@@ -501,7 +505,11 @@ func _build_toast() -> void:
 	_toast.grow_horizontal = Control.GROW_DIRECTION_BOTH
 	_toast.offset_top = 96
 	_toast.offset_bottom = 96
-	_toast_label = _label(_toast, "", &"ToastText")
+	var body := PanelContainer.new()
+	body.theme_type_variation = &"BattleToastBody"
+	body.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_toast.add_child(body)
+	_toast_label = _label(body, "", &"BattleToastText")
 	_toast_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 
 
@@ -753,15 +761,16 @@ func _on_confirm_end() -> void:
 
 func _on_deploy_failed(error: String) -> void:
 	if DEPLOY_TEXT.has(error):
-		_show_toast(DEPLOY_TEXT[error])
+		_show_toast(DEPLOY_TEXT[error], ToastKind.REFUSAL)
 
 
 func _on_cast_failed(error: String) -> void:
 	if CAST_TEXT.has(error):
-		_show_toast(CAST_TEXT[error])
+		_show_toast(CAST_TEXT[error], ToastKind.REFUSAL)
 
 
-func _show_toast(text: String) -> void:
+func _show_toast(text: String, kind: ToastKind = ToastKind.INFO) -> void:
+	_toast.theme_type_variation = &"BattleToastRefusal" if kind == ToastKind.REFUSAL else &"BattleToastInfo"
 	_toast_label.text = text
 	_toast.modulate.a = 1.0
 	_toast.show()

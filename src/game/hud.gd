@@ -2708,6 +2708,23 @@ func _make_theme() -> Theme:
 	ui.set_stylebox("grabber", &"BattleScrollBar", _flat(TEXT_DIM, 4))
 	ui.set_stylebox("grabber_highlight", &"BattleScrollBar", _flat(TEXT, 4))
 	ui.set_stylebox("grabber_pressed", &"BattleScrollBar", _flat(ACCENT, 4))
+	# The toast: its shape in the colour of its kind's edge (red a refusal, cyan the rest), the
+	# panel's fill over all of it but a 4 px band at its left.
+	for kind: StringName in [&"BattleToastInfo", &"BattleToastRefusal"]:
+		var rim := _shape(MaterialKit.DEFENCE if kind == &"BattleToastRefusal" else ACCENT, 10, BORDER)
+		rim.content_margin_left = BORDER + 4
+		ui.set_type_variation(kind, &"PanelContainer")
+		ui.set_stylebox("panel", kind, rim)
+	var body := _flat(Color(PANEL, 1.0), 7)
+	body.corner_radius_top_left = 4
+	body.corner_radius_bottom_left = 4
+	body.content_margin_left = 14
+	body.content_margin_right = 18
+	body.content_margin_top = 8
+	body.content_margin_bottom = 8
+	ui.set_type_variation(&"BattleToastBody", &"PanelContainer")
+	ui.set_stylebox("panel", &"BattleToastBody", body)
+	_label_variation(ui, &"BattleToastText", 19, TEXT, 0)
 	return ui
 
 
