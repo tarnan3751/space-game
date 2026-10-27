@@ -210,6 +210,16 @@ var _muzzles: Dictionary[int, float] = {}
 ## leaves.
 var _aimers := PackedInt32Array()
 var _next_muzzle: Dictionary[int, int] = {}
+## Per aiming defence, in _aimers' order, from its type at setup: how fast its head turns
+## (AIM_TURN) and its barrels pitch (LOB_TURN for a lobbing gun), and how its elevation is found
+## (_elevation): a lobbing gun's degrees at its far end and at its foot (LOB_ELEVATION) and the
+## cells its far end is at (LOB_REACH), a direct-fire gun's PITCH_LIMITS in radians.
+enum Elevate { OWN, DIRECT, LOB }
+var _aim_turn := PackedFloat32Array()
+var _pitch_turn := PackedFloat32Array()
+var _elevate := PackedByteArray()
+var _elevate_span := PackedVector2Array()
+var _lob_reach := PackedFloat32Array()
 ## Per aiming defence with a shot held until its head faces its target: the unit, and when it fired.
 var _held_shots: Dictionary[int, int] = {}
 var _held_since: Dictionary[int, float] = {}
@@ -264,11 +274,13 @@ var _splash: Dictionary[String, float] = {}
 var _ended_at: float = -1.0
 var _finished: bool = false
 ## The deploy mask, one texel a cell (255 where a unit cannot go), its texture, whether a fall
-## changed it this frame, and when a refusal for the zone flashed it.
+## changed it this frame, when a refusal for the zone flashed it, and the strength the ground last
+## took (set_deploy_mask, set again only when it moves).
 var _mask_image: Image
 var _mask: ImageTexture
 var _mask_changed: bool = false
 var _mask_flash_at: float = -10.0
+var _mask_strength: float = 0.0
 ## A drag deploying (a smear): whether one is under way, the last cell it reached, and the cells
 ## it crossed still to deploy on, one a tick.
 var _smearing: bool = false
@@ -351,7 +363,7 @@ func setup(battle_catalog: Catalog, setup_data: Dictionary, iso_camera: IsoCamer
 				_views[id] = view
 				_muzzles[id] = maxf(0.6, view.site_height() * MUZZLE_SHARE)
 				if view.can_aim():
-					_aimers.append(id)
+					_add_aimer(id)
 				var stats := catalog.level_stats(type, level)
 				if int(stats.get("shield_hp", 0)) > 0:
 					_shields.append(id)
@@ -491,12 +503,16 @@ func _process(delta: float) -> void:
 	if _walls_changed:
 		_walls_changed = false
 		field.walls.rebuild_cells(catalog, _walls)
+	var masked := _mask_changed
 	if _mask_changed:
 		_mask_changed = false
 		_update_mask()
 	if deploy_unit != "":
 		var flash := clampf(1.0 - (_clock - _mask_flash_at) / (MASK_FLASH_SECONDS * maxi(speed, 1)), 0.0, 1.0)
-		field.set_deploy_mask(_mask, lerpf(MASK_STRENGTH, MASK_FLASH, flash))
+		var strength := lerpf(MASK_STRENGTH, MASK_FLASH, flash)
+		if masked or strength != _mask_strength:
+			_mask_strength = strength
+			field.set_deploy_mask(_mask, strength)
 	if profiled:
 		Profile.since(&"walls_mask", started)
 		Profile.since(&"battle_view", began)
@@ -518,7 +534,8 @@ func select_unit(unit: String) -> void:
 		_smearing = false
 	else:
 		cast_ability = ""
-	field.set_deploy_mask(_mask, MASK_STRENGTH if unit != "" else 0.0)
+	_mask_strength = MASK_STRENGTH if unit != "" else 0.0
+	field.set_deploy_mask(_mask, _mask_strength)
 
 
 ## Selects the ability a tap casts, "" for none; it lets the unit type go, so the red zone hides
@@ -1027,7 +1044,8 @@ func _shake_camera() -> void:
 ## Turns each aiming head towards its defence's target, `shown` seconds of battle after the last
 ## frame: held while the defence is disabled, back to its idle swing a while after it has none.
 func _aim_defences(shown: float) -> void:
-	for id: int in _aimers:
+	for k: int in _aimers.size():
+		var id := _aimers[k]
 		if not _views.has(id):
 			continue
 		var view := _views[id]
@@ -1035,9 +1053,7 @@ func _aim_defences(shown: float) -> void:
 			var target := sim.building_target(id)
 			if target != 0 and sim.unit_state(target) != BattleArmy.DEAD:
 				var point := units.aim_point(target)
-				var turn := float(AIM_TURN.get(_types[id], AIM_TURN_DEFAULT))
-				var lobs := LOB_ELEVATION.has(_types[id])
-				view.aim_at(point, _elevation(id, view, point), _clock, shown, turn, LOB_TURN if lobs else turn)
+				view.aim_at(point, _elevation(k, view, point), _clock, shown, _aim_turn[k], _pitch_turn[k])
 			else:
 				view.idle_aim(_clock, shown, AIM_RETURN)
 		if _held_shots.has(id) and (view.aim_error(units.aim_point(_held_shots[id])) <= AIM_READY
@@ -1045,22 +1061,43 @@ func _aim_defences(shown: float) -> void:
 			_release_shot(id)
 
 
-## The elevation (radians over level) defence `id`'s barrels want for the world point `point`: a
-## lobbing gun's by its range (LOB_ELEVATION), a direct-fire one's straight at it from its
-## trunnion, within PITCH_LIMITS; the barrels' own for a type with neither.
-func _elevation(id: int, view: BuildingView, point: Vector3) -> float:
+## Aiming defence `id`'s record (_aim_turn and the rest), from its type.
+func _add_aimer(id: int) -> void:
 	var type := _types[id]
+	_aimers.append(id)
+	var turn := float(AIM_TURN.get(type, AIM_TURN_DEFAULT))
+	_aim_turn.append(turn)
+	var elevate := Elevate.OWN
+	var span := Vector2.ZERO
+	var reach := 0.0
+	if LOB_ELEVATION.has(type):
+		elevate = Elevate.LOB
+		span = LOB_ELEVATION[type]
+		reach = maxf(1.0, float(_stat(id, "range_cells")) * float(LOB_REACH.get(type, 1.0)))
+	elif PITCH_LIMITS.has(type):
+		elevate = Elevate.DIRECT
+		var limits: Vector2 = PITCH_LIMITS[type]
+		span = Vector2(deg_to_rad(limits.x), deg_to_rad(limits.y))
+	_pitch_turn.append(LOB_TURN if elevate == Elevate.LOB else turn)
+	_elevate.append(elevate)
+	_elevate_span.append(span)
+	_lob_reach.append(reach)
+
+
+## The elevation (radians over level) the barrels of the aiming defence `k` (its place in _aimers)
+## want for the world point `point`: a lobbing gun's by its range (LOB_ELEVATION), a direct-fire
+## one's straight at it from its trunnion, within PITCH_LIMITS; the barrels' own for a type with
+## neither.
+func _elevation(k: int, view: BuildingView, point: Vector3) -> float:
+	if _elevate[k] == Elevate.OWN:
+		return view.elevation()
 	var from := view.pitch_origin()
 	var across := Vector2(point.x - from.x, point.z - from.z).length()
-	if LOB_ELEVATION.has(type):
-		var lob: Vector2 = LOB_ELEVATION[type]
-		var reach := float(_stat(id, "range_cells")) * float(LOB_REACH.get(type, 1.0))
-		var share := clampf(across / maxf(1.0, reach), 0.0, 1.0)
-		return deg_to_rad(lerpf(lob.y, lob.x, share))
-	if not PITCH_LIMITS.has(type):
-		return view.elevation()
-	var limits: Vector2 = PITCH_LIMITS[type]
-	return clampf(atan2(point.y - from.y, across), deg_to_rad(limits.x), deg_to_rad(limits.y))
+	var span := _elevate_span[k]
+	if _elevate[k] == Elevate.LOB:
+		var share := clampf(across / _lob_reach[k], 0.0, 1.0)
+		return deg_to_rad(lerpf(span.y, span.x, share))
+	return clampf(atan2(point.y - from.y, across), span.x, span.y)
 
 
 ## Fires defence `id`'s held shot: its weapon from its next muzzle socket, wherever its head is now,
