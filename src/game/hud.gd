@@ -2670,6 +2670,9 @@ func _make_theme() -> Theme:
 	ui.set_stylebox("panel", &"BattleCardRing", ring)
 	_label_variation(ui, &"BattleCardName", 17, TEXT, 0)
 	_label_variation(ui, &"BattleCount", 22, TEXT, 0)
+	# The End confirmation: its title, and Keep fighting, the safe choice, in cyan.
+	_label_variation(ui, &"BattleTitle", 30, TEXT, 0, DISPLAY_FONT)
+	_button_variation(ui, &"BattleConfirmButton", ACCENT, 12, DISPLAY_FONT, 24, 0, INK)
 	return ui
 
 

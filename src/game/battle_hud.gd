@@ -41,8 +41,11 @@ const RING_INSET := 5
 const CONTENT_INSET := 9
 ## Between the deploy bar and the abilities bar.
 const BAR_GAP := 16
-## The dim behind the End confirmation, which takes every touch while it is open.
-const BACKDROP := Color(0.106, 0.102, 0.18, 0.35)
+## The dim behind the End confirmation, which takes every touch while it is open: the ink at 55 %,
+## so the field does not compete with the question.
+const BACKDROP := Color(Hud.INK, 0.55)
+const KEEP_SIZE := Vector2(200, 72)
+const CONFIRM_END_SIZE := Vector2(180, 72)
 const SPEED_SIZE := Vector2(96, 64)
 const END_SIZE := Vector2(140, 64)
 ## Between speed and End, so a miss on the toggle does not land on End.
@@ -424,16 +427,16 @@ func _build_confirm() -> void:
 	_confirm = _centred_panel(_confirm_backdrop)
 	_confirm.visible = true
 	var column := _confirm.get_child(0) as VBoxContainer
-	_label(column, "End the battle?", &"InfoTitle").horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	_label(column, "End the battle?", &"BattleTitle").horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	var buttons := HBoxContainer.new()
 	buttons.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	buttons.alignment = BoxContainer.ALIGNMENT_CENTER
 	buttons.add_theme_constant_override("separation", 16)
 	column.add_child(buttons)
-	_keep_button = _button("Keep fighting", Vector2(190, 60), &"ConfirmButton")
+	_keep_button = _button("Keep fighting", KEEP_SIZE, &"BattleConfirmButton")
 	_keep_button.pressed.connect(func() -> void: _confirm_backdrop.hide())
 	buttons.add_child(_keep_button)
-	_confirm_end_button = _button("End battle", Vector2(170, 60), &"BarButton")
+	_confirm_end_button = _button("End battle", CONFIRM_END_SIZE, &"BattleBarButton")
 	_confirm_end_button.pressed.connect(_on_confirm_end)
 	buttons.add_child(_confirm_end_button)
 
@@ -478,7 +481,7 @@ func _build_toast() -> void:
 
 func _centred_panel(parent: Control) -> PanelContainer:
 	var panel := PanelContainer.new()
-	panel.theme_type_variation = &"MenuPanel"
+	panel.theme_type_variation = &"BattlePanel"
 	panel.mouse_filter = Control.MOUSE_FILTER_STOP
 	panel.visible = false
 	parent.add_child(panel)
