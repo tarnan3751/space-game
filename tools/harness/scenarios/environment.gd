@@ -328,7 +328,7 @@ func _check_edge_step(main: MainScript) -> void:
 
 
 ## The HUD's controls over the world on a fresh base, in image pixels: the top bar's meters and
-## drone ring, the Build button, and in a debug build the Template base and Reset base buttons.
+## drone meter, the Build button, and in a debug build the Template base and Reset base buttons.
 func _hud_rects(main: MainScript, scale: Vector2) -> Array[Rect2i]:
 	var hud := main.hud
 	var controls: Array[Control] = [hud.drones_panel(), hud.build_button(), hud.template_button(), hud.reset_button()]

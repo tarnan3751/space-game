@@ -1,6 +1,6 @@
 extends HarnessScenario
 ## The HUD's layout on a fresh base: the top bar's row holds the resource meters and then the
-## drone ring, nothing else; under a notch-like safe-area inset the top bar, the Build
+## drone meter, nothing else; under a notch-like safe-area inset the top bar, the Build
 ## button and the open build panel's content keep inside the inset while the panel reaches the
 ## screen's edges; a drag across the card strip scrolls it and presses nothing; and a window
 ## resized while the panel slides open leaves it open on the new bottom edge.
@@ -22,7 +22,7 @@ func run(main: MainScript) -> void:
 		meters += 1 if hud.resource_panel(res).get_parent() == row else 0
 	check(meters == catalog.resources.size() and row.get_child_count() == meters + 1
 		and hud.drones_panel().get_index() == meters,
-		"the top bar's row holds the %d resource meters, then the drone ring (%d parts)" % [meters, row.get_child_count()])
+		"the top bar's row holds the %d resource meters, then the drone meter (%d parts)" % [meters, row.get_child_count()])
 	await open_build_menu(main)
 	hud.tab_button(catalog.category_of("laser_turret")).pressed.emit()
 	var full := main.get_viewport().get_visible_rect()

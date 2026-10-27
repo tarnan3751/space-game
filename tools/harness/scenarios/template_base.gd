@@ -3,7 +3,7 @@ extends HarnessScenario
 ## button. Checks every type at its count for the top Command Center level, all at the top level
 ## and finished; no two footprints overlapping and all inside the grid; every wall
 ## (PlacementController.PAINT_TYPE) joined to another (each is part of a fence); every resource
-## at its cap; every drone free, on the ring too; every moving part moving (a node's pose changing,
+## at its cap; every drone free, on the drone meter too; every moving part moving (a node's pose changing,
 ## a part folded into its body unheld, BuildingModels.held_at, and carrying a motion that moves), but
 ## for the aiming parts whose idle is still by design (_idles); the save written to
 ## the run's own file, user://base.json untouched. Screenshots: the whole base at the widest zoom
@@ -82,7 +82,7 @@ func run(main: MainScript) -> void:
 		check(state.resources[res] == cap, "%s %d of a cap of %d" % [res, state.resources[res], cap])
 	var ring := Vector2i(main.hud.drones_panel().free_count(), main.hud.drones_panel().total_count())
 	check(state.builders_total() > 0 and state.builders_free() == state.builders_total() and ring.x == ring.y
-		and ring.y == state.builders_total(), "%d of %d drones free, %s on the ring" % [state.builders_free(),
+		and ring.y == state.builders_total(), "%d of %d drones free, %s on the drone meter" % [state.builders_free(),
 		state.builders_total(), ring])
 	var saved: Dictionary = JSON.parse_string(FileAccess.get_file_as_string(main.save_path))
 	check(main.save_path == harness.save_path and (saved["buildings"] as Array).size() == state.buildings.size()

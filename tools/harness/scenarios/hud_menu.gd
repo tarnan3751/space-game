@@ -1,5 +1,5 @@
 extends HarnessScenario
-## The HUD on a fresh base: the meters and drone ring, the Build button and the panel it slides
+## The HUD on a fresh base: the meters and drone meter, the Build button and the panel it slides
 ## up (tabs, cards and their pictures, the selected tab pressed again, close button), a card
 ## picked into the place bar, a purchase and its flash on the metal meter, the crystal meter
 ## still through the new harvester's trickle and flashing on a catch-up, a wide window; the
@@ -78,7 +78,7 @@ func run(main: MainScript) -> void:
 		"pressing the selected tab scrolled its strip back to %d, still selected" % strip.scroll_horizontal)
 
 	# A locked card is disabled and says what it needs. Taps on the panel's empty top row, on a
-	# meter and on the drone ring stop there; the close button closes the panel.
+	# meter and on the drone meter stop there; the close button closes the panel.
 	var locked: String = Array(catalog.menu_order).filter(func(type: String) -> bool:
 		return int(catalog.level_stats(type, 1).get("requires_cc", 1)) > state.cc_level())[0]
 	await tap_screen(main, hud.tab_button(catalog.category_of(locked)).get_global_rect().get_center())
@@ -90,7 +90,7 @@ func run(main: MainScript) -> void:
 	await tap_screen(main, hud.close_button().get_global_rect().get_center())
 	await wait_seconds(main, Hud.MENU_CLOSE_SECONDS)
 	check(not hud.is_menu_open() and not hud.close_button().is_visible_in_tree(), "the close button closed the panel")
-	check(_world_taps == 1, "no touch on the panel, a meter or the ring reached the world (%d did)" % (_world_taps - 1))
+	check(_world_taps == 1, "no touch on the panel, a meter or the drone meter reached the world (%d did)" % (_world_taps - 1))
 
 	# Picking a card closes the panel and begins placing; the place bar takes Build's place.
 	await open_build_menu(main)
@@ -110,7 +110,7 @@ func run(main: MainScript) -> void:
 	await frames(2)
 	check(hud.build_button().is_visible_in_tree(), "Build is back after cancelling")
 
-	# A purchase lowers the metal meter and busies the ring's drone.
+	# A purchase lowers the metal meter and busies the drone meter's drone.
 	var metal_before := hud.resource_fill("metal").size.x
 	await open_build_menu(main)
 	hud.entry_button("crystal_harvester").pressed.emit()
@@ -133,7 +133,7 @@ func run(main: MainScript) -> void:
 	await screenshot("wide-open")
 
 
-## Each meter's fill spans its track by amount over capacity, to a pixel; the ring counts drones.
+## Each meter's fill spans its track by amount over capacity, to a pixel; the drone meter counts drones.
 func _check_top_bar(hud: Hud, state: BaseState) -> void:
 	for res: String in state.catalog.resources:
 		var fill := hud.resource_fill(res)
@@ -143,7 +143,7 @@ func _check_top_bar(hud: Hud, state: BaseState) -> void:
 		check(absf(fill.size.x - want) <= 1.0, "the %s fill is %.0f px for %d / %d" % [res, fill.size.x, state.resources[res], capacity])
 	var ring := hud.drones_panel()
 	check(ring.free_count() == state.builders_free() and ring.total_count() == state.builders_total(),
-		"the drone ring shows %d of %d free" % [ring.free_count(), ring.total_count()])
+		"the drone meter shows %d of %d free" % [ring.free_count(), ring.total_count()])
 
 
 ## Each meter's stripes carry their own glint, a third of a period after the one before; two

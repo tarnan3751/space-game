@@ -572,18 +572,18 @@ widens the camera's bounds to the terrain's, since the player cannot centre the 
 field.
 
 `scenarios/hud_menu.gd` checks the HUD on a fresh base. The top bar: antimatter hidden, each
-meter's fill as wide as its track times amount over capacity (to a pixel) and the drone ring's
+meter's fill as wide as its track times amount over capacity (to a pixel) and the drone meter's
 free and total drones. The build panel: closed at start with Build showing, and a tap where it
 opens reaching the world; Build opens it on the first tab; a tap on each tab shows exactly that
 category's cards; a locked card is disabled with its "Needs Command Center N"; taps on the panel's
-empty top row, on a meter, on the drone ring and on the close button reach nothing behind them,
+empty top row, on a meter, on the drone meter and on the close button reach nothing behind them,
 and the close button closes the panel. A card: Metal Extractor reads "0 / 2"; a finger on it shows
 it pressed, and lifting it closes the panel and begins placing, with the place bar in place of
 Build, which comes back on cancelling. A purchase (Crystal Harvester, through the menu, confirmed)
-lowers the metal fill and busies the ring's one drone, both checked as at the start. Last, Build
+lowers the metal fill and busies the drone meter's one drone, both checked as at the start. Last, Build
 over the new building's info panel clears the selection and opens the panel, and in a 1560x720
 window the close button stays on screen. It screenshots the closed HUD, the open panel on each
-tab, the card pressed, the place bar, the purchase (the meters after it, the busy ring and the new
+tab, the card pressed, the place bar, the purchase (the meters after it, the busy drone meter and the new
 building's info panel), and the open panel in the wide window. Where a check is about touch
 routing, a scenario sends real events with `Input.parse_input_event` (`InputEventScreenTouch`,
 `InputEventScreenDrag`): they arrive in window pixels, so map a HUD point through
@@ -605,13 +605,24 @@ taken (01, 02, 04, 03, 05 per skin); about a minute and a half rendered. Headles
 wiring and the full states.
 
 `scenarios/hud_layout.gd` checks the HUD's layout on a fresh base. The top bar's row holds the
-resource meters and then the drone ring, and nothing else. Under a notch-like safe-area
+resource meters and then the drone meter, and nothing else. Under a notch-like safe-area
 inset (48 at the sides, 44 at the top, 34 at the bottom) with the build panel open on the
 defence tab, the top bar, the Build button, the tabs and the first card keep inside the inset
 less `Hud.MARGIN`, while the panel reaches the screen's sides and bottom edge; it screenshots
 that. Back on the whole screen, a real one-finger drag across the card strip scrolls it and
 presses nothing. Last, it presses Build, resizes the window to 1280x900 two frames into the
 opening slide, and checks that the panel ends open on the new bottom edge, and screenshots it.
+
+`scenarios/drone_meter.gd` shows the top bar's drone meter (`docs/reference/hud.md`, **Drone
+meter**); run it `--rendered`. On a fresh base it sets the real meter to 0/1, 1/1, 1/3, 3/3, 2/5,
+0/5 and 5/5 drones free in turn and screenshots each beside the resource meters (`0of1` ..
+`5of5`), checking the counts it shows, its text ("2 / 5") and that it ends the top bar's row;
+then every count again at 2x on the panel colour, in two columns (`2x`); then the top bar at 2 / 5
+in each skin, A, B and C, through `Hud.set_skin` (`skin-a` .. `skin-c`), checking that the meter
+takes the skin's trough (skin A's shot repeats `2of5`, and says so to the guard). The game's tick is held
+(`main` set to `PROCESS_MODE_DISABLED`) while the meter shows counts the base does not have, so
+the HUD's refresh does not put the real ones back, and the clock is fixed so the resource meters'
+glint stands still.
 
 `scenarios/train_units.gd` checks the training and research HUD (`docs/reference/hud.md`,
 **Army panel**) on the debug build's Template base, pressed through its button, so every
@@ -713,7 +724,7 @@ that every type is there at its count for the top Command Center level (`max_cou
 `max_cc_level()`), all at their top level and finished; that no two footprints overlap and all
 lie inside the grid (on a `BaseGrid` of its own); that every wall has another wall beside it,
 so each is part of a fence; that every resource is at its cap; that every drone is free, on
-the ring too; that the base was saved to the run's own file while `user://base.json`'s
+the drone meter too; that the base was saved to the run's own file while `user://base.json`'s
 modification time stayed the same; that every moving part of every model that is a node (carrying
 `BuildingModels.MOVE_META`) moves: sampled every four frames for 1.5 seconds, a part
 passes once any sample differs from its first pose, so a hammer's hold or a period that divides
