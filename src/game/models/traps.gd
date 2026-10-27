@@ -143,7 +143,8 @@ static func _grown_proximity_mine(p: Parts, level: int) -> void:
 		]), base, 30.0)
 	if level >= 6:
 		# A second filigree band round the dome's shoulder.
-		m.lathe(PackedVector2Array([Vector2(radius * 0.97, height * 0.6), Vector2(radius * 0.89, height * 0.72)]), 16,
+		# A step proud of the vein panels it crosses.
+		m.lathe(PackedVector2Array([Vector2(radius * 0.97 + 0.012, height * 0.6), Vector2(radius * 0.89 + 0.012, height * 0.72)]), 16,
 			base + Vector3(0, 0.006, 0), Parts.FILIGREE)
 	var spike := Parts.CHROME_ROUND
 	if crown:
@@ -355,7 +356,8 @@ static func build_mega_mine(p: Parts, level: int) -> void:
 	var height := 0.42 if level < 2 else 0.54
 	m.dome(radius, height, 24, 6, base + Vector3(0, 0.06, 0), CASING)
 	if level >= 2:
-		m.ring(radius - 0.02, radius + 0.04, 0.05, 24, base + Vector3(0, 0.1, 0),
+		# A step proud of the hazard band's wall.
+		m.ring(radius - 0.02, radius + 0.05, 0.05, 24, base + Vector3(0, 0.1, 0),
 			GOLD_ROUND if p.tier >= Parts.Tier.GOLD else CASING_MID)
 	var lights := 4 if level < 2 else 6
 	for i: int in lights:
