@@ -104,6 +104,11 @@ centre of the window) and frame a subject with `frame_world(main, size, world_po
 the battle sim, headless, and applies its result to a copy of the base (`battle.md`, **Tools**);
 `scenarios/battle_view.gd` runs the same army, without the strike, through the battle view on the
 Practice raid, measures its cost and checks its result against a headless run (`battle-view.md`).
+`scenarios/profile.gd` is the performance profile: the template base at three zooms, the sector map,
+the training panel and a full practice raid at two ticks, each sampled for its frame's parts, the
+render monitors and the CPU time a frame of each system `Profile` (`src/game/profile.gd`, a static
+flag only that scenario sets) times, with the triangles and draws by source and the battle's
+alpha-blended fill; a table at the end of its log (`tools/harness/README.md`).
 `scenarios/expedition.gd` lays out the template base's six expedition fields, fights the even
 one with the same army and applies the result with the expedition key, then scans, headless
 (`expeditions.md`).
@@ -232,7 +237,8 @@ The phone target (`docs/project_overview.md` §3.1): a 2021 mid-range Android (S
 Dimensity 700 class, 6 GB, 1080p) and an iPhone 11 as the floor; at least 30 fps in battle at
 the widest zoom with a maxed outpost and a full 280-housing army on screen, 60 fps in the base
 view. The Mac proxies (`battle_view` and `template_base`, rendered: the Cost ceilings and the
-sim's step) say whether a change is likely to hold it; only the device says whether it does. The
+sim's step; `profile`, rendered, for the cost by system and by source) say whether a change is
+likely to hold it; only the device says whether it does. The
 measurement needs a device in hand and is the owner's:
 
 1. **Build and connect.** Run a debug build on the device with Godot's remote debugger attached,

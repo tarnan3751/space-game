@@ -628,6 +628,34 @@ view's `site_height()`, said in the log), to fill no more
 than 70% of the screen, so none runs under the HUD or off the screen; each part again a second
 later where a part turns in it, to compare the two.
 
+`scenarios/profile.gd` is the performance profile, to re-run after every change made for cost: the
+Template base idle at camera sizes 44, 24 and 10, again at 44 with the sun's shadow off, the
+sector map open, the training panel open, and the Practice raid on it with the battle scenario's
+army at every type's top level, deployed in three groups from tick 1 and sampled live at sizes 44
+and 24 round ticks 200 and 1,000, again at 44 with the shadow off. Rendered, each sample is a
+1600×900 window with vsync off, held a second (three after the shadow goes off), then sampled every
+frame for three seconds: the frame's interval split into the main thread's part, the drawing and
+the wait after it (`RenderingServer.frame_pre_draw` and `frame_post_draw`), the `Performance`
+monitors, the shadow pass's primitives (`viewport_get_render_info`; the Compatibility renderer
+counts its draw calls as 0, so the shadow's draws are the difference the shadow-off sample makes),
+the render thread's CPU time (its GPU time reads 0 on this renderer), and the CPU time a frame of
+each system `Profile` times (`src/game/profile.gd`: a static `enabled` flag only this scenario sets,
+each timed entry point adding its microseconds under its key: `BuildingView._process` over every
+view, `BattleView._process` by section, the sim's step, `BattleUnits`' buffer uploads,
+`BattleEffects.draw` by list group). It also times `Hud.refresh`, `BaseView.sync`, the whole
+`changed` chain and a second's production paid, the save's JSON, the sector map's outposts and
+MultiMesh buffer uploads, and logs the triangles and draws a frame by source (the buildings' bodies,
+outlines and moving parts, the walls, the scenery; the units, each effect list, the rubble) and
+each battle tick's alpha-blended fill (the effects' and the holograms' projected triangles, in
+screens' worth). The log ends with a table, one row a sample, and a note on the nested systems:
+`battle_view` holds `battle_steps` (which holds `sim_step`), `units_draw` (which holds
+`units_upload`), `deaths`, `aim_defences`, `draw_buildings`, `bars_upload`, `effects_draw` (which
+holds every `fx_*`) and `walls_mask`, so the columns are not summed; `building_views` is apart.
+Each rendered sample checks that the window drew at least 99% of its frames (`frame_post_draw`
+fired between one process and the next), so a window that stops drawing fails the run, and the
+effect lists' member names it reads through `get()` are checked to resolve. Headless it skips the
+samples and checks the wiring. It checks no cost against a ceiling: the numbers are read.
+
 The `anim_*` scenarios shoot every moving thing in the game as frame strips, the evidence for
 the animation audit; each frame is framed with `frame_world` and every strip's line in the log
 names its camera size. Their checks only make sure each subject did what its strip is meant to
