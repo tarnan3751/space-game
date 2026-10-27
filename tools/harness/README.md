@@ -236,7 +236,8 @@ every storage (set directly, as the
 `expedition` scenario sets its copy's: training 167 units would take its real time), and Attack
 opens the battle: the map closed, the field's seed the landscape's, and every defender building's
 toon body and the merged walls on `MaterialKit.rival` (or, for the moment of a hit,
-`hit_flash_rival`) while nothing else in the battle carries it, checked at the start and at tick
+`hit_flash_rival`, under an EMP `disabled_rival`, and while a building holds its folded parts its
+held copy of one, `MaterialKit.moving` with `rival` 1) while nothing else in the battle carries it, checked at the start and at tick
 300, and the battle brings the army and the stock at their levels. The army is deployed in four
 waves from the middles of the field's edges through
 `script_commands` and run at 2x to its end, and the result panel's Return (`BattleHud`) leaves it.

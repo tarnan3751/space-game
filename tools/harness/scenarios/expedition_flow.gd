@@ -332,9 +332,9 @@ func run(main: MainScript) -> void:
 
 
 ## Every defender building's toon bodies and the merged walls carry MaterialKit.rival (or, for the
-## moment a building is hit, hit_flash_rival, and while an EMP has it disabled, disabled_rival)
-## exactly when `rival`; no other mesh in the battle
-## (units, outlines, rubble, scenery) carries either.
+## moment a building is hit, hit_flash_rival, and while an EMP has it disabled, disabled_rival; or,
+## while a building holds its folded parts, its held copy of one, _rival_worn) exactly when `rival`;
+## no other mesh in the battle (units, outlines, rubble, scenery) carries either.
 func _check_tint(view: BattleView, rival: bool) -> void:
 	var tinted := 0
 	var plain := 0
@@ -347,8 +347,7 @@ func _check_tint(view: BattleView, rival: bool) -> void:
 				continue
 			for surface: int in mesh.mesh.get_surface_count():
 				var override := mesh.get_surface_override_material(surface)
-				var on := override == MaterialKit.rival() or override == MaterialKit.hit_flash_rival() \
-					or override == MaterialKit.disabled_rival() or mesh.material_override == MaterialKit.rival()
+				var on := _rival_worn(override) or mesh.material_override == MaterialKit.rival()
 				var body := building and surface == 0 and mesh.mesh.surface_get_material(0) == MaterialKit.toon()
 				if mesh == view.field.walls.body:
 					body = true
@@ -367,6 +366,18 @@ func _check_tint(view: BattleView, rival: bool) -> void:
 			"the defender's %d bodies are tinted, %d left plain, %d other meshes tinted" % [tinted, plain, stray])
 	else:
 		check(tinted == 0 and stray == 0, "nothing is tinted (%d bodies, %d other meshes)" % [tinted, stray])
+
+
+## Whether `material` is one of the rival bodies' shared materials, or a held copy of one
+## (MaterialKit.moving: the toon_move shader with the copied `rival` 1), as a building whose folded
+## parts hold wears it (BuildingView._tint_folded).
+func _rival_worn(material: Material) -> bool:
+	if material == MaterialKit.rival() or material == MaterialKit.hit_flash_rival() \
+			or material == MaterialKit.disabled_rival():
+		return true
+	var held := material as ShaderMaterial
+	return held != null and held.shader == MaterialKit.TOON_MOVE_SHADER \
+		and float(held.get_shader_parameter(&"rival")) > 0.5
 
 
 ## Frames the middle of `view`'s buildings (their cells' mean) at BATTLE_ZOOM, the battle paused,

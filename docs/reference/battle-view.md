@@ -87,7 +87,9 @@ never clears the tint. A third variant costs one more shared material and no per
 the alternative, the grey as a per-instance shader parameter, would need instance uniforms on
 every body for the few seconds an EMP lasts; the merged walls' body
 takes `rival()` as its material override (`GeometryInstance3D.material_override`), which, unlike a
-surface's, survives the mesh being rebuilt as walls fall. No material is made per building. The
+surface's, survives the mesh being rebuilt as walls fall. A building that holds its folded parts
+(busy, or disabled by an EMP) wears per-building copies made by `MaterialKit.moving` from the
+material it currently wears, so the tint survives the copy (`rival` stays 1). The
 units, every outline, the rubble, the wall strips and the scenery are never tinted, and a practice
 battle leaves `rival` off.
 
