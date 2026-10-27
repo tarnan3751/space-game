@@ -133,19 +133,30 @@ const BUILD_SIZE := Vector2(136, 72)
 ## The Expedition button, bottom left, and the badge of open fields on its corner.
 const EXPEDITION_SIZE := Vector2(184, 72)
 const BADGE_SIZE := Vector2(30, 30)
-const METER_SIZE := Vector2(220, 36)
-## A meter's icon sits over the left end of its trough, which starts this far in.
-const METER_ICON := Vector2(40, 40)
-const METER_TROUGH_LEFT := 20.0
+## A meter: a pill-shaped trough (its radius half its height) with the resource's coin over its
+## left end, the coin's centre on the trough's left edge, so it overlaps the trough by half.
+const METER_SIZE := Vector2(240, 44)
+const METER_COIN := 48.0
+const METER_TROUGH_LEFT := METER_COIN / 2.0
+## The amount ends this far in from the trough's right end.
+const METER_TEXT_RIGHT := 12.0
 ## What the fill grows across: the trough inside its border.
 const METER_TRACK := Vector2(METER_SIZE.x - METER_TROUGH_LEFT - 2 * BORDER, METER_SIZE.y - 2 * BORDER)
+## The fill is the resource's colour at this share of its value, so it stays a colour under the
+## stripes and the digits read on it.
+const METER_VALUE := 0.85
+## The meters sit on one strip, the panel's fill at this alpha, so the top bar reads as one
+## instrument.
+const STRIP_ALPHA := 0.6
+const STRIP_RADIUS := 24
+const STRIP_PADDING := 8
 ## The fill's texture: a tile this many pixels square crossed by a 45-degree band this wide.
-## The band is white and the rest STRIPE_BASE grey, so the band is 25 % lighter; the stripes'
-## shader tints it by the resource's colour over STRIPE_BASE, so the rest reads as the colour itself.
+## The band is white and the rest STRIPE_BASE grey, so the band is 12 % lighter; the stripes'
+## shader tints it by the fill's colour over STRIPE_BASE, so the rest reads as the colour itself.
 const STRIPE_TILE := 16
 const STRIPE_BAND := 6
-const STRIPE_BASE := 0.8
-## Across the top third of the fill.
+const STRIPE_BASE := 1.0 / 1.12
+## Across the top third of the training header's housing bar.
 const GLOSS := Color(1, 1, 1, 0.25)
 ## The stripes' shader: their drift, the glint and the flash on a change (meter.gdshader).
 const METER_SHADER: Shader = preload("res://src/game/meter.gdshader")
@@ -208,6 +219,8 @@ var _meter_fills: Dictionary[String, Control] = {}
 var _meter_labels: Dictionary[String, Label] = {}
 ## Each meter's stripes' material, and the amount it last showed, which a change flashes.
 var _meter_shaders: Dictionary[String, ShaderMaterial] = {}
+## Whether each meter shows its full state (its amount at its cap).
+var _meter_full: Dictionary[String, bool] = {}
 var _meter_amounts: Dictionary[String, int] = {}
 ## The capacity each meter's text last showed (-1 before the first), so a refresh sets the text
 ## only when its amount or its capacity changed.
@@ -404,6 +417,7 @@ func refresh(state: BaseState, selected_id: int, placing: bool, ghost_ok: bool, 
 			_meter_shaders[res].set_shader_parameter(&"flash_time", Motion.clock())
 		if not shown or amount != _meter_amounts[res] or capacity != _meter_capacities[res]:
 			_meter_labels[res].text = "∞" if cheats else "%s / %s" % [Format.short(amount), Format.short(capacity)]
+			_set_full(res, not cheats and capacity > 0 and amount >= capacity)
 		_meter_amounts[res] = amount
 		_meter_capacities[res] = capacity
 	_drone_ring.set_counts(_drones_total - _drones_busy, _drones_total)
@@ -1402,7 +1416,8 @@ static func _seconds(ms: int) -> String:
 
 # --- Construction ----------------------------------------------------------------
 
-## The top-left row: a meter per resource, then the drone ring.
+## The top-left row: a meter per resource, then the drone ring, on one strip that stops a touch
+## on it as any opaque part does.
 func _build_top_bar() -> void:
 	_top = VBoxContainer.new()
 	_top.mouse_filter = Control.MOUSE_FILTER_IGNORE
@@ -1413,10 +1428,14 @@ func _build_top_bar() -> void:
 	_top.offset_right = -MARGIN
 	_top.offset_top = MARGIN
 	_top.offset_bottom = MARGIN
+	var strip := PanelContainer.new()
+	strip.theme_type_variation = &"MeterStrip"
+	strip.size_flags_horizontal = Control.SIZE_SHRINK_BEGIN
+	_top.add_child(strip)
 	var bar := HBoxContainer.new()
 	bar.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	bar.add_theme_constant_override("separation", 14)
-	_top.add_child(bar)
+	strip.add_child(bar)
 	var stripe := _make_stripe()
 	for i: int in _catalog.resources.size():
 		var res := _catalog.resources[i]
@@ -1425,11 +1444,11 @@ func _build_top_bar() -> void:
 	bar.add_child(_drone_ring)
 
 
-## One meter, under `key` (a resource's id): a trough that the fill, textured with
-## `stripe` and tinted `color`, grows across by amount over storage, the amount on it, and the
-## HudIcon `icon_kind` over its left end. The stripes drift and glint (meter.gdshader), the glint
-## at `phase` of its period. The meter stops a touch on it, as any opaque part does, so it never
-## selects or drags what lies under it; its parts take none.
+## One meter, under `key` (a resource's id): a pill-shaped trough that the fill, textured with
+## `stripe` and tinted `color` at METER_VALUE, grows across by amount over storage, the amount on
+## it, and the HudIcon `icon_kind` on its coin (in the trough's fill) over its left end. The stripes drift and glint
+## (meter.gdshader), the glint at `phase` of its period. The meter stops a touch on it, as any
+## opaque part does, so it never selects or drags what lies under it; its parts take none.
 func _build_meter(parent: Control, key: String, icon_kind: String, color: Color, stripe: Texture2D,
 		phase: float) -> void:
 	var meter := Control.new()
@@ -1453,7 +1472,8 @@ func _build_meter(parent: Control, key: String, icon_kind: String, color: Color,
 	fill.clip_contents = true
 	fill.size = Vector2(0, METER_TRACK.y)
 	track.add_child(fill)
-	# The stripes and the gloss span the whole track; the fill's clip cuts them to the amount.
+	# The stripes span the whole track; the fill's clip cuts them to the amount, and the shader to
+	# the pill's round ends, with the gloss over its top third.
 	var stripes := TextureRect.new()
 	stripes.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	stripes.texture = stripe
@@ -1462,18 +1482,16 @@ func _build_meter(parent: Control, key: String, icon_kind: String, color: Color,
 	stripes.texture_repeat = CanvasItem.TEXTURE_REPEAT_ENABLED
 	var shader := ShaderMaterial.new()
 	shader.shader = METER_SHADER
-	shader.set_shader_parameter(&"tint", Color(color.r / STRIPE_BASE, color.g / STRIPE_BASE, color.b / STRIPE_BASE))
+	var deep := Color.from_hsv(color.h, color.s, color.v * METER_VALUE)
+	shader.set_shader_parameter(&"tint", Color(deep.r / STRIPE_BASE, deep.g / STRIPE_BASE, deep.b / STRIPE_BASE))
 	shader.set_shader_parameter(&"phase", phase)
 	shader.set_shader_parameter(&"track_height", METER_TRACK.y)
+	shader.set_shader_parameter(&"track_width", METER_TRACK.x)
+	shader.set_shader_parameter(&"full_color", GOLD)
 	stripes.material = shader
 	stripes.size = METER_TRACK
 	fill.add_child(stripes)
-	var gloss := ColorRect.new()
-	gloss.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	gloss.color = GLOSS
-	gloss.size = Vector2(METER_TRACK.x, METER_TRACK.y / 3.0)
-	fill.add_child(gloss)
-	# The ink border again over the fill, so the fill's square ends never cover its corners.
+	# The ink border again over the fill.
 	var frame := Panel.new()
 	frame.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	frame.theme_type_variation = &"MeterFrame"
@@ -1482,22 +1500,37 @@ func _build_meter(parent: Control, key: String, icon_kind: String, color: Color,
 	var label := Label.new()
 	label.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	label.theme_type_variation = &"MeterText"
-	label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	label.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
 	label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 	trough.add_child(label)
 	label.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
-	label.offset_left = METER_ICON.x - METER_TROUGH_LEFT
-	var icon := HudIcon.new()
-	icon.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	icon.kind = icon_kind
-	icon.color = color
-	icon.position = Vector2(0, (METER_SIZE.y - METER_ICON.y) / 2.0)
-	icon.size = METER_ICON
-	meter.add_child(icon)
+	label.offset_left = METER_COIN - METER_TROUGH_LEFT
+	label.offset_right = -METER_TEXT_RIGHT
+	var coin := HudIcon.new()
+	coin.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	coin.kind = icon_kind
+	coin.color = color
+	coin.coin = TROUGH
+	coin.position = Vector2(0, (METER_SIZE.y - METER_COIN) / 2.0)
+	coin.size = Vector2.ONE * METER_COIN
+	meter.add_child(coin)
 	_meters[key] = meter
 	_meter_fills[key] = fill
 	_meter_labels[key] = label
 	_meter_shaders[key] = shader
+
+
+## The full state, when a meter's amount reaches its cap: a gold line inside the pill and the
+## digits in gold. Set only when it changes.
+func _set_full(key: String, full: bool) -> void:
+	if _meter_full.get(key, false) == full:
+		return
+	_meter_full[key] = full
+	_meter_shaders[key].set_shader_parameter(&"full", full)
+	if full:
+		_meter_labels[key].add_theme_color_override("font_color", GOLD)
+	else:
+		_meter_labels[key].remove_theme_color_override("font_color")
 
 
 ## Sizes a meter's fill to `fraction` of its track, to the pixel; untouched when that is its width.
@@ -2220,24 +2253,29 @@ func _make_theme() -> Theme:
 	ui.set_type_variation(&"Badge", &"PanelContainer")
 	ui.set_stylebox("panel", &"Badge", _shape(MaterialKit.DEFENCE, 15, 0.0))
 
-	# The meters: the trough under the fill, and its ink border again over it.
+	# The meters: one strip behind them, a pill-shaped trough under each fill, and its ink border
+	# again over it.
+	var strip := _flat(Color(PANEL, STRIP_ALPHA), STRIP_RADIUS)
+	strip.set_content_margin_all(STRIP_PADDING)
+	ui.set_type_variation(&"MeterStrip", &"PanelContainer")
+	ui.set_stylebox("panel", &"MeterStrip", strip)
 	ui.set_type_variation(&"MeterTrough", &"Panel")
-	ui.set_stylebox("panel", &"MeterTrough", _shape(TROUGH, 10))
+	ui.set_stylebox("panel", &"MeterTrough", _shape(TROUGH, roundi(METER_SIZE.y / 2.0)))
 	var frame := StyleBoxFlat.new()
 	frame.draw_center = false
 	frame.border_color = INK
 	frame.set_border_width_all(BORDER)
-	frame.set_corner_radius_all(10)
+	frame.set_corner_radius_all(roundi(METER_SIZE.y / 2.0))
 	ui.set_type_variation(&"MeterFrame", &"Panel")
 	ui.set_stylebox("panel", &"MeterFrame", frame)
 	# White, tinted to the category by the stripe's self_modulate; its top corners follow the
 	# card's inside its border.
-	var stripe := StyleBoxFlat.new()
-	stripe.bg_color = Color.WHITE
-	stripe.corner_radius_top_left = 12 - BORDER
-	stripe.corner_radius_top_right = 12 - BORDER
+	var card_stripe := StyleBoxFlat.new()
+	card_stripe.bg_color = Color.WHITE
+	card_stripe.corner_radius_top_left = 12 - BORDER
+	card_stripe.corner_radius_top_right = 12 - BORDER
 	ui.set_type_variation(&"CardStripe", &"Panel")
-	ui.set_stylebox("panel", &"CardStripe", stripe)
+	ui.set_stylebox("panel", &"CardStripe", card_stripe)
 
 	# Buttons: a card unless a variation says otherwise. None takes focus. Gold commits a spend,
 	# the army's orange starts a raid, cyan is the selected or the safe choice; each carries ink
@@ -2405,6 +2443,15 @@ static func _round_rect(rect: Rect2, radius: Vector2, top_only: bool) -> PackedV
 		for i: int in steps + 1:
 			var angle := from + 0.5 * PI * i / steps
 			points.append(centre + Vector2(cos(angle), sin(angle)) * radius)
+	return points
+
+
+## A closed circle of `sides` points.
+static func _circle(centre: Vector2, radius: float, sides: int) -> PackedVector2Array:
+	var points := PackedVector2Array()
+	for i: int in sides:
+		var angle := TAU * i / sides
+		points.append(centre + Vector2(cos(angle), sin(angle)) * radius)
 	return points
 
 

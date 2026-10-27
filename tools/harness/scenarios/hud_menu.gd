@@ -7,7 +7,7 @@ extends HarnessScenario
 ## Touches are real input events (Input.parse_input_event), so they take a finger's path.
 
 ## The meters' glint (meter.gdshader): its period and how long it takes to cross a fill.
-const GLINT_PERIOD := 3.5
+const GLINT_PERIOD := 8.0
 const GLINT_SWEEP := 0.6
 
 var _world_taps: int = 0
