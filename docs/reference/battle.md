@@ -34,7 +34,7 @@ broken by id.
 | `battle_sim.gd` | `BattleSim` | The setup, the tick loop, commands, the end, destruction, stars, loot, the hash and the result. The only surface the view reads. |
 | `battle_layout.gd` | `BattleLayout` | The defender's buildings in id order (index 0 is the lowest id): type, cell, class, the level's stats as ints, the hull, fallen and revealed flags. |
 | `battle_field.gd` | `BattleField` | Per cell: free, wall or building (`kind`), what stands there, and the deploy zone's cover count. |
-| `battle_pathing.gd` | `BattlePathing` | The ground search and the reach maps (**Pathing**). |
+| `battle_pathing.gd` | `BattlePathing` | The ground search and the reach maps (**Pathing**); the air units' pick (**Targeting**). |
 | `battle_army.gd` | `BattleArmy` | The units in deploy order (a unit's id is its index + 1): stats at the attacker's levels, positions, targets, paths; the unit phase; the unit buckets the defences search. |
 | `battle_combat.gd` | `BattleCombat` | The defences' cooldowns and targets, shells in flight, shields, statuses, traps and the EMP's disabled timers; `damage_building`; the defence phase. |
 | `battle_abilities.gd` | `BattleAbilities` | The abilities brought, left and used, the swarms at work and the strikes on their way; the ability phase (**Abilities**). |
@@ -165,7 +165,8 @@ with nothing of that standing either, the unrevealed buildings too, so the hidde
 found at last.
 
 - Ground units pick by path cost (**Pathing**), air units by straight distance to the footprint,
-  ties to the lowest id.
+  ties to the lowest id. The air pick reads a list of each set's members built at setup, so it
+  never looks at what a set leaves out (the walls and traps of `any`).
 - A unit keeps its target until it falls; defences do not distract it. Units overlap freely.
 - An air unit flies at its target's nearest point and stops in reach.
 

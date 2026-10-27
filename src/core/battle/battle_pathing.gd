@@ -18,6 +18,10 @@ extends RefCounted
 ##
 ## The search and the maps run on the field grown by a border of closed cells, so a step needs
 ## no bounds check; a cell keeps its order there, so ties break as they do on the field.
+##
+## nearest() is the air units' pick: the nearest standing candidate of a set by straight distance,
+## read from a list of each set's members built here, so it never looks at the walls or traps of
+## a set without them.
 
 const SET_ANY := 0
 const SET_DEFENSE := 1
@@ -63,6 +67,10 @@ var _map_reach: PackedInt32Array = PackedInt32Array()
 ## _member_start[m + 1]) of _members.
 var _members: PackedInt32Array = PackedInt32Array()
 var _member_start: PackedInt32Array = PackedInt32Array([0])
+## Each set's members, as _members is each map's: set s's at [_set_start[s], _set_start[s + 1])
+## of _set_members, in index order.
+var _set_members: PackedInt32Array = PackedInt32Array()
+var _set_start: PackedInt32Array = PackedInt32Array([0])
 ## Search buffers, reused: a cell's cost and parent are valid when its stamp is the search's.
 var _cost: PackedInt32Array = PackedInt32Array()
 var _parent: PackedInt32Array = PackedInt32Array()
@@ -98,6 +106,11 @@ func _init(field: BattleField, layout: BattleLayout, wall_cost: int) -> void:
 	_done.fill(0)
 	# A cell is pushed at most once per neighbour that improves it.
 	_heap.resize(_cells * 8 + 8)
+	for set_id: int in SET_ANY_HIDDEN + 1:
+		for b: int in layout.count:
+			if _may_join(b, set_id):
+				_set_members.append(b)
+		_set_start.append(_set_members.size())
 
 
 ## Whether building `b` belongs to a set, standing or not.
@@ -179,6 +192,40 @@ func building_revealed(b: int) -> void:
 		var set_id := _map_set[m]
 		if (set_id == SET_ANY or set_id == SET_DEFENSE) and is_member(b, set_id):
 			_stamp(m, b, 1)
+
+
+## The standing candidate of a set nearest to a point, by the squared distance to its footprint,
+## then the lowest index; -1 when none stands. is_candidate and BattleMath.dist2_to_rect, written
+## out over the set's members.
+func nearest(px: int, py: int, set_id: int) -> int:
+	var seen_only := set_id == SET_ANY or set_id == SET_DEFENSE or set_id == SET_RESOURCE
+	var destroyed := _layout.destroyed
+	var revealed := _layout.revealed
+	var x0 := _layout.x0
+	var y0 := _layout.y0
+	var x1 := _layout.x1
+	var y1 := _layout.y1
+	var best := -1
+	var best_d2 := 0
+	for i: int in range(_set_start[set_id], _set_start[set_id + 1]):
+		var b := _set_members[i]
+		if destroyed[b] != 0 or (seen_only and revealed[b] == 0):
+			continue
+		var dx := 0
+		if px < x0[b]:
+			dx = x0[b] - px
+		elif px > x1[b]:
+			dx = px - x1[b]
+		var dy := 0
+		if py < y0[b]:
+			dy = y0[b] - py
+		elif py > y1[b]:
+			dy = py - y1[b]
+		var d2 := dx * dx + dy * dy
+		if best < 0 or d2 < best_d2:
+			best = b
+			best_d2 = d2
+	return best
 
 
 ## The cheapest path from `start` to a cell where map `m` has a candidate in reach, as cell

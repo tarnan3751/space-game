@@ -410,17 +410,7 @@ func _set_for(t: int) -> int:
 
 
 func _aim_air(u: int) -> void:
-	var set_id := _set_for(unit_type[u])
-	var best := -1
-	var best_d2 := 0
-	for b: int in _layout.count:
-		if not _pathing.is_candidate(b, set_id):
-			continue
-		var d2 := BattleMath.dist2_to_rect(x[u], y[u], _layout.x0[b], _layout.y0[b], _layout.x1[b],
-			_layout.y1[b])
-		if best < 0 or d2 < best_d2:
-			best = b
-			best_d2 = d2
+	var best := _pathing.nearest(x[u], y[u], _set_for(unit_type[u]))
 	_wants[u] = 0
 	if best < 0:
 		_stuck[u] = 1

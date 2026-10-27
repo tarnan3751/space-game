@@ -101,6 +101,41 @@ func test_a_map_is_right_when_a_building_falls_in_the_tick_it_would_be_built() -
 	assert_eq(wrong, 0, "every map's count at every cell is the standing candidates in reach")
 
 
+func test_the_air_pick_is_the_nearest_standing_candidate() -> void:
+	# nearest() against is_candidate and the distance to every building, over every set and a grid
+	# of points, with a building fallen and the sentry unseen, then seen.
+	var catalog := Fixtures.battle_catalog()
+	var layout := BattleLayout.new()
+	layout.build(catalog, Fixtures.battle_setup([["command_center", 9, 9], ["turret", 4, 4], ["academy", 15, 4],
+		["sentry", 4, 15], ["wall", 12, 12], ["wall", 13, 12], ["mine", 16, 16], ["silo", 2, 9]],
+		{})["defender"]["buildings"], catalog.grid_size)
+	var field := BattleField.new(catalog.grid_size)
+	field.place_all(layout)
+	var pathing := BattlePathing.new(field, layout, catalog.wall_cost_units)
+	layout.take(2, 100000)
+	var wrong := 0
+	for round: int in 2:
+		for set_id: int in BattlePathing.SET_ANY_HIDDEN + 1:
+			for py: int in range(500, 20000, 1500):
+				for px: int in range(500, 20000, 1500):
+					var best := -1
+					var best_d2 := 0
+					for b: int in layout.count:
+						if not pathing.is_candidate(b, set_id):
+							continue
+						var d2 := BattleMath.dist2_to_rect(px, py, layout.x0[b], layout.y0[b], layout.x1[b],
+							layout.y1[b])
+						if best < 0 or d2 < best_d2:
+							best = b
+							best_d2 = d2
+					if pathing.nearest(px, py, set_id) != best:
+						wrong += 1
+		layout.reveal(3)
+	assert_eq(wrong, 0, "the same pick as the scan of every building")
+	assert_eq(pathing.nearest(500, 500, BattlePathing.SET_RESOURCE), 7, "the silo")
+	assert_eq(pathing.nearest(500, 500, BattlePathing.SET_ANY), 1, "the turret, the academy fallen")
+
+
 func test_a_straight_walk_to_an_open_target() -> void:
 	var sim := Fixtures.battle([["command_center", 10, 10]], {"melee": 1}, [Fixtures.deploy(0, "melee", 2, 10)])
 	sim.step()
