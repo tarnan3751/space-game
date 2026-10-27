@@ -148,6 +148,7 @@ func _stage(key: String) -> void:
 		_model = UnitModels.create(parts[0], int(parts[1]))
 	else:
 		_model = BuildingModels.create(key, 1, _catalog.size_of(key), BuildingModels.tier_of(_catalog, key, 1))
+		BuildingModels.hold(_model, 0.0)
 	var bounds := AABB()
 	var first := true
 	for child: Node in _model.find_children("*", "MeshInstance3D", true, false):

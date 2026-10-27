@@ -6,19 +6,31 @@ extends RefCounted
 ## on the ground, +Y up, fitting inside size x size cells.
 ##
 ## A model is a Node3D holding the static body's MeshInstance3D and its ink outline's, and up
-## to Parts.max_moving(tier) moving parts (three, four at Crown, the fourth its escort): each a
-## Node3D at its pivot carrying the MOVE_META meta (its Motion), which BuildingView moves while
-## the building is finished and idle, with the part's mesh and its outline under it. So a model
-## has at most eight MeshInstance3D (ten at Crown), half of them at most outlines (OUTLINE_META),
-## which cast no shadow; a part with nothing to outline (only hologram, flicker or jitter parts)
-## has none. The meshes are built once per type, level and tier and shared; the nodes are per
-## view. A level above a type's models shows its top model. The root and each moving part's node
-## carry their sockets (LowPolyMesh.socket) as SOCKETS_META when they have any: a muzzle on a
-## turret's head is on the head's node, so it turns with it. A moving part that rides another
-## (Parts.riding: a ring round a barrel that aims) carries RIDES_META, the index of the one it
-## rides; its node stands beside the others under the root, at its own pivot, and BuildingView
-## carries it with the part it rides. A moving part with a figure marching on the clock (Surf.MARCH)
-## carries MARCH_META, so a busy view hides it rather than let it step in place.
+## to Parts.max_moving(tier) moving parts (three, four at Crown, the fourth its escort).
+##
+## A moving part that moves on the clock alone, its idle, is folded into the body and its outline
+## (_folds): its own body and outline arrays, built in its own space as any moving part's are,
+## are moved by its pivot into the model's space, stamped with its Motion (LowPolyMesh.stamp_motion,
+## Surf.MOVE) and appended to the body's surfaces and the outline, the outline's averaged normals
+## kept as the part had them; the shaders move it, at no draw of its own. The meshes' custom_aabb
+## covers its whole sweep, so it is never culled as it moves, and the root carries FOLDS_META, the
+## static body's top (top_of), which the folded parts leave out. hold() holds the folded parts'
+## pose, for a view that freezes them (BuildingView, while busy or disabled).
+##
+## Every other moving part is a Node3D at its pivot carrying the MOVE_META meta (its Motion),
+## which BuildingView moves while the building is finished and idle, with the part's mesh and its
+## outline under it: a part with a socket (a turret's head with its muzzle), one another rides or
+## one that rides another, and one with a marching figure. So a model has at most eight
+## MeshInstance3D (ten at Crown), half of them at most outlines (OUTLINE_META), which cast no
+## shadow; a part with nothing to outline (only hologram, flicker or jitter parts) has none. The
+## meshes are built once per type, level and tier and shared; the nodes are per view. A level above
+## a type's models shows its top model. The root and each moving part's node carry their sockets
+## (LowPolyMesh.socket) as SOCKETS_META when they have any: a muzzle on a turret's head is on the
+## head's node, so it turns with it. A moving part that rides another (Parts.riding: a ring round
+## a barrel that aims) carries RIDES_META, the index of the one it rides among the moving parts'
+## nodes; its node stands beside the others under the root, at its own pivot, and BuildingView
+## carries it with the part it rides. A moving part with a figure marching on the clock
+## (Surf.MARCH) carries MARCH_META, so a busy view hides it rather than let it step in place.
 ##
 ## Each category shares a look: every building but a wall stands on the concrete foundation pad
 ## (Parts.foundation) in its category's accent colour (docs/reference/art-style.md), and walls
@@ -46,6 +58,13 @@ const SOCKETS_META := "sockets"
 const RIDES_META := "rides"
 ## Set on a moving part's node when any of its parts carries Surf.MARCH.
 const MARCH_META := "march"
+## Set on a model's root when moving parts are folded into its body: the static body's top, in
+## the model's space (top_of).
+const FOLDS_META := "folds"
+## The shaders' instance uniform that holds the folded parts' pose (hold()).
+const HOLD_PARAMETER := &"move_hold"
+## The least clock a hold takes, since 0 is the shaders' "not held".
+const HOLD_LEAST := 0.0001
 
 const CoreModels := preload("res://src/game/models/core.gd")
 const ResourceModels := preload("res://src/game/models/resources.gd")
@@ -105,6 +124,9 @@ class Meshes:
 	var moving: Array[Moving] = []
 	## The body's sockets (LowPolyMesh.socket), in the model's space.
 	var sockets: Dictionary[String, LowPolyMesh.Socket] = {}
+	## Whether moving parts are folded into the body, and the static body's top without them.
+	var folds := false
+	var top: float = 0.0
 
 
 ## A moving part's meshes, where it rests, and how it moves.
@@ -274,13 +296,31 @@ static func _store(key: String, p: Parts) -> Meshes:
 
 static func _meshes(p: Parts) -> Meshes:
 	var meshes := Meshes.new()
-	meshes.body = p.body.to_mesh()
-	meshes.outline = p.body.to_outline_mesh()
 	meshes.sockets = p.body.sockets
+	var opaque := p.body.to_arrays()
+	var holo := p.body.holo_arrays()
+	var outline := p.body.to_outline_arrays()
+	var sweep := AABB()
 	# Each kept part's index in meshes.moving, by its index in p.movers (an empty part is dropped).
 	var kept: Dictionary[int, int] = {}
 	for i: int in p.movers.size():
 		if p.movers[i].triangle_count() == 0:
+			continue
+		if _folds(p, i):
+			if not meshes.folds:
+				meshes.folds = true
+				meshes.top = _top(opaque, holo)
+			var part := p.movers[i]
+			var arrays: Array[Array] = [part.to_arrays(), part.holo_arrays(), part.to_outline_arrays()]
+			var reach := _sweep(arrays, p.pivots[i], p.motions[i])
+			sweep = reach if sweep.size == Vector3.ZERO else sweep.merge(reach)
+			for k: int in arrays.size():
+				if arrays[k].is_empty() or (arrays[k][Mesh.ARRAY_VERTEX] as PackedVector3Array).is_empty():
+					continue
+				LowPolyMesh.stamp_motion(arrays[k], p.pivots[i], p.motions[i])
+			opaque = LowPolyMesh.append_arrays(opaque, _filled(arrays[0]))
+			holo = LowPolyMesh.append_arrays(holo, _filled(arrays[1]))
+			outline = LowPolyMesh.append_arrays(outline, _filled(arrays[2]))
 			continue
 		kept[i] = meshes.moving.size()
 		var moving := Moving.new()
@@ -292,7 +332,80 @@ static func _meshes(p: Parts) -> Meshes:
 		moving.rides = kept.get(p.rides[i], -1)
 		moving.marches = p.movers[i].has_flag(Surf.MARCH)
 		meshes.moving.append(moving)
+	meshes.body = LowPolyMesh.body_mesh(opaque, holo)
+	meshes.outline = LowPolyMesh.outline_mesh(outline)
+	if meshes.folds:
+		meshes.body.custom_aabb = meshes.body.get_aabb().merge(sweep)
+		if meshes.outline != null:
+			meshes.outline.custom_aabb = meshes.outline.get_aabb().merge(sweep)
 	return meshes
+
+
+## Whether moving part `i` of `p` folds into the body: it moves on the clock alone, with no socket
+## (an aiming head's muzzle or trunnion), riding no part and ridden by none, and nothing rigged
+## (Surf.RIG: its joints are in the part's own space, and the shaders move a part before they rig
+## it), a marching figure (MARCH_META, hidden while busy) among them.
+static func _folds(p: Parts, i: int) -> bool:
+	return p.movers[i].sockets.is_empty() and p.rides[i] < 0 and not p.rides.has(i) \
+		and not p.movers[i].has_flag(Surf.RIG) and not p.movers[i].has_flag(Surf.MARCH)
+
+
+## Surface arrays with a vertex, else empty ones, for append_arrays.
+static func _filled(arrays: Array) -> Array:
+	if arrays.is_empty() or (arrays[Mesh.ARRAY_VERTEX] as PackedVector3Array).is_empty():
+		return []
+	return arrays
+
+
+## The highest vertex of a body's surfaces, 0 for none.
+static func _top(opaque: Array, holo: Array) -> float:
+	var top := 0.0
+	for arrays: Array in [opaque, holo]:
+		if arrays.is_empty():
+			continue
+		for vertex: Vector3 in (arrays[Mesh.ARRAY_VERTEX] as PackedVector3Array):
+			top = maxf(top, vertex.y)
+	return top
+
+
+## The box a part built in its own space (its `arrays`, unstamped) sweeps moving as `motion` says
+## about `pivot`, in the model's space: a turning part's ball about the pivot, a sliding part's box
+## at both ends of its slide.
+static func _sweep(arrays: Array[Array], pivot: Vector3, motion: Motion) -> AABB:
+	var box := AABB()
+	var radius := 0.0
+	var first := true
+	for surface: Array in arrays:
+		if surface.is_empty():
+			continue
+		for vertex: Vector3 in (surface[Mesh.ARRAY_VERTEX] as PackedVector3Array):
+			radius = maxf(radius, vertex.length())
+			box = AABB(vertex, Vector3.ZERO) if first else box.expand(vertex)
+			first = false
+	if motion.kind == Motion.Kind.SLIDE:
+		var reach := motion.axis * motion.amplitude
+		return AABB(box.position + pivot - reach, box.size).merge(AABB(box.position + pivot + reach, box.size))
+	return AABB(pivot - Vector3.ONE * radius, Vector3.ONE * radius * 2.0)
+
+
+## Holds the folded moving parts of the model `root` (FOLDS_META) at the clock `time`, seconds
+## (at least HOLD_LEAST), or lets them run on the clock again for a negative `time`: the shaders'
+## move_hold on its body and outline (effects.gdshaderinc). Nothing for a model with none folded.
+static func hold(root: Node3D, time: float) -> void:
+	if not root.has_meta(FOLDS_META):
+		return
+	var value := maxf(time, HOLD_LEAST) if time >= 0.0 else 0.0
+	for child: Node in root.get_children():
+		if child is MeshInstance3D:
+			(child as MeshInstance3D).set_instance_shader_parameter(HOLD_PARAMETER, value)
+
+
+## The top of the model `site`'s static body, in its parent's space: FOLDS_META's when moving parts
+## are folded into it, else its body mesh's (ConstructionDrone.top_of).
+static func top_of(site: Node3D) -> float:
+	if site.has_meta(FOLDS_META):
+		return float(site.get_meta(FOLDS_META)) * site.scale.y
+	return (site.get_child(0) as MeshInstance3D).mesh.get_aabb().end.y * site.scale.y
 
 
 ## The body's instances under `root`, then a node at each moving part's pivot with its instances.
@@ -300,6 +413,8 @@ static func _add_parts(root: Node3D, meshes: Meshes) -> void:
 	_add_instances(root, meshes.body, meshes.outline)
 	if not meshes.sockets.is_empty():
 		root.set_meta(SOCKETS_META, meshes.sockets)
+	if meshes.folds:
+		root.set_meta(FOLDS_META, meshes.top)
 	for moving: Moving in meshes.moving:
 		var node := Node3D.new()
 		node.position = moving.pivot

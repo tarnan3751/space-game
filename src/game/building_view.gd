@@ -32,6 +32,11 @@ extends Node3D
 ## (set_disabled) every moving part holds its pose, and on waking snaps back to the clock's; a
 ## cloaked defence fades in when it is revealed (set_reveal).
 ##
+## Only the moving parts that need the view's state are nodes it poses: the aiming head and what
+## rides it, and the marching figures. The model's idle parts are folded into its body
+## (BuildingModels) and move in the shaders, held by BuildingModels.hold while the building is busy
+## or disabled (_update_hold); a view whose parts all folded does no work a frame.
+##
 ## While the building is busy a ConstructionDrone works over it, driven from _process, and a moving
 ## part whose figure marches on the clock (BuildingModels.MARCH_META) is hidden, since its legs
 ## would step on while its round holds; when the work ends the drone leaves, and if the view is
@@ -92,9 +97,10 @@ var _disabled: bool = false
 var _rival: bool = false
 ## Whether the outlines carry the selected ink now.
 var _inked: bool = false
-## The model's moving parts, each with its Motion and its rest position. They are posed at
-## Motion.clock(), the shaders' clock, while the building is idle; while it is busy they hold
-## their last pose, and on resuming they snap to the clock's.
+## The model's moving parts that are nodes, each with its Motion and its rest position. They are
+## posed at Motion.clock(), the shaders' clock, while the building is idle; while it is busy they
+## hold their last pose, and on resuming they snap to the clock's. The folded parts do the same in
+## the shaders (_held).
 var _movers: Array[Node3D] = []
 var _motions: Array[Motion] = []
 var _rests: PackedVector3Array = PackedVector3Array()
@@ -102,6 +108,9 @@ var _rests: PackedVector3Array = PackedVector3Array()
 ## rides one made before it, so posing in order poses the carrier first.
 var _rides := PackedInt32Array()
 var _animate: bool = true
+## Whether the model's folded moving parts hold their pose (BuildingModels.hold): while it is busy or
+## disabled.
+var _held: bool = false
 ## The moving parts whose figures march on the clock (BuildingModels.MARCH_META), hidden while busy.
 var _marching: Array[Node3D] = []
 ## BaseView's merged wall mesh draws this building, so its own model is hidden (set_merged).
@@ -199,6 +208,7 @@ func show_status(level: int, busy: bool, target_level: int, seconds_left: int) -
 	_model.visible = level >= 1 and not _merged
 	_scaffold.visible = level < 1
 	_animate = level >= 1 and not busy
+	_update_hold()
 	for mover: Node3D in _marching:
 		mover.visible = not busy
 	_label.visible = busy
@@ -281,6 +291,18 @@ func set_disabled(on: bool) -> void:
 		return
 	_disabled = on
 	_apply_tint()
+	_update_hold()
+
+
+## Holds the folded moving parts at the clock now while the building is busy or disabled, as the
+## nodes hold, and lets them run on the clock again, snapping to its pose, when it is neither: once
+## a change, never a frame.
+func _update_hold() -> void:
+	var held := not _animate or _disabled
+	if held == _held:
+		return
+	_held = held
+	BuildingModels.hold(_model, Motion.clock() if held else -1.0)
 
 
 ## Whether the building shows as disabled (set_disabled).

@@ -228,9 +228,10 @@ func release(parent: Node) -> void:
 	set_process(true)
 
 
-## The top of a site (a scaffold or a model, its body the first child), at its scale.
+## The top of a site (a scaffold or a model, its body the first child), at its scale: its static
+## body's (BuildingModels.top_of), the parts folded into it left out.
 static func top_of(site: Node3D) -> float:
-	return (site.get_child(0) as MeshInstance3D).mesh.get_aabb().end.y * site.scale.y
+	return BuildingModels.top_of(site)
 
 
 func is_leaving() -> bool:

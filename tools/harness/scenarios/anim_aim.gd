@@ -35,7 +35,8 @@ extends HarnessScenario
 ## Then "emp-freeze": a level 6 missile battery (its launcher and its radar turning) aiming at a Dune
 ## Runner, an EMP Burst cast on it, the strip (EMP_FRAMES at EMP_STEP_MS) over the stun and the wake.
 ## Checks: while it is disabled no moving part moves (the muzzle socket and the radar stand still
-## from frame to frame); once awake they move again. And "reveal": a cloaked sentry hidden until the
+## from frame to frame: the radar, folded into the body, by the clock its pose is drawn at, the body's
+## hold or the clock, BuildingModels.hold); once awake they move again. And "reveal": a cloaked sentry hidden until the
 ## Dune Runner comes within its range, the strip (REVEAL_FRAMES at REVEAL_STEP_MS) over its fade in.
 ## Checks: it shows every step of the fade (BuildingView.reveal_step) and ends as itself.
 
@@ -140,12 +141,12 @@ var _aim_wanted := PackedFloat32Array()
 ## those of them its parts moved, the frames they moved after it woke, and the last poses.
 var _frozen_view: BattleView = null
 var _frozen: BuildingView = null
-var _frozen_radar: Node3D = null
+var _frozen_radar: MeshInstance3D = null
 var _frozen_frames := 0
 var _frozen_moves := 0
 var _awake_moves := 0
 var _last_muzzle := Vector3.ZERO
-var _last_radar := Transform3D.IDENTITY
+var _last_radar := 0.0
 
 
 func run(main: MainScript) -> void:
@@ -295,7 +296,7 @@ func _emp_freeze(main: MainScript) -> void:
 	_frozen_moves = 0
 	_awake_moves = 0
 	_last_muzzle = defence.socket_point("muzzle")
-	_last_radar = radar.transform if radar != null else Transform3D.IDENTITY
+	_last_radar = _radar_clock()
 	main.get_tree().process_frame.connect(_watch_frozen)
 	await _strip(main, "emp-freeze", EMP_FRAMES, EMP_STEP_MS, true)
 	await _until(view, func() -> bool: return _frozen_frames > 0 and not view.is_shown_disabled(DEFENCE))
@@ -349,8 +350,8 @@ func _reveal(main: MainScript) -> void:
 ## disabled and after.
 func _watch_frozen() -> void:
 	var muzzle := _frozen.socket_point("muzzle")
-	var turned := _frozen_radar.transform if _frozen_radar != null else Transform3D.IDENTITY
-	var moved := muzzle.distance_to(_last_muzzle) > 0.0001 or not turned.is_equal_approx(_last_radar)
+	var turned := _radar_clock()
+	var moved := muzzle.distance_to(_last_muzzle) > 0.0001 or turned != _last_radar
 	if _frozen_view.is_shown_disabled(DEFENCE):
 		_frozen_frames += 1
 		if moved and _frozen_frames > 1:
@@ -407,14 +408,21 @@ func _head(view: BattleView, defence: BuildingView) -> Vector3:
 	return view.building_centre(DEFENCE) + Vector3(0, defence.site_height() * 0.6, 0)
 
 
-## The missile battery's radar: its moving part spinning about +Y with no muzzle on it.
-func _radar(defence: BuildingView) -> Node3D:
-	for child: Node in defence.get_child(0).get_children():
-		if child.has_meta(BuildingModels.MOVE_META) and not child.has_meta(BuildingModels.SOCKETS_META):
-			var motion: Motion = child.get_meta(BuildingModels.MOVE_META)
-			if motion.kind == Motion.Kind.SPIN:
-				return child as Node3D
-	return null
+## The missile battery's radar: its idle part, folded into its body (BuildingModels.FOLDS_META), so
+## the body that draws it.
+func _radar(defence: BuildingView) -> MeshInstance3D:
+	var model := defence.get_child(0)
+	return model.get_child(0) as MeshInstance3D if model.has_meta(BuildingModels.FOLDS_META) else null
+
+
+## The clock the frozen defence's radar is drawn at: its body's hold (BuildingModels.hold) while set,
+## else the clock.
+func _radar_clock() -> float:
+	if _frozen_radar == null:
+		return 0.0
+	var value: Variant = _frozen_radar.get_instance_shader_parameter(BuildingModels.HOLD_PARAMETER)
+	var hold: float = value if typeof(value) == TYPE_FLOAT else 0.0
+	return hold if hold != 0.0 else Motion.clock()
 
 
 ## Starts sampling `defence` each frame (null stops it).

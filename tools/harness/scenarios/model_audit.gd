@@ -6,7 +6,8 @@ extends HarnessScenario
 ## Every building type at every level, built for its level's tier as the gallery builds it
 ## (BuildingModels.create, BuildingModels.tier_of); every unit type at every tier, near and far
 ## (UnitModels.build at detail 1 and UnitModels.FAR_DETAIL); and the colonist and the automaton
-## at stance (Figures). Each model's body and each moving part (BuildingModels.MOVE_META) are read
+## at stance (Figures). Each model's body and each moving part (BuildingModels.MOVE_META, or folded
+## into the body, Surf.MOVE) are read
 ## back from their meshes, every surface, and split into parts: triangles joined along an edge that
 ## exactly two of them share, on one surface (layer and flags), so a part stacked flush on another
 ## (whose edges three or four triangles share) stays apart from it. A part is named
@@ -45,8 +46,10 @@ extends HarnessScenario
 ##   only meets the body in motion. One that does is a mount when every crossing lies within
 ##   MOUNT_RADIUS of the axis, else a seat (resting on or through the body away from its pivot: a
 ##   judgment). A rider is posed only with its carrier at rest, not carried; BOB is not applied; a
-##   part that spins in the shaders (Surf.SPIN, the gunship's rotors) is read as static body and
-##   never posed; the pairs of moving parts, BOB and the riders carried are model_clash's.
+##   part that moves in the shaders (Surf.MOVE: a building's idle part folded into its body, the
+##   gunship's rotors) is read back as a moving part of its own, its pivot and Motion decoded from
+##   CUSTOM0 and CUSTOM3 (Motion.from_channels), after the nodes; the pairs of moving parts, BOB and
+##   the riders carried are model_clash's.
 ## - **aim**: an aiming part's pitch sweep against the other moving parts, model_clash's own
 ##   (_travel, _pitch_sweep, read as model_clash reads a model): any pose touching a part other than
 ##   the one that turns it (which carries it) is a finding.
@@ -307,13 +310,14 @@ func _audit(spec: Spec, model: Node3D) -> void:
 	var body := Soup.new()
 	var outline_keys := {}
 	var movers: Array[Node3D] = []
+	var folded := {}
 	for child: Node in model.get_children():
 		if child is MeshInstance3D:
 			var mesh := (child as MeshInstance3D).mesh
 			if child.has_meta(BuildingModels.OUTLINE_META):
 				outline_tris += _outline_keys(mesh, outline_keys)
 			else:
-				_read(mesh, body)
+				_read(mesh, body, folded)
 		elif child.has_meta(BuildingModels.MOVE_META):
 			movers.append(child as Node3D)
 	_mark_outlined(body, outline_keys)
@@ -331,6 +335,10 @@ func _audit(spec: Spec, model: Node3D) -> void:
 				else:
 					_read((grandchild as MeshInstance3D).mesh, soup)
 		_mark_outlined(soup, keys)
+		_soups.append(soup)
+	for soup: Soup in folded.values():
+		soup.name = "mover%d" % _soups.size()
+		_mark_outlined(soup, outline_keys, soup.pivot)
 		_soups.append(soup)
 	for soup: Soup in _soups:
 		_split(soup)
@@ -447,15 +455,34 @@ func _audit(spec: Spec, model: Node3D) -> void:
 
 
 ## Adds a mesh's triangles, every surface, to `soup`, with their flat normals, flags and layers.
-func _read(mesh: Mesh, soup: Soup) -> void:
+## With `folded`, a triangle that moves in the shaders (Surf.MOVE) goes instead to the soup of its
+## motion there (made on first use, keyed by its CUSTOM0 and CUSTOM3), in that part's own space.
+func _read(mesh: Mesh, soup: Soup, folded: Dictionary = {}) -> void:
+	var into := soup
 	for surface: int in mesh.get_surface_count():
 		var arrays := mesh.surface_get_arrays(surface)
 		var vertices: PackedVector3Array = arrays[Mesh.ARRAY_VERTEX]
 		var uv2s: PackedVector2Array = arrays[Mesh.ARRAY_TEX_UV2]
+		var first: Variant = arrays[Mesh.ARRAY_CUSTOM0]
+		var second: Variant = arrays[Mesh.ARRAY_CUSTOM3]
+		var moves := typeof(first) == TYPE_PACKED_FLOAT32_ARRAY and typeof(second) == TYPE_PACKED_FLOAT32_ARRAY
 		for k: int in range(0, vertices.size(), 3):
-			var a := vertices[k]
-			var b := vertices[k + 1]
-			var c := vertices[k + 2]
+			soup = into
+			var origin := Vector3.ZERO
+			if moves and (roundi(uv2s[k].y) & Surf.MOVE) != 0:
+				var c0 := Vector4(first[k * 4], first[k * 4 + 1], first[k * 4 + 2], first[k * 4 + 3])
+				var c3 := Vector4(second[k * 4], second[k * 4 + 1], second[k * 4 + 2], second[k * 4 + 3])
+				var key := [c0, c3]
+				if not folded.has(key):
+					var part := Soup.new()
+					part.pivot = Vector3(c0.x, c0.y, c0.z)
+					part.motion = Motion.from_channels(c0, c3)
+					folded[key] = part
+				soup = folded[key]
+				origin = soup.pivot
+			var a := vertices[k] - origin
+			var b := vertices[k + 1] - origin
+			var c := vertices[k + 2] - origin
 			soup.points.append(a)
 			soup.points.append(b)
 			soup.points.append(c)
@@ -477,10 +504,13 @@ func _outline_keys(mesh: Mesh, keys: Dictionary) -> int:
 	return count
 
 
-func _mark_outlined(soup: Soup, keys: Dictionary) -> void:
+## Marks the soup's triangles that `keys` holds, its points moved by `offset` first (a folded part's
+## pivot, whose outline is in the model's space).
+func _mark_outlined(soup: Soup, keys: Dictionary, offset: Vector3 = Vector3.ZERO) -> void:
 	soup.outlined.resize(soup.normals.size())
 	for t: int in soup.normals.size():
-		soup.outlined[t] = 1 if keys.has(_tri_key(soup.points[t * 3], soup.points[t * 3 + 1], soup.points[t * 3 + 2])) else 0
+		soup.outlined[t] = 1 if keys.has(_tri_key(soup.points[t * 3] + offset, soup.points[t * 3 + 1] + offset,
+			soup.points[t * 3 + 2] + offset)) else 0
 
 
 func _q(p: Vector3) -> Vector3i:
@@ -1331,6 +1361,9 @@ func _aim(spec: Spec, model: Node3D, finds: Array) -> void:
 				if grandchild is MeshInstance3D and not grandchild.has_meta(BuildingModels.OUTLINE_META):
 					_clash._read((grandchild as MeshInstance3D).mesh, part)
 			parts.append(part)
+	# The parts folded into the body, read back as moving parts, as model_clash adds them.
+	for entry: Array in spins.values():
+		parts.append(entry[0])
 	if not any:
 		return
 	for i: int in parts.size():

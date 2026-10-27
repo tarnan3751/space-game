@@ -3,7 +3,9 @@ extends HarnessScenario
 ## button. Checks every type at its count for the top Command Center level, all at the top level
 ## and finished; no two footprints overlapping and all inside the grid; every wall
 ## (PlacementController.PAINT_TYPE) joined to another (each is part of a fence); every resource
-## at its cap; every drone free, on the ring too; every moving part moving; the save written to
+## at its cap; every drone free, on the ring too; every moving part moving (a node's pose changing,
+## a part folded into its body unheld, BuildingModels.hold, and carrying a motion that moves); the
+## save written to
 ## the run's own file, user://base.json untouched. Screenshots: the whole base at the widest zoom
 ## in a WIDE window, then each band, framed on its buildings but the walls, with the fence under
 ## it (the Command Center's with the first category's), in even parts
@@ -91,6 +93,8 @@ func run(main: MainScript) -> void:
 	var bands := {}
 	var tallest := {}
 	var turning := []
+	# The models whose idle parts are folded into their bodies, which the shaders move unless held.
+	var folding := []
 	for view: BuildingView in main.base_view.views.values():
 		var building: BuildingState = state.buildings[view.building_id]
 		var band := catalog.category_of(building.type)
@@ -101,6 +105,8 @@ func run(main: MainScript) -> void:
 			tallest[band] = maxf(float(tallest.get(band, 0.0)), view.site_height())
 		turning.append_array(view.find_children("*", "Node3D", true, false).filter(
 			func(node: Node) -> bool: return node.has_meta(BuildingModels.MOVE_META)))
+		folding.append_array(view.find_children("*", "Node3D", true, false).filter(
+			func(node: Node) -> bool: return node.has_meta(BuildingModels.FOLDS_META)))
 	# A part may hold still for a while (a hammer's hold) or come back to its first pose on a
 	# whole period, so each is sampled every few frames over a second and a half and passes once
 	# any sample differs from its first pose.
@@ -114,6 +120,19 @@ func run(main: MainScript) -> void:
 				moved[i] = true
 	check(moved.size() > 0 and moved.size() == turning.size(), "%d of %d moving parts moved within %.1f s"
 		% [moved.size(), turning.size(), MOVE_SAMPLE_SECONDS])
+	var held := folding.filter(func(model: Node3D) -> bool:
+		var value: Variant = (model.get_child(0) as MeshInstance3D).get_instance_shader_parameter(BuildingModels.HOLD_PARAMETER)
+		return typeof(value) == TYPE_FLOAT and value != 0.0)
+	check(folding.size() > 0 and held.is_empty(), "%d of %d models with folded moving parts hold them"
+		% [held.size(), folding.size()])
+	var folded := 0
+	var still_folded := 0
+	for model: Node3D in folding:
+		for motion: Motion in _folded_motions((model.get_child(0) as MeshInstance3D).mesh):
+			folded += 1
+			still_folded += 0 if (motion.rate if motion.kind == Motion.Kind.SPIN else motion.amplitude) != 0.0 else 1
+	check(folded > 0 and still_folded == 0, "%d of %d folded moving parts carry no motion (Motion.from_channels)"
+		% [still_folded, folded])
 
 	if toast.time_left > 0.0:
 		await toast.timeout
@@ -137,7 +156,7 @@ func run(main: MainScript) -> void:
 			var name := "band-%s-%d" % [band, i + 1] if parts > 1 else "band-" + band
 			var at := main.base_view.cell_to_world(part.position, 0) + Vector3(part.size.x, 0, part.size.y) * 0.5
 			await shot_at(main, name, at, _fit(main, part, height))
-			if turning.any(func(mover: Node3D) -> bool:
+			if (turning + folding).any(func(mover: Node3D) -> bool:
 					return part.has_point(main.base_view.world_to_cell(mover.global_position))):
 				await main.get_tree().create_timer(1.0).timeout
 				await screenshot(name + "-later")
@@ -185,3 +204,26 @@ func _measure(main: MainScript, zoom: String, size: float) -> void:
 		"the whole base at the %s zoom (size %.0f) in %dx%d: %d draw calls (ceiling %d), %d primitives (ceiling %d), %.2f ms render CPU (ceiling %.1f), %.2f ms process at the slowest, %d fps over %d frames"
 		% [zoom, size, MEASURE.x, MEASURE.y, draws, DRAW_CALL_CEILING, primitives, PRIMITIVE_CEILING,
 		render / count, RENDER_CPU_CEILING, process, fps, count])
+
+
+## The distinct Motions the folded parts of a body carry (Surf.MOVE vertices, decoded from CUSTOM0
+## and CUSTOM3 with Motion.from_channels), every surface.
+func _folded_motions(mesh: Mesh) -> Array[Motion]:
+	var motions: Array[Motion] = []
+	var seen := {}
+	for surface: int in mesh.get_surface_count():
+		var arrays := mesh.surface_get_arrays(surface)
+		var uv2s: PackedVector2Array = arrays[Mesh.ARRAY_TEX_UV2]
+		var first: Variant = arrays[Mesh.ARRAY_CUSTOM0]
+		var second: Variant = arrays[Mesh.ARRAY_CUSTOM3]
+		if typeof(first) != TYPE_PACKED_FLOAT32_ARRAY or typeof(second) != TYPE_PACKED_FLOAT32_ARRAY:
+			continue
+		for i: int in uv2s.size():
+			if (roundi(uv2s[i].y) & Surf.MOVE) == 0:
+				continue
+			var c0 := Vector4(first[i * 4], first[i * 4 + 1], first[i * 4 + 2], first[i * 4 + 3])
+			var c3 := Vector4(second[i * 4], second[i * 4 + 1], second[i * 4 + 2], second[i * 4 + 3])
+			if not seen.has([c0, c3]):
+				seen[[c0, c3]] = true
+				motions.append(Motion.from_channels(c0, c3))
+	return motions

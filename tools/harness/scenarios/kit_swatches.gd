@@ -12,8 +12,8 @@ extends HarnessScenario
 ## It logs each swatch by index with its layer and flags, and checks that every swatch's layer is
 ## within the kit, that each escort is at most ESCORT_TRIANGLES body triangles (the troopers
 ## TROOPERS_TRIANGLES) and stays within the pad's extent (half its footprint plus 0.15) all the way
-## round, and that the escorts move.
-## It moves them itself, as the effects rig does (Motion.tick() first, then Motion.transform_at).
+## round, and that the escorts are folded into the pad's body (BuildingModels, Surf.MOVE: no node of
+## their own, one motion each on the body's vertices), so the shaders move them.
 ## Rendered, it frames the rows and the pad at ZOOM_SIZE (the closest zoom) and screenshots them,
 ## then again 0.3 and 1.0 seconds later, so FLOW, PULSE, the flickers and the orbits show.
 
@@ -32,10 +32,6 @@ const TROOPERS_TRIANGLES := 3000
 const PAD_SIZE := 3
 const SETTLE_SECONDS := 0.5
 const SETTLE_FRAMES := 10
-
-var _movers: Array[Node3D] = []
-var _motions: Array[Motion] = []
-var _rests := PackedVector3Array()
 
 
 func run(main: MainScript) -> void:
@@ -86,7 +82,6 @@ func run(main: MainScript) -> void:
 	var pad_node := BuildingModels.instantiate(pad)
 	pad_node.position = down * PAD_AHEAD
 	root.add_child(pad_node)
-	_collect_movers(pad_node)
 
 	var sparks := Parts.new()
 	for side: float in [-1.0, 1.0]:
@@ -109,18 +104,11 @@ func run(main: MainScript) -> void:
 	stack_node.position = down * PAD_AHEAD + across * SIDE_ACROSS
 	root.add_child(stack_node)
 
-	var update := _update_movers
-	main.get_tree().process_frame.connect(update)
-	var before: Array[Transform3D] = []
-	for mover: Node3D in _movers:
-		before.append(mover.transform)
-	await frames(10)
-	var moved := 0
-	for i: int in _movers.size():
-		if not _movers[i].transform.is_equal_approx(before[i]):
-			moved += 1
-	check(moved == escorts.size() and _movers.size() == escorts.size(),
-		"%d of %d escorts moved in 10 frames" % [moved, _movers.size()])
+	var nodes := pad_node.get_children().filter(func(child: Node) -> bool: return child.has_meta(BuildingModels.MOVE_META))
+	var motions := _motions_of((pad_node.get_child(0) as MeshInstance3D).mesh)
+	check(nodes.is_empty() and pad_node.has_meta(BuildingModels.FOLDS_META) and motions == escorts.size(),
+		"the escorts are folded into the pad's body: %d node(s), %d motion(s) on its vertices, %d escorts"
+		% [nodes.size(), motions, escorts.size()])
 
 	zoom_to(main, ZOOM_SIZE, down * 1.5)
 	await main.get_tree().create_timer(SETTLE_SECONDS).timeout
@@ -130,7 +118,6 @@ func run(main: MainScript) -> void:
 	await screenshot("swatches-soon")
 	await main.get_tree().create_timer(0.7).timeout
 	await screenshot("swatches-later")
-	main.get_tree().process_frame.disconnect(update)
 	root.queue_free()
 
 
@@ -151,16 +138,19 @@ func _swatches() -> Array[Array]:
 	]
 
 
-func _update_movers() -> void:
-	var time := Motion.tick()
-	for i: int in _movers.size():
-		_movers[i].transform = _motions[i].transform_at(time, _rests[i])
-
-
-func _collect_movers(node: Node3D) -> void:
-	for child: Node in node.get_children():
-		if child.has_meta(BuildingModels.MOVE_META):
-			var mover := child as Node3D
-			_movers.append(mover)
-			_motions.append(mover.get_meta(BuildingModels.MOVE_META) as Motion)
-			_rests.append(mover.position)
+## How many distinct motions (CUSTOM0 and CUSTOM3 pairs) the MOVE vertices of `mesh` carry, every
+## surface.
+func _motions_of(mesh: Mesh) -> int:
+	var seen := {}
+	for surface: int in mesh.get_surface_count():
+		var arrays := mesh.surface_get_arrays(surface)
+		var uv2s: PackedVector2Array = arrays[Mesh.ARRAY_TEX_UV2]
+		var first: Variant = arrays[Mesh.ARRAY_CUSTOM0]
+		var second: Variant = arrays[Mesh.ARRAY_CUSTOM3]
+		if typeof(first) != TYPE_PACKED_FLOAT32_ARRAY:
+			continue
+		for i: int in uv2s.size():
+			if (roundi(uv2s[i].y) & Surf.MOVE) != 0:
+				seen[[Vector4(first[i * 4], first[i * 4 + 1], first[i * 4 + 2], first[i * 4 + 3]),
+					Vector4(second[i * 4], second[i * 4 + 1], second[i * 4 + 2], second[i * 4 + 3])]] = true
+	return seen.size()

@@ -9,13 +9,12 @@ extends HarnessScenario
 ## outline, a crackling arc (UNLIT, FLICKER and JITTER strips), and a HOLO prism on a pedestal,
 ## then the same again with the pedestal ghost-tinted. The second row: moving parts that SPIN
 ## about Y, SWING about X (SMOOTH), SLIDE along X (HAMMER) and SLIDE along Z (RECOIL), and one
-## made only of FLICKER sparks, which has no outline. The scenario moves the moving parts
-## itself, with Motion.transform_at at Motion.clock(), as BuildingView does. It poses them from
-## the tree's process_frame, which fires before main.gd's _process ticks the clock, so it ticks
-## the clock itself first (Motion.tick()), so the parts match this frame's shaders as a view's do.
+## made only of FLICKER sparks, which has no outline. Each moves on the clock alone, so each is
+## folded into its body and outline (BuildingModels, Surf.MOVE) and the shaders move it.
 ##
 ## Headless it checks each part's surfaces and flags, the outline's channels, the instance
-## counts and that the moving parts move. Rendered it frames the rig at the closest zoom and
+## counts and that the moving parts are folded: no node of their own, their vertices in the body
+## (and, but for the sparks, the outline) carrying their kind and easing (Motion.from_channels). Rendered it frames the rig at the closest zoom and
 ## screenshots it 0.0, 0.3 and 0.9 seconds after a settle, and checks that every part's region
 ## of the screen changes between the shots: between the first two, or between any two of the three
 ## for the flickering parts, which can be off in both, and for the PULSE orb, whose real-time 1.6 s
@@ -36,10 +35,15 @@ const PIXEL_DELTA := 0.04
 ## Each rig part: {"name", "node", "surfaces" (the body's surface count), "flags" (bits every
 ## vertex of surface 0 carries), "outlined" (whether the body has an outline)}.
 var _rig: Array[Dictionary] = []
-var _movers: Array[Node3D] = []
-var _motions: Array[Motion] = []
-var _rests := PackedVector3Array()
 var _main: MainScript
+## The moving rig parts: [kind, easing] of each, by name.
+const MOVING := {
+	"spin": [Motion.Kind.SPIN, Motion.Ease.SMOOTH],
+	"swing": [Motion.Kind.SWING, Motion.Ease.SMOOTH],
+	"slide_hammer": [Motion.Kind.SLIDE, Motion.Ease.HAMMER],
+	"slide_recoil": [Motion.Kind.SLIDE, Motion.Ease.RECOIL],
+	"flicker_mover": [Motion.Kind.SPIN, Motion.Ease.SMOOTH],
+}
 
 
 func run(main: MainScript) -> void:
@@ -62,20 +66,9 @@ func run(main: MainScript) -> void:
 			var node: Node3D = part["node"]
 			node.position = across * SPACING * (k - (count - 1) * 0.5) + down * ROW_GAP * (row - 0.5)
 			root.add_child(node)
-			_collect_movers(node)
 
 	_check_parts()
-	var update := _update_movers
-	main.get_tree().process_frame.connect(update)
-	var before: Array[Transform3D] = []
-	for mover: Node3D in _movers:
-		before.append(mover.transform)
-	await frames(10)
-	var moved := 0
-	for i: int in _movers.size():
-		if not _movers[i].transform.is_equal_approx(before[i]):
-			moved += 1
-	check(moved == _movers.size() and moved == 5, "%d of %d moving parts moved in 10 frames" % [moved, _movers.size()])
+	_check_folded()
 
 	zoom_to(main, ZOOM_SIZE, Vector3.ZERO)
 	# The window shows a frame or more behind the scene, and the first frames compile the rig's
@@ -92,7 +85,6 @@ func run(main: MainScript) -> void:
 			shots.append(main.get_viewport().get_texture().get_image())
 	if not shots.is_empty():
 		_check_regions(shots)
-	main.get_tree().process_frame.disconnect(update)
 	root.queue_free()
 
 
@@ -220,12 +212,6 @@ func _check_parts() -> void:
 		check(mesh.get_surface_count() == part["surfaces"] and all_flagged and holo_ok and instances <= 8
 			and uncompressed, "%s: %d surface(s), flags %d on every vertex %s, %d instance(s), %d phase(s), UV2 uncompressed %s"
 			% [name, mesh.get_surface_count(), flags, all_flagged, instances, phases.size(), uncompressed])
-		for mover: Node in node.get_children():
-			if mover.has_meta(BuildingModels.MOVE_META):
-				var outlines := mover.get_children().filter(
-					func(child: Node) -> bool: return child.has_meta(BuildingModels.OUTLINE_META)).size()
-				var expected := 0 if name == "flicker_mover" else 1
-				check(outlines == expected, "%s: its moving part has %d outline(s), %d expected" % [name, outlines, expected])
 	var bob := _outline(_part("bob")["node"])
 	var format: int = bob.mesh.surface_get_format(0)
 	check((format & Mesh.ARRAY_FORMAT_TEX_UV2) != 0 and (format & Mesh.ARRAY_FORMAT_COLOR) != 0,
@@ -298,19 +284,35 @@ func _changed(a: Image, b: Image, region: Rect2i) -> int:
 	return count
 
 
-func _update_movers() -> void:
-	var time := Motion.tick()
-	for i: int in _movers.size():
-		_movers[i].transform = _motions[i].transform_at(time, _rests[i])
+## Checks that each moving rig part is folded into its model: no node of its own, FOLDS_META on the
+## root, and its kind and easing on the MOVE vertices of the body and, but for the sparks, which
+## are never outlined, of the outline.
+func _check_folded() -> void:
+	for name: String in MOVING:
+		var node: Node3D = _part(name)["node"]
+		var want: Array = MOVING[name]
+		var nodes := node.get_children().filter(func(child: Node) -> bool: return child.has_meta(BuildingModels.MOVE_META))
+		var body := _moves_of(_body(node).mesh)
+		var outline := _moves_of(_outline(node).mesh) if _outline(node) != null else []
+		var outlined := name != "flicker_mover"
+		check(nodes.is_empty() and node.has_meta(BuildingModels.FOLDS_META) and body == want
+			and (outline == want if outlined else outline.is_empty()),
+			"%s: folded (%d node(s)), body moves as %s, outline as %s, %s wanted" % [name, nodes.size(), body, outline, want])
 
 
-func _collect_movers(node: Node3D) -> void:
-	for child: Node in node.get_children():
-		if child.has_meta(BuildingModels.MOVE_META):
-			var mover := child as Node3D
-			_movers.append(mover)
-			_motions.append(mover.get_meta(BuildingModels.MOVE_META) as Motion)
-			_rests.append(mover.position)
+## [kind, easing] of the MOVE vertices of `mesh`'s first surface (decoded from CUSTOM0 and CUSTOM3),
+## empty when none moves.
+func _moves_of(mesh: Mesh) -> Array:
+	var arrays := mesh.surface_get_arrays(0)
+	var uv2s: PackedVector2Array = arrays[Mesh.ARRAY_TEX_UV2]
+	var first: Variant = arrays[Mesh.ARRAY_CUSTOM0]
+	var second: Variant = arrays[Mesh.ARRAY_CUSTOM3]
+	for i: int in uv2s.size():
+		if (roundi(uv2s[i].y) & Surf.MOVE) != 0 and typeof(first) == TYPE_PACKED_FLOAT32_ARRAY:
+			var motion := Motion.from_channels(Vector4(first[i * 4], first[i * 4 + 1], first[i * 4 + 2], first[i * 4 + 3]),
+				Vector4(second[i * 4], second[i * 4 + 1], second[i * 4 + 2], second[i * 4 + 3]))
+			return [motion.kind, motion.easing]
+	return []
 
 
 func _part(name: String) -> Dictionary:

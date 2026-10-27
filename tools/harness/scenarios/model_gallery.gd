@@ -214,23 +214,77 @@ func _check_budget(catalog: Catalog, entry: Dictionary) -> void:
 
 
 ## How high a model stands, in world units, times the model's scale: the static body's bounds,
-## and each moving part's over its whole motion (_moving_top).
+## and each moving part's over its whole motion (_moving_top), the parts folded into the body
+## (Surf.MOVE) included.
 func _top(model: Node3D, bodies: Array[MeshInstance3D]) -> float:
 	var top := 0.0
 	for body: MeshInstance3D in bodies:
 		if body.get_parent() == model:
-			top = maxf(top, body.mesh.get_aabb().end.y)
+			for part: Dictionary in _parts_of(body.mesh):
+				var vertices: PackedVector3Array = part["vertices"]
+				if part["motion"] == null:
+					top = maxf(top, _box(vertices).end.y)
+				else:
+					top = maxf(top, _moving_top(vertices, part["motion"] as Motion, part["pivot"] as Vector3))
 		else:
 			var node := body.get_parent() as Node3D
-			top = maxf(top, _moving_top(body.mesh, node.get_meta(BuildingModels.MOVE_META) as Motion, node.position))
+			top = maxf(top, _moving_top(_vertices_of(body.mesh), node.get_meta(BuildingModels.MOVE_META) as Motion,
+				node.position))
 	return top * model.scale.y
+
+
+## A body mesh's vertices split by the moving part folded into it (Surf.MOVE, its pivot and Motion
+## decoded from CUSTOM0 and CUSTOM3): {"motion", "pivot", "vertices"} per part, its vertices in its
+## own space, and the static body's with a null motion.
+func _parts_of(mesh: Mesh) -> Array[Dictionary]:
+	var still := {"motion": null, "pivot": Vector3.ZERO, "vertices": PackedVector3Array()}
+	var parts: Array[Dictionary] = [still]
+	var by_motion := {}
+	for surface: int in mesh.get_surface_count():
+		var arrays := mesh.surface_get_arrays(surface)
+		var vertices: PackedVector3Array = arrays[Mesh.ARRAY_VERTEX]
+		var uv2s: PackedVector2Array = arrays[Mesh.ARRAY_TEX_UV2]
+		var first: Variant = arrays[Mesh.ARRAY_CUSTOM0]
+		var second: Variant = arrays[Mesh.ARRAY_CUSTOM3]
+		for i: int in vertices.size():
+			if (roundi(uv2s[i].y) & Surf.MOVE) == 0 or typeof(first) != TYPE_PACKED_FLOAT32_ARRAY:
+				(still["vertices"] as PackedVector3Array).append(vertices[i])
+				continue
+			var c0 := Vector4(first[i * 4], first[i * 4 + 1], first[i * 4 + 2], first[i * 4 + 3])
+			var c3 := Vector4(second[i * 4], second[i * 4 + 1], second[i * 4 + 2], second[i * 4 + 3])
+			var key := [c0, c3]
+			if not by_motion.has(key):
+				by_motion[key] = {"motion": Motion.from_channels(c0, c3), "pivot": Vector3(c0.x, c0.y, c0.z),
+					"vertices": PackedVector3Array()}
+				parts.append(by_motion[key])
+			var part: Dictionary = by_motion[key]
+			(part["vertices"] as PackedVector3Array).append(vertices[i] - (part["pivot"] as Vector3))
+	return parts
+
+
+## Every vertex of a mesh, all its surfaces.
+func _vertices_of(mesh: Mesh) -> PackedVector3Array:
+	var all := PackedVector3Array()
+	for surface: int in mesh.get_surface_count():
+		all.append_array(mesh.surface_get_arrays(surface)[Mesh.ARRAY_VERTEX])
+	return all
+
+
+## The bounds of `vertices`.
+func _box(vertices: PackedVector3Array) -> AABB:
+	if vertices.is_empty():
+		return AABB()
+	var box := AABB(vertices[0], Vector3.ZERO)
+	for vertex: Vector3 in vertices:
+		box = box.expand(vertex)
+	return box
 
 
 ## A moving part's highest point over its whole motion: its bounds' corners turned about the
 ## axis every SWING_STEP degrees (a whole turn for a SPIN, -amplitude to +amplitude for a SWING),
 ## or at both ends of a SLIDE.
-func _moving_top(mesh: Mesh, motion: Motion, pivot: Vector3) -> float:
-	var box := mesh.get_aabb()
+func _moving_top(vertices: PackedVector3Array, motion: Motion, pivot: Vector3) -> float:
+	var box := _box(vertices)
 	var poses: Array[Transform3D] = []
 	match motion.kind:
 		Motion.Kind.SPIN, Motion.Kind.SWING:
@@ -251,15 +305,21 @@ func _moving_top(mesh: Mesh, motion: Motion, pivot: Vector3) -> float:
 
 
 ## How far a model reaches from its centre in x or z, in world units, times the model's scale:
-## the static body's bounds, and each moving part's reach over its whole motion (_moving_reach).
+## the static body's bounds, and each moving part's reach over its whole motion (_moving_reach), the
+## parts folded into the body included.
 func _reach(model: Node3D, bodies: Array[MeshInstance3D]) -> float:
 	var reach := 0.0
 	for body: MeshInstance3D in bodies:
 		if body.get_parent() == model:
-			reach = maxf(reach, _box_reach(body.mesh.get_aabb(), Transform3D.IDENTITY))
+			for part: Dictionary in _parts_of(body.mesh):
+				var vertices: PackedVector3Array = part["vertices"]
+				if part["motion"] == null:
+					reach = maxf(reach, _box_reach(_box(vertices), Transform3D.IDENTITY))
+				else:
+					reach = maxf(reach, _moving_reach(vertices, part["motion"] as Motion, part["pivot"] as Vector3))
 		else:
 			var node := body.get_parent() as Node3D
-			reach = maxf(reach, _moving_reach(body.mesh, node.get_meta(BuildingModels.MOVE_META) as Motion,
+			reach = maxf(reach, _moving_reach(_vertices_of(body.mesh), node.get_meta(BuildingModels.MOVE_META) as Motion,
 				node.position))
 	return reach * model.scale.x
 
@@ -272,16 +332,14 @@ func _reach(model: Node3D, bodies: Array[MeshInstance3D]) -> float:
 ## SWING: the part's bounds turned every SWING_STEP degrees from -amplitude to +amplitude, both
 ## ends included. SLIDE: its
 ## bounds at both ends of the slide.
-func _moving_reach(mesh: Mesh, motion: Motion, pivot: Vector3) -> float:
-	var box := mesh.get_aabb()
+func _moving_reach(vertices: PackedVector3Array, motion: Motion, pivot: Vector3) -> float:
+	var box := _box(vertices)
 	match motion.kind:
 		Motion.Kind.SPIN:
 			var sweep := 0.0
-			for surface: int in mesh.get_surface_count():
-				var vertices: PackedVector3Array = mesh.surface_get_arrays(surface)[Mesh.ARRAY_VERTEX]
-				for vertex: Vector3 in vertices:
-					var centre := motion.axis * vertex.dot(motion.axis)
-					sweep = maxf(sweep, Vector2(centre.x, centre.z).length() + (vertex - centre).length())
+			for vertex: Vector3 in vertices:
+				var centre := motion.axis * vertex.dot(motion.axis)
+				sweep = maxf(sweep, Vector2(centre.x, centre.z).length() + (vertex - centre).length())
 			return maxf(absf(pivot.x), absf(pivot.z)) + sweep
 		Motion.Kind.SWING:
 			var reach := 0.0
