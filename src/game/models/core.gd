@@ -149,6 +149,9 @@ const WIDE_PYLON_RADIUS := (WIDE_UPPER_STEP * 0.5 + Parts.STRUCTURAL_MIN * 0.5 +
 ## and at L10, where it stands still, the way it is aimed (degrees about Y): towards the camera.
 const WING_DISH := 135.0
 const WING_DISH_AIM := -135.0
+## How far behind the wing's mast, along the wing's depth, the dish's post stands: its feed horn's
+## round clears the mast.
+const WING_DISH_BACK := 0.26
 ## The L10 security bots' round, outside the tower's conduits and the dish's column, at
 ## GUARD_SCALE of their size so the round stays within the reach, and their heights: one low over
 ## floor D, one high under the dome, flying opposite ways.
@@ -353,7 +356,12 @@ static func build_command_center(p: Parts, level: int) -> void:
 		var hover := Vector3(0, dome_base + 0.14, 0)
 		var inner := _gold_ring_outer(level) + HOVER_GAP
 		var outer := inner + HOVER_WIDTH
-		m.ring(inner, outer, 0.05, 24, hover, HOVER_RING)
+		# The rim is the middle of the ring's outer wall, which runs below and above it, so the two
+		# never share a face.
+		m.lathe(PackedVector2Array([Vector2(outer, 0), Vector2(outer, 0.008)]), 24, hover, HOVER_RING)
+		m.lathe(PackedVector2Array([
+			Vector2(outer, 0.042), Vector2(outer, 0.05), Vector2(inner, 0.05), Vector2(inner, 0),
+		]), 24, hover, HOVER_RING)
 		m.lathe(PackedVector2Array([Vector2(outer - 0.015, 0.052), Vector2(inner + 0.015, 0.052)]), 24, hover, HOVER_VEINS)
 		m.lathe(PackedVector2Array([Vector2(outer, 0.008), Vector2(outer, 0.042)]), 24, hover, HOVER_RIM)
 	if level >= 9:
@@ -398,8 +406,9 @@ static func _hangar_door(m: LowPolyMesh, gold: bool, wide: bool) -> void:
 	m.box_chamfered(Vector3(0.86, 0.06, 0.76), 0.03, block + Vector3(0, 0.75, 0), Parts.GOLD_TRIM if gold else Parts.HULL_MID, yaw)
 	var front := block + LowPolyMesh.turn(Vector3(0, 0, 0.35), yaw)
 	m.box(Vector3(0.52, 0.5, 0.04), front, DOOR, yaw)
+	# The posts stop under the lintel, so their faces never share its plane.
 	for side: float in [-1.0, 1.0]:
-		m.box(Vector3(0.1, 0.56, 0.06), front + LowPolyMesh.turn(Vector3(side * 0.31, 0, 0), yaw), Parts.HAZARD, yaw)
+		m.box(Vector3(0.1, 0.52, 0.06), front + LowPolyMesh.turn(Vector3(side * 0.31, 0, 0), yaw), Parts.HAZARD, yaw)
 	m.box(Vector3(0.72, 0.08, 0.06), front + Vector3(0, 0.52, 0), Parts.HAZARD, yaw)
 	# Four warning lamps over the lintel, chasing across it.
 	for k: int in 4:
@@ -534,9 +543,11 @@ static func _core_band(m: LowPolyMesh, y: float, r: float) -> void:
 	for rim: float in [0.0, CORE_BAND - 0.05]:
 		m.lathe(PackedVector2Array([Vector2(r + 0.04, 0), Vector2(r + 0.04, 0.05), Vector2(r - 0.06, 0.05)]), 24, at + Vector3(0, rim, 0),
 			Parts.GOLD_ROUND)
+	# The mullions run between the rims, their tops inside the top rim.
 	for k: int in 8:
 		var degrees := 45.0 * k
-		m.box(Vector3(0.07, CORE_BAND, 0.07), Parts.around(r + 0.01, degrees, y), Parts.GOLD_TRIM, Vector3(0, 90.0 - degrees, 0))
+		m.box(Vector3(0.07, CORE_BAND - 0.03, 0.07), Parts.around(r + 0.01, degrees, y), Parts.GOLD_TRIM,
+			Vector3(0, 90.0 - degrees, 0))
 
 
 ## The tower's and the wing caps' armour by tier: obsidian from the Obsidian tier, chrome at the
@@ -568,7 +579,8 @@ static func _wing(m: LowPolyMesh, degrees: float, level: int, tier: int) -> void
 	m.box(Vector3(0.74, 0.06, 0.04), block + LowPolyMesh.turn(Vector3(0, 0.22, 0.31), yaw), SCREENS, yaw)
 	var roof := block + Vector3(0, 0.8, 0)
 	if gold:
-		m.box_chamfered(Vector3(1.0, 0.1, 0.66), 0.03, block + Vector3(0, 0.72, 0), Parts.GOLD_TRIM, yaw)
+		# At L10 its end stops inside the cap's filigree band, which would share its face.
+		m.box_chamfered(Vector3(0.98 if level >= 10 else 1.0, 0.1, 0.66), 0.03, block + Vector3(0, 0.72, 0), Parts.GOLD_TRIM, yaw)
 	m.box_chamfered(Vector3(0.44, 0.08, 0.36), 0.02, roof, ROOF_VENT, yaw)
 	if level >= 4:
 		var foot := Parts.around(1.6 if wide else 1.45, degrees, roof.y)
@@ -616,7 +628,7 @@ static func _wing_cap(m: LowPolyMesh, block: Vector3, degrees: float, yaw: Vecto
 static func _wing_dish(p: Parts, gold: bool, wide: bool) -> void:
 	var m := p.body
 	var yaw := Vector3(0, 90.0 - DOOR_FACING, 0)
-	var foot := Parts.around(1.65 if wide else 1.5, WING_DISH, DECK + 0.9) + LowPolyMesh.turn(Vector3(0, 0, -0.22), yaw)
+	var foot := Parts.around(1.65 if wide else 1.5, WING_DISH, DECK + 0.9) + LowPolyMesh.turn(Vector3(0, 0, -WING_DISH_BACK), yaw)
 	var turntable := Parts.dish_post(m, foot, 2.1 - foot.y, Parts.CHROME, yaw.y)
 	if p.tier >= Parts.Tier.CROWN:
 		_comms_dish(m, gold, 0.65, turntable, WING_DISH_AIM)
@@ -628,10 +640,13 @@ static func _wing_dish(p: Parts, gold: bool, wide: bool) -> void:
 ## round wall with a band of screens and a chamfered roof edge, its roof closed in to `inner`, the
 ## door and wings (and to L5 the masts and pylon) rising through it.
 static func _rooms(m: LowPolyMesh, gold: bool, radius: float, inner: float) -> void:
-	m.lathe(PackedVector2Array([
-		Vector2(radius, 0), Vector2(radius, ROOMS_HEIGHT - 0.06),
-		Vector2(radius - 0.06, ROOMS_HEIGHT), Vector2(inner, ROOMS_HEIGHT),
-	]), 24, Vector3(0, DECK, 0), Parts.HULL_LIGHT_ROUND)
+	var profile := PackedVector2Array([
+		Vector2(radius, 0), Vector2(radius, ROOMS_HEIGHT - 0.06), Vector2(radius - 0.06, ROOMS_HEIGHT),
+	])
+	# The roof runs in to `inner`, unless the floor above stands on its edge (WIDE_FLOOR_RADII's A and B).
+	if not is_equal_approx(inner, radius - 0.06):
+		profile.append(Vector2(inner, ROOMS_HEIGHT))
+	m.lathe(profile, 24, Vector3(0, DECK, 0), Parts.HULL_LIGHT_ROUND)
 	m.lathe(PackedVector2Array([Vector2(radius + 0.01, 0), Vector2(radius + 0.01, 0.18)]), 24,
 		Vector3(0, DECK + 0.2, 0), SCREENS)
 	m.lathe(PackedVector2Array([Vector2(radius + 0.03, 0), Vector2(radius + 0.03, 0.1)]), 24,
