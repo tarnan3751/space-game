@@ -96,9 +96,11 @@ const NESTED := "Nested keys: battle_view holds battle_steps (which holds sim_st
 var _rows: Array[Dictionary] = []
 ## Every Profile key collected, over the samples and after them.
 var _seen: Dictionary[StringName, bool] = {}
-## Triangles per mesh, counted once.
+## Triangles per mesh, counted once a split; and per mesh for the fill, all surfaces and the
+## hologram surfaces alone, once a fill. Each is let go after its split or fill (_forget_meshes):
+## a mesh held here would outlive its replacement (the merged walls', rebuilt as walls fall) and
+## count in the video memory.
 var _tris: Dictionary[Mesh, int] = {}
-## Triangles per mesh for the fill, all surfaces and the hologram surfaces alone.
 var _effect_faces: Dictionary[Mesh, PackedVector3Array] = {}
 var _holo_faces: Dictionary[Mesh, PackedVector3Array] = {}
 
@@ -432,6 +434,7 @@ func _split_base(main: MainScript) -> void:
 	for view: BuildingView in main.base_view.views.values():
 		_split_building(view, view, out)
 	_say_split("the base at size %d" % int(main.camera.size), out)
+	_forget_meshes()
 
 
 ## Triangles a frame of the battle by source.
@@ -458,6 +461,7 @@ func _split_battle(_main: MainScript, view: BattleView, label: String) -> void:
 		else:
 			_split_tree(child, out)
 	_say_split(label, out)
+	_forget_meshes()
 
 
 ## The rest of the battle's children: the buildings' root (BuildingViews, the traps hidden until
@@ -618,6 +622,14 @@ func _holo_fill(main: MainScript, root: Node, label: String) -> void:
 	_holo_walk(main, root, screen, found)
 	say("the hologram surfaces of %s at size %d: %d meshes, %.2f screens of alpha-blended fill"
 		% [label, int(main.camera.size), int(found[0]), float(found[1])])
+	_forget_meshes()
+
+
+## Lets go of every mesh the splits and the fills counted (_tris and the faces).
+func _forget_meshes() -> void:
+	_tris.clear()
+	_effect_faces.clear()
+	_holo_faces.clear()
 
 
 func _holo_walk(main: MainScript, node: Node, screen: Vector2, found: Array) -> void:
@@ -631,7 +643,7 @@ func _holo_walk(main: MainScript, node: Node, screen: Vector2, found: Array) -> 
 		_holo_walk(main, child, screen, found)
 
 
-## A mesh's triangles, three points each: its hologram surfaces' only when `holo`. Counted once.
+## A mesh's triangles, three points each: its hologram surfaces' only when `holo`. Counted once a fill.
 func _faces(mesh: Mesh, holo: bool) -> PackedVector3Array:
 	var faces := PackedVector3Array()
 	if mesh == null:

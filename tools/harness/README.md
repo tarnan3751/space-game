@@ -697,7 +697,9 @@ view, `BattleView._process` by section, the sim's step, `BattleUnits`' buffer up
 MultiMesh buffer uploads, and logs the triangles and draws a frame by source (the buildings' bodies,
 outlines and moving parts, the walls, the scenery; the units, each effect list, the rubble) and
 each battle tick's alpha-blended fill (the effects' and the holograms' projected triangles, in
-screens' worth). The log ends with a table, one row a sample, and a note on the nested systems:
+screens' worth); the meshes it counts are let go after each split and fill, so one the battle has
+since replaced (the merged walls', rebuilt as walls fall) is not kept alive in the video memory it
+reads. The log ends with a table, one row a sample, and a note on the nested systems:
 `battle_view` holds `battle_steps` (which holds `sim_step`), `units_draw` (which holds
 `units_upload`), `deaths`, `aim_defences`, `draw_buildings`, `bars_upload`, `effects_draw` (which
 holds every `fx_*`) and `walls_mask`, so the columns are not summed; `building_views` is apart.
