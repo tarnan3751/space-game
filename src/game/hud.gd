@@ -197,6 +197,9 @@ var _meter_labels: Dictionary[String, Label] = {}
 ## Each meter's stripes' material, and the amount it last showed, which a change flashes.
 var _meter_shaders: Dictionary[String, ShaderMaterial] = {}
 var _meter_amounts: Dictionary[String, int] = {}
+## The capacity each meter's text last showed (-1 before the first), so a refresh sets the text
+## only when its amount or its capacity changed.
+var _meter_capacities: Dictionary[String, int] = {}
 ## The state's time at the meters' last refresh, so a rise is weighed against the production of
 ## the seconds since.
 var _meters_now: int = 0
@@ -205,6 +208,8 @@ var _build_button: Button
 var _expedition_button: Button
 var _expedition_badge: Control
 var _expedition_count: Label
+## The open fields the badge last showed, -1 before the first refresh.
+var _open_fields: int = -1
 ## The build panel, outside the root and under it, so the Build button draws over it.
 var _menu: PanelContainer
 ## Pads the panel's content to the safe area.
@@ -339,8 +344,8 @@ func setup(catalog: Catalog) -> void:
 	_build_toast()
 	if OS.is_debug_build():
 		_build_debug_buttons()
-	get_viewport().size_changed.connect(_fit_safe_area)
-	_fit_safe_area()
+	get_viewport().size_changed.connect(fit_safe_area)
+	fit_safe_area()
 
 
 ## `painting`: walls are being painted, so Place reads Done and is always enabled; there is
@@ -348,9 +353,6 @@ func setup(catalog: Catalog) -> void:
 func refresh(state: BaseState, selected_id: int, placing: bool, ghost_ok: bool, painting: bool) -> void:
 	_state = state
 	_watch(state)
-	# The safe area can move without a resize: turning a phone over moves the notch to the
-	# other side. Every refresh, the 1 s tick's included, checks it.
-	_fit_safe_area()
 	var elapsed := clampi(state.now - _meters_now, 1, FLASH_MAX_SECONDS)
 	_meters_now = state.now
 	for res: String in _catalog.resources:
@@ -366,11 +368,15 @@ func refresh(state: BaseState, selected_id: int, placing: bool, ghost_ok: bool, 
 		# A drop (a purchase) or a rise past FLASH_RISE_TICKS ticks' production (a payout, an
 		# offline catch-up) flashes the fill; the per-tick trickle does not. Under the cheats the
 		# meter reads "∞" whatever it holds.
-		if not cheats and _meter_amounts.has(res) and _flashes(res, amount - _meter_amounts[res], elapsed):
+		var shown := _meter_amounts.has(res)
+		if not cheats and shown and _flashes(res, amount - _meter_amounts[res], elapsed):
 			_meter_shaders[res].set_shader_parameter(&"flash_time", Motion.clock())
+		if not shown or amount != _meter_amounts[res] or capacity != _meter_capacities[res]:
+			_meter_labels[res].text = "∞" if cheats else "%s / %s" % [Format.short(amount), Format.short(capacity)]
 		_meter_amounts[res] = amount
-		_meter_labels[res].text = "∞" if cheats else "%s / %s" % [Format.short(amount), Format.short(capacity)]
-	_drone_ring.set_counts(state.builders_free(), state.builders_total())
+		_meter_capacities[res] = capacity
+	var drones := state.builders_total()
+	_drone_ring.set_counts(drones - state.builders_busy(), drones)
 
 	var has_selection := selected_id != 0 and state.buildings.has(selected_id)
 	_selected_id = selected_id if has_selection else 0
@@ -383,11 +389,15 @@ func refresh(state: BaseState, selected_id: int, placing: bool, ghost_ok: bool, 
 		_close_army()
 	_build_button.visible = not placing
 	var open_fields := _catalog.expedition_field_count() - state.sector.cleared.size()
-	_expedition_count.text = str(open_fields)
+	if open_fields != _open_fields:
+		_open_fields = open_fields
+		_expedition_count.text = str(open_fields)
 	_expedition_badge.visible = open_fields > 0
 	_show_expedition()
 	_place_bar.visible = placing
-	_place_button.text = "Done" if painting else "Place"
+	var place_text := "Done" if painting else "Place"
+	if _place_button.text != place_text:
+		_place_button.text = place_text
 	_place_button.disabled = not ghost_ok and not painting
 	_info_panel.visible = not placing and has_selection and _army_page == ArmyPage.NONE
 	if _menu_open:
@@ -443,7 +453,7 @@ func apply_safe_area(inset: Rect2) -> void:
 		_army.offset_bottom = 0.0
 
 
-## The device's safe area in `viewport`'s visible rect, as _fit_safe_area fits it: the battle's HUD
+## The device's safe area in `viewport`'s visible rect, as fit_safe_area fits it: the battle's HUD
 ## (BattleHud) fits itself to it too.
 static func safe_area(viewport: Viewport) -> Rect2:
 	var visible_rect := viewport.get_visible_rect()
@@ -460,7 +470,9 @@ static func safe_area(viewport: Viewport) -> Rect2:
 ## window onto the visible rect, so the scale between them is their size ratio. A window
 ## with no size (headless) gets the whole rect. It applies only a rect that differs from
 ## the last one it fitted, so an inset the harness applied stays until the device's changes.
-func _fit_safe_area() -> void:
+## It runs at ready, on the viewport's size_changed, and once a second from main.gd's tick: the
+## safe area can move without a resize (turning a phone over moves the notch to the other side).
+func fit_safe_area() -> void:
 	var area := safe_area(get_viewport())
 	if area == _fitted_area:
 		return

@@ -156,6 +156,7 @@ func _on_tick() -> void:
 	state.advance_to(_now())
 	# Timer labels change every second even when nothing else did.
 	_dirty = true
+	hud.fit_safe_area()
 	if sector_map.visible:
 		sector_map.tick(state)
 	_ticks += 1
