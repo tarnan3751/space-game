@@ -8,7 +8,8 @@ extends RefCounted
 ## clock() is the game's one animation clock: seconds from a monotonic clock, wrapping every
 ## WRAP_SECONDS as the shaders' time did, so a period that divides it never jumps. main.gd sets it
 ## once a frame (tick) and hands the same value to the shaders as the anim_time global, so a
-## moving part and its surface effects keep step.
+## moving part and its surface effects keep step. The harness may fix it (fix_clock), so two runs
+## draw the same poses at the same clock values.
 ##
 ## SWING and SLIDE move between -amplitude and +amplitude on a wave s(u) of the cycle's share u,
 ## from -1 to 1. At s = -1 the part is at its rest turned or moved by -amplitude: a HAMMER rests
@@ -36,6 +37,8 @@ var phase := 0.0
 
 const WRAP_SECONDS := 3600
 static var _clock: float = 0.0
+## The clock fix_clock set, negative while the clock runs.
+static var _fixed: float = -1.0
 
 
 ## The animation clock now, in seconds, as of this frame's tick().
@@ -46,8 +49,17 @@ static func clock() -> float:
 ## Reads the monotonic clock into clock() and returns it; main.gd calls it once a frame, before
 ## the views animate.
 static func tick() -> float:
-	_clock = (Time.get_ticks_usec() % (WRAP_SECONDS * 1000000)) / 1000000.0
+	if _fixed >= 0.0:
+		_clock = _fixed
+	else:
+		_clock = (Time.get_ticks_usec() % (WRAP_SECONDS * 1000000)) / 1000000.0
 	return _clock
+
+
+## Holds the clock at `time` seconds from the next tick() on, for the harness (HarnessScenario.fix_clock);
+## a negative `time` lets it run on the monotonic clock again.
+static func fix_clock(time: float) -> void:
+	_fixed = time
 
 
 ## Continuous rotation about `axis` through the pivot at `rate` radians a second.

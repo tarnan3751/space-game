@@ -126,6 +126,11 @@ Helpers on `HarnessScenario`:
   screenshot. `crop` takes the centre half of the window each way instead of the whole (the log
   line says "centre half"), twice the pixels on a close subject. A count under 1 fails a check
   and saves nothing. Headless runs log and skip it.
+- `fix_clock(time)`, `release_clock()` — holds the animation clock (`Motion.clock()`, and through
+  `main.gd` the shaders' `anim_time`) at `time` seconds from the next frame on, so every moving
+  part and surface effect stands at that moment, the same in every run and on every tree: two
+  trees' shots at the same fixed clock compare pixel for pixel. A strip under a fixed clock
+  repeats its frames. `release_clock()` lets it run on real time again.
 - `frame_world(main, size, world_pos)` — sets the camera to `size` with `world_pos` at the
   screen's centre, the framing every close-up shares. A size under the camera's own closest zoom
   (`IsoCamera.MIN_ZOOM_SIZE`, 10) is set directly, as no gesture can, so a unit can be framed at
@@ -807,5 +812,12 @@ strip. Each battle is surrendered and left before the next.
   from 12 ticks before it lands) and `strike-smoke` (8, 150 ms); `shield-hit` and `shield-drop`
   (8, 100 ms) on a shield generator's pool; `rubble-settle` (12, 100 ms) from a Drone Bay's fall
   and `smoke-column` (8, 250 ms) two seconds later.
+- `scenarios/anim_identity.gd`: the models' poses at fixed clocks (`fix_clock`), for comparing
+  two trees' animation shot for shot: every type but the wall at level 1, its middle level and its
+  top level, each alone at the field's middle (the base's views hidden), framed on its middle at
+  2.6 a cell, and the gunship at Base and at Crown, each a screenshot `<type>-<level>-<k>` at the
+  clocks 0.37, 2.9 and 7.41 seconds (repeats allowed). Run it rendered on each tree into its own
+  `--out` and compare the shots of the same name (`Image.compute_image_metrics`): a part moved
+  differently shows as a difference at a known clock. Checks: every view showed its model.
 
 Each runs in about one to four minutes rendered, inside the watchdog's 300 seconds.

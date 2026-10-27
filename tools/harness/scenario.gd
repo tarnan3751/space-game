@@ -60,6 +60,17 @@ func strip(name: String, count: int, step_ms: int, crop: bool = false) -> void:
 	await harness.strip(name, count, step_ms, crop)
 
 
+## Holds the animation clock (Motion.clock() and the shaders' anim_time) at `time` seconds from the
+## next frame on, so a shot shows every moving part and surface effect at that moment, the same in
+## every run; release_clock() lets it run again.
+func fix_clock(time: float) -> void:
+	Motion.fix_clock(time)
+
+
+func release_clock() -> void:
+	Motion.fix_clock(-1.0)
+
+
 ## Sets the camera to `size` with `world_pos` at the screen's centre, so every close-up is framed
 ## the same way. A size under the camera's own closest zoom (IsoCamera.MIN_ZOOM_SIZE) is set
 ## directly, as no gesture can.
