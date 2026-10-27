@@ -867,7 +867,10 @@ static func build_shield_generator(p: Parts, level: int) -> void:
 	Parts.drum(m, 0.9, 0.16, 0.04, 24, Vector3(0, top, 0), _by_tier(p.tier, SHELL_MID, Parts.CHROME_ROUND, Parts.OBSIDIAN_ROUND))
 	var foot := top + 0.16
 	m.dome(0.84, 0.55, 20, 6, Vector3(0, foot, 0), _by_tier(p.tier, SHELL, Parts.CHROME_ROUND, Parts.OBSIDIAN_ROUND))
+	# The dome fills the ring: no camera sees its inner wall (LowPolyMesh.inner_unseen).
+	m.inner_unseen = true
 	m.ring(0.8, 0.88, 0.05, 24, Vector3(0, foot, 0), Parts.CORE_GLOW if obsidian else ION)
+	m.inner_unseen = false
 	var orb_radius := 0.3 + 0.05 * level
 	var orb := Vector3(0, top + 1.45 + 0.05 * level + lift, 0)
 	var knuckle := GOLD if p.tier >= Parts.Tier.GOLD else ARMOUR_ROUND
@@ -1512,7 +1515,10 @@ static func build_railgun(p: Parts, level: int) -> void:
 	# glowing band (cyan, violet from the Obsidian tier) under the gun, broad from L5.
 	m.lathe(PackedVector2Array([Vector2(0.5, 0), Vector2(0.5, 0.05), Vector2(0.36, 0.15), Vector2(0.36, lift), Vector2(0, lift)]),
 		24, foot, _by_tier(p.tier, SHELL, Parts.CHROME_ROUND, Parts.OBSIDIAN_ROUND))
+	# The mount fills the ring: no camera sees its inner wall (LowPolyMesh.inner_unseen).
+	m.inner_unseen = true
 	m.ring(0.35, 0.4, 0.07, 24, foot + Vector3(0, 0.16, 0), ARMOUR_ROUND)
+	m.inner_unseen = false
 	var band := 0.08 if level < 5 else 0.16
 	m.ring(0.35, 0.385, band, 24, foot + Vector3(0, lift - 0.04 - band, 0), glow)
 	# The rail assembly turns on the mount: the housing, the rails and all they carry, one moving
@@ -1984,7 +1990,10 @@ static func _capacitor(m: LowPolyMesh, pos: Vector3, height: float, top: bool, b
 	Parts.drum(m, 0.2, height, 0.04, 16, pos, body)
 	if not top:
 		return pos + Vector3(0, height, 0)
+	# The can fills the ring: no camera sees its inner wall (LowPolyMesh.inner_unseen).
+	m.inner_unseen = true
 	m.ring(0.19, 0.225, 0.1, 16, pos + Vector3(0, height * 0.5 - 0.015, 0), band)
+	m.inner_unseen = false
 	Parts.drum(m, 0.12, 0.08, 0.02, 16, pos + Vector3(0, height, 0), Parts.GUNMETAL)
 	return pos + Vector3(0, height + 0.08, 0)
 
@@ -1996,8 +2005,11 @@ static func _capacitor(m: LowPolyMesh, pos: Vector3, height: float, top: bool, b
 ## blinking, a violet crystal swelling from the Obsidian tier.
 static func _rail_cell(m: LowPolyMesh, pos: Vector3, height: float, step: int, tier: int) -> void:
 	Parts.drum(m, 0.12, height, 0.03, 12, pos, _by_tier(tier, RIBBED_LIGHT, CHROME_RIBBED, OBSIDIAN_RIBBED))
+	# The cell fills the ring: no camera sees its inner wall (LowPolyMesh.inner_unseen).
+	m.inner_unseen = true
 	m.ring(0.115, 0.135, 0.06, 12, pos + Vector3(0, height - 0.16, 0),
 		Parts.CORE_GLOW if tier >= Parts.Tier.OBSIDIAN else Parts.CYAN_STRIP)
+	m.inner_unseen = false
 	var phase := Parts.chase(step, 6)
 	if tier < Parts.Tier.OBSIDIAN:
 		Parts.drum(m, 0.075, 0.07, 0.02, 12, pos + Vector3(0, height, 0), ION_BLINK.phased(phase))
