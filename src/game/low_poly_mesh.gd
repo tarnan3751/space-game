@@ -58,6 +58,14 @@ const SMOOTH_COS := 0.766
 const MIN_SIDES := 6
 const MIN_RINGS := 2
 const FAR_SMOOTH_COS := 0.423
+## The side counts' rule (zoom): a round part takes the least sides whose chords stray no more than
+## SAGITTA_PX from its circle on a SCREEN_HEIGHT-pixel-high screen at the zoom, never under
+## SMOOTH_FLOOR when it is smooth shaded (fewer than 10 meet at over SMOOTH_ANGLE and shade
+## faceted) or FLAT_FLOOR when not, rounded up to an even count, and never more than asked.
+const SCREEN_HEIGHT := 1080.0
+const SAGITTA_PX := 0.5
+const SMOOTH_FLOOR := 10
+const FLAT_FLOOR := 8
 ## Corners closer than this (world units) are one point when normals are averaged.
 const WELD := 0.001
 ## The custom vertex channels and their format shifts, in step.
@@ -120,6 +128,11 @@ var rig: Vector4 = Vector4.ZERO
 var rig2: Vector4 = Vector4.ZERO
 ## The share of their sides and rings round parts are built with; set before the first part.
 var detail: float = 1.0
+## The closest camera size (IsoCamera, orthographic: world units on the screen's height) the mesh
+## is drawn at, set before the first part: above 0, a round part takes no more sides than its
+## radius needs there (SAGITTA_PX), the side count a caller asks being the most it takes. 0, the
+## default, keeps every count as asked.
+var zoom := 0.0
 ## Set by lathe() while it emits a face of a round part that faces its axis, with inner_unseen on.
 var _inner_face := false
 ## The named points added with socket(), by name.
@@ -699,7 +712,7 @@ func tube(inner_radius: float, outer_radius: float, height: float, sides: int, p
 func disc(radius: float, sides: int, pos: Vector3, surf: Surf,
 		rot: Vector3 = Vector3.ZERO) -> void:
 	var start := _vertices.size()
-	_fan(radius, 0.0, _sides(sides), Transform3D(_basis(rot), pos), surf, _repeats(radius, surf))
+	_fan(radius, 0.0, _sides(sides, radius, FLAT_FLOOR), Transform3D(_basis(rot), pos), surf, _repeats(radius, surf))
 	_finish(start, surf)
 
 
@@ -712,7 +725,6 @@ func disc(radius: float, sides: int, pos: Vector3, surf: Surf,
 func lathe(profile: PackedVector2Array, sides: int, pos: Vector3, surf: Surf,
 		rot: Vector3 = Vector3.ZERO, from_deg: float = 0.0, to_deg: float = 360.0) -> void:
 	var start := _vertices.size()
-	sides = _sides(sides)
 	var xf := Transform3D(_basis(rot), pos)
 	var last := profile.size() - 1
 	var flat_top := profile[last].x == 0.0 and last > 0 and profile[last - 1].y == profile[last].y
@@ -722,6 +734,7 @@ func lathe(profile: PackedVector2Array, sides: int, pos: Vector3, surf: Surf,
 		arc.append(arc[i] + profile[i].distance_to(profile[i + 1]))
 	for point: Vector2 in profile:
 		widest = maxf(widest, point.x)
+	sides = _sides(sides, widest, SMOOTH_FLOOR if surf.smooth else FLAT_FLOOR)
 	var repeats := _repeats(widest, surf)
 	var from := 0.0
 	var span := TAU
@@ -968,11 +981,18 @@ func _finish(start: int, surf: Surf) -> void:
 				_normals[i] = sum.normalized()
 
 
-## `sides` at this mesh's detail.
-func _sides(sides: int) -> int:
-	if detail >= 1.0:
+## `sides` at this mesh's detail, then for a part of `radius` at its zoom, never under `least`
+## (the rule at SCREEN_HEIGHT), and never more than asked.
+func _sides(sides: int, radius: float, least: int) -> int:
+	if detail < 1.0:
+		sides = maxi(mini(sides, MIN_SIDES), roundi(sides * detail))
+	if zoom <= 0.0 or sides <= least:
 		return sides
-	return maxi(mini(sides, MIN_SIDES), roundi(sides * detail))
+	var px := radius * SCREEN_HEIGHT / zoom
+	var needed := least
+	if px > SAGITTA_PX * 2.0:
+		needed = maxi(least, ceili(PI / acos(1.0 - SAGITTA_PX / px)))
+	return mini(sides, needed + needed % 2)
 
 
 ## `rings` at this mesh's detail.

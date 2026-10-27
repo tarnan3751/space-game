@@ -59,7 +59,9 @@ extends HarnessScenario
 ##   swept over an arc counts, else through their mean), its levels and rings grouped by RING_GAP
 ##   (_cluster), evenly spaced but for one gap (its sides: a whole turn's at that spacing), with more
 ##   sides than its radius warrants on screen: the least sides whose chords stray SAGITTA_PX or less from the circle at
-##   SCREEN_HEIGHT pixels for the camera's height in world units, never under FLOOR_SIDES: `wide=`
+##   SCREEN_HEIGHT pixels for the camera's height in world units, never under LowPolyMesh.SMOOTH_FLOOR
+##   (10) for a smooth-shaded part or FLAT_FLOOR (8) for a flat one, rounded up to an even count, as
+##   LowPolyMesh caps a part's sides (its corner normals tell smooth from flat): `wide=`
 ##   at the wide zoom (IsoCamera.MAX_ZOOM_SIZE) and `play=` at the closest zoom the model is drawn at
 ##   (Spec.zoom: a building, a unit's near version and a figure at IsoCamera.MIN_ZOOM_SIZE, a unit's
 ##   far version at BattleUnits.FAR_ZOOM, where the battle swaps it in). Its surplus is its triangles
@@ -124,8 +126,8 @@ const MOUNT_RADIUS := 0.15
 ## The screen a round part's sides are judged on: a phone's height in pixels, the chord's stray.
 const SCREEN_HEIGHT := 1080.0
 const SAGITTA_PX := 0.5
-## The fewest sides a round part is judged to need (docs/reference/art-style.md: 8 under 0.15).
-const FLOOR_SIDES := 8
+## A triangle is smooth shaded when a corner's normal leaves its face's by more than about 2 degrees.
+const SMOOTH_DOT := 0.9995
 ## A part needs this many triangles to be tested for being round.
 const ROUND_MIN_TRIS := 12
 ## Rays are cast this far.
@@ -181,6 +183,10 @@ class Soup:
 	var boxes: Array[AABB] = []
 	var comp_tris := PackedInt32Array()
 	var comp_flags := PackedInt32Array()
+	## Per triangle: whether a corner's normal leaves its face's (smooth shading); per part, whether
+	## any of its triangles does.
+	var smooth := PackedByteArray()
+	var comp_smooth := PackedByteArray()
 	## Per part: its round axis's point and direction, its sides (0 when not round), its radius.
 	var round_at := PackedVector3Array()
 	var round_axis := PackedVector3Array()
@@ -399,8 +405,9 @@ func _audit(spec: Spec, model: Node3D) -> void:
 				continue
 			rounds += 1
 			var seen_share := _seen_share(soup, c)
-			var play := _warranted(soup.radius[c], spec.zoom)
-			var wide := _warranted(soup.radius[c], IsoCamera.MAX_ZOOM_SIZE)
+			var least := LowPolyMesh.SMOOTH_FLOOR if soup.comp_smooth[c] == 1 else LowPolyMesh.FLAT_FLOOR
+			var play := _warranted(soup.radius[c], spec.zoom, least)
+			var wide := _warranted(soup.radius[c], IsoCamera.MAX_ZOOM_SIZE, least)
 			if soup.sides[c] > play:
 				var extra := soup.comp_tris[c] * (1.0 - float(play) / soup.sides[c]) * seen_share
 				surplus += extra
@@ -463,6 +470,7 @@ func _read(mesh: Mesh, soup: Soup, folded: Dictionary = {}) -> void:
 		var arrays := mesh.surface_get_arrays(surface)
 		var vertices: PackedVector3Array = arrays[Mesh.ARRAY_VERTEX]
 		var uv2s: PackedVector2Array = arrays[Mesh.ARRAY_TEX_UV2]
+		var corner_normals: PackedVector3Array = arrays[Mesh.ARRAY_NORMAL]
 		var first: Variant = arrays[Mesh.ARRAY_CUSTOM0]
 		var second: Variant = arrays[Mesh.ARRAY_CUSTOM3]
 		var moves := typeof(first) == TYPE_PACKED_FLOAT32_ARRAY and typeof(second) == TYPE_PACKED_FLOAT32_ARRAY
@@ -487,7 +495,12 @@ func _read(mesh: Mesh, soup: Soup, folded: Dictionary = {}) -> void:
 			soup.points.append(b)
 			soup.points.append(c)
 			# Godot's front faces wind clockwise (LowPolyMesh._emit).
-			soup.normals.append((c - a).cross(b - a).normalized())
+			var face := (c - a).cross(b - a).normalized()
+			soup.normals.append(face)
+			var smoothed := false
+			for corner: int in 3:
+				smoothed = smoothed or corner_normals[k + corner].dot(face) < SMOOTH_DOT
+			soup.smooth.append(1 if smoothed else 0)
 			soup.degen.append(1 if (c - a).cross(b - a).length() * 0.5 < DEGEN_AREA else 0)
 			soup.layers.append(roundi(uv2s[k].x))
 			soup.flags.append(roundi(uv2s[k].y))
@@ -578,10 +591,12 @@ func _split(soup: Soup) -> void:
 			soup.boxes.append(AABB(soup.points[t * 3], Vector3.ZERO))
 			soup.comp_tris.append(0)
 			soup.comp_flags.append(0)
+			soup.comp_smooth.append(0)
 		var c: int = ids[r]
 		soup.comp[t] = c
 		soup.comp_tris[c] += 1
 		soup.comp_flags[c] |= soup.flags[t]
+		soup.comp_smooth[c] |= soup.smooth[t]
 		for corner: int in 3:
 			soup.boxes[c] = soup.boxes[c].expand(soup.points[t * 3 + corner])
 	soup.comps = ids.size()
@@ -844,12 +859,14 @@ func _rings(points: PackedVector3Array, centre: Vector3, axis: Vector3) -> Vecto
 	return Vector2(sides, best_radius)
 
 
-## The least sides a round part of `radius` needs at camera size `zoom` (SAGITTA_PX on SCREEN_HEIGHT).
-func _warranted(radius: float, zoom: float) -> int:
+## The least sides a round part of `radius` needs at camera size `zoom` (SAGITTA_PX on SCREEN_HEIGHT),
+## never under `least`, rounded up to an even count: LowPolyMesh's own rule (LowPolyMesh._sides).
+func _warranted(radius: float, zoom: float, least: int) -> int:
 	var px := radius * SCREEN_HEIGHT / zoom
-	if px <= SAGITTA_PX * 2.0:
-		return FLOOR_SIDES
-	return maxi(FLOOR_SIDES, ceili(PI / acos(1.0 - SAGITTA_PX / px)))
+	var needed := least
+	if px > SAGITTA_PX * 2.0:
+		needed = maxi(least, ceili(PI / acos(1.0 - SAGITTA_PX / px)))
+	return needed + needed % 2
 
 
 ## The model's physics space: the opaque body, its holograms, the moving parts at rest.

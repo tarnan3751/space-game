@@ -113,6 +113,8 @@ static func build(type: String, tier: int, detail: float = 1.0) -> Parts:
 	# A unit turns to its heading, banks, kicks and rolls as it dies: never upright (Parts.upright).
 	p.upright = false
 	p.body.detail = detail
+	# The far version is drawn from BattleUnits.FAR_ZOOM out, the near one at the camera's closest.
+	p.body.zoom = BattleUnits.FAR_ZOOM if detail < 1.0 else IsoCamera.MIN_ZOOM_SIZE
 	match type:
 		"ranger":
 			InfantryModels.build_ranger(p)

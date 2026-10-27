@@ -381,7 +381,8 @@ the other moving parts, counted by `model_clash`'s own sweep (`aim`; the part th
 out, it carries it); and round parts, a part swept over an arc included (its axis through the
 circumcentre of three corners of one level, else their mean; levels and rings grouped where
 neighbours lie within 0.002), with more sides than their radius needs on a 1080-pixel-high screen
-(chords within half a pixel, at least 8 sides) at the closest zoom the model is drawn at (`play=`: a
+(chords within half a pixel, at least 10 sides for a smooth-shaded part and 8 for a flat one,
+an even count, as `LowPolyMesh` caps them) at the closest zoom the model is drawn at (`play=`: a
 building, a unit's near version and a figure at the base camera's closest, size 10; a unit's far
 version at 20, where the battle swaps it in) and at the widest, 44 (`wide=`). The moving parts are
 posed as `Motion.transform_at` poses them, turned or shifted rather than sampled on the clock: at

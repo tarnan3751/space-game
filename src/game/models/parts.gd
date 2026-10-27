@@ -111,14 +111,18 @@ var rides := PackedInt32Array()
 
 func _init() -> void:
 	body.upright = upright
+	# A building is drawn no closer than the base camera's closest zoom; UnitModels.build sets a
+	# unit's own (LowPolyMesh.zoom).
+	body.zoom = IsoCamera.MIN_ZOOM_SIZE
 
 
 ## A new moving part, which moves about `pivot` as `motion` says: build it in its own space,
-## with the pivot at its origin. It is upright (LowPolyMesh.upright) when the model is and its
+## with the pivot at its origin, at the body's zoom (LowPolyMesh.zoom). It is upright (LowPolyMesh.upright) when the model is and its
 ## motion spins about +Y or slides.
 func moving(pivot: Vector3, motion: Motion) -> LowPolyMesh:
 	assert(movers.size() < max_moving(tier), "a model has at most %d moving parts" % max_moving(tier))
 	var mesh := LowPolyMesh.new()
+	mesh.zoom = body.zoom
 	mesh.upright = upright and (motion.kind == Motion.Kind.SLIDE
 		or (motion.kind == Motion.Kind.SPIN and absf(motion.axis.y) > 0.9999))
 	movers.append(mesh)
