@@ -98,6 +98,6 @@ Also landed after the owner's read of the folders (§3.1 **The owner's three cor
 pass**): housing out of the top bar into the training panels, the Command Center's broad L7+ tower
 with the dome inside it, and the gravity well's vortex.
 
-Left: the `battle` scenario's step budget fails under machine load (core measurement); the
-mortar at L7 brushes its loader arm at two yaws in battle; the phone measurement still needs a
-device (`docs/reference/testing-tools.md`).
+Left: the `battle` scenario's step budget fails under machine load (core measurement); the phone
+measurement still needs a device (`docs/reference/testing-tools.md`). The mortar's L7 loader arm,
+which brushed the barrel at two yaws in battle, was moved clear in the performance pass.
