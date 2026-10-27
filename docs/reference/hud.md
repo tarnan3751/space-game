@@ -157,7 +157,15 @@ sectors (on two diagonals the ring's and the icon's own shadows fall there) and 
 four rotors round a small body. Any other
 resource gets a plain cut gem. **army**, in front of the training header's housing line (**Army
 panel**), is a figure: a head over a pair of rounded shoulders, each with a lighter facet.
-`HudIcon.paint(pen, kind, rect, color, wing)` adds one to a `HudIcon.Pen`.
+`HudIcon.paint(pen, kind, rect, color, wing, coin)` adds one to a `HudIcon.Pen`.
+
+**Coins.** Any icon can wear a coin, the badge the icon families share (`HudIcon.coin`, or
+`paint`'s `coin`; transparent, the default, for none): a disc filling the rect (18.5 units of the
+box's 20) in the coin's colour held to at most 55 % HSV value (`COIN_VALUE`), a lighter band
+across its upper 40 % (the cel band, the fill lightened 15 %), a 3 px ink ring and the icon's
+2 px ink offset shadow, with the silhouette inset on it to 70 % of the rect (`COIN_INSET`).
+The coin is part of the icon's one triangle array. A coin keeps its own backing on any fill, so a
+selected card's cyan does not swallow the emblem on it.
 
 **Unit glyphs.** The queue entries show a unit by its crew (`catalog.unit_crew`), drawn the same
 way in the army accent (the army panel's cards show the unit's picture instead, **Pictures**): **human** a space helmet from the front, a dome over two cheek guards

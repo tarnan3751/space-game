@@ -7,7 +7,8 @@ extends Control
 ## icon's colour, with a lighter highlight facet and a 2.5 px ink outline, over a 2 px ink
 ## offset shadow under the whole icon. The shapes are laid out in a 40-unit box, scaled to
 ## the rect they are painted into. A control draws only when it is built or resized, and the
-## whole icon is one triangle array, so one draw call (`Pen`).
+## whole icon is one triangle array, so one draw call (`Pen`). Any icon can wear a coin under it
+## (`coin`): a disc in the coin's colour with its light band and ink ring, the silhouette inset on it.
 
 ## The box the silhouettes are laid out in, in units.
 const BOX := 40.0
@@ -15,6 +16,15 @@ const OUTLINE := 2.5
 ## Inner edges between the facets of one part.
 const EDGE := 2.0
 const SHADOW_OFFSET := Vector2(2, 2)
+## The coin: its disc's radius, its ink ring, the most HSV value its fill keeps, how much lighter its
+## band is, the share of its height the band covers from the top, and the share of the rect the
+## silhouette is inset to.
+const COIN_RADIUS := 18.5
+const COIN_RING := 3.0
+const COIN_VALUE := 0.55
+const COIN_BAND_LIGHT := 0.15
+const COIN_BAND := 0.4
+const COIN_INSET := 0.7
 
 ## "metal", "crystal", "antimatter", "drones", "army" (the army's figure, on the training panel's
 ## housing line), or a unit's crew, "human", "piloted" or "autonomous", or an ability's effect,
@@ -23,11 +33,13 @@ var kind: String = ""
 var color: Color = Color.WHITE
 ## A wing mark at the lower right: an air unit.
 var winged: bool = false
+## The coin under the icon, in this colour (at most COIN_VALUE in value); transparent for none.
+var coin: Color = Color.TRANSPARENT
 
 
 func _draw() -> void:
 	var pen := Pen.new()
-	paint(pen, kind, Rect2(Vector2.ZERO, size), color, winged)
+	paint(pen, kind, Rect2(Vector2.ZERO, size), color, winged, coin)
 	pen.draw(self)
 
 
@@ -41,8 +53,15 @@ func show_icon(new_kind: String, new_winged: bool) -> void:
 
 
 ## Adds the `icon`, fitted to `rect`, to `pen`: every part's shadow, then the parts, the wing
-## mark last when `wing`.
-static func paint(pen: Pen, icon: String, rect: Rect2, tint: Color, wing: bool = false) -> void:
+## mark last when `wing`; on a coin of `coin_color` filling `rect`, the icon inset on it, unless
+## `coin_color` is transparent.
+static func paint(pen: Pen, icon: String, rect: Rect2, tint: Color, wing: bool = false,
+		coin_color: Color = Color.TRANSPARENT) -> void:
+	if coin_color.a > 0.0:
+		pen.fit(rect)
+		_coin(pen, coin_color)
+		var side := minf(rect.size.x, rect.size.y) * COIN_INSET
+		rect = Rect2(rect.get_center() - Vector2(side, side) * 0.5, Vector2(side, side))
 	pen.fit(rect)
 	for shadow: bool in [true, false]:
 		pen.shadow = shadow
@@ -74,6 +93,21 @@ static func paint(pen: Pen, icon: String, rect: Rect2, tint: Color, wing: bool =
 		if wing:
 			_wing(pen)
 	pen.shadow = false
+
+
+## The coin: its shadow, a disc of `coin_color` at most COIN_VALUE in value, a lighter cel band
+## across its upper COIN_BAND, and its ink ring.
+static func _coin(pen: Pen, coin_color: Color) -> void:
+	var centre := Vector2(BOX, BOX) * 0.5
+	var disc := _ellipse(centre, Vector2(COIN_RADIUS, COIN_RADIUS), 0.0, TAU, 32)
+	var fill := Color.from_hsv(coin_color.h, coin_color.s, minf(coin_color.v, COIN_VALUE))
+	pen.shadow = true
+	pen.shape(disc, fill)
+	pen.shadow = false
+	pen.shape(disc, fill)
+	pen.facet(_cap(centre, COIN_RADIUS, COIN_RADIUS * (1.0 - 2.0 * COIN_BAND), true, 16),
+		fill.lightened(COIN_BAND_LIGHT))
+	pen.outline(disc, COIN_RING)
 
 
 ## A bar seen from the front and a little above: a trapezoid front, a lighter top face and a
@@ -285,6 +319,14 @@ static func _gem(pen: Pen, tint: Color) -> void:
 	pen.outline(outline)
 
 
+## The part of the circle round `centre`, `radius` across, beyond a chord `from_centre` from its
+## centre, above it when `top`, else below it: the arc in `steps`, closed along the chord.
+static func _cap(centre: Vector2, radius: float, from_centre: float, top: bool, steps: int) -> PackedVector2Array:
+	var half := acos(clampf(from_centre / radius, -1.0, 1.0))
+	var middle := -PI / 2.0 if top else PI / 2.0
+	return _ellipse(centre, Vector2(radius, radius), middle - half, middle + half, steps)
+
+
 ## Points along an ellipse round `centre` from angle `from` to `to`, rotated by `tilt`; a whole
 ## turn does not repeat its first point.
 static func _ellipse(centre: Vector2, radii: Vector2, from: float, to: float, steps: int,
@@ -336,9 +378,9 @@ class Pen:
 		if not shadow:
 			add_stroke(place(points), HudIcon.EDGE * _thinning, Hud.INK, false)
 
-	func outline(points: PackedVector2Array) -> void:
+	func outline(points: PackedVector2Array, width: float = HudIcon.OUTLINE) -> void:
 		if not shadow:
-			add_stroke(place(points), HudIcon.OUTLINE * _thinning, Hud.INK, true)
+			add_stroke(place(points), width * _thinning, Hud.INK, true)
 
 	## An open stroke with a shadow of its own: an ink band, and a core of `fill` unless the
 	## band is ink itself.
