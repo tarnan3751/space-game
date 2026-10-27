@@ -587,6 +587,10 @@ class Pen:
 			for lane: int in 3:
 				_quad(a + lane, a + lane + 1, b + lane + 1, b + lane)
 
+	## How many triangles have been added, for the harness.
+	func triangle_count() -> int:
+		return _indices.size() / 3
+
 	## Submits everything added as one triangle array on `item`'s canvas item.
 	func draw(item: CanvasItem) -> void:
 		if not _indices.is_empty():

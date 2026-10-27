@@ -454,6 +454,18 @@ the pad body's vertices). Rendered, it frames the row and the pad at the
 closest zoom (camera size 10) and screenshots them, then again 0.3 and 1.0 seconds later, so FLOW,
 PULSE, the flickers and the orbits show.
 
+`scenarios/icon_sheet.gd` is the HUD icons' sheet (`docs/reference/hud.md`, **Icons**, **Marks**,
+**Coins**): over the game, a page per background, the panel's, the card's and the accent's (a
+selected card), each with every `HudIcon` kind in two columns, a row per kind with its name in
+`InfoTitle`, the kind at 24, 36, 48 and 64 px bare and then on its coin (the star twice, gold and
+the hull-dark of a star not won); then a block of the three ability emblems and the three unit
+glyphs on their coins at 128 px on the card's colour. In both modes it paints every kind into a
+`HudIcon.Pen` of its own and checks that it adds triangles (`Pen.triangle_count()`), that no kind
+but the fallback draws the fallback's gem, and that a coin adds to it. Rendered, it shoots the
+pages (`sheet-panel`, `sheet-card`, `sheet-accent`) and the block (`emblems-2x`), and checks that
+a row of 17 coined icons costs at most a draw call each (the draw calls with the row shown and
+hidden).
+
 `scenarios/figures.gd` is the humanoid design study (`docs/reference/art-style.md`, **Figures**):
 on the field, the base's own views hidden, a row of figures (`Figures`), each on a small concrete
 pad and turned 25 degrees off the camera, the striding ones in profile, walking towards the

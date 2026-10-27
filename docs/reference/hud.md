@@ -207,6 +207,7 @@ icon, or the whole drone ring with its icon, as one triangle array instead
 `Geometry2D.triangulate_polygon`, strokes as quads with mitred corners (capped at three times
 their width), and in place of the renderer's antialiasing a 1 px feather that fades to nothing
 along every stroke and shadow. Fills are left hard, since their outlines cover their edges.
+`Pen.triangle_count()` says how many triangles have been added, for the harness (`icon_sheet`).
 
 **Drone ring.** `DroneRing`, 56×56, at the row's right end: one annular sector per drone
 (`state.builders_total()`, kept with the capacities, **Refresh**; outer radius 26, inner 18), laid out symmetrically round the whole
