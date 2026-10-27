@@ -84,6 +84,11 @@ func ghost_is_valid() -> bool:
 	return state.check_place(placing_type, _ghost_cell) == ""
 
 
+## Whether a finger is dragging: the camera, the ghost, a building or the wall brush.
+func is_dragging() -> bool:
+	return _drag != Drag.NONE
+
+
 ## Placing walls: the ghost is a brush and there is nothing to confirm.
 func is_painting() -> bool:
 	return _painting

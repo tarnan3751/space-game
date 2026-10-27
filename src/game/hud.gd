@@ -225,6 +225,8 @@ var _entries: Dictionary[String, Button] = {}
 ## Each card's picture of its building, empty until ModelPreview has rendered it.
 var _entry_preview: Dictionary[String, TextureRect] = {}
 var _preview: ModelPreview
+## The pictures render in the base's idle frames too (prerender), so a panel finds them made.
+var _prerender: bool = false
 ## Each card's picture, name and cost, dimmed while it cannot be built.
 var _entry_heading: Dictionary[String, Control] = {}
 ## Each card's last line: built / max, or why it cannot be built.
@@ -766,9 +768,24 @@ func _slide_menu(open: bool) -> void:
 	_show_expedition()
 
 
-## The pictures render while a panel that shows them is open: the build panel or the army panel.
+## The pictures render while a panel that shows them is open: the build panel or the army panel;
+## and while the base is idle (prerender).
 func _run_preview() -> void:
-	_preview.run(_menu_open or _army_page != ArmyPage.NONE)
+	_preview.run(_menu_open or _army_page != ArmyPage.NONE or _prerender)
+
+
+## main.gd: whether the base is idle (no drag, no placing, no battle or map, after the first
+## second), when the pictures not made yet render one a frame. Turned on, it asks first for every
+## unit's picture at its researched level's tier, which the training and research cards show,
+## then the build cards' go on in their order.
+func prerender(on: bool) -> void:
+	_prerender = on
+	if on and _state != null:
+		var keys := PackedStringArray()
+		for unit: String in _catalog.unit_types():
+			keys.append(ModelPreview.unit_key(unit, UnitModels.tier_of(_catalog, unit, _state.unit_level(unit))))
+		_preview.request(keys)
+	_run_preview()
 
 
 ## Slides a bottom panel up from below the screen's bottom edge, or back down and out of the

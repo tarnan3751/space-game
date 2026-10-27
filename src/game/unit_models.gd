@@ -68,6 +68,8 @@ const SEAT_SHOW := 1.25
 
 static var _cache: Dictionary[String, BuildingModels.Meshes] = {}
 static var _glows: Dictionary[String, Surf] = {}
+## Guards _glows: a unit model may be built on another thread (ModelPreview's pictures).
+static var _glows_lock: Mutex = Mutex.new()
 static var _warned: Dictionary[String, bool] = {}
 
 
@@ -202,9 +204,12 @@ static func trim(tier: int, smooth: bool = false) -> Surf:
 static func glow(tier: int, flags: int = 0, outline: bool = true) -> Surf:
 	var all := Surf.UNLIT | flags | (Surf.PULSE if tier >= Parts.Tier.CHROME and (flags & Surf.BLINK) == 0 else 0)
 	var key := "%d/%d/%s" % [tier, all, outline]
+	_glows_lock.lock()
 	if not _glows.has(key):
 		_glows[key] = Surf.make(MaterialKit.Layer.GLOW, GLOW_TINTS[tier], 1.0, all, true, outline)
-	return _glows[key]
+	var made: Surf = _glows[key]
+	_glows_lock.unlock()
+	return made
 
 
 # --- Shared helpers -----------------------------------------------------------------

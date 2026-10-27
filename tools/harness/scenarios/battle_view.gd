@@ -6,9 +6,11 @@ extends HarnessScenario
 ##
 ## First the Practice raid button with the Hangars empty: refused with a toast, no battle. Then the
 ## practice setup (main.practice_setup) given the battle scenario's army (ARMY at LEVEL, the
-## Hangars' 280 housing) and SEED, not the base's scenery seed, opened through main.open_battle:
+## Hangars' 280 housing) and SEED, not the base's scenery seed, opened through main.open_battle
+## once the base's idle frames are making the cards' pictures (Hud.prerender):
 ## the field in a landscape of its own, the base's view and input out of the tree, its HUD hidden,
-## the BattleHud shown with a card per type, the first selected and the red zone up. Through the
+## the BattleHud shown with a card per type, the first selected and the red zone up, and in a
+## rendered run every card's picture made. Through the
 ## HUD: the Ranger's card selects it; a tap deploys one and a tap in the zone is refused with a
 ## toast; a drag over SMEAR cells deploys one a cell, one a tick; a drag back and forth over two cells
 ## deploys two. One Ranger is kept back. The rest of the army is deployed
@@ -102,6 +104,11 @@ func run(main: MainScript) -> void:
 	setup["attacker"] = {"army": ARMY, "unit_levels": levels, "abilities": stock, "ability_levels": {}}
 	var zoom := main.camera.size
 	var focus_before := main.camera.focus
+	# Opened while the base's idle frames are making the cards' pictures, so the battle's HUD
+	# must keep the preview running for its deploy cards.
+	await main.get_tree().create_timer(MainScript.PRERENDER_AFTER + 0.2).timeout
+	check(main.hud.preview().is_processing() or main.hud.preview().is_done(),
+		"the base's idle frames are making the pictures as the battle opens")
 	var error := main.open_battle(setup, true)
 	check(error == "", "the battle opens: '%s'" % error)
 	if error != "":
@@ -122,6 +129,15 @@ func run(main: MainScript) -> void:
 	for unit: String in brought:
 		check(hud.card(unit).is_visible_in_tree() and hud.card_count(unit) == "x%d" % int(ARMY[unit]),
 			"%s's card shows x%d (%s)" % [unit, int(ARMY[unit]), hud.card_count(unit)])
+	if harness.headless:
+		say("the deploy cards' pictures skipped (headless: nothing is drawn)")
+	else:
+		var waited := 0
+		while waited < 240 and _unpictured(hud, brought) > 0:
+			await frames(1)
+			waited += 1
+		check(_unpictured(hud, brought) == 0,
+			"every deploy card has its picture (%d frames after the battle opened)" % waited)
 
 	# The scripted groups, each spread over the deploy cells within SPREAD of its point, from tick
 	# SCRIPT_TICK, so the HUD's own deploys come first.
@@ -159,7 +175,8 @@ func run(main: MainScript) -> void:
 	view.input.tapped.emit(_screen(main, view, blocked))
 	check(view.sim.unit_count() == 1 and hud.toast_text() == "Can't deploy there",
 		"a tap in the zone deploys nothing: '%s'" % hud.toast_text())
-	await frames(2)
+	# The cards count on the sim's step, which a fixed number of frames may not reach.
+	await view.stepped
 	check(hud.card_count("ranger") == "x%d" % (int(ARMY["ranger"]) - 1), "the Ranger's card counts down: %s"
 		% hud.card_count("ranger"))
 	await screenshot("tick-%d" % CLOSE_TICKS[0])
@@ -459,3 +476,12 @@ func _measure(main: MainScript, view: BattleView) -> void:
 		"the battle at the widest zoom (size %.0f) in %dx%d with %d units drawn, ticks %d: %d draw calls (ceiling %d), %d primitives (ceiling %d), %.2f ms render CPU (ceiling %.1f), %.2f ms process at the slowest, %d fps over %d frames"
 		% [IsoCamera.MAX_ZOOM_SIZE, MEASURE.x, MEASURE.y, drawn, view.sim.tick, draws, DRAW_CALL_CEILING, primitives,
 		PRIMITIVE_CEILING, render / count, RENDER_CPU_CEILING, process, fps, count])
+
+
+## The deploy cards of `units` still without a picture.
+func _unpictured(hud: BattleHud, units: PackedStringArray) -> int:
+	var missing := 0
+	for unit: String in units:
+		if hud.card_picture(unit) == null:
+			missing += 1
+	return missing

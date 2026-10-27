@@ -5,9 +5,17 @@ extends Node
 ## (docs/reference/hud.md, **Cards**). A picture is named by its key: a building's type, or
 ## unit_key(type, tier) for a unit's (the training, research and deploy cards).
 ##
-## One SubViewport, with a world of its own, renders the models one a frame while the HUD lets
-## it run (while the build panel is open): a model is put in front of the camera one frame,
-## drawn at the end of it, and read back into an ImageTexture the next, which emits `rendered`.
+## One SubViewport, with a world of its own, renders the models one at a time while the HUD lets
+## it run (while a panel that shows pictures is open, and in the base's idle frames, so a panel
+## finds them made). A model's parts and every array of its meshes are built off the main thread,
+## one WorkerThreadPool task at a time (PictureJob: BuildingModels.parts_of or UnitModels.build,
+## then BuildingModels.mesh_data, which read no cache, write none and make no resource or node);
+## the frame that finds the task finished makes the meshes from the arrays (meshes_from), puts the
+## model in front of the camera and has it drawn at the end of that frame, and the next reads it
+## back into an ImageTexture, which emits `rendered`, and starts the next task. A model is built
+## for its picture alone, outside UnitModels' and BuildingModels' caches, and freed after the
+## readback: the texture is all the picture keeps. A task still running when the HUD stops the
+## preview finishes and is staged when it runs again; leaving the tree waits for it.
 ## The camera looks from the world's angle (IsoCamera) and the key light from main.gd's
 ## direction, with no ambient and no shadow; the materials are the world's, the ink's line
 ## widened to the same pixels on the texture as on the screen. Moving parts stand at time 0.
@@ -39,6 +47,46 @@ var _ink: ShaderMaterial
 ## The model drawn this frame, read back next; null between models.
 var _model: Node3D
 var _model_type: String = ""
+## The build running off the main thread, null for none.
+var _job: PictureJob
+
+
+## One picture's model built on a WorkerThreadPool thread: what to build, given on the main thread
+## (the catalog read there), and, once the task has finished, its mesh arrays and, for a unit, its
+## body's extent in the camera's plane, which frames it. Only the task writes them, and the main
+## thread reads them after wait_for_task_completion.
+class PictureJob:
+	var key: String
+	## A unit's type and tier, or a building's type, tier and size ("" unit for a building).
+	var unit: String = ""
+	var type: String = ""
+	var tier: int = 0
+	var size: int = 1
+	## The camera's basis: its x and y span the plane a unit is framed in.
+	var view: Basis
+	var task: int = -1
+	var data: BuildingModels.MeshData
+	var low := Vector2(INF, INF)
+	var high := Vector2(-INF, -INF)
+
+	func run() -> void:
+		var p := UnitModels.build(unit, tier) if unit != "" else BuildingModels.parts_of(type, 1, size, tier)
+		data = BuildingModels.mesh_data(p)
+		if unit == "":
+			return
+		# A unit is framed on its body's own vertices (every surface but the outlines'), as _stage
+		# frames a building on its bounds.
+		var surfaces: Array[Array] = [data.opaque, data.holo]
+		for moving: BuildingModels.MovingData in data.moving:
+			surfaces.append(moving.opaque)
+			surfaces.append(moving.holo)
+		for arrays: Array in surfaces:
+			if arrays.is_empty():
+				continue
+			for point: Vector3 in (arrays[Mesh.ARRAY_VERTEX] as PackedVector3Array):
+				var on_view := Vector2(point.dot(view.x), point.dot(view.y))
+				low = low.min(on_view)
+				high = high.max(on_view)
 
 
 func setup(catalog: Catalog, types: PackedStringArray) -> void:
@@ -66,17 +114,18 @@ func texture_of(key: String) -> Texture2D:
 func request(keys: PackedStringArray) -> void:
 	var front := PackedStringArray()
 	for key: String in keys:
-		if not _cache.has(key) and not _queue.has(key) and key != _model_type and not front.has(key):
+		if not _cache.has(key) and not _queue.has(key) and key != _model_type and not front.has(key) \
+				and (_job == null or key != _job.key):
 			front.append(key)
 	_queue = front + _queue
 
 
 ## Whether every type has its picture.
 func is_done() -> bool:
-	return _queue.is_empty() and _model == null
+	return _queue.is_empty() and _model == null and _job == null
 
 
-## Renders while `on`, one model a frame.
+## Renders while `on`, one model at a time.
 func run(on: bool) -> void:
 	set_process(on and not is_done())
 
@@ -94,20 +143,56 @@ func prioritize(types: PackedStringArray) -> void:
 	_queue = front + rest
 
 
+## The last frame's model read back; a finished build staged, to be drawn this frame; and the
+## next build started. With nothing left, the viewport is freed and processing stops.
 func _process(_delta: float) -> void:
 	if _model != null:
 		_read_back()
-	if _queue.is_empty():
-		_viewport.queue_free()
+	if _job != null and WorkerThreadPool.is_task_completed(_job.task):
+		var job := _job
+		_job = null
+		WorkerThreadPool.wait_for_task_completion(job.task)
+		if _viewport == null:
+			_build_viewport()
+		_stage(job)
+	if _job == null and not _queue.is_empty():
+		_start(_queue[0])
+		_queue.remove_at(0)
+	if is_done():
+		if _viewport != null:
+			_viewport.queue_free()
 		_viewport = null
 		_camera = null
 		_ink = null
 		set_process(false)
-		return
-	if _viewport == null:
-		_build_viewport()
-	_stage(_queue[0])
-	_queue.remove_at(0)
+
+
+func _exit_tree() -> void:
+	if _job != null:
+		WorkerThreadPool.wait_for_task_completion(_job.task)
+		_job = null
+
+
+## Starts the build of `key`'s model (a building type or a unit_key) on a worker thread.
+func _start(key: String) -> void:
+	var job := PictureJob.new()
+	job.key = key
+	job.view = _view()
+	if key.begins_with(UNIT_PREFIX):
+		var parts := key.trim_prefix(UNIT_PREFIX).split(":")
+		job.unit = parts[0]
+		job.tier = int(parts[1])
+	else:
+		job.type = key
+		job.tier = BuildingModels.tier_of(_catalog, key, 1)
+		job.size = _catalog.size_of(key)
+	job.task = WorkerThreadPool.add_task(job.run, false, "Build a card's picture")
+	_job = job
+
+
+## The camera's basis: the world's angle (IsoCamera).
+static func _view() -> Basis:
+	return Basis.from_euler(Vector3(deg_to_rad(IsoCamera.PITCH_DEG), deg_to_rad(IsoCamera.YAW_DEG), 0.0))
 
 
 func _build_viewport() -> void:
@@ -127,7 +212,7 @@ func _build_viewport() -> void:
 	_camera.near = 0.1
 	_camera.far = CAMERA_DISTANCE * 2.0
 	_camera.environment = environment
-	_camera.basis = Basis.from_euler(Vector3(deg_to_rad(IsoCamera.PITCH_DEG), deg_to_rad(IsoCamera.YAW_DEG), 0.0))
+	_camera.basis = _view()
 	_viewport.add_child(_camera)
 	var sun := DirectionalLight3D.new()
 	sun.rotation_degrees = SUN_ROTATION
@@ -139,15 +224,13 @@ func _build_viewport() -> void:
 	_ink.set_shader_parameter("ink_px", INK_PX * 720.0 / SIZE)
 
 
-## Puts the model of `key` (a building type or a unit_key) in front of the camera, framed, to be
-## drawn this frame.
-func _stage(key: String) -> void:
-	_model_type = key
-	if key.begins_with(UNIT_PREFIX):
-		var parts := key.trim_prefix(UNIT_PREFIX).split(":")
-		_model = UnitModels.create(parts[0], int(parts[1]))
-	else:
-		_model = BuildingModels.create(key, 1, _catalog.size_of(key), BuildingModels.tier_of(_catalog, key, 1))
+## Puts the model `job` built in front of the camera, its meshes made from its arrays, framed,
+## to be drawn this frame.
+func _stage(job: PictureJob) -> void:
+	_model_type = job.key
+	_model = BuildingModels.assemble(BuildingModels.meshes_from(job.data))
+	if job.unit == "":
+		_model.scale = Vector3.ONE * BuildingModels.scale_of(job.type, job.size)
 		BuildingModels.hold(_model, 0.0)
 	var bounds := AABB()
 	var first := true
@@ -165,25 +248,17 @@ func _stage(key: String) -> void:
 	_viewport.add_child(_model)
 	# The bounds' corners in the camera's plane: the camera frames their extent. A unit, slender
 	# and round where a building is a block, would sit small in its bounds' corners, so it is
-	# framed on its body's own vertices instead and fills the picture as a building does.
+	# framed on its body's own vertices instead (the task's extent) and fills the picture as a
+	# building does.
 	var view := _camera.basis
-	var low := Vector2(INF, INF)
-	var high := Vector2(-INF, -INF)
-	var points := PackedVector3Array()
-	if key.begins_with(UNIT_PREFIX):
-		for child: Node in _model.find_children("*", "MeshInstance3D", true, false):
-			var instance: MeshInstance3D = child
-			if not instance.has_meta(BuildingModels.OUTLINE_META):
-				for surface: int in instance.mesh.get_surface_count():
-					var vertices: PackedVector3Array = instance.mesh.surface_get_arrays(surface)[Mesh.ARRAY_VERTEX]
-					points.append_array(_model.transform * vertices)
-	else:
+	var low := job.low
+	var high := job.high
+	if job.unit == "":
 		for i: int in 8:
-			points.append(bounds.get_endpoint(i))
-	for point: Vector3 in points:
-		var on_view := Vector2(point.dot(view.x), point.dot(view.y))
-		low = low.min(on_view)
-		high = high.max(on_view)
+			var corner := bounds.get_endpoint(i)
+			var on_view := Vector2(corner.dot(view.x), corner.dot(view.y))
+			low = low.min(on_view)
+			high = high.max(on_view)
 	var extent := high - low
 	_camera.size = maxf(extent.x, extent.y) * (1.0 + 2.0 * MARGIN)
 	var centre := (low + high) / 2.0

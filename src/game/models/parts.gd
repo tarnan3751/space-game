@@ -77,6 +77,13 @@ static var CORE_GLOW := Surf.make(MaterialKit.Layer.GLOW, CORE_GLOW_TINT, 1.0, S
 
 static var _surfs: Dictionary[String, Surf] = {}
 
+
+## Every SURFACES entry made when the script loads, on the main thread, so surf() only reads the
+## table afterwards and a model may be built on another thread (ModelPreview's pictures).
+static func _static_init() -> void:
+	for name: String in SURFACES:
+		surf(name)
+
 ## Moving parts a model of `model_tier` may have: three, and at Crown a fourth for its escort.
 static func max_moving(model_tier: int) -> int:
 	return 4 if model_tier >= Tier.CROWN else 3

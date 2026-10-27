@@ -27,6 +27,8 @@ const DEFAULT_SAVE_PATH := "user://base.json"
 const SAVE_PATH_ARG := "--save-path="
 const NO_CHEATS_ARG := "--no-cheats"
 const SAVE_EVERY_TICKS := 10
+## The HUD's pictures start rendering in idle frames this long after boot.
+const PRERENDER_AFTER := 1.0
 
 ## Where this run loads and saves the base.
 var save_path: String = DEFAULT_SAVE_PATH
@@ -50,6 +52,10 @@ var _ticks: int = 0
 ## _process: the base's view, the ghost and the HUD; and the sector map's cards while it is open.
 var _dirty: bool = false
 var _sector_dirty: bool = false
+## Seconds since boot, counted up to PRERENDER_AFTER; and whether the HUD's pictures are rendering
+## in the base's idle frames (Hud.prerender).
+var _booted: float = 0.0
+var _prerendering: bool = false
 ## Where the camera looked at the base, and its zoom, when a battle opened: put back after it.
 var _base_focus: Vector3 = Vector3.ZERO
 var _base_zoom: float = IsoCamera.START_ZOOM_SIZE
@@ -129,8 +135,15 @@ func _ready() -> void:
 ## processes first): Motion.clock() for the moving parts, anim_time for the shaders. Then what the
 ## frame's state changes and the tick marked is redrawn, once however many there were: a command
 ## applied from input (which runs before _process) is drawn in the same frame.
-func _process(_delta: float) -> void:
+func _process(delta: float) -> void:
 	RenderingServer.global_shader_parameter_set(&"anim_time", Motion.tick())
+	if _booted < PRERENDER_AFTER:
+		_booted += delta
+	var idle := _booted >= PRERENDER_AFTER and state != null and battle == null and not sector_map.visible \
+		and not placement.is_placing() and not placement.is_dragging()
+	if idle != _prerendering:
+		_prerendering = idle
+		hud.prerender(idle)
 	if _dirty:
 		_dirty = false
 		base_view.sync(state)
@@ -361,6 +374,11 @@ func open_battle(setup: Dictionary, practice: bool, expedition: Dictionary = {})
 	hud.visible = false
 	battle = view
 	add_child(battle)
+	# The base is no longer idle: the prerender stops before the battle's HUD runs the preview for
+	# its deploy cards, so the next frame's idle check leaves that run alone.
+	if _prerendering:
+		_prerendering = false
+		hud.prerender(false)
 	battle_hud = BattleHud.new()
 	battle_hud.setup(catalog, hud.ui_theme(), hud.preview(), battle)
 	add_child(battle_hud)

@@ -16,8 +16,8 @@ extends RefCounted
 ## covers its whole sweep, so it is never culled as it moves, and the root carries FOLDS_META, the
 ## static body's top (top_of), which the folded parts leave out. hold() holds the folded parts'
 ## pose, for a view that freezes them (BuildingView, while busy or disabled). The fold, like every
-## array of the meshes, is worked out as arrays alone (mesh_data), and the meshes are made from the
-## arrays after (meshes_from).
+## array of the meshes, is worked out in thread-safe array work (mesh_data), and the meshes are made
+## from the arrays on the main thread (meshes_from); ModelPreview runs the first on a worker thread.
 ##
 ## Every other moving part is a Node3D at its pivot carrying the MOVE_META meta (its Motion),
 ## which BuildingView moves while the building is finished and idle, with the part's mesh and its
@@ -214,7 +214,8 @@ static func create(type: String, level: int, size: int, tier: int) -> Node3D:
 
 ## The parts of `type`'s model at `level` for `tier`, at its built size (scale_of scales it to
 ## `size` cells), uncached; a type with no model is the generic block. They read no cache, write
-## none and make no resource or node.
+## none and make no resource or node, so they may be built on a worker thread, and mesh_data()
+## with them (ModelPreview's pictures).
 static func parts_of(type: String, level: int, size: int, tier: int) -> Parts:
 	var p := Parts.new()
 	p.tier = tier
@@ -344,8 +345,8 @@ static func _meshes(p: Parts) -> Meshes:
 
 ## The surfaces of the model built as `p`, as arrays: the body's, with the idle moving parts folded
 ## in (stamped with their motion, _folds), and each kept moving part's. Works out every array of
-## the meshes without making a resource or a node and without touching a cache; meshes_from() makes
-## the meshes from them.
+## the meshes without making a resource or a node and without touching a cache, so it may run on a
+## worker thread (ModelPreview's pictures); meshes_from() makes the meshes on the main thread.
 static func mesh_data(p: Parts) -> MeshData:
 	var data := MeshData.new()
 	data.sockets = p.body.sockets
@@ -387,7 +388,7 @@ static func mesh_data(p: Parts) -> MeshData:
 	return data
 
 
-## The meshes of `data` (mesh_data), each surface on the kit's material.
+## The meshes of `data` (mesh_data), each surface on the kit's material: on the main thread.
 static func meshes_from(data: MeshData) -> Meshes:
 	var meshes := Meshes.new()
 	meshes.sockets = data.sockets
