@@ -66,6 +66,16 @@ const CUSTOM_SHIFTS: Array[int] = [Mesh.ARRAY_FORMAT_CUSTOM0_SHIFT, Mesh.ARRAY_F
 	Mesh.ARRAY_FORMAT_CUSTOM2_SHIFT, Mesh.ARRAY_FORMAT_CUSTOM3_SHIFT]
 ## A triangle with less area than this (square world units) is degenerate: _emit drops it.
 const DEGENERATE_AREA := 1e-8
+## A face whose normal's y is under this points more than 67 degrees below the horizon: the camera,
+## 35 degrees down (IsoCamera.PITCH_DEG), never sees a face 55 degrees down or more from any side,
+## and a falling building tilts 12 more (BattleView.COLLAPSE_TILT). -sin(67 degrees).
+const UNDER_Y := -0.9205
+## Per triangle (_unseen): drawn in the body and the outline; a face pointing down past UNDER_Y,
+## left out of the body when the mesh is upright; an inner face of a round part added while
+## `inner_unseen` was set, always left out of the body.
+const SEEN := 0
+const UNDER := 1
+const INNER := 2
 
 var _vertices := PackedVector3Array()
 var _normals := PackedVector3Array()
@@ -83,6 +93,8 @@ var _inks := PackedFloat32Array()
 ## each motion's two channels (CUSTOM0, CUSTOM3) as two entries.
 var _move_of := PackedByteArray()
 var _move_list := PackedVector4Array()
+## Per triangle: SEEN, UNDER or INNER, whether the body leaves it out (the outline never does).
+var _unseen := PackedByteArray()
 ## Per triangle: 0, or 1 + the index in _rig_list of the pair (rig, rig2) it was added with; the
 ## list holds each pair as two entries.
 var _rig_of := PackedByteArray()
@@ -108,8 +120,22 @@ var rig: Vector4 = Vector4.ZERO
 var rig2: Vector4 = Vector4.ZERO
 ## The share of their sides and rings round parts are built with; set before the first part.
 var detail: float = 1.0
+## Set by lathe() while it emits a face of a round part that faces its axis, with inner_unseen on.
+var _inner_face := false
 ## The named points added with socket(), by name.
 var sockets: Dictionary[String, Socket] = {}
+## Whether this mesh is only ever drawn upright, turned about +Y at most (a building's body, a
+## moving part that spins about +Y or slides, on a carrier that is upright too): its faces pointing
+## down past UNDER_Y, which no camera angle shows, are left out of the body, kept in the outline,
+## whose line under a part's lower edge they draw. Off by default: a unit banks and rolls, the
+## drone tilts. A mesh with a `trunnion` socket pitches in battle, so never counts as upright.
+var upright := false
+## The moving part this one rides (Parts.riding), whose uprightness it shares.
+var carrier: LowPolyMesh = null
+## While set, as `ink` is kept, the faces of round parts that face their axis are left out of the
+## body (kept in the outline): for a ring or a torus whose inside something fills, so its inner wall
+## shows at most as a sliver at a band's end or while a falling building tilts.
+var inner_unseen := false
 ## How many degenerate triangles (DEGENERATE_AREA) the parts added would have had: dropped, not
 ## emitted.
 var degenerates := 0
@@ -152,7 +178,31 @@ func has_flag(flag: int) -> bool:
 
 ## Triangles in the body mesh, both surfaces.
 func triangle_count() -> int:
-	return _vertices.size() / 3
+	var count := _vertices.size() / 3
+	var under := _upright_now()
+	for t: int in count:
+		if _left_out(t, under):
+			count -= 1
+	return count
+
+
+## Whether the mesh is upright now (`upright`): its own flag, no trunnion, and its carrier upright.
+func _upright_now() -> bool:
+	return upright and not sockets.has("trunnion") and (carrier == null or carrier._upright_now())
+
+
+## Whether the body leaves out triangle `t`, `under` whether the mesh is upright now.
+func _left_out(t: int, under: bool) -> bool:
+	return _unseen[t] == INNER or (under and _unseen[t] == UNDER)
+
+
+## Whether the body leaves out any triangle.
+func _leaves_out() -> bool:
+	var under := _upright_now()
+	for t: int in _unseen.size():
+		if _left_out(t, under):
+			return true
+	return false
 
 
 ## The body: the opaque parts on the toon material, then, when there are any, the HOLO parts
@@ -186,7 +236,7 @@ func holo_arrays() -> Array:
 ## CUSTOM3 when a part moves), for a caller that merges meshes itself (WallMesh); HOLO parts are left
 ## out.
 func to_arrays() -> Array:
-	if _has_holo():
+	if _has_holo() or _leaves_out():
 		return _select(false)
 	var arrays := []
 	arrays.resize(Mesh.ARRAY_MAX)
@@ -420,8 +470,9 @@ func _select(holo: bool) -> Array:
 	var uv2s := PackedVector2Array()
 	var colors := PackedColorArray()
 	var triangles := PackedInt32Array()
+	var under := _upright_now()
 	for i: int in _vertices.size():
-		if ((roundi(_uv2s[i].y) & Surf.HOLO) != 0) == holo:
+		if ((roundi(_uv2s[i].y) & Surf.HOLO) != 0) == holo and not _left_out(i / 3, under):
 			vertices.append(_vertices[i])
 			normals.append(_normals[i])
 			uvs.append(_uvs[i])
@@ -702,6 +753,9 @@ func lathe(profile: PackedVector2Array, sides: int, pos: Vector3, surf: Surf,
 			var upper_a := Vector3(q.x * cos(a0), q.y, q.x * sin(a0))
 			var vp := -arc[i] * surf.uv_scale
 			var vq := -arc[i + 1] * surf.uv_scale
+			# The profile runs from the bottom outside up, its outward side to the right of each
+			# step, so a step going down faces the axis.
+			_inner_face = inner_unseen and q.y < p.y
 			if p.x == 0.0:
 				_tri(xf * lower_a, xf * upper_a, xf * upper_b,
 					Vector2(um, vp), Vector2(u0, vq), Vector2(u1, vq), surf, false)
@@ -713,6 +767,7 @@ func lathe(profile: PackedVector2Array, sides: int, pos: Vector3, surf: Surf,
 					Vector2(u0, vp), Vector2(u0, vq), Vector2(u1, vq), surf, false)
 				_tri(xf * lower_a, xf * upper_b, xf * lower_b,
 					Vector2(u0, vp), Vector2(u1, vq), Vector2(u1, vp), surf, false)
+	_inner_face = false
 	if flat_top:
 		_fan(profile[last - 1].x, profile[last].y, steps, xf, surf, repeats, from, span)
 	if partial:
@@ -851,6 +906,12 @@ func _emit(a: Vector3, b: Vector3, c: Vector3, uv_a: Vector2, uv_b: Vector2, uv_
 	_outlined.append(1 if surf.outline and ((surf.flags | flags) & Surf.NO_OUTLINE) == 0 else 0)
 	_hard.append(1 if hard else 0)
 	_inks.append(ink)
+	if _inner_face:
+		_unseen.append(INNER)
+	elif normal.y < UNDER_Y and not moving and not rigged:
+		_unseen.append(UNDER)
+	else:
+		_unseen.append(SEEN)
 	if moving:
 		var first := _motion.channel0(_motion_pivot)
 		var second := _motion.channel3()

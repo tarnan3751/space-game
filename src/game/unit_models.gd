@@ -110,6 +110,8 @@ static func instantiate(p: Parts) -> Node3D:
 static func build(type: String, tier: int, detail: float = 1.0) -> Parts:
 	var p := Parts.new()
 	p.tier = tier
+	# A unit turns to its heading, banks, kicks and rolls as it dies: never upright (Parts.upright).
+	p.upright = false
 	p.body.detail = detail
 	match type:
 		"ranger":

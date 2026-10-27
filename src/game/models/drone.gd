@@ -76,8 +76,10 @@ const SPARK_RISE := [0.7, 1.4]
 const ROTOR_SPEEDS := [0.92, 0.08, 0.96, 0.04]
 
 
-## The construction drone, round its own centre.
+## The construction drone, round its own centre. It banks and pitches in flight, and its laser
+## and flare turn to the face they hit, so none of the three is upright (Parts.upright).
 static func build_drone(p: Parts) -> void:
+	p.upright = false
 	add_drone(p.body, Vector3.ZERO, false)
 
 
@@ -118,6 +120,7 @@ static func add_drone(m: LowPolyMesh, pos: Vector3, parked: bool) -> void:
 ## prisms: their planar UVs keep the texture as dense across the rod as along it, where a lathe's
 ## whole repeat round so thin a rod would mip the bands away.
 static func build_beam(p: Parts) -> void:
+	p.upright = false
 	p.body.box(Vector3(BEAM_WIDTH, 1.0, BEAM_WIDTH), Vector3.ZERO, BEAM_CORE)
 	p.body.box(Vector3(SHEATH_WIDTH, 1.0, SHEATH_WIDTH), Vector3.ZERO, BEAM_SHEATH)
 
@@ -125,6 +128,7 @@ static func build_beam(p: Parts) -> void:
 ## Where the laser hits: a small bright dome with spark shards fanned round it, hazard yellow and
 ## white-hot by turns, each one a thin triangle seen from both sides, rising from its root.
 static func build_flare(p: Parts) -> void:
+	p.upright = false
 	var m := p.body
 	m.dome(FLARE_RADIUS, FLARE_RADIUS * 0.8, 10, 3, Vector3.ZERO, FLARE)
 	for k: int in SPARKS.size():

@@ -93,6 +93,14 @@ static func max_moving(model_tier: int) -> int:
 ## the tier's surfaces (`p.tier >= Parts.Tier.GOLD` for gold trim).
 var tier: int = Tier.BASE
 var body := LowPolyMesh.new()
+## Whether the model is only ever drawn upright (LowPolyMesh.upright): a building is, so its body
+## and its moving parts that spin about +Y or slide leave the faces no camera sees out of their
+## bodies. A builder whose model tilts turns it off before its first part (UnitModels.build, the
+## drone's).
+var upright := true:
+	set(value):
+		upright = value
+		body.upright = value
 ## The moving parts, each with its pivot and Motion, in the order moving() made them.
 var movers: Array[LowPolyMesh] = []
 var pivots := PackedVector3Array()
@@ -101,11 +109,18 @@ var motions: Array[Motion] = []
 var rides := PackedInt32Array()
 
 
+func _init() -> void:
+	body.upright = upright
+
+
 ## A new moving part, which moves about `pivot` as `motion` says: build it in its own space,
-## with the pivot at its origin.
+## with the pivot at its origin. It is upright (LowPolyMesh.upright) when the model is and its
+## motion spins about +Y or slides.
 func moving(pivot: Vector3, motion: Motion) -> LowPolyMesh:
 	assert(movers.size() < max_moving(tier), "a model has at most %d moving parts" % max_moving(tier))
 	var mesh := LowPolyMesh.new()
+	mesh.upright = upright and (motion.kind == Motion.Kind.SLIDE
+		or (motion.kind == Motion.Kind.SPIN and absf(motion.axis.y) > 0.9999))
 	movers.append(mesh)
 	pivots.append(pivot)
 	motions.append(motion)
@@ -119,6 +134,7 @@ func moving(pivot: Vector3, motion: Motion) -> LowPolyMesh:
 ## Built as moving() builds one, and counted with them.
 func riding(on: LowPolyMesh, pivot: Vector3, motion: Motion) -> LowPolyMesh:
 	var mesh := moving(pivot, motion)
+	mesh.carrier = on
 	rides[rides.size() - 1] = movers.find(on)
 	return mesh
 
