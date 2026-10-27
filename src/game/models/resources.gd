@@ -821,8 +821,11 @@ static func build_crystal_harvester(p: Parts, level: int) -> void:
 
 	# The laser ring rides on struts from a hub turning on the foot of a post under the carriage.
 	var hub := Vector3(0, beam_y - RING_DROP, 0)
+	# Inside the emitter head (LowPolyMesh.buried).
+	m.buried = true
 	m.prism(Parts.STRUCTURAL_MIN * 0.5, Parts.STRUCTURAL_MIN * 0.5, beam_y - 0.06 - (hub.y - 0.03), 12, hub - Vector3(0, 0.03, 0),
 		Parts.GUNMETAL)
+	m.buried = false
 	var crystal_height := float(SHARDS[0][2]) * growth
 	var crystal_radius := float(SHARDS[0][3]) * girth
 	if level >= 8:
