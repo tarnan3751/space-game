@@ -290,8 +290,9 @@ const HAULER_ASIDE := 0.15
 ## gameplay zoom.
 const HAULER_PERIOD := 5.0
 const HAULER_SCALE := 1.35
-## The L10 antimatter core on the housing's roof, on its front corner clear of the legs.
-const HOUSE_CORE := Vector3(0.2, 0, 0.2)
+## The L10 antimatter core on the housing's roof, on its front corner clear of the legs and of the
+## drill's chuck and fins turning beside it: 0.5 out at 30 degrees, between the legs at 320 and 80.
+const HOUSE_CORE := Vector3(0.433, 0, 0.25)
 
 ## The high levels' own: the L8 ore crystals hovering over the hopper, metal like all the ore; the
 ## L9 collar, obsidian with veins across its top and a violet rim, bobbing together; and the
@@ -568,7 +569,8 @@ static func _rocker(s: LowPolyMesh, gold: bool) -> void:
 	var yaw := Vector3(0, 135, 0)
 	var half := ROCKER_LENGTH * 0.5
 	s.box_chamfered(Vector3(0.14, 0.12, ROCKER_LENGTH), 0.03, Vector3(0, -0.06, 0), Parts.GOLD_TRIM if gold else Parts.HULL_LIGHT, yaw)
-	s.box_chamfered(Vector3(0.16, 0.28, 0.16), 0.04, ACROSS * (half - 0.06) + Vector3(0, -0.22, 0), METAL_ACCENT, yaw)
+	# The horse head's top stops inside the beam, so the two never share a face.
+	s.box_chamfered(Vector3(0.16, 0.27, 0.16), 0.04, ACROSS * (half - 0.06) + Vector3(0, -0.22, 0), METAL_ACCENT, yaw)
 	s.box_chamfered(Vector3(0.2, 0.2, 0.22), 0.04, ACROSS * -(half - 0.1) + Vector3(0, -0.2, 0), Parts.GUNMETAL, yaw)
 
 
@@ -608,7 +610,8 @@ static func _pumpjack(p: Parts, tier: int) -> void:
 	m.box(Vector3(0.14, 0.06, 0.21), motor + Vector3(0, 0.12, 0), _rig_strip(tier), yaw)
 	var well := base + ACROSS * (PUMPJACK_LENGTH * 0.5 - 0.02) + Vector3(0, 0.08, 0)
 	m.prism(0.07, 0.06, 0.14, 12, well, Parts.GUNMETAL)
-	m.prism(0.022, 0.022, PUMPJACK_PIN - 0.4, 8, well + Vector3(0, 0.14, 0), Parts.ROD)
+	# The polished rod stops under the horse head's lowest swing.
+	m.prism(0.022, 0.022, PUMPJACK_PIN - 0.49, 8, well + Vector3(0, 0.14, 0), Parts.ROD)
 	var s := p.moving(pin, Motion.swing(ROCKER_AXIS, PUMPJACK_SWING, ROCKER_PERIOD, 0.5))
 	var half := PUMPJACK_LENGTH * 0.5
 	s.box_chamfered(Vector3(0.07, 0.07, PUMPJACK_LENGTH), 0.02, Vector3(0, -0.035, 0), Parts.GOLD_TRIM if tier >= Parts.Tier.GOLD else Parts.HULL_LIGHT, yaw)
@@ -923,7 +926,8 @@ static func _laser_ring(s: LowPolyMesh, radius: float, drop: float, count: int, 
 			trim, 8, false)
 	for k: int in count:
 		var degrees := 180.0 * k
-		s.box_chamfered(Vector3(0.16, 0.14, 0.1), 0.02, Parts.around(radius + 0.05, degrees, -drop - 0.05), trim,
+		# Short enough that its top never shares a plane with a facet of the emitter's hub over it.
+		s.box_chamfered(Vector3(0.16, 0.12, 0.1), 0.02, Parts.around(radius + 0.05, degrees, -drop - 0.05), trim,
 			Vector3(0, -degrees, 0))
 		var at := Parts.around(radius + 0.1, degrees, -drop + 0.1)
 		var target := Parts.around(aim.x, degrees, aim.y)
@@ -1139,9 +1143,10 @@ static func _field_pylon(m: LowPolyMesh, degrees: float, level: int, gold: bool,
 				var size := Vector3(0.15, height - 0.77, 0.02) if normal.x == 0.0 else Vector3(0.02, height - 0.77, 0.15)
 				m.box(size, foot + LowPolyMesh.turn(normal * (w * 0.5 + 0.01) + Vector3(0, 0.62, 0), lean), VEIN_PANEL, lean)
 	if level >= 5:
-		# Two glowing rings round the column, between the accent band and the filigree's places.
+		# Two glowing rings round the column, between the accent band and the filigree's places, a
+		# step proud of the vein panels so their faces never share a plane.
 		for ring: float in [0.42, 0.78]:
-			m.box(Vector3(w + 0.04, 0.06, w + 0.04), foot + LowPolyMesh.turn(Vector3(0, height * ring, 0), lean),
+			m.box(Vector3(w + 0.06, 0.06, w + 0.06), foot + LowPolyMesh.turn(Vector3(0, height * ring, 0), lean),
 				Parts.CORE_GLOW if tier >= Parts.Tier.OBSIDIAN else Parts.CYAN_STRIP, lean)
 	if level >= 7:
 		m.prism(0.07, 0.07, 0.04, 4, foot + LowPolyMesh.turn(Vector3(0, 0.06, 0.2), yaw), INLAY.phased(degrees / 360.0),
@@ -1799,7 +1804,8 @@ static func build_antimatter_vault(p: Parts, level: int) -> void:
 				Parts.GOLD_TRIM if gold else Parts.HULL_MID, Vector3(0, 90.0 - degrees, 0))
 		m.prism(0.18, 0.16, 0.06, 16, Vector3(0, top + 0.38, 0), Parts.HULL_DARK_ROUND)
 		if level < 4:
-			m.disc(0.12, 16, Vector3(0, top + 0.441, 0), ANTIMATTER_GLOW)
+			# A glowing plate standing on the cap, its top a step over the cap's.
+			m.prism(0.12, 0.12, 0.01, 16, Vector3(0, top + 0.44, 0), ANTIMATTER_GLOW)
 	else:
 		m.box_chamfered(Vector3(0.7, 0.1, 0.7), 0.04, Vector3(0, top, 0), Parts.HULL_DARK)
 		m.box(Vector3(0.5, 0.02, 0.5), Vector3(0, top + 0.1, 0), ANTIMATTER_GLOW)
@@ -1849,8 +1855,8 @@ static func build_antimatter_vault(p: Parts, level: int) -> void:
 		_containment_ring(p, core, OUTER_CONTAINMENT_RADIUS, Vector3(0, 0, 28), OUTER_CONTAINMENT_RATE)
 	if crown:
 		m.lathe(PackedVector2Array([Vector2(0.725, 0.0), Vector2(0.725, 0.08)]), 24, Vector3(0, top + 0.01, 0), Parts.FILIGREE)
-		# The halo over the core.
-		Parts.torus(m, core_radius + 0.08, 0.04, 24, 6, core + Vector3(0, core_radius + 0.22, 0), Parts.CORE_GLOW)
+		# The halo over the core, bobbing and pulsing with it.
+		Parts.torus(m, core_radius + 0.08, 0.04, 24, 6, core + Vector3(0, core_radius + 0.22, 0), VAULT_CROWN_CORE)
 		Parts.escort_guard(p, VAULT_GUARD_RADIUS, VAULT_GUARD_HEIGHT, VAULT_GUARD_RATE)
 
 
@@ -1868,9 +1874,16 @@ static func _vault_lid(tier: int) -> Surf:
 ## rim, bobbing with the core.
 static func _containment_ring(p: Parts, core: Vector3, r: float, tilt: Vector3, rate: float) -> void:
 	var ring := p.moving(core, Motion.spin(Vector3.UP, rate))
-	ring.ring(r - 0.06, r + 0.06, 0.05, 24, Vector3(0, -0.025, 0), CONTAINMENT_RING, tilt)
-	ring.lathe(PackedVector2Array([Vector2(r + 0.05, 0.027), Vector2(r - 0.05, 0.027)]), 24, Vector3.ZERO, CONTAINMENT_VEINS, tilt)
-	ring.lathe(PackedVector2Array([Vector2(r + 0.065, -0.017), Vector2(r + 0.065, 0.017)]), 24, Vector3.ZERO, CONTAINMENT_RIM, tilt)
+	# One section in three surfaces, so no two share a face: the rim is the middle of the outer
+	# wall and the veins the middle of the top, the obsidian the rest.
+	ring.lathe(PackedVector2Array([Vector2(r + 0.06, -0.025), Vector2(r + 0.06, -0.017)]), 24, Vector3.ZERO, CONTAINMENT_RING,
+		tilt)
+	ring.lathe(PackedVector2Array([Vector2(r + 0.06, -0.017), Vector2(r + 0.06, 0.017)]), 24, Vector3.ZERO, CONTAINMENT_RIM, tilt)
+	ring.lathe(PackedVector2Array([Vector2(r + 0.06, 0.017), Vector2(r + 0.06, 0.025), Vector2(r + 0.05, 0.025)]), 24,
+		Vector3.ZERO, CONTAINMENT_RING, tilt)
+	ring.lathe(PackedVector2Array([Vector2(r + 0.05, 0.025), Vector2(r - 0.05, 0.025)]), 24, Vector3.ZERO, CONTAINMENT_VEINS, tilt)
+	ring.lathe(PackedVector2Array([Vector2(r - 0.05, 0.025), Vector2(r - 0.06, 0.025), Vector2(r - 0.06, -0.025)]), 24,
+		Vector3.ZERO, CONTAINMENT_RING, tilt)
 
 
 ## The vault door, VAULT_DOOR_RADIUS round, in the antimatter accent at every tier: a round plate
