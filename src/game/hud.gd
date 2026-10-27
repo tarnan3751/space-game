@@ -124,11 +124,31 @@ const MENU_BAND := 74.0
 const MENU_BAND_LIGHTEN := 0.06
 const TAB_SIZE := Vector2(160, 56)
 const CLOSE_SIZE := Vector2(56, 56)
-const CARD_SIZE := Vector2(200, 176)
-## The building's picture at the top of a card (ModelPreview), shown at this size.
-const PREVIEW_SIZE := Vector2(84, 84)
+const CARD_SIZE := Vector2(200, 200)
+## The building's picture at the top of a card (ModelPreview), shown at this size on a round plinth
+## of the category's colour at PLINTH_ALPHA over the card, PLINTH across, with a thin ink ring.
+const PREVIEW_SIZE := Vector2(112, 112)
+const PLINTH := 120.0
+const PLINTH_ALPHA := 0.22
+const PLINTH_RING := 2.0
 ## The category stripe along a card's top, inside its border.
 const STRIPE_HEIGHT := 6
+## Where a card's lines (the name, the cost row and the last line) start, from its top.
+const CARD_LINES_TOP := 127.0
+## A cost row's icons, each on a coin of its resource's own colour (darkened to the coin's value
+## cap), so the colour says which resource it is; and the clock before a card's build time.
+const COST_ICON := Vector2(22, 22)
+const CLOCK_SIZE := 16.0
+## A card's chips (its count, a locked card's Command Center level): an ink ring this wide round
+## the text with this much room either side.
+const CHIP_RING := 2.0
+const CHIP_PAD := Vector2(7, 2)
+## The padlock on a locked card's chip.
+const LOCK_ICON := 18.0
+## A locked card's name.
+const LOCKED_NAME_ALPHA := 0.7
+## A locked card's picture (locked.gdshader).
+const LOCKED_SHADER: Shader = preload("res://src/game/locked.gdshader")
 const BUILD_SIZE := Vector2(136, 72)
 ## The Expedition button, bottom left, and the badge of open fields on its corner.
 const EXPEDITION_SIZE := Vector2(184, 72)
@@ -168,8 +188,8 @@ const FLASH_RISE_TICKS := 1.5
 ## two still never flashes, while a longer gap's catch-up (the app resumed) does.
 const FLASH_MAX_SECONDS := 5
 ## The build panel's height, never past a share of the screen's.
-const MENU_HEIGHT := 300.0
-const MENU_MAX_SHARE := 0.4
+const MENU_HEIGHT := 324.0
+const MENU_MAX_SHARE := 0.45
 const MENU_OPEN_SECONDS := 0.18
 const MENU_CLOSE_SECONDS := 0.14
 ## Pressing the selected tab again scrolls its strip back to the start over this long.
@@ -265,10 +285,10 @@ var _entry_preview: Dictionary[String, TextureRect] = {}
 var _preview: ModelPreview
 ## The pictures render in the base's idle frames too (prerender), so a panel finds them made.
 var _prerender: bool = false
-## Each card's picture, name and cost, dimmed while it cannot be built.
-var _entry_heading: Dictionary[String, Control] = {}
-## Each card's last line: built / max, or why it cannot be built.
-var _entry_status: Dictionary[String, Label] = {}
+## Each card's parts that a refresh sets.
+var _cards: Dictionary[String, BuildCard] = {}
+## A locked card's picture's material, shared by every locked card.
+var _locked_material: ShaderMaterial
 ## The selected build-menu category. Remembered while the game runs, not saved.
 var _tab: String = ""
 ## The state of the last refresh, so a tab change can fill its cards.
@@ -344,6 +364,77 @@ var _research_cards: Dictionary[String, ArmyCard] = {}
 ## last showed, so a tick sets its text only when they changed.
 var _research_prefix: String = ""
 var _research_seconds: int = -1
+
+
+## A build card's parts that a refresh sets, and what it last showed.
+class BuildCard:
+	var art: CardArt
+	var picture: TextureRect
+	var title: Label
+	## The count chip's text, and the chip of the Command Center level a locked card needs.
+	var count: Label
+	var lock: Control
+	## The cost row's room for each icon (its resource in `kinds`, its colour in `colors`), and the
+	## clock's on the last line, which reads the build time (`time`) or why the card cannot be built.
+	var icons: Array[Control] = []
+	var kinds: PackedStringArray = PackedStringArray()
+	var colors: PackedColorArray = PackedColorArray()
+	var clock: Control
+	var line: Label
+	var time: String = ""
+	## The state in words (entry_status), and whether the card is locked or shows a reason.
+	var status: String = ""
+	var locked: bool = false
+	var reason: bool = false
+
+
+## What a build card draws under its picture, as one triangle array (HudIcon.Pen): a light line
+## inside its border, its category's stripe along its top, the plinth, the count chip's shape,
+## the cost row's icons on their coins and the clock. Redrawn when the card's rows are laid out
+## or its state changes, never per frame.
+class CardArt:
+	extends Control
+
+	const SIDES := 48
+
+	var card: BuildCard
+	## The category's colour.
+	var tint: Color = Color.WHITE
+
+	## The plinth's centre, under the stripe.
+	func plinth_centre() -> Vector2:
+		return Vector2(Hud.CARD_SIZE.x / 2.0, Hud.BORDER + Hud.STRIPE_HEIGHT + 4 + Hud.PLINTH / 2.0)
+
+	func _draw() -> void:
+		var pen := HudIcon.Pen.new()
+		var inside := Rect2(Vector2.ZERO, size).grow(-Hud.BORDER)
+		pen.add_stroke(Hud._round_rect(inside.grow(-0.5), Vector2.ONE * (12 - Hud.BORDER - 0.5), false), 1.0,
+			Hud.EDGE_LIGHT, true)
+		var stripe := Rect2(inside.position, Vector2(inside.size.x, Hud.STRIPE_HEIGHT))
+		pen.add_fill(Hud._round_rect(stripe, Vector2(12 - Hud.BORDER, Hud.STRIPE_HEIGHT), true), tint, false)
+		var centre := plinth_centre()
+		var radius := Hud.PLINTH / 2.0
+		pen.add_fill(Hud._circle(centre, radius, SIDES), Color(tint, Hud.PLINTH_ALPHA), false)
+		pen.add_stroke(Hud._circle(centre, radius - Hud.PLINTH_RING / 2.0, SIDES), Hud.PLINTH_RING, Hud.INK, true)
+		if card.count.visible:
+			_chip(pen, _rect_of(card.count).grow_individual(Hud.CHIP_PAD.x, Hud.CHIP_PAD.y, Hud.CHIP_PAD.x,
+				Hud.CHIP_PAD.y), Hud.CARD_DISABLED)
+		for i: int in card.icons.size():
+			HudIcon.paint(pen, card.kinds[i], _rect_of(card.icons[i]), card.colors[i], false, card.colors[i])
+		if card.clock.visible:
+			HudIcon.paint(pen, "clock", _rect_of(card.clock), Hud.TEXT_DIM)
+		pen.draw(self)
+
+	## A pill round `rect`: `fill`, an ink ring.
+	func _chip(pen: HudIcon.Pen, rect: Rect2, fill: Color) -> void:
+		var radius := Vector2.ONE * rect.size.y / 2.0
+		pen.add_fill(Hud._round_rect(rect, radius, false), fill, false)
+		pen.add_stroke(Hud._round_rect(rect.grow(-Hud.CHIP_RING / 2.0), radius - Vector2.ONE * Hud.CHIP_RING / 2.0,
+			false), Hud.CHIP_RING, Hud.INK, true)
+
+	## Where `control` lies in this one's space.
+	func _rect_of(control: Control) -> Rect2:
+		return get_global_transform().affine_inverse() * control.get_global_rect()
 
 
 ## A unit card or a queue entry: the button, what dims while it cannot be pressed, the picture
@@ -595,9 +686,10 @@ func entry_button(type: String) -> Button:
 	return _entries[type]
 
 
-## A card's last line: built / max, or why it cannot be built.
+## A card's state in words: "built / max", or why it cannot be built (as its chips and its last
+## line show it).
 func entry_status(type: String) -> String:
-	return _entry_status[type].text
+	return _cards[type].status
 
 
 ## A card's picture of its building; null until it is rendered.
@@ -1210,9 +1302,10 @@ func _on_queue_entry(index: int) -> void:
 
 # --- Refresh helpers -------------------------------------------------------------
 
-## Only the selected tab's cards; the others are hidden. A card that cannot be built now
-## dims its name and cost and gives its reason, still readable, in place of its count. The
-## buildings are counted by type once, for every card's count.
+## Only the selected tab's cards; the others are hidden. A card shows its count on a chip; one
+## that cannot be built now is disabled, and says why on its last line in place of its build time;
+## one the Command Center has not unlocked shows its picture greyed under a chip of the level it
+## needs, its name dimmed, and no count. The buildings are counted by type once, for every card.
 func _refresh_entries(state: BaseState) -> void:
 	var counts: Dictionary[String, int] = {}
 	for id: int in state.buildings:
@@ -1222,11 +1315,24 @@ func _refresh_entries(state: BaseState) -> void:
 		if _catalog.category_of(type) != _tab:
 			continue
 		var error := state.check_can_build(type)
-		var status: Label = _entry_status[type]
-		status.text = _entry_status_text(state, type, error, counts.get(type, 0))
-		status.theme_type_variation = &"CardCount" if error == "" else &"CardReason"
+		var card := _cards[type]
+		var count: int = counts.get(type, 0)
+		card.status = _entry_status_text(state, type, error, count)
 		_entries[type].disabled = error != ""
-		_entry_heading[type].modulate.a = 1.0 if error == "" else DISABLED_ALPHA
+		var locked := error == BaseState.ERR_CC_LEVEL
+		var reason := error != "" and not locked
+		card.count.text = "%d/%d" % [count, _catalog.max_count(type, state.cc_level())]
+		card.line.text = card.status if reason else card.time
+		card.line.theme_type_variation = &"CardWarning" if reason else &"CardTime"
+		if locked != card.locked or reason != card.reason:
+			card.locked = locked
+			card.reason = reason
+			card.count.visible = not locked
+			card.lock.visible = locked
+			card.clock.visible = not reason
+			card.picture.material = _locked_material if locked else null
+			card.title.modulate.a = LOCKED_NAME_ALPHA if locked else 1.0
+			card.art.queue_redraw()
 
 
 ## `count`: the buildings of `type` the base has.
@@ -1648,6 +1754,8 @@ func _build_menu() -> void:
 	cards.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	cards.add_theme_constant_override("separation", 12)
 	room.add_child(cards)
+	_locked_material = ShaderMaterial.new()
+	_locked_material.shader = LOCKED_SHADER
 	for type: String in _catalog.menu_order:
 		cards.add_child(_build_entry(type))
 	_preview = ModelPreview.new()
@@ -1662,66 +1770,141 @@ func _build_menu() -> void:
 	_select_tab(_catalog.categories[0])
 
 
-## A card: the category's stripe along its top, then the building's picture (ModelPreview's,
-## empty until it is rendered), and three lines: the name, the level 1 cost (each amount in its
-## resource's colour), and the status line `_refresh_entries` fills.
+## A card: the category's stripe along its top and the building's picture (ModelPreview's, empty
+## until it is rendered) on a plinth of the category's colour, its count on a chip at the top
+## right, and three lines: the name, the level 1 cost (each amount after its resource's icon, in
+## its resource's colour) and the build time after a small clock, or why it cannot be built.
+## A locked card adds a chip of the Command Center level it needs over the plinth.
+## `_refresh_entries` fills them. The card's drawn parts (CardArt) are one triangle array under the
+## picture; its content sinks with it when pressed.
 func _build_entry(type: String) -> Button:
 	var button := _button("", CARD_SIZE)
 	# PASS, so a drag that starts on a card reaches the ScrollContainer and scrolls the
 	# strip; the panel behind still stops the touch from reaching the world.
 	button.mouse_filter = Control.MOUSE_FILTER_PASS
 	button.pressed.connect(_on_card_pressed.bind(type))
-	var stripe := Panel.new()
-	stripe.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	stripe.theme_type_variation = &"CardStripe"
-	var stripe_color: Color = CATEGORY_STRIPE.get(_catalog.category_of(type), ACCENT)
-	stripe.self_modulate = stripe_color
-	button.add_child(stripe)
-	stripe.set_anchors_preset(Control.PRESET_TOP_WIDE)
-	stripe.offset_left = BORDER
-	stripe.offset_right = -BORDER
-	stripe.offset_top = BORDER
-	stripe.offset_bottom = BORDER + STRIPE_HEIGHT
-	var content := VBoxContainer.new()
-	content.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	content.alignment = BoxContainer.ALIGNMENT_CENTER
-	content.add_theme_constant_override("separation", 2)
-	button.add_child(content)
-	content.set_anchors_preset(Control.PRESET_FULL_RECT)
-	content.offset_left = 10
-	content.offset_top = BORDER + STRIPE_HEIGHT + 2
-	content.offset_right = -10
-	content.offset_bottom = -BORDER - 2
-	var heading := VBoxContainer.new()
-	heading.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	heading.add_theme_constant_override("separation", 0)
-	content.add_child(heading)
-	var preview := TextureRect.new()
-	preview.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	preview.custom_minimum_size = PREVIEW_SIZE
-	preview.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
-	preview.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
-	heading.add_child(preview)
-	_entry_preview[type] = preview
-	var name_label := _card_label(heading, _catalog.display_name(type), &"CardName")
-	name_label.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
+	var card := BuildCard.new()
+	var body := _card_body(button)
+	card.art = CardArt.new()
+	card.art.card = card
+	card.art.tint = CATEGORY_STRIPE.get(_catalog.category_of(type), ACCENT)
+	card.art.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	body.add_child(card.art)
+	card.art.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	card.picture = TextureRect.new()
+	card.picture.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	card.picture.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	card.picture.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+	card.picture.position = card.art.plinth_centre() - PREVIEW_SIZE / 2.0
+	card.picture.size = PREVIEW_SIZE
+	body.add_child(card.picture)
+	_entry_preview[type] = card.picture
+
+	card.count = Label.new()
+	card.count.theme_type_variation = &"CardChip"
+	card.count.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	body.add_child(card.count)
+	card.count.set_anchors_preset(Control.PRESET_TOP_RIGHT)
+	card.count.grow_horizontal = Control.GROW_DIRECTION_BEGIN
+	card.count.offset_right = -BORDER - 4 - CHIP_PAD.x
+	card.count.offset_top = BORDER + STRIPE_HEIGHT + 4 + CHIP_PAD.y
+	card.count.resized.connect(card.art.queue_redraw)
+	# Over the plinth's foot, centred.
+	var lock_row := CenterContainer.new()
+	lock_row.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	body.add_child(lock_row)
+	lock_row.set_anchors_preset(Control.PRESET_TOP_WIDE)
+	lock_row.offset_top = card.art.plinth_centre().y + PLINTH / 2.0 - 30
+	card.lock = PanelContainer.new()
+	card.lock.theme_type_variation = &"LockChip"
+	card.lock.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	card.lock.visible = false
+	lock_row.add_child(card.lock)
+	var lock_line := HBoxContainer.new()
+	lock_line.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	lock_line.add_theme_constant_override("separation", 3)
+	card.lock.add_child(lock_line)
+	var padlock := HudIcon.new()
+	padlock.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	padlock.kind = "lock"
+	padlock.color = TEXT
+	padlock.custom_minimum_size = Vector2.ONE * LOCK_ICON
+	padlock.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	lock_line.add_child(padlock)
+	var level := Label.new()
+	level.theme_type_variation = &"LockText"
+	level.text = "CC %d" % int(_catalog.level_stats(type, 1).get("requires_cc", 1))
+	lock_line.add_child(level)
+
+	var lines := VBoxContainer.new()
+	lines.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	lines.add_theme_constant_override("separation", -2)
+	body.add_child(lines)
+	lines.set_anchors_preset(Control.PRESET_FULL_RECT)
+	lines.offset_left = 8
+	lines.offset_top = CARD_LINES_TOP
+	lines.offset_right = -8
+	lines.offset_bottom = -BORDER - 2
+	card.title = _card_label(lines, _catalog.display_name(type), &"CardName")
+	card.title.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
 	var cost_row := HBoxContainer.new()
 	cost_row.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	cost_row.alignment = BoxContainer.ALIGNMENT_CENTER
-	cost_row.add_theme_constant_override("separation", 12)
-	heading.add_child(cost_row)
-	var cost: Dictionary = _catalog.level_stats(type, 1).get("cost", {})
+	cost_row.add_theme_constant_override("separation", 4)
+	lines.add_child(cost_row)
+	var stats := _catalog.level_stats(type, 1)
+	var cost: Dictionary = stats.get("cost", {})
 	if cost.is_empty():
 		_card_label(cost_row, "Free", &"CardCost")
 	for res: Variant in cost:
+		if cost_row.get_child_count() > 0:
+			_spacer(cost_row, Vector2(8, 0))
+		card.icons.append(_spacer(cost_row, COST_ICON))
+		card.kinds.append(str(res))
+		card.colors.append(_resource_color(str(res)))
 		var amount := _card_label(cost_row, Format.amount(int(cost[res])), &"CardCost")
 		amount.add_theme_color_override("font_color", _resource_color(str(res)))
-	var status := _card_label(content, "", &"CardCount")
-	status.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
-	_entry_heading[type] = heading
-	_entry_status[type] = status
+	cost_row.sort_children.connect(card.art.queue_redraw)
+	var last_row := HBoxContainer.new()
+	last_row.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	last_row.alignment = BoxContainer.ALIGNMENT_CENTER
+	last_row.add_theme_constant_override("separation", 4)
+	lines.add_child(last_row)
+	card.clock = _spacer(last_row, Vector2.ONE * CLOCK_SIZE)
+	card.time = Format.duration(int(stats.get("build_seconds", 0)))
+	card.line = _card_label(last_row, card.time, &"CardTime")
+	last_row.sort_children.connect(card.art.queue_redraw)
+	_cards[type] = card
 	_entries[type] = button
 	return button
+
+
+## A card's content, which sinks with the card's shape while it is pressed (_sink).
+func _card_body(button: Button) -> Control:
+	var body := Control.new()
+	body.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	button.add_child(body)
+	body.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	button.draw.connect(_sink.bind(button, body))
+	return body
+
+
+## Moves a card's content with its shape: PRESSED_SINK down and right while it is pressed. The
+## button redraws whenever its state changes, so its draw signal says when.
+static func _sink(button: Button, body: Control) -> void:
+	var mode := button.get_draw_mode()
+	var pressed := mode == BaseButton.DRAW_PRESSED or mode == BaseButton.DRAW_HOVER_PRESSED
+	body.position = Vector2.ONE * PRESSED_SINK if pressed else Vector2.ZERO
+
+
+## An empty control `size` big in `parent`: room in a row for something the card draws there.
+static func _spacer(parent: Control, size: Vector2) -> Control:
+	var spacer := Control.new()
+	spacer.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	spacer.custom_minimum_size = size
+	spacer.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	parent.add_child(spacer)
+	return spacer
 
 
 ## Bottom left, opposite Build: opens the sector map, with a badge of the open fields on its top
@@ -2307,6 +2490,18 @@ func _make_theme() -> Theme:
 	_label_variation(ui, &"QueueName", 19, TEXT, 0)
 	_label_variation(ui, &"HousingText", 19, TEXT, 0)
 	_label_variation(ui, &"CardWarning", 17, WARNING, 0)
+	_label_variation(ui, &"CardTime", 17, TEXT_DIM, 0)
+	_label_variation(ui, &"CardChip", 17, TEXT, 0)
+	_label_variation(ui, &"LockText", 17, INK, 0)
+	var lock := _flat(WARNING, 12)
+	lock.border_color = INK
+	lock.set_border_width_all(roundi(CHIP_RING))
+	lock.content_margin_left = CHIP_PAD.x + CHIP_RING
+	lock.content_margin_right = CHIP_PAD.x + CHIP_RING
+	lock.content_margin_top = CHIP_PAD.y
+	lock.content_margin_bottom = CHIP_PAD.y
+	ui.set_type_variation(&"LockChip", &"PanelContainer")
+	ui.set_stylebox("panel", &"LockChip", lock)
 	_label_variation(ui, &"MeterText", 20, TEXT, 2.5, _meter_font())
 	_label_variation(ui, &"InfoTitle", 30, TEXT, 0, DISPLAY_FONT)
 	_label_variation(ui, &"InfoDetail", 19, TEXT, 0)
