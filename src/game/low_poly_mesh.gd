@@ -79,11 +79,12 @@ const DEGENERATE_AREA := 1e-8
 ## and a falling building tilts 12 more (BattleView.COLLAPSE_TILT). -sin(67 degrees).
 const UNDER_Y := -0.9205
 ## Per triangle (_unseen): drawn in the body and the outline; a face pointing down past UNDER_Y,
-## left out of the body when the mesh is upright; an inner face of a round part added while
-## `inner_unseen` was set, always left out of the body.
+## left out of the body when the mesh is upright; a face its caller marks unseen (an inner face of
+## a round part added while `inner_unseen` was set, a face of a part added while `buried` was set),
+## always left out of the body.
 const SEEN := 0
 const UNDER := 1
-const INNER := 2
+const HIDDEN := 2
 
 var _vertices := PackedVector3Array()
 var _normals := PackedVector3Array()
@@ -101,7 +102,7 @@ var _inks := PackedFloat32Array()
 ## each motion's two channels (CUSTOM0, CUSTOM3) as two entries.
 var _move_of := PackedByteArray()
 var _move_list := PackedVector4Array()
-## Per triangle: SEEN, UNDER or INNER, whether the body leaves it out (the outline never does).
+## Per triangle: SEEN, UNDER or HIDDEN, whether the body leaves it out (the outline never does).
 var _unseen := PackedByteArray()
 ## Per triangle: 0, or 1 + the index in _rig_list of the pair (rig, rig2) it was added with; the
 ## list holds each pair as two entries.
@@ -149,6 +150,12 @@ var carrier: LowPolyMesh = null
 ## body (kept in the outline): for a ring or a torus whose inside something fills, so its inner wall
 ## shows at most as a sliver at a band's end or while a falling building tilts.
 var inner_unseen := false
+## While set, as `ink` is kept, the parts added are wholly inside another opaque part of this static
+## body, so no camera sees them: they are left out of the body and kept in the outline, which can
+## still reach past the part they are in. Never on a moving part's mesh (it can move away from what
+## hides it) nor on a hologram's, and a rigged part keeps its body (a joint's orb fills the gap as
+## the limb bends).
+var buried := false
 ## How many degenerate triangles (DEGENERATE_AREA) the parts added would have had: dropped, not
 ## emitted.
 var degenerates := 0
@@ -206,7 +213,7 @@ func _upright_now() -> bool:
 
 ## Whether the body leaves out triangle `t`, `under` whether the mesh is upright now.
 func _left_out(t: int, under: bool) -> bool:
-	return _unseen[t] == INNER or (under and _unseen[t] == UNDER)
+	return _unseen[t] == HIDDEN or (under and _unseen[t] == UNDER)
 
 
 ## Whether the body leaves out any triangle.
@@ -919,8 +926,8 @@ func _emit(a: Vector3, b: Vector3, c: Vector3, uv_a: Vector2, uv_b: Vector2, uv_
 	_outlined.append(1 if surf.outline and ((surf.flags | flags) & Surf.NO_OUTLINE) == 0 else 0)
 	_hard.append(1 if hard else 0)
 	_inks.append(ink)
-	if _inner_face:
-		_unseen.append(INNER)
+	if (_inner_face or buried) and not rigged:
+		_unseen.append(HIDDEN)
 	elif normal.y < UNDER_Y and not moving and not rigged:
 		_unseen.append(UNDER)
 	else:
