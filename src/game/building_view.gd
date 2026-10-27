@@ -355,14 +355,16 @@ func release_drone(parent: Node) -> ConstructionDrone:
 
 
 func _process(delta: float) -> void:
+	var started := Time.get_ticks_usec() if Profile.enabled else 0
 	if _drone != null and not _drone.advance(delta):
 		_drone = null
 		set_process(not _movers.is_empty())
-	if not _animate or _disabled:
-		return
-	var time := Motion.clock()
-	for i: int in _movers.size():
-		_pose(i, time)
+	if _animate and not _disabled:
+		var time := Motion.clock()
+		for i: int in _movers.size():
+			_pose(i, time)
+	if Profile.enabled:
+		Profile.since(&"building_views", started)
 
 
 ## Poses moving part `i` at `time`: its Motion (the aiming head's aim, idle Motion and kick), carried

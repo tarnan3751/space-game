@@ -1318,15 +1318,25 @@ func set_shield(id: int, pool: int, now: float) -> void:
 
 ## Draws everything at `now`, the battle's clock, and drops what has ended.
 func draw(now: float) -> void:
+	var profiled := Profile.enabled
+	var started := Time.get_ticks_usec() if profiled else 0
 	_draw_flights(_bolts, now)
 	_draw_flights(_missiles, now)
 	_draw_flights(_bombs, now)
 	_draw_flights(_pulses, now)
+	if profiled:
+		started = Profile.since(&"fx_flights", started)
 	_beams.draw(now)
 	_draw_vortices(now)
+	if profiled:
+		started = Profile.since(&"fx_beams_vortices", started)
 	_debris.draw(now)
+	if profiled:
+		started = Profile.since(&"fx_debris", started)
 	_draw_impacts(now)
 	_draw_arcs(now)
+	if profiled:
+		started = Profile.since(&"fx_impacts_arcs", started)
 	_domes.draw(now, DOME_HEIGHT, 1.0)
 	_markers.draw(now, 1.0, 0.0)
 	_hover_markers.draw(now, 1.0, 0.0)
@@ -1341,6 +1351,8 @@ func draw(now: float) -> void:
 	_stuns.draw(now, 1.0, 0.0)
 	_draw_shields(now)
 	_scorches.draw(now, 1.0, 0.0)
+	if profiled:
+		Profile.since(&"fx_timed", started)
 
 
 ## Starts a frame's health bars.

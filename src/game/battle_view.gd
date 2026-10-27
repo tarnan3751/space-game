@@ -438,6 +438,9 @@ func clock() -> float:
 
 
 func _process(delta: float) -> void:
+	var profiled := Profile.enabled
+	var began := Time.get_ticks_usec() if profiled else 0
+	var started := began
 	var shown := delta * speed
 	_clock += shown
 	if not sim.is_over():
@@ -458,19 +461,33 @@ func _process(delta: float) -> void:
 		select_unit("")
 		select_ability("")
 		ended.emit(sim.result())
+	if profiled:
+		started = Profile.since(&"battle_steps", started)
 	var alpha := clampf(_accumulator / TICK_SECONDS, 0.0, 1.0)
 	effects.begin_bars()
 	units.draw(alpha, _clock, shown, effects, camera.size >= BattleUnits.FAR_ZOOM)
+	if profiled:
+		started = Profile.since(&"units_draw", started)
 	_land_blows()
 	_trail_crashes()
 	_finish_deaths()
+	if profiled:
+		started = Profile.since(&"deaths", started)
 	_aim_defences(shown)
+	if profiled:
+		started = Profile.since(&"aim_defences", started)
 	_draw_buildings(shown)
 	_draw_traps()
 	_draw_collapses()
 	_shake_camera()
+	if profiled:
+		started = Profile.since(&"draw_buildings", started)
 	effects.end_bars()
+	if profiled:
+		started = Profile.since(&"bars_upload", started)
 	effects.draw(_clock)
+	if profiled:
+		started = Profile.since(&"effects_draw", started)
 	if _walls_changed:
 		_walls_changed = false
 		field.walls.rebuild_cells(catalog, _walls)
@@ -480,6 +497,9 @@ func _process(delta: float) -> void:
 	if deploy_unit != "":
 		var flash := clampf(1.0 - (_clock - _mask_flash_at) / (MASK_FLASH_SECONDS * maxi(speed, 1)), 0.0, 1.0)
 		field.set_deploy_mask(_mask, lerpf(MASK_STRENGTH, MASK_FLASH, flash))
+	if profiled:
+		Profile.since(&"walls_mask", started)
+		Profile.since(&"battle_view", began)
 
 
 ## The camera is the base's: a shake still on leaves no offset behind.
@@ -542,6 +562,8 @@ func _step() -> void:
 	var started := Time.get_ticks_usec()
 	sim.step()
 	var spent := Time.get_ticks_usec() - started
+	if Profile.enabled:
+		Profile.since(&"sim_step", started)
 	_step_usec += spent
 	if spent > _step_usec_max:
 		_step_usec_max = spent

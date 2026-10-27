@@ -473,11 +473,14 @@ func draw(alpha: float, now: float, delta: float, effects: BattleEffects, far: b
 			_bar[u] = lerpf(_bar[u], left, ease_bar)
 			if left < 1.0:
 				effects.bar(Vector3(at.x, _top[t] + BAR_OVER + lift, at.y), _bar[u], MaterialKit.ENERGY)
+	var started := Time.get_ticks_usec() if Profile.enabled else 0
 	for t: int in _types.size():
 		_bodies[t].buffer = _buffers[t].data
 		_bodies[t].visible_instance_count = _drawn[t]
 		_outlines[t].buffer = _buffers[t].data
 		_outlines[t].visible_instance_count = _drawn[t]
+	if Profile.enabled:
+		Profile.since(&"units_upload", started)
 
 
 ## How many units are drawn this frame, every type.
