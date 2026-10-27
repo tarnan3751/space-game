@@ -338,6 +338,55 @@ spire turning with it, are what the review reads. The last line says the
 models, moving parts and pairs and how many pairs crossed: every model of the roster passes, with
 no pair crossing. The whole roster takes about half a minute.
 
+`scenarios/model_audit.gd` lists geometric defects and triangles never seen, for a fix pass; its
+checks are informational, so it fails only on a script error. Headless, it builds every building
+type at every level for its level's tier, every unit type at every tier near and far
+(`UnitModels.build` at detail 1 and `UnitModels.FAR_DETAIL`), and the colonist and the automaton at
+stance, reads back the body and each moving part, and splits each into parts: triangles joined
+across an edge exactly two triangles of one surface share, so a part stacked flush on another stays
+apart. The probes cast rays through a physics space of the model's own (`PhysicsServer3D`): parts
+crossing each other (each edge, shrunk 0.0005 at its ends, cast against the body; the length of each
+part's edges inside the other, sampled every 0.02, inside meaning rays along +X and +Z both cross it
+an odd number of times), piercing (an edge through the other part and out of its far side) and
+poking (a piercing end sticking out under 0.03); faces sharing a plane with another part's, facing
+the same way (`zfight`); parts floating (lowest point over 0.02 up, bounds grown 0.02 meeting no
+other part's; tagged `bob` or `holo` when meant to) or under the ground (below -0.01); parts never
+seen (`hidden`); duplicate (same corners, same winding) and degenerate triangles; each moving part
+against the body, its edges cast against the body, the body's edges against it and a corner of each
+body part near it tested for being inside it (`brush` when it touches only in motion, `mount` when
+it touches at rest within 0.15 of its axis, `seat` otherwise); an aiming part's pitch sweep against
+the other moving parts, counted by `model_clash`'s own sweep (`aim`; the part that turns it is left
+out, it carries it); and round parts, a part swept over an arc included (its axis through the
+circumcentre of three corners of one level, else their mean; levels and rings grouped where
+neighbours lie within 0.002), with more sides than their radius needs on a 1080-pixel-high screen
+(chords within half a pixel, at least 8 sides) at the closest zoom the model is drawn at (`play=`: a
+building, a unit's near version and a figure at the base camera's closest, size 10; a unit's far
+version at 20, where the battle swaps it in) and at the widest, 44 (`wide=`). The moving parts are
+posed as `Motion.transform_at` poses them, turned or shifted rather than sampled on the clock: at
+rest and every 10 degrees of a spin's turn or a swing's range, both ends, a slide at five poses. A
+rider is posed only with its carrier at rest, BOB is not applied, and a part that spins in the
+shaders (`Surf.SPIN`, the gunship's rotors) is read as static body and never posed: the pairs of
+moving parts, BOB and riders carried are `model_clash`'s. A triangle is seen when, from one of
+sixteen headings at the camera's pitch, it faces the camera and a ray from one of four points on it
+towards the camera meets nothing opaque; the unseen ones are counted by kind (`ground`, `onpart`,
+`air` for faces that face down at every heading; `inner`, `buried`, `occluded`), and `fixed=` counts
+those unseen from the base camera's one heading. The log is the list: a `MODEL` line per model, a
+`FIND` line per finding, both `key=value` (`kind=`, part `a=` and `b=` named by soup, index, bounds'
+centre and size, triangles and kit layer, `count=`, `tris=`, `at=` the point), `KNOWN` for contacts
+on record, and `SUMMARY` lines: totals, the top twenty models by waste (unseen, duplicate and
+degenerate triangles and the rounds' surplus) and the top ten by triangles. The thresholds are
+constants at the top of the scenario. The whole roster takes about three minutes headless. A
+headless run writes the flagged models (brush, aim, below, float but not bob or holo, zfight, dup,
+seat), with each finding's point, to `out/model_audit.flags`, stamped with the MD5s of the sources
+its findings depend on (`src/game/models/`, `low_poly_mesh.gd`, `unit_models.gd`,
+`building_models.gd`, `surf.gd`, `motion.gd`, `battle_view.gd`, `data/buildings.json`,
+`data/units.json`, this scenario and `model_clash.gd`); a rendered run reads it, or audits first
+when it is missing or its stamp differs, saying so in the log, and writes it, and shoots the
+highest-scoring flagged model of each type close at four headings,
+`<type>-<level>-<tier>-h<degrees>`, a marker over each finding drawn through the geometry in its
+kind's colour (red brush and aim, orange seat, cyan zfight, magenta float and below, yellow dup).
+Run the headless pass first, so the rendered one holds the display only for the shots.
+
 `scenarios/effects.gd` is the animation rig (`docs/reference/art-style.md`, **Animation**): a
 test part for each surface effect and each kind of moving part, built with `LowPolyMesh` and
 `Parts` and assembled by `BuildingModels.instantiate`, in two rows across the screen with the

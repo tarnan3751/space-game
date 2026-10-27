@@ -118,7 +118,8 @@ Two scenarios check every model of the roster against the art style's contract
 triangle budgets, reach and height per type and level, with screenshots of every page, row and
 row's first model) and `model_clash`, headless, the clash rule's check: no two moving parts of a
 model cross over their whole motion, rigid and with BOB applied, and the poses at which each
-touches the static body counted for review.
+touches the static body counted for review. `model_audit` lists defects and unseen triangles for
+a fix pass; informational, see the README.
 
 ## Batch battles: `tools/sim_battles.gd`
 
