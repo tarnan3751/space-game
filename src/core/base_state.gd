@@ -112,6 +112,12 @@ var making: Dictionary[int, TrainingQueue] = {}
 var raids: Array[Dictionary] = []
 ## The expedition sector: its seed, epoch, cleared fields, last scan and snapshot.
 var sector: Sector = Sector.new()
+## Counts the changes that can move what the buildings add up to (capacities, production_rates,
+## the builders, housing, the stock): one at the end of every apply() that succeeds, whatever its
+## op, and one for every completion advance_to processes (a building finishing, a research, a
+## unit trained or an ability made). Production paying out alone never moves it. Not saved: a
+## loaded or new base starts at 0, so a reader caching on it keys on the BaseState too.
+var buildings_revision: int = 0
 
 ## Production not yet paid out, per resource, in "resource-seconds" (amount * 3600).
 ## Keeping the remainder means ticking every second or once a day gives the same total.
@@ -203,6 +209,7 @@ func apply(command: Dictionary, at_time: int) -> String:
 	if result == "":
 		# An upgrade stops its building's training; a train starts it.
 		_resume_training()
+		buildings_revision += 1
 		changed.emit()
 	return result
 
@@ -473,6 +480,7 @@ func advance_to(time: int) -> void:
 			_finish_head(queue)
 		else:
 			_finish_making(made)
+		buildings_revision += 1
 		# A finished producer resumes, a finished Hangar or unit changes the room.
 		_resume_training()
 	if _accumulate(time - now):
@@ -506,6 +514,16 @@ func capacity(res: String) -> int:
 	return total
 
 
+## Every resource's capacity, each as capacity(res), from one pass over the buildings.
+func capacities() -> Dictionary[String, int]:
+	var totals := _zero_per_resource()
+	for id: int in buildings:
+		var building: BuildingState = buildings[id]
+		if building.level >= 1:
+			_add_amounts(totals, _stats(building), "storage")
+	return totals
+
+
 ## Busy buildings (constructing or upgrading) don't produce.
 func production_per_hour(res: String) -> int:
 	var total := 0
@@ -514,6 +532,17 @@ func production_per_hour(res: String) -> int:
 		if building.level >= 1 and not building.is_busy():
 			total += _amount(_stats(building), "produces", res)
 	return total
+
+
+## Every resource's production per hour, each as production_per_hour(res), from one pass over the
+## buildings.
+func production_rates() -> Dictionary[String, int]:
+	var totals := _zero_per_resource()
+	for id: int in buildings:
+		var building: BuildingState = buildings[id]
+		if building.level >= 1 and not building.is_busy():
+			_add_amounts(totals, _stats(building), "produces")
+	return totals
 
 
 func builders_total() -> int:
@@ -1158,10 +1187,7 @@ func _scan() -> String:
 
 ## Records the Command Center level and the capacity the sector's fields are laid out against.
 func _snapshot_sector() -> void:
-	var capacities: Dictionary[String, int] = {}
-	for res: String in catalog.resources:
-		capacities[res] = capacity(res)
-	sector.snapshot(cc_level(), capacities)
+	sector.snapshot(cc_level(), capacities())
 
 
 ## The expedition half of check_raid_result: `bad_expedition` unless `data` names an open field
@@ -1386,22 +1412,28 @@ func _make_cost(ability: String, level: int) -> Dictionary:
 
 
 ## Pays out production for `seconds` at current rates, capped by storage. Returns true
-## if any resource amount changed.
+## if any resource amount changed. The rates come from one pass over the buildings, and the
+## capacities from one more the first time a resource gains; nothing completes inside a call, so
+## each is what production_per_hour(res) and capacity(res) would return.
 func _accumulate(seconds: int) -> bool:
 	if seconds <= 0:
 		return false
 	var any_change := false
+	var rates := production_rates()
+	var capacities_now: Dictionary[String, int] = {}
 	for res: String in catalog.resources:
-		var rate := production_per_hour(res)
+		var rate: int = rates[res]
 		if rate <= 0:
 			continue
 		var pending: int = _remainders[res] + rate * seconds
 		var gained: int = pending / SECONDS_PER_HOUR
 		_remainders[res] = pending % SECONDS_PER_HOUR
 		if gained > 0:
+			if capacities_now.is_empty():
+				capacities_now = capacities()
 			# Full storage stops production but never removes what's already there.
 			var before: int = resources[res]
-			var after := maxi(before, mini(capacity(res), before + gained))
+			var after := maxi(before, mini(capacities_now[res], before + gained))
 			if after != before:
 				resources[res] = after
 				any_change = true
@@ -1429,6 +1461,24 @@ func _stats(building: BuildingState) -> Dictionary:
 static func _amount(stats: Dictionary, field: String, res: String) -> int:
 	var amounts: Dictionary = stats.get(field, _EMPTY)
 	return int(amounts.get(res, 0))
+
+
+## 0 for every catalog resource, in the catalog's order.
+func _zero_per_resource() -> Dictionary[String, int]:
+	var totals: Dictionary[String, int] = {}
+	for res: String in catalog.resources:
+		totals[res] = 0
+	return totals
+
+
+## Adds a level's `field` amounts (storage, produces) to `totals`, the catalog's resources only, as
+## _amount reads them.
+func _add_amounts(totals: Dictionary[String, int], stats: Dictionary, field: String) -> void:
+	var amounts: Dictionary = stats.get(field, _EMPTY)
+	if amounts.is_empty():
+		return
+	for res: String in totals:
+		totals[res] += int(amounts.get(res, 0))
 
 
 static func _cell_from(value: Variant) -> Vector2i:

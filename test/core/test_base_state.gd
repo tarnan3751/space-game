@@ -504,3 +504,32 @@ func _version_1_save() -> Dictionary:
 
 func _place(type: String, x: int, y: int) -> Dictionary:
 	return {"op": "place", "type": type, "cell": [x, y]}
+
+
+func test_the_buildings_revision_counts_commands_and_completions() -> void:
+	var state := Fixtures.new_base()
+	assert_eq(state.buildings_revision, 0, "a new base starts at 0")
+	assert_eq(state.apply({"op": "place", "type": "extractor", "cell": [5, 5]}, 0), "")
+	assert_eq(state.buildings_revision, 1, "a command that succeeds counts once")
+	assert_eq(state.apply({"op": "place", "type": "harvester", "cell": [5, 5]}, 0), BaseState.ERR_BLOCKED)
+	assert_eq(state.buildings_revision, 1, "a refused one does not")
+	state.advance_to(60)
+	assert_eq(state.buildings_revision, 2, "the extractor finishing counts once")
+	var before: int = state.resources["metal"]
+	state.advance_to(100)
+	assert_true(state.resources["metal"] > before, "production paid")
+	assert_eq(state.buildings_revision, 2, "production alone does not count")
+	var loaded := BaseState.from_dict(state.catalog, JSON.parse_string(JSON.stringify(state.to_dict())))
+	assert_eq(loaded.buildings_revision, 0, "a loaded base starts at 0")
+	assert_false(state.to_dict().has("buildings_revision"), "it is not saved")
+
+
+func test_the_buildings_revision_counts_a_raid_result() -> void:
+	var state := BaseState.create_new(Fixtures.battle_catalog(), 0)
+	state.army["melee"] = 2
+	var revision := state.buildings_revision
+	var battle := Fixtures.battle_setup([["command_center", 10, 10]], {"melee": 2}, [])
+	var result := {"abilities_used": {}, "deployed": {}, "destruction": 0, "hash": 7, "loot": {"metal": 10},
+		"stars": 0, "ticks": 100}
+	assert_eq(state.apply({"op": "raid_result", "battle": battle, "result": result}, 0), "")
+	assert_eq(state.buildings_revision, revision + 1)

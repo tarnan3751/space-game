@@ -118,10 +118,6 @@ func index_of(id: int) -> int:
 	return _index_of.get(id, -1)
 
 
-func is_alive(b: int) -> bool:
-	return destroyed[b] == 0
-
-
 ## Takes `amount` off a building's hull; returns true when that destroys it.
 func take(b: int, amount: int) -> bool:
 	if destroyed[b] != 0 or amount <= 0:
