@@ -135,6 +135,8 @@ var _far: Array[BuildingModels.Meshes] = []
 var _far_shown: bool = false
 var _buffers: Array[BattleEffects.Instances] = []
 var _drawn := PackedInt32Array()
+## Per type, how many it drew last frame: a type that draws none two frames running uploads nothing.
+var _drawn_last := PackedInt32Array()
 var _hop := PackedFloat32Array()
 var _stride := PackedFloat32Array()
 var _altitude := PackedFloat32Array()
@@ -224,6 +226,7 @@ func setup(sim: BattleSim, catalog: Catalog, army: Dictionary, levels: Dictionar
 		_outlines.append(_multimesh(meshes.outline, count, area, false))
 		_buffers.append(BattleEffects.Instances.new(count))
 		_drawn.append(0)
+		_drawn_last.append(0)
 		var box := meshes.body.get_aabb()
 		var hovers := _has_flag(meshes.body, Surf.BOB)
 		_aims.append(1 if _aiming(meshes.body) else 0)
@@ -475,6 +478,9 @@ func draw(alpha: float, now: float, delta: float, effects: BattleEffects, far: b
 				effects.bar(Vector3(at.x, _top[t] + BAR_OVER + lift, at.y), _bar[u], MaterialKit.ENERGY)
 	var started := Time.get_ticks_usec() if Profile.enabled else 0
 	for t: int in _types.size():
+		if _drawn[t] == 0 and _drawn_last[t] == 0:
+			continue
+		_drawn_last[t] = _drawn[t]
 		_bodies[t].buffer = _buffers[t].data
 		_bodies[t].visible_instance_count = _drawn[t]
 		_outlines[t].buffer = _buffers[t].data
