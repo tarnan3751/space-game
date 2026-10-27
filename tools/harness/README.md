@@ -371,12 +371,14 @@ crossing each other (each edge, shrunk 0.0005 at its ends, cast against the body
 part's edges inside the other, sampled every 0.02, inside meaning rays along +X and +Z both cross it
 an odd number of times), piercing (an edge through the other part and out of its far side) and
 poking (a piercing end sticking out under 0.03); faces sharing a plane with another part's, facing
-the same way (`zfight`); parts floating (lowest point over 0.02 up, bounds grown 0.02 meeting no
+the same way (`zfight`, or `projection` where either part is a hologram or a spark); parts floating (lowest point over 0.02 up, bounds grown 0.02 meeting no
 other part's; tagged `bob` or `holo` when meant to) or under the ground (below -0.01); parts never
 seen (`hidden`); duplicate (same corners, same winding) and degenerate triangles; each moving part
 against the body, its edges cast against the body, the body's edges against it and a corner of each
 body part near it tested for being inside it (`brush` when it touches only in motion, `mount` when
-it touches at rest within 0.15 of its axis, `seat` otherwise); an aiming part's pitch sweep against
+it touches at rest within 0.15 of its axis, `seat` otherwise, and `projection`, listed but never
+flagged, whatever its poses, when either part is a hologram or a spark, FLICKER or JITTER: anything
+may pass through one); an aiming part's pitch sweep against
 the other moving parts, counted by `model_clash`'s own sweep (`aim`; the part that turns it is left
 out, it carries it); and round parts, a part swept over an arc included (its axis through the
 circumcentre of three corners of one level, else their mean; levels and rings grouped where
@@ -397,7 +399,8 @@ towards the camera meets nothing opaque; the unseen ones are counted by kind (`g
 those unseen from the base camera's one heading. The log is the list: a `MODEL` line per model, a
 `FIND` line per finding, both `key=value` (`kind=`, part `a=` and `b=` named by soup, index, bounds'
 centre and size, triangles and kit layer, `count=`, `tris=`, `at=` the point), `KNOWN` for contacts
-on record, and `SUMMARY` lines: totals, the top twenty models by waste (unseen, duplicate and
+on record (matter on matter and meant, by model or by type: the hangar's door in its hood, the
+heavy fabricator's heads on their anvils, the drydock's welds on its hull, the crystal harvester's beams in its crystals), and `SUMMARY` lines: totals, the top twenty models by waste (unseen, duplicate and
 degenerate triangles and the rounds' surplus) and the top ten by triangles. The thresholds are
 constants at the top of the scenario. The whole roster takes about three minutes headless. A
 headless run writes the flagged models (brush, aim, below, float but not bob or holo, zfight, dup,

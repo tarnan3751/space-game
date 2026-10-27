@@ -26,7 +26,8 @@ extends HarnessScenario
 ##   line (most are mounts: a pipe sunk in a tank); piercing pairs are findings, a poke when an
 ##   end sticks out by less than POKE_STUB (an overlong part nicking through), its `stub=` said.
 ## - **zfight**: a seen triangle with a triangle of another part within ZFIGHT_GAP of its centre,
-##   facing the same way (COPLANAR_COS): two faces sharing a plane.
+##   facing the same way (COPLANAR_COS): two faces sharing a plane. Where either part is a hologram
+##   or a spark (PROJECTION) it is a projection instead, never flagged.
 ## - **float**: a part whose lowest point is over FLOAT_GAP above the ground and whose bounds,
 ##   grown FLOAT_GAP, meet no other part's (the moving parts' at rest included). Tagged `bob` when
 ##   it carries Surf.BOB (a hovering ring is meant to) and `holo` for a hologram.
@@ -45,11 +46,13 @@ extends HarnessScenario
 ##   from the motion's axis through the pivot). A pair that does not touch at rest is a brush: it
 ##   only meets the body in motion. One that does is a mount when every crossing lies within
 ##   MOUNT_RADIUS of the axis, else a seat (resting on or through the body away from its pivot: a
-##   judgment). A rider is posed only with its carrier at rest, not carried; BOB is not applied; a
-##   part that moves in the shaders (Surf.MOVE: a building's idle part folded into its body, the
-##   gunship's rotors) is read back as a moving part of its own, its pivot and Motion decoded from
-##   CUSTOM0 and CUSTOM3 (Motion.from_channels), after the nodes; the pairs of moving parts, BOB and
-##   the riders carried are model_clash's.
+##   judgment). A pair where either part is a hologram (Surf.HOLO) or a spark (FLICKER or JITTER,
+##   PROJECTION) is a projection whatever its poses, listed but never flagged: anything may pass
+##   through one (art-style.md, **The clash rule**). A rider is posed only with its carrier at rest,
+##   not carried; BOB is not applied; a part that moves in the shaders (Surf.MOVE: a building's idle
+##   part folded into its body, the gunship's rotors) is read back as a moving part of its own, its
+##   pivot and Motion decoded from CUSTOM0 and CUSTOM3 (Motion.from_channels), after the nodes; the
+##   pairs of moving parts, BOB and the riders carried are model_clash's.
 ## - **aim**: an aiming part's pitch sweep against the other moving parts, model_clash's own
 ##   (_travel, _pitch_sweep, read as model_clash reads a model): any pose touching a part other than
 ##   the one that turns it (which carries it) is a finding.
@@ -157,11 +160,22 @@ const STAMPED := [
 	"res://tools/harness/scenarios/model_audit.gd", "res://tools/harness/scenarios/model_clash.gd",
 ]
 const STAMPED_DIR := "res://src/game/models"
-## Contacts on record, by model label: the finding is still listed, marked known.
+## Contacts on record, by model label or by type for every level: the finding is still listed, marked
+## known. Matter on matter, meant: a sliding part in its slot, a hammer on its anvil, a weld on its
+## hull (a projection's contacts are a kind of their own).
 const KNOWN := {
-	"plasma_mortar 7 obsidian":
-		"the barrel brushes the loader arm at two yaws of its pitch sweep (docs/plans/model-animation-pass.md)",
+	"hangar": "the main door's leaves slide up into their hood behind the lintel, their hazard band between the posts",
+	"heavy_fabricator": "each press head strikes its anvil's face at the bottom of its stroke",
+	"drydock": "the welds and the welder bots' beams touch the hull and its bands where they work as they slide",
+	"crystal_harvester": "the laser beams cut into the crystals as the ring turns, the shard they aim at and its neighbours",
+	"cloaked_sentry 6 obsidian":
+		"the hovering cloak ring touches the hex shoulder seam at the top of its travel, seen since the moving parts were folded, the render lane checking whether the fold or the audit's decode brings it",
+	"cloaked_sentry 7 crown":
+		"the hovering cloak ring touches the hex shoulder seam at the top of its travel, seen since the moving parts were folded, the render lane checking whether the fold or the audit's decode brings it",
 }
+## The surface flags that make a part a projection, which anything may pass through: a hologram, a
+## spark (FLICKER or JITTER).
+const PROJECTION := Surf.HOLO | Surf.FLICKER | Surf.JITTER
 ## Physics layers: the opaque body, its holograms, the moving parts at rest.
 const OPAQUE := 1
 const HOLO := 2
@@ -441,8 +455,9 @@ func _audit(spec: Spec, model: Node3D) -> void:
 	_totals["hidden_tris"] = int(_totals.get("hidden_tris", 0)) + hidden_tris
 	var known := ""
 	for f: Array in finds:
-		var tag := " known=1" if KNOWN.has(spec.label) and (f[0] == "aim" or f[0] == "brush") else ""
-		known = KNOWN.get(spec.label, "") if tag != "" else known
+		var on_record: String = KNOWN.get(spec.label, KNOWN.get(spec.type, ""))
+		var tag := " known=1" if on_record != "" and (f[0] == "aim" or f[0] == "brush") else ""
+		known = on_record if tag != "" else known
 		say("FIND model=%s kind=%s a=%s b=%s count=%d tris=%d at=%s%s" % [spec.label.replace(" ", "/"), f[0], f[1], f[2],
 			f[3], f[4], _vec(f[5]), tag])
 		if FLAG_KINDS.has(f[0]) and not (f[0] == "float" and (str(f[1]).contains("bob") or str(f[1]).contains("holo"))):
@@ -1200,6 +1215,10 @@ func _mover_poses(s: int, body_edges: PackedInt32Array, finds: Array) -> void:
 		var kind := "brush"
 		if at_rest.has(pair):
 			kind = "mount" if float(far[pair]) <= MOUNT_RADIUS else "seat"
+		# A hologram or a spark is a projection: anything may pass through it (art-style.md, **The clash
+		# rule**).
+		if ((soup.comp_flags[pair.x] | body.comp_flags[pair.y]) & PROJECTION) != 0:
+			kind = "projection"
 		finds.append([kind, _part(s, pair.x), _part(0, pair.y) + ",of=%d,away=%.2f" % [poses.size(), float(far[pair])],
 			int(touched[pair]), soup.comp_tris[pair.x], where[pair]])
 
@@ -1265,8 +1284,10 @@ func _zfight(finds: Array) -> void:
 				pairs[key] = int(pairs.get(key, 0)) + 1
 				where[key] = centre
 	for key: Array in pairs:
-		finds.append(["zfight", _part(int(key[0]), int(key[1])), _part(int(key[2]), int(key[3])), int(pairs[key]),
-			int(pairs[key]), where[key]])
+		# A hologram or a spark sharing a plane is a projection, not matter fighting matter.
+		var shared := _soups[int(key[0])].comp_flags[int(key[1])] | _soups[int(key[2])].comp_flags[int(key[3])]
+		finds.append(["projection" if (shared & PROJECTION) != 0 else "zfight", _part(int(key[0]), int(key[1])),
+			_part(int(key[2]), int(key[3])), int(pairs[key]), int(pairs[key]), where[key]])
 
 
 ## Parts whose lowest point is over FLOAT_GAP up and whose grown bounds meet no other part's;
