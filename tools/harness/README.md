@@ -691,7 +691,7 @@ passes once any sample differs from its first pose, so a hammer's hold or a peri
 the gap cannot hide it, but for the aiming parts that are still at idle by design (an idle Motion
 of a zero swing, slide or spin, carried by none that moves: the railgun's rails, the orbital
 cannon's mount and the tower riding it), which move only as they aim in battle; and that no model's
-folded parts are held (`BuildingModels.hold`) and each carries a motion that moves (its spin's rate
+folded parts are held (`BuildingModels.held_at`) and each carries a motion that moves (its spin's rate
 or its swing's or slide's amplitude, decoded with `Motion.from_channels`). Once the "Template base" toast has faded (2.5 seconds after the press),
 rendered only (headless it logs that it skipped), it measures the whole base in a 1600x900
 window at the widest zoom (camera size 44) and at the start zoom (24), each held 2.1 seconds and

@@ -10,9 +10,9 @@ camera and the views' wiring are in `input-camera.md`.
 | `src/game/material_kit.gd` | `MaterialKit`: the kit's `Texture2DArray`, the colour roles, the shared materials |
 | `src/game/surf.gd` | `Surf`: how a part is painted |
 | `src/game/low_poly_mesh.gd` | `LowPolyMesh`: parts, UVs, smoothing, the body and outline meshes |
-| `src/game/toon.gdshader`, `toon_common.gdshaderinc` | the body shader and the light it shares with the ground and the terrain |
+| `src/game/toon.gdshader`, `toon_move.gdshader`, `toon_body.gdshaderinc`, `toon_common.gdshaderinc` | the body shader (with and without the folded parts' hold, **Folded parts**) and the light it shares with the ground and the terrain |
 | `src/game/effects.gdshaderinc` | the surface flags and their time-driven effects, shared by the toon, ink and holo shaders (**Animation**) |
-| `src/game/ink.gdshader` | the outline shader |
+| `src/game/ink.gdshader`, `ink_move.gdshader`, `ink_body.gdshaderinc` | the outline shader, with and without the hold; `holo.gdshader`, `holo_move.gdshader` and `holo_body.gdshaderinc` are the hologram surface's likewise |
 | `src/game/sky.gdshader` | the sky beyond the terrain ring (**Light and shading**) |
 | `src/game/holo.gdshader` | the hologram surface (**Animation**) |
 | `src/game/motion.gd` | `Motion`: how a moving part moves (**Animation**) |
@@ -954,8 +954,8 @@ The shaders use `anim_time`, never `TIME`, whose zero is the engine's first draw
 falls anywhere from a fraction of a second to seconds after the ticks' zero. Moving parts are
 posed at `Motion.clock()`, the same value, so the two agree to within a frame: a part and its
 surface effects keep step (the flak cannon's muzzles flash on the barrels' kick). A model with no
-`main.gd` above it (a HUD preview) poses its parts at 0, its folded ones held at 0
-(`BuildingModels.hold`, **Folded parts**). The harness can hold the clock at a value
+`main.gd` above it (a HUD preview) poses its parts at 0; its folded ones move on the clock, which
+the preview draws once. The harness can hold the clock at a value
 (`Motion.fix_clock`, `HarnessScenario.fix_clock`), so two runs draw the same poses.
 
 While a building is busy (constructing an upgrade) its moving parts hold their last pose and on
@@ -975,9 +975,9 @@ its part and a hologram moves like any other part. A part's phase (`Surf.phase`,
 its cycle by phase times the period. It is stored in the vertex colour's alpha, 8 bits, in 1/254
 steps: `LowPolyMesh` writes (round(phase × 254) + 0.25) / 255, the same byte whether the store
 rounds or truncates, and `surf_phase()` in `effects.gdshaderinc` reads round(alpha × 255) / 254,
-so 0.5 (a FLOW part standing still) is exact. The one per-instance uniform is a folded part's hold,
-`move_hold` (**Folded parts**): every instance of a mesh animates alike, but for that and for the
-battle's MultiMesh instances, whose custom data
+so 0.5 (a FLOW part standing still) is exact. There are no per-instance uniforms (a held building
+wears its own material copies, **Folded parts**): every instance of a mesh animates alike, but for a
+held building and for the battle's MultiMesh instances, whose custom data
 (`INSTANCE_CUSTOM`) carries their own state: x a gait's phase in steps, y its share, z a hit
 flash, w a fade (`battle-view.md`, **Units**); while a rigged unit aims, y is minus the aim's share
 and x the fire phase instead (**Rig**), and the gait shows nothing. The toon and ink shaders apply the gait
@@ -1078,15 +1078,30 @@ the meshes are made from its arrays on the main thread (`meshes_from`).
   moves; the model's root carries `FOLDS_META`, the static body's top, which `top_of` and so
   `site_height` read, so the drone, the timer label and the battle's muzzle heights stand where
   they did.
-- **The hold.** The toon, ink and hologram shaders each declare `instance uniform float move_hold`:
-  0 is live; any other value is the `anim_time` at which the folded parts hold their pose, while
-  their surface effects run on. `BuildingModels.hold(root, time)` sets it on the model's body and
-  outline instances (a negative time releases them), once a change, never a frame: `BuildingView`
-  holds them at the clock while the building is busy or disabled and releases them to the clock's
-  pose when it is neither, and `ModelPreview` holds them at 0. A view created busy (a building
-  loaded mid-upgrade) holds its folded parts at the clock at setup, where its nodes stand at rest.
-  Instance uniforms work in the Compatibility renderer since Godot 4.4 but are unverified on the
-  phone; if they failed there, a held idle would keep moving while held, nothing worse.
+- **The hold.** `uniform float move_hold`, a plain material uniform: 0 is live; any other value is
+  the `anim_time` at which the folded parts hold their pose, while their surface effects run on.
+  Each of the toon, ink and hologram shaders is a thin `.gdshader` over a `*_body.gdshaderinc`, and
+  its `*_move` twin defines `MOVE_HELD` first, which declares `move_hold` (`effects.gdshaderinc`);
+  the plain shaders, which every unheld instance wears, move the folded parts on the clock alone.
+  `MaterialKit.moving(material, hold)` makes a copy of a kit material (the plain body, ink and
+  hologram materials and every state's: flash, grey, reveal, rival, selected ink) on its move
+  shader with `move_hold` set. `BuildingView` holds by putting such copies on its model's own body
+  (every surface, the hologram's included) and outline, of the materials its state gives them, as
+  the building starts to hold (`_update_hold`, `_tint_folded`, `_ink_outlines`) and again, with the
+  same hold, when its state changes while it holds (a hit's flash over an EMP's grey); on release it
+  puts the shared plain materials back and the copies are freed with their last reference.
+  `BuildingModels.held_at(root)` reads the hold back from the worn material, for the harness. The
+  cost: a material copy per held surface (two or three a building), made on a hold and on a state
+  change while held, never a frame, and the draws unchanged; held buildings are few, those under
+  construction (one a builder) and those an EMP has disabled. Holds do not use instance uniforms:
+  every instance drawn with a shader that declares one takes a block of 16 vec4s of the global
+  shader buffer, whatever its value, which holds 4,096 vec4s on the development Mac (255 instances,
+  measured) and may hold a quarter of that on a phone, and the block is kept until the instance is
+  freed, not when its material changes; the maxed base draws about 1,580 instances on these
+  shaders. So no engine limit applies to a hold, and the caveat that instance uniforms were
+  unverified on the phone no longer concerns it. A placement ghost and a HUD preview never hold. A
+  view created busy (a building loaded mid-upgrade) holds its folded parts at the clock at setup,
+  where its nodes stand at rest.
 - **Cost.** A body with a folded part carries `CUSTOM0` and `CUSTOM3` on every vertex, 32 bytes a
   vertex for each unique mesh, and its vertices without the flag skip the motion: 21 MB more video
   memory on the maxed base (**Cost**), accepted for now. Two levers wait on the phone measurement,
@@ -1465,8 +1480,11 @@ against their neighbours.
 
 A view never makes a material: a state overrides an instance's surface 0 with a shared one from
 `MaterialKit` through `set_surface_override_material`, and clears it with `null` when the state
-ends (`BuildingView`). A hologram surface is never overridden: a ghost tints a body's surface 0
-only when it is the toon surface, so its holograms keep their look.
+ends (`BuildingView`); while a building holds its folded parts, its model's own body and outline
+wear held copies of those materials instead (`MaterialKit.moving`, **Folded parts**), the only
+materials made for one building. A hologram surface takes no state: a ghost tints a body's surface
+0 only when it is the toon surface, so its holograms keep their look; a held body's hologram
+surface wears a held copy of the hologram material, unchanged but for the hold.
 
 | State | What changes |
 | --- | --- |

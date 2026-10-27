@@ -431,12 +431,16 @@ any of them can be reversed as a data or model change.
   `CUSTOM3`) with `Motion`'s exact math, at the same pose at the same clock as the node it replaces;
   the rotor of the gunship moved onto the same path. What stays a node is what needs the view's
   state: the aiming heads and what rides them, and the marching figures (198 of the template base's
-  257 moving parts fold, 59 stay). Busy and EMP-disabled buildings hold their folded parts through a
-  per-instance shader uniform (`move_hold`), set once a change. On the Mac the maxed base fell from
+  257 moving parts fold, 59 stay). Busy and EMP-disabled buildings hold their folded parts by
+  wearing their own copies of their materials on move shaders with the hold time set (`move_hold`, a
+  plain material uniform), made as they hold and when their state changes while held, never a
+  frame; the few held buildings pay a material copy per surface. Holds no longer rely on instance
+  uniforms: the first version used one, but every instance on such a shader takes 16 vec4s of a
+  global buffer that fits 255 of them on the Mac and fewer on a phone, kept until the instance is
+  freed, so the maxed base ran out and holds silently failed. On the Mac the maxed base fell from
   1,198 draw calls to 615 at the widest zoom and its frame from about 7 ms to 5, for 21 MB more video
   memory; moving parts were two thirds of the draw calls, the first thing a phone would have broken
-  on. Instance uniforms are unverified on the phone: if they fail there, a held idle keeps moving,
-  nothing worse. The video memory is accepted for now; the phone measurement decides between two
+  on. The video memory is accepted for now; the phone measurement decides between two
   follow-ups: `CUSTOM3` as half floats (with a precision check), or the folded parts in a second body
   surface (about three more draws a folded building, the channels on their vertices only).
 

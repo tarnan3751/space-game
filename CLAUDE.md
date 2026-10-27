@@ -149,7 +149,8 @@ src/game/        main, template_base, iso_camera, world_input, placement_control
                  building_view, construction_drone, building_models, unit_models, wall_mesh, low_poly_mesh, surf,
                  battle_view, battle_units, battle_effects, weapons, battle_hud,
                  motion, rig, material_kit, hud, hud_icon, drone_ring, sector_map, format, model_preview, profile, toon.gdshader,
-                 toon_common.gdshaderinc, effects.gdshaderinc, ink.gdshader, holo.gdshader,
+                 toon_move.gdshader, toon_body.gdshaderinc, toon_common.gdshaderinc, effects.gdshaderinc, ink.gdshader,
+                 ink_move.gdshader, ink_body.gdshaderinc, holo.gdshader, holo_move.gdshader, holo_body.gdshaderinc,
                  ground.gdshader, terrain.gdshader, field_marks.gdshaderinc, meter.gdshader
 src/game/models/ parts (the model being built, shared helpers and surfaces), then one file of
                  model builders per category: core, resources, army, defense, traps; walls, the wall's own; and

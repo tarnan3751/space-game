@@ -325,7 +325,8 @@ in `setup`; while the building is finished and idle, `_process` sets each one's 
 run on (`art-style.md`, **Animation**, **One clock**); during an upgrade they hold their last
 pose and on resuming snap to the clock's (the surface effects keep running). Those nodes are only
 the parts that need the view's state (an aiming head, what rides it, a marching figure): the idle
-parts are folded into the body and moved by the shaders, held through `BuildingModels.hold` while
+parts are folded into the body and moved by the shaders, held through copies of the view's
+materials with the hold set (`MaterialKit.moving`) while
 the building is busy or disabled, set once a change (`art-style.md`, **Folded parts**). A view with
 no moving node turns processing off in `_ready`, so walls, traps and a building whose parts all
 folded cost nothing per frame.
