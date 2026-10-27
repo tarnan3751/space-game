@@ -152,7 +152,12 @@ const LOCKED_SHADER: Shader = preload("res://src/game/locked.gdshader")
 const BUILD_SIZE := Vector2(136, 72)
 ## The Expedition button, bottom left, and the badge of open fields on its corner.
 const EXPEDITION_SIZE := Vector2(184, 72)
-const BADGE_SIZE := Vector2(30, 30)
+## The badge is centred on the button's top right corner, a light ring inside its ink, so it
+## stands apart from the button's own border.
+const BADGE_SIZE := Vector2(36, 36)
+const BADGE_RING := 2
+## Debug builds: the dev buttons, demoted to small grey chips under a "DEV" label.
+const DEBUG_SIZE := Vector2(132, 40)
 ## A meter: a pill-shaped trough (its radius half its height) with the resource's coin over its
 ## left end, the coin's centre on the trough's left edge, so it overlaps the trough by half.
 const METER_SIZE := Vector2(240, 44)
@@ -1925,10 +1930,14 @@ func _build_expedition_button() -> void:
 	_expedition_badge.custom_minimum_size = BADGE_SIZE
 	_expedition_button.add_child(_expedition_badge)
 	_expedition_badge.set_anchors_preset(Control.PRESET_TOP_RIGHT)
-	_expedition_badge.offset_left = -BADGE_SIZE.x + 10
-	_expedition_badge.offset_right = 10
-	_expedition_badge.offset_top = -12
-	_expedition_badge.offset_bottom = -12 + BADGE_SIZE.y
+	_expedition_badge.offset_left = -BADGE_SIZE.x / 2.0
+	_expedition_badge.offset_right = BADGE_SIZE.x / 2.0
+	_expedition_badge.offset_top = -BADGE_SIZE.y / 2.0
+	_expedition_badge.offset_bottom = BADGE_SIZE.y / 2.0
+	var ring := Panel.new()
+	ring.theme_type_variation = &"BadgeRing"
+	ring.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_expedition_badge.add_child(ring)
 	_expedition_count = Label.new()
 	_expedition_count.theme_type_variation = &"BadgeText"
 	_expedition_count.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
@@ -2324,23 +2333,30 @@ func _build_toast() -> void:
 
 ## Debug builds only: start over without digging through user:// for the save file, swap the
 ## base for the template, every type at its top level (TemplateBase), or raid the template with
-## the army in the Hangars (Practice raid, main.gd). On a row of its own under the top bar,
-## right-aligned, so a long top bar never runs under it.
+## the army in the Hangars (Practice raid, main.gd). Under the top bar's strip at the left, small
+## and grey under a "DEV" label in the body face, so a tester never takes them for the game's.
 func _build_debug_buttons() -> void:
+	var column := VBoxContainer.new()
+	column.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	column.add_theme_constant_override("separation", 2)
+	_top.add_child(column)
+	var label := Label.new()
+	label.theme_type_variation = &"DevLabel"
+	label.text = "DEV"
+	column.add_child(label)
 	var row := HBoxContainer.new()
 	row.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	row.alignment = BoxContainer.ALIGNMENT_END
-	row.add_theme_constant_override("separation", 16)
-	_top.add_child(row)
-	var practice := _button("Practice raid", Vector2(150, 48), &"DebugButton")
+	row.add_theme_constant_override("separation", 10)
+	column.add_child(row)
+	var practice := _button("Practice raid", DEBUG_SIZE, &"DebugButton")
 	practice.pressed.connect(func() -> void: practice_pressed.emit())
 	row.add_child(practice)
 	_practice_button = practice
-	var template := _button("Template base", Vector2(150, 48), &"DebugButton")
+	var template := _button("Template base", DEBUG_SIZE, &"DebugButton")
 	template.pressed.connect(func() -> void: template_pressed.emit())
 	row.add_child(template)
 	_template_button = template
-	var reset := _button("Reset base", Vector2(150, 48), &"DebugButton")
+	var reset := _button("Reset base", DEBUG_SIZE, &"DebugButton")
 	reset.pressed.connect(func() -> void: reset_pressed.emit())
 	row.add_child(reset)
 	_reset_button = reset
@@ -2434,7 +2450,14 @@ func _make_theme() -> Theme:
 	ui.set_type_variation(&"ScreenPanel", &"PanelContainer")
 	ui.set_stylebox("panel", &"ScreenPanel", _shape(Color(PANEL, 1.0), 12))
 	ui.set_type_variation(&"Badge", &"PanelContainer")
-	ui.set_stylebox("panel", &"Badge", _shape(MaterialKit.DEFENCE, 15, 0.0))
+	ui.set_stylebox("panel", &"Badge", _shape(MaterialKit.DEFENCE, roundi(BADGE_SIZE.x / 2.0), BORDER))
+	var badge_ring := StyleBoxFlat.new()
+	badge_ring.draw_center = false
+	badge_ring.border_color = TEXT
+	badge_ring.set_border_width_all(BADGE_RING)
+	badge_ring.set_corner_radius_all(roundi(BADGE_SIZE.x / 2.0) - BORDER)
+	ui.set_type_variation(&"BadgeRing", &"Panel")
+	ui.set_stylebox("panel", &"BadgeRing", badge_ring)
 
 	# The meters: one strip behind them, a pill-shaped trough under each fill, and its ink border
 	# again over it.
@@ -2475,7 +2498,11 @@ func _make_theme() -> Theme:
 	_button_variation(ui, &"CommitButton", GOLD, 12, DISPLAY_FONT, 24, 0, INK)
 	_button_variation(ui, &"ConfirmButton", ACCENT, 12, DISPLAY_FONT, 24, 0, INK)
 	_button_variation(ui, &"BarButton", CARD, 12, DISPLAY_FONT, 24, 0)
-	_button_variation(ui, &"DebugButton", CARD, 12, DISPLAY_FONT, 20, 0)
+	# The dev chips: grey, a thinner ink border, dim text in the body face.
+	_button_variation(ui, &"DebugButton", CARD_DISABLED, 10, BODY_FONT, 16, 0, TEXT_DIM)
+	for item: String in ["normal", "hover", "pressed", "hover_pressed", "disabled"]:
+		var chip: StyleBoxFlat = ui.get_stylebox(item, &"DebugButton")
+		chip.set_border_width_all(2)
 	_button_variation(ui, &"CloseButton", CARD, 12, DISPLAY_FONT, 28, 0)
 	_button_variation(ui, &"TabButton", CARD, 10, DISPLAY_FONT, 24, 0)
 	# The selected tab: cyan in every state, ink text.
@@ -2508,6 +2535,9 @@ func _make_theme() -> Theme:
 	_label_variation(ui, &"InfoNote", 19, WARNING, 0)
 	_label_variation(ui, &"ToastText", 19, TEXT, 0)
 	_label_variation(ui, &"BadgeText", 19, TEXT, 2)
+	# Debug builds only, over the dev chips and the world (so outlined): below the floor, as they
+	# are not the game's.
+	_label_variation(ui, &"DevLabel", 14, TEXT_DIM, 2)
 
 	# The card strip's scroll bar: a dim grabber on an ink track.
 	var track := _flat(Color(INK, 0.6), 4)
