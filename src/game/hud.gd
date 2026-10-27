@@ -282,6 +282,9 @@ var _train_cards: Dictionary[String, ArmyCard] = {}
 var _queue_strip: HBoxContainer
 var _queue_entries: Array[ArmyCard] = []
 var _queue_units: PackedStringArray = PackedStringArray()
+## The producer whose queue the strip last showed, 0 when the panel has opened since: a rebuild
+## whose queue is the one shown only counts the head down.
+var _queue_id: int = 0
 var _queue_empty: Label
 ## What the head entry last showed: its status and its seconds left, so a tick that changes
 ## neither sets no text.
@@ -822,6 +825,7 @@ func _open_army(page: ArmyPage) -> void:
 		return
 	_army_page = page
 	_army_id = _selected_id
+	_queue_id = 0
 	_train_page.visible = page == ArmyPage.TRAIN or page == ArmyPage.MAKE
 	_housing_row.visible = page == ArmyPage.TRAIN
 	_train_scroll.visible = page == ArmyPage.TRAIN
@@ -976,11 +980,17 @@ func _refresh_making(state: BaseState, building: BuildingState) -> void:
 
 
 ## The queue strip: an entry per queued unit (or ability, on the making page), oldest first, the head's with its state. Entries
-## are made only as the queue first grows that long; after that a rebuild only sets text.
+## are made only as the queue first grows that long; after that a rebuild only sets text, and only
+## when the queue is not the one shown.
 func _refresh_queue(state: BaseState) -> void:
 	# A copy, built per call: taken here, on a state change, and kept for the ticks between.
 	var making := _army_page == ArmyPage.MAKE
-	_queue_units = state.making_queue_of(_army_id) if making else state.queue_of(_army_id)
+	var units := state.making_queue_of(_army_id) if making else state.queue_of(_army_id)
+	if _queue_id == _army_id and units == _queue_units:
+		_refresh_head(state)
+		return
+	_queue_id = _army_id
+	_queue_units = units
 	while _queue_entries.size() < _queue_units.size():
 		_queue_entries.append(_build_queue_entry(_queue_entries.size()))
 	for i: int in _queue_entries.size():
@@ -1139,22 +1149,28 @@ func _on_queue_entry(index: int) -> void:
 # --- Refresh helpers -------------------------------------------------------------
 
 ## Only the selected tab's cards; the others are hidden. A card that cannot be built now
-## dims its name and cost and gives its reason, still readable, in place of its count.
+## dims its name and cost and gives its reason, still readable, in place of its count. The
+## buildings are counted by type once, for every card's count.
 func _refresh_entries(state: BaseState) -> void:
+	var counts: Dictionary[String, int] = {}
+	for id: int in state.buildings:
+		var type := state.buildings[id].type
+		counts[type] = counts.get(type, 0) + 1
 	for type: String in _entries:
 		if _catalog.category_of(type) != _tab:
 			continue
 		var error := state.check_can_build(type)
 		var status: Label = _entry_status[type]
-		status.text = _entry_status_text(state, type, error)
+		status.text = _entry_status_text(state, type, error, counts.get(type, 0))
 		status.theme_type_variation = &"CardCount" if error == "" else &"CardReason"
 		_entries[type].disabled = error != ""
 		_entry_heading[type].modulate.a = 1.0 if error == "" else DISABLED_ALPHA
 
 
-func _entry_status_text(state: BaseState, type: String, error: String) -> String:
+## `count`: the buildings of `type` the base has.
+func _entry_status_text(state: BaseState, type: String, error: String, count: int) -> String:
 	if error == "":
-		return "%d / %d" % [state.count_of(type), _catalog.max_count(type, state.cc_level())]
+		return "%d / %d" % [count, _catalog.max_count(type, state.cc_level())]
 	var first := _catalog.level_stats(type, 1)
 	if error == BaseState.ERR_CC_LEVEL:
 		return "Needs Command Center %d" % int(first.get("requires_cc", 1))
