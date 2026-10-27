@@ -282,8 +282,10 @@ var _queue_empty: Label
 ## neither sets no text.
 var _head_status: String = ""
 var _head_seconds: int = -1
-## The state whose `changed` rebuilds the army panel's content; a tick only counts down.
+## The state whose `changed` rebuilds the army panel's content, at the next refresh (main.gd
+## refreshes once a frame after any change); a tick only counts down.
 var _watched: BaseState
+var _army_stale: bool = false
 var _research_page: Control
 var _research_scroll: ScrollContainer
 ## The research running and its time left, or that none is.
@@ -392,9 +394,13 @@ func refresh(state: BaseState, selected_id: int, placing: bool, ghost_ok: bool, 
 		_refresh_entries(state)
 	if _info_panel.visible:
 		_refresh_info(state, state.buildings[selected_id])
-	# Its content is rebuilt on a state change (_on_state_changed); the tick only counts down.
+	# Its content is rebuilt after a state change (_on_state_changed); the tick only counts down.
 	if _army_page != ArmyPage.NONE:
-		_tick_army(state)
+		if _army_stale:
+			_refresh_army(state)
+		else:
+			_tick_army(state)
+	_army_stale = false
 
 
 ## Placement began, ended or its ghost moved. A move changes only the Place button, so
@@ -837,8 +843,9 @@ func _on_army_close() -> void:
 		_refresh_info(_state, _state.buildings[_selected_id])
 
 
-## Rebuilds the army panel's content on `state.changed`, which the HUD connects to itself from
-## the state it is given (main.gd's handler, connected first, has refreshed by then).
+## Rebuilds the army panel's content after `state.changed`, which the HUD connects to itself from
+## the state it is given: the change marks it, and the next refresh (main.gd's, at the end of the
+## frame) rebuilds it once however many changes came.
 func _watch(state: BaseState) -> void:
 	if state == _watched:
 		return
@@ -849,8 +856,7 @@ func _watch(state: BaseState) -> void:
 
 
 func _on_state_changed() -> void:
-	if _army_page != ArmyPage.NONE:
-		_refresh_army(_watched)
+	_army_stale = _army_page != ArmyPage.NONE
 
 
 ## The one-second tick while the panel is open: only the countdown. It calls no query that

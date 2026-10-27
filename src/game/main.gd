@@ -46,6 +46,10 @@ var sector_map: SectorMap
 var battle: BattleView
 var battle_hud: BattleHud
 var _ticks: int = 0
+## What a state change or the tick left to redraw, serviced once at the end of the frame's
+## _process: the base's view, the ghost and the HUD; and the sector map's cards while it is open.
+var _dirty: bool = false
+var _sector_dirty: bool = false
 ## Where the camera looked at the base, and its zoom, when a battle opened: put back after it.
 var _base_focus: Vector3 = Vector3.ZERO
 var _base_zoom: float = IsoCamera.START_ZOOM_SIZE
@@ -122,9 +126,20 @@ func _ready() -> void:
 
 
 ## The one animation clock, set before any view animates (main is their ancestor, so it
-## processes first): Motion.clock() for the moving parts, anim_time for the shaders.
+## processes first): Motion.clock() for the moving parts, anim_time for the shaders. Then what the
+## frame's state changes and the tick marked is redrawn, once however many there were: a command
+## applied from input (which runs before _process) is drawn in the same frame.
 func _process(_delta: float) -> void:
 	RenderingServer.global_shader_parameter_set(&"anim_time", Motion.tick())
+	if _dirty:
+		_dirty = false
+		base_view.sync(state)
+		placement.refresh()
+		_refresh_hud()
+	if _sector_dirty:
+		_sector_dirty = false
+		if sector_map.visible:
+			sector_map.refresh(state)
 
 
 func _notification(what: int) -> void:
@@ -140,8 +155,7 @@ func _now() -> int:
 func _on_tick() -> void:
 	state.advance_to(_now())
 	# Timer labels change every second even when nothing else did.
-	base_view.sync(state)
-	_refresh_hud()
+	_dirty = true
 	if sector_map.visible:
 		sector_map.tick(state)
 	_ticks += 1
@@ -149,12 +163,11 @@ func _on_tick() -> void:
 		_save()
 
 
+## Marks the redraw _process does; production fires this every second on a producing base, and
+## a command once per apply.
 func _on_state_changed() -> void:
-	base_view.sync(state)
-	placement.refresh()
-	_refresh_hud()
-	if sector_map.visible:
-		sector_map.refresh(state)
+	_dirty = true
+	_sector_dirty = true
 
 
 func _refresh_hud() -> void:
