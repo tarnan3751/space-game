@@ -386,7 +386,9 @@ neighbours lie within 0.002), with more sides than their radius needs on a 1080-
 (chords within half a pixel, at least 10 sides for a smooth-shaded part and 8 for a flat one,
 an even count, as `LowPolyMesh` caps them) at the closest zoom the model is drawn at (`play=`: a
 building, a unit's near version and a figure at the base camera's closest, size 10; a unit's far
-version at 20, where the battle swaps it in) and at the widest, 44 (`wide=`). The moving parts are
+version at 20, where the battle swaps it in) and at the widest, 44 (`wide=`). A part swept over an
+arc reports the sides a whole turn would have at its spacing (so 13, 15, 17 or 25 mean an arc), and
+an arc with fewer than six corners on a ring is never judged round. The moving parts are
 posed as `Motion.transform_at` poses them, turned or shifted rather than sampled on the clock: at
 rest and every 10 degrees of a spin's turn or a swing's range, both ends, a slide at five poses. A
 rider is posed only with its carrier at rest, BOB is not applied, and a part that moves in the

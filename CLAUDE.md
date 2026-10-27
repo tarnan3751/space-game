@@ -31,7 +31,12 @@ the owner's ask; `docs/plans/model-animation-pass.md`): every model reworked to 
 standard, then a vertex-shader part rig with sockets (units walk, drive, fly, fire and die by
 class), defences that aim and kick, a weapon table with one projectile and impact per type, traps
 and collapses drawn, and every building idling, all verified from the harness's frame strips
-(`tools/harness/README.md`).
+(`tools/harness/README.md`). **The performance pass is built** (2026-10-27;
+`docs/plans/performance-pass.md`): the Mac measured with the `profile` and `model_audit` scenarios,
+then the sim's search budget, the battle view's uploads on change, idle building parts moved into
+the vertex shader (the maxed base from 1,198 to 615 draw calls), the base's once-a-frame redraw,
+the models' defects fixed and 9.5% of their triangles trimmed unseen; the UI pass and sound come
+next and are not started.
 `docs/project_overview.md` holds the roadmap (§2.2), the known limitations (§2.3) and the
 decisions (§3). The numbers in `data/` are the retune's real timers and economy
 (`docs/plans/retune.md`); a debug build's dev cheats make them free and one second at most.
