@@ -203,6 +203,19 @@ var _meter_capacities: Dictionary[String, int] = {}
 ## The state's time at the meters' last refresh, so a rise is weighed against the production of
 ## the seconds since.
 var _meters_now: int = 0
+## What the buildings add up to, as the state and its buildings_revision were when they were
+## read: kept while neither moves, so a refresh with no building changed reads none of them again.
+## The rates are read only when a meter rises, and then once (_rates_read).
+var _counted: BaseState = null
+var _counted_revision: int = -1
+var _capacities: Dictionary[String, int] = {}
+var _drones_total: int = 0
+var _drones_busy: int = 0
+var _rates: Dictionary[String, int] = {}
+var _rates_read: bool = false
+## What the info panel's text was built from: the building, its level, its target, its seconds
+## left, the state and its revision, the army's housing and the stock; unchanged, the text stays.
+var _info_key: Array = []
 var _drone_ring: DroneRing
 var _build_button: Button
 var _expedition_button: Button
@@ -360,10 +373,11 @@ func refresh(state: BaseState, selected_id: int, placing: bool, ghost_ok: bool, 
 	_watch(state)
 	var elapsed := clampi(state.now - _meters_now, 1, FLASH_MAX_SECONDS)
 	_meters_now = state.now
+	_count(state)
 	for res: String in _catalog.resources:
 		# A resource the base has no storage for yet (antimatter, early on) is hidden, unless
 		# the cheats make every resource infinite.
-		var capacity := state.capacity(res)
+		var capacity: int = _capacities[res]
 		_meters[res].visible = capacity > 0 or cheats
 		var amount: int = state.resources[res]
 		var fraction := clampf(float(amount) / capacity, 0.0, 1.0) if capacity > 0 else 0.0
@@ -380,8 +394,7 @@ func refresh(state: BaseState, selected_id: int, placing: bool, ghost_ok: bool, 
 			_meter_labels[res].text = "∞" if cheats else "%s / %s" % [Format.short(amount), Format.short(capacity)]
 		_meter_amounts[res] = amount
 		_meter_capacities[res] = capacity
-	var drones := state.builders_total()
-	_drone_ring.set_counts(drones - state.builders_busy(), drones)
+	_drone_ring.set_counts(_drones_total - _drones_busy, _drones_total)
 
 	var has_selection := selected_id != 0 and state.buildings.has(selected_id)
 	_selected_id = selected_id if has_selection else 0
@@ -886,6 +899,9 @@ func _watch(state: BaseState) -> void:
 		_watched.changed.disconnect(_on_state_changed)
 	_watched = state
 	state.changed.connect(_on_state_changed)
+	# What was kept of the last state goes with it, so it is freed (Reset base, Template base).
+	_counted = null
+	_info_key = []
 
 
 func _on_state_changed() -> void:
@@ -1252,6 +1268,12 @@ func _on_preview_rendered(key: String, texture: Texture2D) -> void:
 
 func _refresh_info(state: BaseState, building: BuildingState) -> void:
 	var type := building.type
+	var key := [building.id, building.level, building.target_level, state.seconds_left(building.id), state,
+		state.buildings_revision, state.housing_used(), state.stock_total()]
+	if key == _info_key:
+		_refresh_upgrade(state, building, false)
+		return
+	_info_key = key
 	_info_title.text = "%s   Lv %d" % [_catalog.display_name(type), building.level]
 
 	# The current level's stats (level 1's while it is first being built), each with the
@@ -1318,7 +1340,14 @@ func _refresh_info(state: BaseState, building: BuildingState) -> void:
 		_action_button.text = "Research"
 	elif page == ArmyPage.MAKE:
 		_action_button.text = "Make"
+	_refresh_upgrade(state, building, true)
 
+
+## The info panel's upgrade button and its note: its text (`with_text`, when the panel's text is
+## rebuilt) from the level, and whether it can be pressed from the state's check, which the
+## resources move every second.
+func _refresh_upgrade(state: BaseState, building: BuildingState, with_text: bool) -> void:
+	var type := building.type
 	_upgrade_note.text = ""
 	if building.is_busy():
 		_upgrade_button.text = "Under construction"
@@ -1328,11 +1357,13 @@ func _refresh_info(state: BaseState, building: BuildingState) -> void:
 		_upgrade_button.text = "Max level"
 		_upgrade_button.disabled = true
 		return
-	_upgrade_button.text = "Upgrade to Lv %d   %s   (%s)" % [
-		building.level + 1,
-		Format.cost(next.get("cost", {}), _catalog),
-		Format.duration(int(next.get("build_seconds", 0))),
-	]
+	if with_text:
+		var next := _catalog.level_stats(type, building.level + 1)
+		_upgrade_button.text = "Upgrade to Lv %d   %s   (%s)" % [
+			building.level + 1,
+			Format.cost(next.get("cost", {}), _catalog),
+			Format.duration(int(next.get("build_seconds", 0))),
+		]
 	var error := state.check_upgrade(building.id)
 	_upgrade_button.disabled = error != ""
 	_upgrade_note.text = "" if error == "" else error_text(error)
@@ -1469,7 +1500,23 @@ func _set_fill(key: String, fraction: float) -> void:
 func _flashes(res: String, change: int, elapsed: int) -> bool:
 	if change <= 0:
 		return change < 0
-	return change > ceili(FLASH_RISE_TICKS * _state.production_per_hour(res) * elapsed / 3600.0)
+	if not _rates_read:
+		_rates = _state.production_rates()
+		_rates_read = true
+	return change > ceili(FLASH_RISE_TICKS * _rates[res] * elapsed / 3600.0)
+
+
+## Reads the capacities and the builders again when the state or its buildings_revision moved since
+## they were read, and lets the rates be read again then.
+func _count(state: BaseState) -> void:
+	if state == _counted and state.buildings_revision == _counted_revision:
+		return
+	_counted = state
+	_counted_revision = state.buildings_revision
+	_capacities = state.capacities()
+	_drones_total = state.builders_total()
+	_drones_busy = state.builders_busy()
+	_rates_read = false
 
 
 ## Bottom right: toggles the build panel.
