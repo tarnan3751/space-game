@@ -173,23 +173,39 @@ static func _orb(pen: Pen, tint: Color) -> void:
 	pen.band(_ellipse(centre, ring_radii, 0.0, PI, 12, tilt), ring_color)
 
 
-## A quadcopter seen from above, the drone's classic glyph, its parts kept clear of the drone
-## ring's sectors: a large light rotor disc on each diagonal with a white highlight and an ink
-## hub, round a rounded square body, the icon's colour, with a lighter facet and an ink eye at
-## its front.
+## The construction drone from the front and a little above, as it flies over a site: a domed
+## hull in the icon's colour, a light rim inside its ink round the dome and its belly a little
+## darker, with a highlight lobe at the top left and a dark visor band across its front holding a
+## white eye; a rotor arm out from each of its upper flanks, over the hull, to a light rotor disc
+## seen at an angle; the tool's nozzle under its belly, a light lens at its end.
 static func _drone(pen: Pen, tint: Color) -> void:
-	var rotors: Array[Vector2] = [Vector2(12, 12), Vector2(28, 12), Vector2(12, 28), Vector2(28, 28)]
-	for centre: Vector2 in rotors:
-		var disc := _ellipse(centre, Vector2(6, 6), 0.0, TAU, 16)
-		pen.shape(disc, tint.lightened(0.5))
-		pen.facet(_ellipse(centre - Vector2(1.8, 1.8), Vector2(2.4, 2.4), 0.0, TAU, 10), Color(1, 1, 1, 0.8))
+	var nozzle := PackedVector2Array([Vector2(15.5, 25), Vector2(24.5, 25), Vector2(22.5, 33), Vector2(17.5, 33)])
+	pen.shape(nozzle, tint.darkened(0.15))
+	pen.facet(_ellipse(Vector2(20, 31.2), Vector2(2.2, 1.1), 0.0, TAU, 10), tint.lightened(0.7))
+	pen.outline(nozzle)
+	var centre := Vector2(20, 23)
+	var hull := _ellipse(centre, Vector2(12, 11), PI, TAU, 16)
+	hull.append_array(_ellipse(centre, Vector2(12, 5), 0.0, PI, 12).slice(1, 12))
+	pen.shape(hull, tint)
+	pen.facet(_ellipse(centre, Vector2(12, 5), 0.0, PI, 12), tint.darkened(0.18))
+	if not pen.shadow:
+		pen.add_stroke(pen.place(_ellipse(centre, Vector2(10.3, 9.3), PI * 1.06, PI * 1.94, 12)), 1.5,
+			tint.lightened(0.55), false)
+	pen.facet(_ellipse(Vector2(15, 14.8), Vector2(3.2, 1.6), 0.0, TAU, 12, -0.5), tint.lightened(0.7))
+	# A visor band round the dome's middle, dipping towards the eye at its front.
+	var visor := _ellipse(Vector2(20, 11), Vector2(11, 7.5), PI * 0.2, PI * 0.8, 8)
+	visor.append_array(_ellipse(Vector2(20, 12), Vector2(11.5, 10.5), PI * 0.8, PI * 0.2, 8))
+	pen.facet(visor, Hud.INK)
+	pen.facet(_ellipse(Vector2(20, 20.5), Vector2(3.8, 1.6), 0.0, TAU, 12), Color.WHITE)
+	pen.outline(hull)
+	for side: float in [-1.0, 1.0]:
+		pen.band(PackedVector2Array([Vector2(20 + side * 8.0, 17.5), Vector2(20 + side * 14.0, 13)]), tint.darkened(0.25))
+	for side: float in [-1.0, 1.0]:
+		var hub := Vector2(20 + side * 14.0, 11.5)
+		var disc := _ellipse(hub, Vector2(6.0, 2.6), 0.0, TAU, 16)
+		pen.shape(disc, tint.lightened(0.55))
+		pen.facet(_ellipse(hub + Vector2(-1.8, -0.8), Vector2(2.6, 0.9), 0.0, TAU, 10), Color(1, 1, 1, 0.85))
 		pen.outline(disc)
-		pen.facet(_ellipse(centre, Vector2(1.6, 1.6), 0.0, TAU, 8), Hud.INK)
-	var body := _rounded_square(Vector2(20, 20), 6.5, 4.0)
-	pen.shape(body, tint)
-	pen.facet(_ellipse(Vector2(17.2, 16.8), Vector2(2.2, 1.4), 0.0, TAU, 10, -0.7), tint.lightened(0.6))
-	pen.outline(body)
-	pen.facet(_ellipse(Vector2(20, 21), Vector2(2.6, 2.6), 0.0, TAU, 12), Hud.INK)
 
 
 ## The army's figure: a head over a pair of rounded shoulders, each with a lighter facet.

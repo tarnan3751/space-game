@@ -229,13 +229,13 @@ darker end), always in steel `7FA6CC` (`HudIcon.STEEL`) whatever the icon's colo
 the metal's text colour so it does not match the crystal in value; **crystal** a pair of shards (a
 tall kite and a smaller one leaning on it, each with a lighter left face); **antimatter** an orb
 with an orbit ring tilted across it, a lighter band over the orb's upper half and a white
-highlight, so it is no dark blob when small; **drones** a
-quadcopter seen from above, the classic drone glyph: a large light rotor disc on each diagonal
-with a white highlight and an ink hub, round a rounded square body in the icon's colour with a
-lighter facet and an ink eye at its front. Its parts keep inside a circle of about 18.5 units
-round the box's centre, so at the ring's 30 px about 2 px lie between the rotors and the
-sectors (on two diagonals the ring's and the icon's own shadows fall there) and they read as
-four rotors round a small body. Any other
+highlight, so it is no dark blob when small; **drones** the
+construction drone (`art-style.md`, **Construction drone**) from the front and a little above:
+a domed hull in the icon's colour with a light rim inside its ink round the dome, a slightly
+darker belly, a highlight lobe at its top left and an ink visor band round its middle holding a
+white eye; a rotor arm from each upper flank, over the hull, out to a light rotor disc seen at an
+angle; and the tool's nozzle under the belly, a light lens at its end; few, big
+shapes, so it reads on its 48 px coin. Any other
 resource gets a plain cut gem. **army**, in front of the training header's housing line (**Army
 panel**), is a figure: a head over a pair of rounded shoulders, each with a lighter facet.
 `HudIcon.paint(pen, kind, rect, color, wing, coin)` adds one to a `HudIcon.Pen`.
