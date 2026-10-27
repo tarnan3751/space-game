@@ -372,16 +372,19 @@ func _aim_sweep(part: Shape, body: Shape) -> String:
 ## _aim_sweep), against the part that turns it (its carrier, turned with it) and every other moving
 ## part (one riding the same carrier turned with it, any other at rest; a part riding the pitching
 ## one moves with it and is left out): "carrier a of n, part k b of n, ..." counting the poses that
-## touch each.
-func _pitch_sweep(part: Shape, parts: Array[Shape]) -> String:
+## touch each. Into `tally`, when given, each other part's count by its index in `parts` and
+## "poses" the poses swept, for a caller that reads the counts (model_audit).
+func _pitch_sweep(part: Shape, parts: Array[Shape], tally: Dictionary = {}) -> String:
 	var turner := part.carrier if part.carrier != null else part
 	var others: Array[Shape] = []
 	var names := PackedStringArray()
+	var indices := PackedInt32Array()
 	for k: int in parts.size():
 		var other := parts[k]
 		if other == part or _rides_on(other, part) or (other == turner and turner == part):
 			continue
 		others.append(other)
+		indices.append(k)
 		names.append("carrier" if other == turner else "part %d" % (k + 1))
 	var counts := PackedInt32Array()
 	counts.resize(others.size())
@@ -405,8 +408,10 @@ func _pitch_sweep(part: Shape, parts: Array[Shape]) -> String:
 						box.intersection(other_box)):
 					counts[o] += 1
 	var said := PackedStringArray()
+	tally["poses"] = poses
 	for o: int in others.size():
 		said.append("%s %d of %d" % [names[o], counts[o], poses])
+		tally[indices[o]] = counts[o]
 	return ", ".join(said) if not said.is_empty() else "no other part"
 
 
