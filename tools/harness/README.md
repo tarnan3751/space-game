@@ -280,7 +280,9 @@ down. Then the top bar checked against
 the sim, the speed button to 2x, at tick 1,000 End, Keep fighting, End again and End battle, the
 result panel in the deploy bar's place, and Return. Screenshots: tick 0, the smear, tick 200, the
 strike's marker and blast, the EMP, the swarm, tick 1,000, the confirmation, the result panel and
-the base after it. It checks the sim's step under 5 ms on average and logs its longest and the tick
+the base after it. Last, a practice battle with one of every unit type and ability brought: both
+bars left of the Build column, one of each deployed and each ability cast, End, and the result
+panel listing them all with Return inside the safe area (shot `result-every-type`). It checks the sim's step under 5 ms on average and logs its longest and the tick
 it fell on; the result against a headless `BattleSim.run` of the setup with the commands the view
 sent (equal text, hash included); every unit deployed; the result panel's abilities used; something
 fallen; the base back with the toast "Practice: nothing applied", the camera where it was and its

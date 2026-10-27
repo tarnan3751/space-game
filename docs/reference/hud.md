@@ -74,7 +74,7 @@ the building view's timer label included, wider.
 | Text `TEXT` | `F4F2FF` | names, amounts |
 | Text dim `TEXT_DIM` | `9A95C4` | counts, reasons, the scroll bar's grabber |
 | Accent `ACCENT` | `58E8FF` | the selected and the safe: the selected tab, Done, Train, Make and Research, Scan, Keep fighting, free drones, the unit glyphs' visors, canopies and eyes |
-| Build gold `GOLD` | `FFC13B` | commit and spend: the Build button, Place, the upgrade button, Attack, a full meter's line and digits, the cleared stamp, storages on the minimap |
+| Build gold `GOLD` | `FFC13B` | commit and spend: the Build button, Place, the upgrade button, Attack, the battle's Return, a full meter's line and digits, the cleared stamp, storages on the minimap, won stars and a victory's banner |
 | Trough `TROUGH` | `17162A` | the meters' troughs |
 | Warning `WARNING` | `FFB37A` | the info panel's note, a research card's lab level the lab lacks, a build card's reason and its Command Center chip |
 | Resource colours | `rules.json`, `Catalog.resource_color` | costs, the meters' fills and icons |
@@ -83,7 +83,9 @@ the building view's timer label included, wider.
 
 **Colour roles.** Gold commits a spend (Build, Place, Upgrade, Attack), the army's orange starts
 a raid (Expedition), cyan is the selected or the safe choice only (the selected tab, Done, Keep
-fighting); each of the three carries ink text. Place takes `CommitButton` and swaps to the cyan
+fighting); each of the three carries ink text. The battle's End, a defeat's banner and a refused
+deploy's toast edge take the defence red (`MaterialKit.DEFENCE`), End with ink text, so it reads as
+stop. Place takes `CommitButton` and swaps to the cyan
 `ConfirmButton` while walls are painted, when it reads Done.
 
 **Shapes.** A `StyleBoxFlat` with a flat fill, a 3 px ink border (`BORDER`), round corners
@@ -106,7 +108,9 @@ stroke reaches a quarter of `outline_size` out from each glyph.
 
 **Touch sizes.** The tabs are 160×56, the close buttons 56×56, Build 136×72 and Expedition 184×72,
 the info panel's Train, Make or Research 112×56 and its Close 96×56 (`ACTION_SIZE`,
-`INFO_CLOSE_SIZE`), the place bar's Cancel and Place 170×72; the build cards 200×200.
+`INFO_CLOSE_SIZE`), the place bar's Cancel and Place 170×72; the build cards 200×200. In battle (**Battle HUD**): speed
+96×64 and End 140×64, Keep fighting 200×72 and End battle 180×72, Return 240×72, the deploy and
+ability cards 124×136.
 
 ## Skins
 
@@ -116,8 +120,9 @@ engine's own `Skin` class takes that name). `Hud.skin`, static, names the one `_
 and the parts that draw themselves read: set it before `setup`, or call `set_skin(look)` on a HUD
 already built, which builds the theme again, hands it to the root and the two bottom panels, and
 redraws what the cards, the panels and the meters draw themselves. The `hud_directions` scenario
-shoots each (`tools/harness/README.md`). The battle's HUD takes whatever theme is current when a
-battle opens; the in-field surfaces are not designed for B or C yet.
+shoots each (`tools/harness/README.md`). The battle's HUD is the dark family over the field under
+every skin: its variations are its own, built after the skin's in a Battle HUD block at the end of
+`_make_theme` (**Battle HUD**), so no skin reaches them.
 
 - **A, the comic console** (the default): everything above.
 - **B, the halftone console**: the bottom panels, the cards and the buttons drawn from 9-slice
@@ -675,23 +680,30 @@ and when the timer's second changes); its panels and buttons take theirs.
 
 | Part | Where | What |
 | --- | --- | --- |
-| Status panel | top left | the time left as `m:ss` (`seconds_left`, Bangers 24), "N% destruction" (`destruction_pct`) and three stars drawn in code (`BattleHud.Star`: a five-pointed fill over an ink shadow, ink-outlined, gold once won, `CARD_DISABLED` violet until) |
-| Speed and End | top right | `1x`/`2x`, toggling `BattleView.speed` through `SPEEDS`; End, which opens the confirmation |
-| Loot | top right, under them | "Loot" over a row per resource: its icon (`HudIcon`) and the amount taken so far (`loot()`, `Format.short`) in its colour |
-| Deploy bar | along the bottom from the left margin, as wide as its cards (and scrolling when they would reach the Build button's column, which stays clear), the rest of the bottom edge left to the field | a `MenuPanel` with a strip of cards (124×136), one per unit type brought in sorted order: the unit's picture (64×64, its attacker's level's tier), its name and "xN" left (`left_to_deploy`). A press selects the type (the accent fill, `TabSelected`, its text in ink) or, on the selected card, lets it go; the first card starts selected. A type run out is let go and its card shown at 55 %. Cards PASS, so a drag on one scrolls the strip |
-| Abilities bar | along the bottom, right of the deploy bar after a 16-unit gap, as wide as its cards; the deploy bar scrolls in what is left, the Build column still clear; hidden when no ability is brought | a `MenuPanel` with a card per ability brought (above 0) in the catalog's order: its glyph (**Ability glyphs**), its name and "xN" left (`left_to_use`). A press selects the ability and lets the unit type go, so the red zone hides (a unit card's press does the reverse); on the selected card it lets it go. A tap on the field then casts it at the cell, anywhere on the field (`BattleView.cast`); a drag pans. An ability run out is let go and its card shown at 55 % |
-| Confirmation | centred, over a faint ink dim across the whole screen that takes every touch while it is open, so no tap or drag beside the panel reaches the field | "End the battle?", Keep fighting (accent) and End battle, which surrenders (`BattleView.surrender`) |
-| Result panel | centred, on `ended` | "Victory!" with a star or more, else "Defeat"; the stars (64×64); "N% destruction"; the loot per resource; "Units deployed" with each type's picture and "Name xN" (the result's `deployed`), or "No units deployed"; "Abilities used" with each ability's glyph and "Name xN" (the result's `abilities_used`) when any was; Return, which leaves the battle (`BattleView.leave`). The deploy and abilities bars hide and Speed and End are disabled |
-| Toast | top centre | a refused cast (`cast_failed`): "Can't cast there" (`blocked`, off the field), "None of those left" (`none_left`); a refused deploy (`deploy_failed`): "Can't deploy there" (`blocked`), "None of those left" (`none_left`: a tap never meets it, since a card run out is let go at once, but a smear can when a frame steps several ticks and the type runs out between two), faded after a second |
+| Status panel | top left | the time left as `m:ss` (`seconds_left`, Bangers 28), the destruction as "41%" (`destruction_pct`, Bangers 28) with "destruction" dim beside it at 17, and the three stars, `HudIcon`'s `star` at 36 px: the buildings' dark hull grey (`MaterialKit.HULL_DARK`, `BattleHud.UNEARNED`) with the ink outline until won, gold once won |
+| Loot | top centre, one pill in the status panel's shape | per resource its icon in its colour on a trough coin (40 px, the silhouette 28) and the amount taken so far (`loot()`, `Format.short`) at 20 px in the text colour |
+| Speed and End | top right, 24 apart | speed 96×64 (`1x`/`2x`, toggling `BattleView.speed` through `SPEEDS`), End 140×64 in the defence red with ink text (`EndButton`), which opens the confirmation; both disabled once the battle ends |
+| Deploy bar | along the bottom from the left margin, as wide as its cards (and scrolling when they would reach the Build button's column, which stays clear), the rest of the bottom edge left to the field | a panel (`BattleBar`, skin A's bottom panel) with a strip of cards (124×136), one per unit type brought in sorted order: the unit's picture (64×64, its attacker's level's tier), its name (17) and "xN" left (22, `left_to_deploy`). A press selects the type (`BattleCardSelected`: the cyan fill, a 3 px ink ring 5 px inside its edge framing the picture, its text in ink) or, on the selected card, lets it go; the first card starts selected. A type run out is let go and its card shown at 55 %. Cards PASS, so a drag on one scrolls the strip |
+| Abilities bar | along the bottom, right of the deploy bar after a 16-unit gap, as wide as its cards; the deploy bar scrolls in what is left, the Build column still clear; hidden when no ability is brought | the same panel with a card per ability brought (above 0) in the catalog's order: its emblem on its coin (**Ability glyphs**, 64 px), its name and "xN" left (`left_to_use`) as the deploy cards'. A press selects the ability and lets the unit type go, so the red zone hides (a unit card's press does the reverse); on the selected card it lets it go. A tap on the field then casts it at the cell, anywhere on the field (`BattleView.cast`); a drag pans. An ability run out is let go and its card shown at 55 % |
+| Confirmation | centred, over the ink at 55 % across the whole screen that takes every touch while it is open, so no tap or drag beside the panel reaches the field | "End the battle?" (Bangers 30), Keep fighting (cyan, the safe choice, 200×72) and End battle (the card's fill, 180×72), which surrenders (`BattleView.surrender`) |
+| Result panel | top centre, 12 under the loot pill, on `ended`, 720 wide, its height capped so Return ends `MARGIN` above the safe area's bottom, the panel's shape with the light inner line the base's panels have (`_draw_edge`) | the title on a rounded banner across the top, gold with "Victory!" when a star was won, else red with "Defeat", in Bangers 48 in ink; the stars at 80 px (won gold, the rest the dark hull grey) over the destruction as "41%" (Bangers 40) with "destruction" dim, beside the loot as three rows of a coin and "+amount" at 24 px; "Units deployed" (or "No units deployed") over a strip of each type's picture (64 px, the deploy cards') with its count "xN" on a chip at its lower right corner (17 px, the disabled card's fill, an ink ring) and its name under it at 17 (the result's `deployed`); "Abilities used", when any was, the same with each ability's emblem at 48 px (the result's `abilities_used`); a strip too wide for the panel wraps. All between the banner and Return sits in a vertical scroll that scrolls only when it would not fit (`_fit_result`, again on a resize and once a wrapped strip knows its height), so the banner and Return stay in place. Return, gold, 240×72, leaves the battle (`BattleView.leave`). The deploy and abilities bars hide and Speed and End are disabled |
+| Toast | top centre, 96 down | a refused cast (`cast_failed`): "Can't cast there" (`blocked`, off the field), "None of those left" (`none_left`); a refused deploy (`deploy_failed`): "Can't deploy there" (`blocked`), "None of those left" (`none_left`: a tap never meets it, since a card run out is let go at once, but a smear can when a frame steps several ticks and the type runs out between two), faded after a second. Text at 19 on the panel's fill, with a 4 px band down its left edge in its kind's colour (`ToastKind`, the show function's argument, `INFO` by default): the defence red for a refusal, as every toast here is, cyan for anything else |
+
+Every part takes a variation of its own (`BattlePanel`, `BattleBar`, `BattleCard`, `BattleBarButton`,
+`EndButton`, `BattleConfirmButton`, `BattleCommitButton`, the `Battle*` labels, the banners, the
+chip, the result's scroll bar and the toast's, its text `BattleToastText` included), made in the Battle HUD block at the end of `_make_theme` after the skin's,
+so the attack HUD is the same under every skin (**Skins**). Every control tapped mid-battle is at
+least 64 tall; no text is under 17 px.
 
 The top bar's text is set on the view's `stepped`, only where what it shows changed: the time,
 the destruction, the stars and each card's count are kept as ints and formatted only when one
 moves, and the loot is read (`BattleSim.loot()` builds a dictionary) only after a building has
 fallen (`BattleView.falls()`), so a refresh with nothing changed allocates nothing. Queries for
 the harness: `card(unit)`, `card_count(unit)`, `card_picture(unit)`, `timer_text()`,
-`ability_card(ability)`, `ability_count(ability)`, `destruction_text()`, `stars_lit()`, `speed_button()`, `end_button()`,
+`ability_card(ability)`, `ability_count(ability)`, `destruction_text()` (the number, "41%"), `stars_lit()` (the stars won), `speed_button()`, `end_button()`,
 `is_confirm_open()`, `confirm_end_button()`, `keep_button()`, `is_result_open()`,
-`result_lines()`, `return_button()`, `deploy_bar()`, `toast_text()`.
+`result_lines()` (the title, then every text under the banner in order: a chip's "xN" comes just
+before the name under its picture), `return_button()`, `deploy_bar()`, `ability_bar()`, `toast_text()`.
 
 ## Signals
 
