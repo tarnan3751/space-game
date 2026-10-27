@@ -264,7 +264,7 @@ var _theme: Theme
 var _root: Control
 ## The last safe area fitted from the device, in the HUD's coordinates.
 var _fitted_area: Rect2 = Rect2()
-## The top bar's rows: the meters and the drone ring, then the debug buttons in debug builds.
+## The top bar's rows: the meters and the drone meter, then the debug buttons in debug builds.
 var _top: VBoxContainer
 ## Each resource's meter, the fill that grows across it, and its amount.
 var _meters: Dictionary[String, Control] = {}
@@ -1582,7 +1582,7 @@ static func _seconds(ms: int) -> String:
 
 # --- Construction ----------------------------------------------------------------
 
-## The top-left row: a meter per resource, then the drone ring, on one strip that stops a touch
+## The top-left row: a meter per resource, then the drone meter, on one strip that stops a touch
 ## on it as any opaque part does.
 func _build_top_bar() -> void:
 	_top = VBoxContainer.new()
@@ -1691,11 +1691,17 @@ static func _cost_color(color: Color) -> Color:
 	return INK if skin == Look.C else color
 
 
-## A meter's fill: its resource's colour at METER_VALUE, or under skin C saturated at full value.
-static func _tint_meter(shader: ShaderMaterial, color: Color) -> void:
-	var deep := Color.from_hsv(color.h, color.s, color.v * METER_VALUE)
+## A meter's fill colour for `color`: at METER_VALUE, or under skin C saturated at full value. The
+## drone meter's free slots take it too.
+static func meter_fill(color: Color) -> Color:
 	if skin == Look.C:
-		deep = Color.from_hsv(color.h, minf(color.s * 1.6, 1.0), 1.0)
+		return Color.from_hsv(color.h, minf(color.s * 1.6, 1.0), 1.0)
+	return Color.from_hsv(color.h, color.s, color.v * METER_VALUE)
+
+
+## Tints a meter's stripes to its fill colour (meter_fill).
+static func _tint_meter(shader: ShaderMaterial, color: Color) -> void:
+	var deep := meter_fill(color)
 	shader.set_shader_parameter(&"tint", Color(deep.r / STRIPE_BASE, deep.g / STRIPE_BASE, deep.b / STRIPE_BASE))
 
 

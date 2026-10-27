@@ -1,7 +1,7 @@
 class_name HudIcon
 extends Control
 ## A HUD badge drawn in code, vector, from no asset file: the icon at the left end of each
-## meter, the drone at the centre of the drone ring (`DroneRing`), the unit glyphs of the queue
+## meter, the drone on the drone meter's coin (`DroneRing`), the unit glyphs of the queue
 ## strip and the abilities' glyphs (docs/reference/hud.md, **Top bar**, **Unit glyphs**, **Ability
 ## glyphs**). Each part of a silhouette is a flat fill in the
 ## icon's colour, with a lighter highlight facet and a 2.5 px ink outline, over a 2 px ink
@@ -502,7 +502,7 @@ static func _ellipse(centre: Vector2, radii: Vector2, from: float, to: float, st
 	return points
 
 
-## Builds an icon (or the drone ring) as one triangle array, so it costs one draw call: the
+## Builds an icon (or the drone meter's slots) as one triangle array, so it costs one draw call: the
 ## renderer draws every draw_polygon and draw_polyline on its own. Shapes are given in box
 ## units (fit() maps the box onto a rect); in the shadow pass only shadows are added. Strokes
 ## and shadows get a 1 px feather that fades to nothing, in place of the renderer's

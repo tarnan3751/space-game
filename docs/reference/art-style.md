@@ -1794,8 +1794,8 @@ build gold for a spend and the army's orange for a raid; every shape a flat fill
 border, round corners and a flat ink shadow offset down and right, the panels with a cel edge (a
 light line inside the ink, a lighter band across a bottom panel's top); white text over a bright
 fill or the world outlined in ink, ink text on the bright fills. Its
-icons (the resource meters' ingot, shards and orb, seen from an angle, and the drone ring's
-quadcopter, seen from above)
+icons (the resource meters' ingot, shards and orb, seen from an angle, and the drone meter's
+construction drone, seen from the front)
 are vector shapes drawn in code, flat fills with a lighter facet and an ink outline, with no
 asset file, the meters' on coins. The meters' stripes drift, a soft glint crosses each fill in
 turn every 8 s and a change flashes it, all from `anim_time` (`meter.gdshader`, `hud.md`, **Top

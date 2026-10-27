@@ -18,9 +18,9 @@ swallows every touch over it and the world underneath stops responding. Layout-o
 that span empty screen space — the root, the top bar's column and its rows, the place bar's
 row, the build panel's rows, the army panel's rows and pages — are set to `MOUSE_FILTER_IGNORE`. Panels and buttons keep the
 default and block, which is what they should do. A new container must be IGNORE unless it is
-meant to block. The meters and the drone ring block too, like the panels: an opaque part of the
+meant to block. The meters and the drone meter block too, like the panels: an opaque part of the
 HUD never lets a tap through to select or drag what lies under it. Each meter's root and the
-ring are `MOUSE_FILTER_STOP`, and a meter's own parts (trough, fill, amount, coin) are IGNORE,
+drone meter are `MOUSE_FILTER_STOP`, and a meter's own parts (trough, fill, amount, coin) are IGNORE,
 so the root is what a touch lands on; the strip they sit on stops a touch between them. The toast is IGNORE, so it never blocks the world while it
 shows. The Expedition button's badge is IGNORE, so a touch on it presses the button. The sector map
 is `STOP` over the whole safe area and its layout containers IGNORE (**Sector map**).
@@ -140,7 +140,7 @@ battle opens; the in-field surfaces are not designed for B or C yet.
   category's colour across its top third under an ink dot screen and an ink line, the picture
   standing on it with no plinth, the name on an ink ribbon (`CardName`'s `normal` style), the
   costs in ink (`_cost_color`, which a card's amounts take when built and on `set_skin`). The
-  meters are cream troughs with saturated fills and ink digits on an ink strip; a full meter keeps
+  meters, the drone meter among them, are cream troughs with saturated fills and ink digits on an ink strip; a full meter keeps
   its gold line, its digits ink. The info panel and the sector map go cream
   too, as they share the titles' and the lines' variations; the toast stays dark.
 
@@ -152,7 +152,7 @@ so its parts — the Build button above all — draw over the panel.
 
 | Part | Where | Contents |
 | --- | --- | --- |
-| Top bar | top, `MARGIN` (16) in, a column across the width | First row, from the left: a meter per resource in catalog order, then the drone ring (**Top bar**). The army's housing is not here: it shows in the training facilities' UI (**Info panel**, **Army panel**). |
+| Top bar | top, `MARGIN` (16) in, a column across the width | First row, from the left: a meter per resource in catalog order, then the drone meter (**Top bar**). The army's housing is not here: it shows in the training facilities' UI (**Info panel**, **Army panel**). |
 | Build button | bottom right, `MARGIN` from the safe area's corner, 136×72 | "BUILD" in ink on gold; toggles the build panel (**Build panel**). Hidden while placing or painting. |
 | Expedition button | bottom left, `MARGIN` from the safe area's corner, 184×72 | "EXPEDITION" in Bangers 30 on the army's orange, ink text, with a badge centred on its top right corner: the open fields' count in `BadgeText` (Lilita One 19, 2 px of ink) on a defence-red circle (`Badge`, 36×36) with a 2 px light ring inside its ink (`BadgeRing`), hidden at none. Emits `expedition_pressed`. Shown with Build, and hidden while the build panel or the army panel is open across its corner (`_show_expedition`). |
 | Build panel | bottom, the screen's full width | Slides up over the bottom of the screen (**Build panel**). |
@@ -177,8 +177,8 @@ or the sector map.
 
 **Meters.** One per resource, 240×44 (`METER_SIZE`), hidden while the resource's capacity
 (`state.capacities()`, **Refresh**) is 0, so antimatter appears once something stores it. The
-meters and the drone ring sit on one strip (`MeterStrip`: the panel's fill at 60 %, radius 24, 8 px
-of padding), so the top bar reads as one instrument; the ring keeps the strip's right end. A
+meters and the drone meter sit on one strip (`MeterStrip`: the panel's fill at 60 %, radius 24, 8 px
+of padding), so the top bar reads as one instrument; the drone meter keeps the strip's right end. A
 meter's trough (`TROUGH`, a pill: its radius half its height, its shadow) starts 24 px in from the
 meter's left, under the resource's icon on its coin (a `HudIcon` 48 across wearing a coin in the
 trough's colour, **Coins**), whose centre sits on the trough's left edge, so the coin overlaps
@@ -280,31 +280,37 @@ falling into it from the upper right, its corner kept inside a coin's ring.
 
 **One draw call each.** The renderer draws every `draw_colored_polygon` and `draw_polyline` on
 its own, so an icon drawn with them would cost a draw call per part. `HudIcon.Pen` builds a whole
-icon, or the whole drone ring with its icon, as one triangle array instead
+icon, or the drone meter's slots, as one triangle array instead
 (`RenderingServer.canvas_item_add_triangle_array`, per-vertex colours): fills triangulated with
 `Geometry2D.triangulate_polygon`, strokes as quads with mitred corners (capped at three times
 their width), and in place of the renderer's antialiasing a 1 px feather that fades to nothing
 along every stroke and shadow. Fills are left hard, since their outlines cover their edges.
 `Pen.triangle_count()` says how many triangles have been added, for the harness (`icon_sheet`).
 
-**Drone ring.** `DroneRing`, 56×56, at the row's right end: one annular sector per drone
-(`state.builders_total()`, kept with the capacities, **Refresh**; outer radius 26, inner 18), laid out symmetrically round the whole
-circle from the top, clockwise, with 6 degrees between neighbours, so a lone drone is a ring with
-a seam at the top. Each sector is a closed polygon, at least 8 steps per arc and one per 12
-degrees of a longer one, with a 2.5 px ink outline, over a 2 px ink offset shadow under the whole
-ring, all one triangle array with the icon (**One draw call each**). The first
-`state.builders_free()` sectors clockwise from the top are filled in the accent cyan with a thin
-highlight arc (white at 35 %) in their outer third; the busy ones take the card-disabled fill. The
-drone icon, 30 across, sits in the middle; with no drones the icon shows alone. It is redrawn
-only when `refresh` changes a count (`set_counts`), never per frame, and shows no text: the "All
-drones are busy" toast and the cards' "No free drone" name the drones.
+**Drone meter.** `DroneRing`, 200×44, at the strip's right end, shows how many of the base's drones
+(`state.builders_total()`, kept with the capacities, **Refresh**) are free
+(`state.builders_free()`). It is a resource meter's twin, built from the same parts, so a skin
+styles it as it styles the meters: the pill-shaped trough (`MeterTrough`), the drone icon in the
+accent cyan on its coin in the trough's colour over the left end, the trough's ink border again
+over what is inside it (`MeterFrame`), and "free / all" right-aligned 12 px in from the end in
+`MeterText`. Inside the border, from the coin's edge to 52 px short of the text's end, a slot per
+drone split by 3 px ink lines, with one at either end, the first on the coin's ink ring and the pill's round end inked up to it behind the coin: free slots
+in the accent as a meter's fill takes a colour (`Hud.meter_fill`: 85 % of its value, or under skin
+C saturated), with the meters' gloss (white at 10 %) over their top third; busy slots the trough's
+own fill crossed by the meters' 45-degree stripes (16 px apart, 6 wide, static), 14 % lighter on a
+dark trough or darker on a light one (skin C's cream): at work. Like a resource meter it costs six
+draws: the trough, the slots, the frame, the text and its outline, and the coin; only the slots are
+one triangle array (**One draw call each**). The slots read the theme's `MeterTrough` when drawn
+(skin A's trough colour and border if a skin's is not a flat shape) and are redrawn only when
+`refresh` changes a count (`set_counts`) or the theme changes (`set_skin`), never per frame. The
+"All drones are busy" toast and the cards' "No free drone" also name the drones.
 
 ## Refresh
 
 `refresh(state, selected_id, placing, ghost_ok, painting)` is called by `main.gd` once in a
 frame after the tick or any state change (`main._process`, `input-camera.md`), and on every
 selection change; `painting` is `PlacementController.is_painting()`, which turns `Place` into
-`Done`. It updates the meters, the drone ring and the Expedition button's badge (the field count
+`Done`. It updates the meters, the drone meter and the Expedition button's badge (the field count
 less the sector's cleared fields), each text set only when what it shows changed, then:
 
 - **placing** (painting included) → the build panel closes, Build hides and the place bar shows;
