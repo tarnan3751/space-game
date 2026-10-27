@@ -181,6 +181,10 @@ const MORTAR_WIDE := 1.38
 ## the bowl's rim (its seat), more at the Crown, over the crown's spikes.
 const MORTAR_BOWL := 1.1
 const MORTAR_LOADER_CLEAR := 0.4
+## Where the loader arm's boom reaches (on the ground): over the bowl's left flank, far enough out
+## that its boom and canister clear the chamber's swirl, its band and the pool through the arm's swing:
+## 1.15 out at 100 degrees (Parts.around).
+const MORTAR_REACH := Vector3(-0.19970, 0, 1.13253)
 ## The L7 charge ring: how far past the muzzle's lip it hovers, and its radii.
 const MORTAR_CHARGE_OFF := 0.38
 ## How far (degrees) the mortar's gun scans either way: from L7 its charge ring reaches the extent's
@@ -463,7 +467,7 @@ static func build_laser_turret(p: Parts, level: int) -> void:
 	if level >= 8:
 		# Veins round the head's drum and up its dome.
 		head.ring(0.615, 0.64, 0.12, 20, Vector3(0, 0.08, 0), VEIN_PANEL)
-		for degrees: float in [20.0, 110.0, 200.0, 290.0]:
+		for degrees: float in [25.0, 115.0, 205.0, 295.0]:
 			Parts.dome_seam(head, 0.57, 0.3, Vector3(0, 0.32, 0), degrees, Parts.CORE_GLOW)
 	if level >= 10:
 		# Filigree round the drum, and a gold crown on a stem over the dome, in the targeting ring,
@@ -541,14 +545,17 @@ static func build_missile_battery(p: Parts, level: int) -> void:
 	for pod: Vector3 in pods:
 		tubes = _pod(launcher, trunnion, aim, pod.x, int(pod.y), int(pod.z), spacing, level, p.tier, tubes)
 	if level >= 2:
-		_lamp_post(m, Parts.around(0.95, 225.0, top), 0.7, LASER_PULSE)
+		# From L7 further out, clear of the second rack's sweep.
+		_lamp_post(m, Parts.around(0.95 if level < 7 else 1.1, 225.0, top), 0.7, LASER_PULSE)
 	if level >= 5:
 		_crate(m, Parts.around(1.42, 45.0, Parts.PAD_HEIGHT))
 	if level < 6:
 		return
 	if level >= 8:
 		_plinth_panels(m, 1.2, plinth)
-		m.ring(0.86, 1.08, 0.012, 8, Vector3(0, top, 0), Parts.VEINS, Parts.OCTAGON)
+		# At the Crown the filigree ring covers the veins' ring.
+		if level < 10:
+			m.ring(0.86, 1.08, 0.012, 8, Vector3(0, top, 0), Parts.VEINS, Parts.OCTAGON)
 		for degrees: float in [15.0, 45.0, 75.0]:
 			m.prism(0.07, 0.07, 0.05, 4, Parts.around(0.96, degrees, top), INLAY.phased(degrees / 90.0),
 				Vector3(90, 90.0 - degrees, 0))
@@ -576,11 +583,14 @@ static func build_missile_battery(p: Parts, level: int) -> void:
 		Vector2(0.06, 0) * dish, Vector2(0.34, 0.1) * dish, Vector2(0.32, 0.13) * dish, Vector2(0, 0.04) * dish,
 	]), 24, Vector3(0, 0.12, -0.08), _by_tier(p.tier, SHELL, Parts.CHROME_ROUND, Parts.CHROME_ROUND), face)
 	radar.prism(0.05, 0.05, 0.14, 16, Vector3.ZERO, Parts.GUNMETAL)
-	radar.orb(0.055 * dish, 12, 6, Vector3(0, 0.12, 0) + LowPolyMesh.turn(Vector3(0, 0.27 * dish, 0), face),
-		Parts.CORE_GLOW if p.tier >= Parts.Tier.OBSIDIAN else Parts.CYAN_STRIP)
+	var feed := Vector3(0, 0.12, 0) + LowPolyMesh.turn(Vector3(0, 0.27 * dish, 0), face)
+	# The feed horn on a rod from the dish's middle.
+	Parts.pipe(radar, Vector3(0, 0.12, 0) + LowPolyMesh.turn(Vector3(0, 0.04 * dish, 0), face), feed, 0.015, Parts.ROD, 8, false)
+	radar.orb(0.055 * dish, 12, 6, feed, Parts.CORE_GLOW if p.tier >= Parts.Tier.OBSIDIAN else Parts.CYAN_STRIP)
 	if level >= 9:
 		var ring := p.moving(Vector3(0, deck + trunnion.y + 1.0, 0), Motion.spin(Vector3.UP, -0.5))
-		_hover_ring(ring, 0.3, 0.42, p.tier)
+		# At L10 its sights stop short of the crown's spikes inside it.
+		_hover_ring(ring, 0.3, 0.42, p.tier, Vector3.ZERO, 0.04 if level >= 10 else 0.0)
 
 
 ## A missile pod on the launcher, `columns` by `rows` tubes `spacing` apart, centred `x` across
@@ -630,8 +640,9 @@ static func _pod(s: LowPolyMesh, trunnion: Vector3, aim: Vector3, x: float, colu
 			VEIN_PANEL, aim)
 		for side: float in [-1.0, 1.0]:
 			if LowPolyMesh.turn(Vector3(side, 0, 0), aim).dot(TOWARD_CAMERA) > 0.2:
-				s.box(Vector3(0.02, height - 0.24, depth - 0.3),
-					_at(trunnion, Vector3(x + side * (width * 0.5 + 0.01), -(height - 0.24) * 0.5, -0.05), aim), VEIN_PANEL, aim)
+				# Ending short of the face's frame, which would share its outer plane.
+				s.box(Vector3(0.02, height - 0.24, depth - 0.42),
+					_at(trunnion, Vector3(x + side * (width * 0.5 + 0.01), -(height - 0.24) * 0.5, -0.11), aim), VEIN_PANEL, aim)
 	return first + rows * columns
 
 
@@ -702,10 +713,10 @@ static func build_plasma_mortar(p: Parts, level: int) -> void:
 		Parts.torus(m, chamber + 0.01, 0.035, 16, 6, _at(breech, Vector3(0, -0.035, 0), rib), Parts.GUNMETAL, rib)
 	# Plasma bubbles surfacing between the bars, and tongues of plasma licking out of the core round
 	# its rim as the camera sees it, swelling out of step.
-	var bubbles: Array[Vector2] = [Vector2(35, 22), Vector2(70, 40), Vector2(92, 14)]
+	var bubbles: Array[Vector2] = [Vector2(35, 12), Vector2(70, 25), Vector2(92, 14)]
 	for k: int in bubbles.size():
 		m.orb(0.05, 8, 3, breech + Parts.on_sphere(chamber - 0.01, bubbles[k]), BUBBLE.phased(k / 3.0 + 0.1))
-	var tongues: Array[Vector2] = [Vector2(140, 4), Vector2(180, 40), Vector2(30, -18)]
+	var tongues: Array[Vector2] = [Vector2(140, 4), Vector2(180, 25), Vector2(30, -18)]
 	for k: int in tongues.size():
 		var out := Parts.on_sphere(1.0, tongues[k])
 		m.lathe(PackedVector2Array([
@@ -720,7 +731,8 @@ static func build_plasma_mortar(p: Parts, level: int) -> void:
 	var rotor := p.moving(fan, Motion.spin(Vector3.BACK, 7.0))
 	Parts.drum(rotor, 0.045, 0.05, 0.015, 8, Vector3(0, 0, -0.03), Parts.GUNMETAL, Vector3(90, 0, 0))
 	for k: int in 3:
-		rotor.box(Vector3(0.06, 0.1, 0.02), Vector3(0, 0, -0.01), SHELL_MID, Vector3(0, 0, 120.0 * k))
+		# Its tips just inside the housing's bore.
+		rotor.box(Vector3(0.06, 0.085, 0.02), Vector3(0, 0, -0.01), SHELL_MID, Vector3(0, 0, 120.0 * k))
 	for side: float in [-1.0, 1.0]:
 		var cheek := LowPolyMesh.turn(Vector3(side * (chamber + 0.12), 0, 0.05), heading)
 		gun.box_chamfered(Vector3(0.14, 0.24, 0.5), 0.04, Vector3(cheek.x, seat - 0.1, cheek.z), SHELL, heading)
@@ -748,7 +760,7 @@ static func build_plasma_mortar(p: Parts, level: int) -> void:
 		Parts.torus(gun, 0.455, 0.032, 12, 6, _at(mouth, Vector3(0, along, 0), tilt), coil, tilt)
 	if level >= 6:
 		if level < 8:
-			_loader_arm(p, Parts.around(MORTAR_LOADER, 45.0, Parts.PAD_HEIGHT), Parts.around(0.95, 108.0, 0.0), p.tier,
+			_loader_arm(p, Parts.around(MORTAR_LOADER, 45.0, Parts.PAD_HEIGHT), MORTAR_REACH, p.tier,
 				seat + MORTAR_LOADER_CLEAR - Parts.PAD_HEIGHT)
 	if level >= 7:
 		_plinth_panels(m, radius, plinth)
@@ -777,8 +789,9 @@ static func build_plasma_mortar(p: Parts, level: int) -> void:
 		Parts.torus(m, chamber + 0.04, 0.06, 20, 8, Vector3(0, seat, 0), Parts.CORE_GLOW)
 		# The gold crown round the bowl's rim.
 		Parts.torus(m, 0.86, 0.04, 24, 8, Vector3(0, seat - 0.06, 0), Parts.GOLD_ROUND)
+		# The spikes on the torus's outer side, clear of the gun's cheeks as they scan.
 		for k: int in 8:
-			m.cone(0.05, 0.16, 8, Parts.around(0.86, 22.5 + 45.0 * k, seat), Parts.GOLD_ROUND)
+			m.cone(0.05, 0.16, 8, Parts.around(0.93, 22.5 + 45.0 * k, seat), Parts.GOLD_ROUND)
 		# The ammunition rack on the near corner: the loader arm stands on its pedestal, taller, and
 		# feeds the mortar from the canisters racked beside it on the camera's side.
 		var balcony := Parts.around(MORTAR_BALCONY, 45.0, Parts.PAD_HEIGHT)
@@ -800,7 +813,7 @@ static func build_plasma_mortar(p: Parts, level: int) -> void:
 			m.ring(MORTAR_CANISTER - 0.005, MORTAR_CANISTER + 0.02, 0.05, 12, stand + Vector3(0, MORTAR_CANISTER_HEIGHT * 0.55, 0),
 				Parts.GOLD_ROUND)
 		# The canister clears the crown's spikes.
-		_loader_arm(p, Vector3(balcony.x, top, balcony.z), Parts.around(0.95, 108.0, 0.0), p.tier,
+		_loader_arm(p, Vector3(balcony.x, top, balcony.z), MORTAR_REACH, p.tier,
 			seat + MORTAR_LOADER_CLEAR + 0.16 - top, false)
 
 
@@ -818,7 +831,8 @@ static func _loader_arm(p: Parts, foot: Vector3, reach: Vector3, tier: int, shou
 	var across := Vector3(reach.x - foot.x, 0, reach.z - foot.z)
 	var start := 0.14 if base else 0.0
 	if base:
-		Parts.drum(arm, 0.17, 0.14, 0.03, 12, Vector3.ZERO, Parts.GUNMETAL)
+		# Slim enough that its corners clear the plinth's vein panel as the arm swings.
+		Parts.drum(arm, 0.15, 0.14, 0.03, 12, Vector3.ZERO, Parts.GUNMETAL)
 	# On the rack's pedestal (no base) the column is slimmer, clear of the canisters.
 	var column := 0.11 if base else 0.08
 	arm.prism(column, column - 0.02, shoulder_y - 0.06 - start, 12, Vector3(0, start, 0), plate)
@@ -1395,13 +1409,15 @@ static func build_emp_tower(p: Parts, level: int) -> void:
 	var top := _plinth(m, 3, 1.2, plinth, ARMOUR, _by_tier(p.tier, Parts.GUNMETAL, Parts.CHROME_ROUND, Parts.OBSIDIAN_ROUND))
 	var block := _by_tier(p.tier, Parts.HULL_LIGHT, Parts.CHROME, Parts.OBSIDIAN)
 	m.box_chamfered(Vector3(0.9, 0.56, 0.9), 0.07, Vector3(0, top, 0), block)
-	m.box_chamfered(Vector3(0.94, 0.12, 0.94), 0.03, Vector3(0, top + 0.38, 0), HAZARD_FINE)
+	# Low enough that its bevel never shares the block's.
+	m.box_chamfered(Vector3(0.94, 0.12, 0.94), 0.03, Vector3(0, top + 0.36, 0), HAZARD_FINE)
 	if level >= 4:
 		# The storey between the blocks, red armour plates on its corners and a glowing band round
 		# its top.
 		m.box_chamfered(Vector3(0.82, rise, 0.82), 0.06, Vector3(0, top + 0.56, 0), block)
 		for k: int in 4:
-			m.box_chamfered(Vector3(0.12, rise - 0.1, 0.12), 0.03, Parts.around(0.56, 45.0 + 90.0 * k, top + 0.61), ARMOUR,
+			# Their tops a step under the band's.
+			m.box_chamfered(Vector3(0.12, rise - 0.13, 0.12), 0.03, Parts.around(0.56, 45.0 + 90.0 * k, top + 0.61), ARMOUR,
 				Vector3(0, 45.0 - 90.0 * k, 0))
 		m.box(Vector3(0.84, 0.05, 0.84), Vector3(0, top + 0.56 + rise - 0.1, 0), Parts.CORE_GLOW if obsidian else Parts.CYAN_STRIP)
 	m.box_chamfered(Vector3(0.72, 0.5, 0.72), 0.06, Vector3(0, top + 0.56 + rise, 0), block)
@@ -1523,7 +1539,8 @@ static func build_railgun(p: Parts, level: int) -> void:
 		gun.box_chamfered(Vector3(RAIL_SPINE, RAIL_SPINE, length - 0.1), 0.04, _at(root, Vector3(0, -0.1, length * 0.5 - 0.05), aim),
 			Parts.GUNMETAL, aim)
 	for side: float in [-1.0, 1.0]:
-		gun.box_chamfered(Vector3(rail.x, rail.y, length), 0.04, _at(root, Vector3(side * across, 0, length * 0.5), aim),
+		# The rail ends inside its end cap, so the two never share an end face.
+		gun.box_chamfered(Vector3(rail.x, rail.y, length - 0.02), 0.04, _at(root, Vector3(side * across, 0, length * 0.5 - 0.01), aim),
 			_by_tier(p.tier, Parts.HULL_LIGHT if low else Parts.GUNMETAL, Parts.CHROME, Parts.OBSIDIAN), aim)
 		gun.box_chamfered(Vector3(rail.z, rail.y + 0.02, 0.16), 0.04, _at(root, Vector3(side * across, -0.01, length - 0.08), aim),
 			GOLD if p.tier >= Parts.Tier.GOLD else ARMOUR, aim)
@@ -1611,7 +1628,8 @@ static func build_ion_beam(p: Parts, level: int) -> void:
 		var foot := Parts.around(0.6, degrees, top)
 		m.box_chamfered(Vector3(0.18, 0.08, 0.18), 0.03, foot, _by_tier(p.tier, Parts.GUNMETAL, Parts.CHROME, Parts.OBSIDIAN),
 			Vector3(0, -degrees, 0))
-		Parts.pipe_run(m, PackedVector3Array([foot, Parts.around(0.18, degrees, head.y - 0.12)]), 0.08, conduit)
+		# Up under the housing, clear of the cowl's rim as the emitter swings.
+		Parts.pipe_run(m, PackedVector3Array([foot, Parts.around(0.13, degrees, head.y - 0.12)]), 0.08, conduit)
 		if level >= 4:
 			m.prism(0.06, 0.06, 0.04, 4, foot + Vector3(0, 0.08, 0), INLAY.phased(k / 3.0), Vector3(0, 45.0 - degrees, 0))
 	var aim := Vector3(40, 100, 0)
@@ -1789,7 +1807,8 @@ static func build_orbital_cannon(p: Parts, level: int) -> void:
 			_by_tier(p.tier, Parts.GUNMETAL, Parts.CHROME, Parts.CHROME))
 		rise += step.y
 		if k < ORBITAL_STEPS.size() - 1:
-			tower.box_chamfered(Vector3(step.x + 0.06, 0.06, step.x + 0.06), 0.02, Vector3(0, rise - 0.06, 0),
+			# A step over the top of the step below, so the two never share a plane.
+			tower.box_chamfered(Vector3(step.x + 0.06, 0.07, step.x + 0.06), 0.02, Vector3(0, rise - 0.06, 0),
 				lens_glow if k == ORBITAL_STEPS.size() - 2 else trim)
 	var lens := Vector3(0, ORBITAL_SPIRE, 0)
 	var lens_aim := Parts.facing(TOWARD_LENS)
@@ -1922,15 +1941,17 @@ static func _crown(m: LowPolyMesh, pos: Vector3, radius: float, points: int, spi
 ## A ring hovering over a weapon, built about its own centre on a moving part (or about `at` on
 ## one it shares): obsidian between
 ## `inner` and `outer`, glowing violet across its top, veins round its rim (gold at the Crown) and
-## four red sights pointing in, all bobbing together.
-static func _hover_ring(s: LowPolyMesh, inner: float, outer: float, tier: int, at: Vector3 = Vector3.ZERO) -> void:
+## four red sights pointing in, all bobbing together, their inner ends `clear` short of the usual.
+static func _hover_ring(s: LowPolyMesh, inner: float, outer: float, tier: int, at: Vector3 = Vector3.ZERO,
+		clear: float = 0.0) -> void:
 	s.ring(inner, outer, 0.07, 24, at, HOVER)
 	s.lathe(PackedVector2Array([Vector2(outer - 0.02, 0.072), Vector2(inner + 0.02, 0.072)]), 24, at, HOVER_RIM)
 	s.lathe(PackedVector2Array([Vector2(outer + 0.006, 0.006), Vector2(outer + 0.006, 0.064)]), 24, at,
 		HOVER_GOLD if tier >= Parts.Tier.CROWN else HOVER_VEINS)
 	for k: int in 4:
 		var degrees := 90.0 * k
-		s.box(Vector3(0.06, 0.05, 0.16), at + Parts.around(inner - 0.05, degrees, 0.01), HOVER_SIGHT, Vector3(0, 90.0 - degrees, 0))
+		s.box(Vector3(0.06, 0.05, 0.16 - clear), at + Parts.around(inner - 0.05 + clear * 0.5, degrees, 0.01), HOVER_SIGHT,
+			Vector3(0, 90.0 - degrees, 0))
 
 
 ## A surface by tier: `base` below the Chrome tier, `chrome` at it, `obsidian` from the Obsidian
