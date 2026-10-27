@@ -2639,6 +2639,13 @@ func _make_theme() -> Theme:
 		_skin_b(ui)
 	elif skin == Look.C:
 		_skin_c(ui)
+
+	# Battle HUD: the attack HUD's own variations (battle_hud.gd), the dark family over the field.
+	# Built after the skins, so the attack HUD is the same under every one.
+	ui.set_type_variation(&"BattlePanel", &"PanelContainer")
+	ui.set_stylebox("panel", &"BattlePanel", _shape(PANEL, 12))
+	_label_variation(ui, &"BattleFigure", 28, TEXT, 0, DISPLAY_FONT)
+	_label_variation(ui, &"BattleDim", 17, TEXT_DIM, 0)
 	return ui
 
 

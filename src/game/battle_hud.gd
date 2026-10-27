@@ -5,7 +5,7 @@ extends CanvasLayer
 ## reports presses to the view; it never changes the sim itself.
 ##
 ## - Top left, a panel: the time left (seconds_left), the destruction and the three stars, each
-##   lit as it is won.
+##   gold once won and dark until.
 ## - Top right: the speed button (1x, 2x: BattleView.speed) and End, which asks before it
 ##   surrenders; under them, the loot taken so far per resource, each with its icon.
 ## - Along the bottom, the deploy bar: a card per unit type the attacker brought, its picture
@@ -25,10 +25,12 @@ extends CanvasLayer
 ## unit's picture there.
 const CARD_SIZE := Vector2(124, 136)
 const PICTURE_SIZE := Vector2(64, 64)
-const STAR_SIZE := Vector2(30, 30)
+const STAR_SIZE := Vector2(36, 36)
 const RESULT_STAR_SIZE := Vector2(64, 64)
 const RESULT_PICTURE_SIZE := Vector2(48, 48)
 const ICON_SIZE := Vector2(28, 28)
+## A star not won yet: dark, but clear of the panel under it.
+const UNEARNED := MaterialKit.HULL_DARK
 const CARD_GAP := 10
 ## Between the deploy bar and the abilities bar.
 const BAR_GAP := 16
@@ -55,7 +57,7 @@ var _root: Control
 var _fitted: Rect2 = Rect2()
 var _timer: Label
 var _destruction: Label
-var _stars: Array[Star] = []
+var _stars: Array[HudIcon] = []
 var _loot: Dictionary[String, Label] = {}
 var _speed_button: Button
 var _end_button: Button
@@ -80,7 +82,7 @@ var _keep_button: Button
 var _confirm_end_button: Button
 var _result: PanelContainer
 var _result_title: Label
-var _result_stars: Array[Star] = []
+var _result_stars: Array[HudIcon] = []
 var _result_lines: VBoxContainer
 var _return_button: Button
 var _toast: PanelContainer
@@ -93,33 +95,6 @@ var _shown_stars: int = -1
 var _shown_loot: Dictionary[String, int] = {}
 var _shown_falls: int = -1
 var _shown_left: Dictionary[String, int] = {}
-
-
-## A star drawn in code: a five-pointed fill, gold when lit and the card's violet when not, in an
-## ink outline over an offset ink shadow, as the HUD's icons are.
-class Star:
-	extends Control
-	var lit: bool = false:
-		set(value):
-			if value != lit:
-				lit = value
-				queue_redraw()
-
-	func _draw() -> void:
-		var centre := size * 0.5
-		var outer := minf(size.x, size.y) * 0.5 - 3.0
-		var points := PackedVector2Array()
-		for k: int in 10:
-			var radius := outer if k % 2 == 0 else outer * 0.45
-			var angle := -PI * 0.5 + PI * k / 5.0
-			points.append(centre + Vector2(cos(angle), sin(angle)) * radius)
-		var shadow := PackedVector2Array()
-		for point: Vector2 in points:
-			shadow.append(point + Vector2(2, 2))
-		draw_colored_polygon(shadow, Hud.SHADOW)
-		draw_colored_polygon(points, Hud.GOLD if lit else Hud.CARD_DISABLED)
-		points.append(points[0])
-		draw_polyline(points, Hud.INK, 2.5, true)
 
 
 ## Call once, before adding to the tree: the HUD of `view`'s battle on `catalog`, in `theme` (the
@@ -189,15 +164,16 @@ func timer_text() -> String:
 	return _timer.text
 
 
+## The destruction, as "41%".
 func destruction_text() -> String:
 	return _destruction.text
 
 
-## Stars lit in the top panel.
+## Stars won in the top panel.
 func stars_lit() -> int:
 	var lit := 0
-	for star: Star in _stars:
-		lit += 1 if star.lit else 0
+	for star: HudIcon in _stars:
+		lit += 1 if star.color == Hud.GOLD else 0
 	return lit
 
 
@@ -257,6 +233,7 @@ func toast_text() -> String:
 ## the top right.
 func _build_top() -> void:
 	var left := PanelContainer.new()
+	left.theme_type_variation = &"BattlePanel"
 	left.mouse_filter = Control.MOUSE_FILTER_STOP
 	_root.add_child(left)
 	left.set_anchors_preset(Control.PRESET_TOP_LEFT)
@@ -266,8 +243,13 @@ func _build_top() -> void:
 	column.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	column.add_theme_constant_override("separation", 2)
 	left.add_child(column)
-	_timer = _label(column, "", &"InfoTitle")
-	_destruction = _label(column, "", &"InfoDetail")
+	_timer = _label(column, "", &"BattleFigure")
+	var destruction := HBoxContainer.new()
+	destruction.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	destruction.add_theme_constant_override("separation", 6)
+	column.add_child(destruction)
+	_destruction = _label(destruction, "", &"BattleFigure")
+	_label(destruction, "destruction", &"BattleDim").size_flags_vertical = Control.SIZE_SHRINK_CENTER
 	var stars := HBoxContainer.new()
 	stars.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	stars.add_theme_constant_override("separation", 4)
@@ -506,12 +488,12 @@ func _refresh() -> void:
 	var pct := sim.destruction_pct()
 	if pct != _shown_pct:
 		_shown_pct = pct
-		_destruction.text = "%d%% destruction" % pct
+		_destruction.text = "%d%%" % pct
 	var stars := sim.stars()
 	if stars != _shown_stars:
 		_shown_stars = stars
 		for k: int in _stars.size():
-			_stars[k].lit = k < stars
+			_light(_stars[k], k < stars)
 	# The loot moves only when a building falls, and BattleSim.loot() builds a dictionary, so it
 	# is read only then.
 	if _view.falls() != _shown_falls:
@@ -550,7 +532,7 @@ func _show_result(result: Dictionary) -> void:
 	var stars := int(result.get("stars", 0))
 	_result_title.text = "Victory!" if stars > 0 else "Defeat"
 	for k: int in _result_stars.size():
-		_result_stars[k].lit = k < stars
+		_light(_result_stars[k], k < stars)
 	_label(_result_lines, "%d%% destruction" % int(result.get("destruction", 0)), &"InfoDetail") \
 		.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	var loot_row := HBoxContainer.new()
@@ -737,12 +719,23 @@ func _button(text: String, min_size: Vector2, variation: StringName = &"") -> Bu
 	return button
 
 
-func _star(parent: Control, star_size: Vector2) -> Star:
-	var star := Star.new()
+## A star (HudIcon's), not won yet.
+func _star(parent: Control, star_size: Vector2) -> HudIcon:
+	var star := HudIcon.new()
 	star.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	star.custom_minimum_size = star_size
+	star.color = UNEARNED
+	star.show_icon("star", false)
 	parent.add_child(star)
 	return star
+
+
+## A star gold once won, UNEARNED until.
+func _light(star: HudIcon, won: bool) -> void:
+	var color := Hud.GOLD if won else UNEARNED
+	if star.color != color:
+		star.color = color
+		star.queue_redraw()
 
 
 func _picture(parent: Control, picture_size: Vector2) -> TextureRect:

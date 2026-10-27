@@ -237,7 +237,7 @@ func run(main: MainScript) -> void:
 	await screenshot("tick-%d" % CLOSE_TICKS[1])
 	await _cast_abilities(main, view, hud)
 	check(hud.timer_text() == "%d:%02d" % [view.sim.seconds_left() / 60, view.sim.seconds_left() % 60]
-		and hud.destruction_text() == "%d%% destruction" % view.sim.destruction_pct()
+		and hud.destruction_text() == "%d%%" % view.sim.destruction_pct()
 		and hud.stars_lit() == view.sim.stars(),
 		"the top bar: %s, %s, %d stars" % [hud.timer_text(), hud.destruction_text(), hud.stars_lit()])
 
