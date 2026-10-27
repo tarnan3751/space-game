@@ -262,52 +262,96 @@ static func _rounded_square(centre: Vector2, half: float, radius: float) -> Pack
 	return points
 
 
-## The repair swarm: a cluster of seven small round nanites, each with a lighter facet.
+## The repair swarm: three fat nanites of three sizes overlapping, the largest in front with a
+## white "+" on it in its ink outline.
 static func _swarm(pen: Pen, tint: Color) -> void:
-	var spots: Array[Vector2] = [Vector2(20, 20), Vector2(11, 15), Vector2(29, 15), Vector2(11, 26),
-		Vector2(29, 26), Vector2(20, 9), Vector2(20, 31)]
-	for k: int in spots.size():
-		var radius := 5.5 if k == 0 else 4.2
-		var dot := _ellipse(spots[k], Vector2(radius, radius), 0.0, TAU, 12)
-		pen.shape(dot, tint)
-		pen.facet(_ellipse(spots[k] - Vector2(1.3, 1.3), Vector2(radius * 0.4, radius * 0.4), 0.0, TAU, 8),
-			tint.lightened(0.55))
-		pen.outline(dot)
+	_blob(pen, Vector2(24, 9.5), 6.5, tint)
+	_blob(pen, Vector2(30, 22), 8.0, tint)
+	_blob(pen, Vector2(15.5, 25), 12.5, tint)
+	var cross := _plus(Vector2(15.5, 25.5), 8.0, 3.1)
+	pen.shape(cross, Color.WHITE)
+	pen.outline(cross)
 
 
-## The EMP burst: a ring with eight sparks shooting out of it round a bright core.
+## A round nanite: its fill, a darker band across its lower part, a white highlight at its upper
+## left and its ink outline.
+static func _blob(pen: Pen, centre: Vector2, radius: float, tint: Color) -> void:
+	var disc := _ellipse(centre, Vector2(radius, radius), 0.0, TAU, 20)
+	pen.shape(disc, tint)
+	pen.facet(_cap(centre, radius, radius * 0.35, false, 10), tint.darkened(0.3))
+	pen.facet(_ellipse(centre + Vector2(-0.38, -0.4) * radius, Vector2(0.3, 0.2) * radius, 0.0, TAU, 10, -0.7),
+		Color.WHITE)
+	pen.outline(disc)
+
+
+## The EMP: three thick concentric arcs opening upward, each with a lighter inner edge, and a slim
+## white zigzag bolt down through them, its jog below the innermost arc so all three show either
+## side of it.
 static func _burst(pen: Pen, tint: Color) -> void:
-	var centre := Vector2(20, 20)
-	for k: int in 8:
-		var angle := TAU * k / 8.0
-		var along := Vector2(cos(angle), sin(angle))
-		var side := Vector2(-along.y, along.x)
-		var spark := PackedVector2Array([centre + along * 12.0 + side * 2.2, centre + along * 19.0,
-			centre + along * 12.0 - side * 2.2])
-		pen.shape(spark, tint.lightened(0.3))
-		pen.outline(spark)
-	var ring := _ellipse(centre, Vector2(11, 11), 0.0, TAU, 24)
-	pen.shape(ring, tint)
-	pen.outline(ring)
-	var core := _ellipse(centre, Vector2(5.5, 5.5), 0.0, TAU, 16)
-	pen.facet(core, tint.lightened(0.6))
-	pen.outline(core)
-
-
-## The orbital strike: a crosshair ring with its ticks, and a bolt falling into it from the upper
-## right.
-static func _strike(pen: Pen, tint: Color) -> void:
-	var centre := Vector2(18, 23)
-	var ring := _ellipse(centre, Vector2(12, 12), 0.0, TAU, 24)
-	pen.band(ring + PackedVector2Array([ring[0]]), tint)
-	for tick: Vector2 in [Vector2(1, 0), Vector2(-1, 0), Vector2(0, 1), Vector2(0, -1)]:
-		pen.band(PackedVector2Array([centre + tick * 7.0, centre + tick * 16.0]), tint)
-	var bolt := PackedVector2Array([Vector2(36, 2), Vector2(29, 13), Vector2(33, 13), Vector2(21, 24),
-		Vector2(25, 14), Vector2(21, 14), Vector2(28, 2)])
-	pen.shape(bolt, MaterialKit.HAZARD)
-	pen.facet(PackedVector2Array([Vector2(28, 2), Vector2(32, 2), Vector2(26, 11), Vector2(23, 11)]),
-		MaterialKit.HAZARD.lightened(0.5))
+	var centre := Vector2(20, 2)
+	var half := deg_to_rad(38.0)
+	for band: Vector2 in [Vector2(9, 15), Vector2(18, 24), Vector2(27, 33)]:
+		var arc := _arc_band(centre, band.x, band.y, PI / 2.0 - half, PI / 2.0 + half, 10)
+		pen.shape(arc, tint)
+		pen.facet(_arc_band(centre, band.x, band.x + 2.5, PI / 2.0 - half, PI / 2.0 + half, 10),
+			tint.lightened(0.55))
+		pen.outline(arc)
+	var bolt := PackedVector2Array([Vector2(21, 0), Vector2(26, 0), Vector2(22.5, 20), Vector2(27, 20),
+		Vector2(16, 40), Vector2(18, 26), Vector2(14, 26)])
+	pen.shape(bolt, Color.WHITE)
+	pen.facet(PackedVector2Array([Vector2(22.5, 20), Vector2(27, 20), Vector2(16, 40), Vector2(20, 25)]),
+		tint.lightened(0.7))
 	pen.outline(bolt)
+
+
+## The orbital strike: a thick white crosshair, a ring in four arcs between four bars round a dot
+## of the colour, broken by a hazard-yellow bolt falling into it from the upper right, its corner
+## kept inside a coin's ring.
+static func _strike(pen: Pen, tint: Color) -> void:
+	var centre := Vector2(19, 21)
+	var gap := deg_to_rad(16.0)
+	for quarter: int in 4:
+		var from := quarter * PI / 2.0
+		var arc := _arc_band(centre, 8.5, 14.0, from + gap, from + PI / 2.0 - gap, 6)
+		pen.shape(arc, Color.WHITE)
+		pen.outline(arc)
+	for along: Vector2 in [Vector2(1, 0), Vector2(-1, 0), Vector2(0, 1), Vector2(0, -1)]:
+		var side := along.orthogonal() * 2.6
+		var bar := PackedVector2Array([centre + along * 5.0 + side, centre + along * 18.5 + side,
+			centre + along * 18.5 - side, centre + along * 5.0 - side])
+		pen.shape(bar, Color.WHITE)
+		pen.outline(bar)
+	var dot := _ellipse(centre, Vector2(3, 3), 0.0, TAU, 12)
+	pen.shape(dot, tint)
+	pen.outline(dot)
+	var bolt := PackedVector2Array([Vector2(28, 3), Vector2(37, 3), Vector2(31, 12), Vector2(36, 12),
+		Vector2(19, 27), Vector2(23.5, 16), Vector2(19, 16)])
+	pen.shape(bolt, MaterialKit.HAZARD)
+	pen.facet(PackedVector2Array([Vector2(28, 3), Vector2(32, 3), Vector2(23.5, 16), Vector2(19, 16)]),
+		MaterialKit.HAZARD.lightened(0.55))
+	pen.outline(bolt)
+
+
+## A "+" round `centre`, each arm `reach` from it and `half` either side of its axis.
+static func _plus(centre: Vector2, reach: float, half: float) -> PackedVector2Array:
+	var points := PackedVector2Array()
+	for corner: Vector2 in [Vector2(-half, -reach), Vector2(half, -reach), Vector2(half, -half),
+			Vector2(reach, -half), Vector2(reach, half), Vector2(half, half), Vector2(half, reach),
+			Vector2(-half, reach), Vector2(-half, half), Vector2(-reach, half), Vector2(-reach, -half),
+			Vector2(-half, -half)]:
+		points.append(centre + corner)
+	return points
+
+
+## A thick arc round `centre` between radii `inner` and `outer`, from angle `from` to `to`: the
+## outer edge in `steps`, then the inner one back.
+static func _arc_band(centre: Vector2, inner: float, outer: float, from: float, to: float,
+		steps: int) -> PackedVector2Array:
+	var points := _ellipse(centre, Vector2(outer, outer), from, to, steps)
+	var back := _ellipse(centre, Vector2(inner, inner), from, to, steps)
+	back.reverse()
+	points.append_array(back)
+	return points
 
 
 ## A cut gem, for a resource with no silhouette of its own.

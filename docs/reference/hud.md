@@ -177,12 +177,15 @@ winged)` swaps a glyph in place, redrawing only when either changed, as a queue 
 the queue moves.
 
 **Ability glyphs.** An ability has no model, so the making and research cards, the making queue's
-entries and the battle's abilities bar and result panel show its glyph by its effect
+entries and the battle's abilities bar and result panel show its emblem by its effect
 (`catalog.ability_effect`), in its effect's colour (`Hud.ABILITY_COLORS`, set by
-`Hud.show_ability_glyph`): **swarm** a cluster of seven round nanites with lighter facets in
-nanite green; **emp** a ring with eight sparks shooting out of it round a bright core in arc
-blue; **strike** a crosshair (a ring and four ticks, ink bands round a core of the colour) with a
-hazard-yellow bolt falling into it from the upper right, in defence red.
+`Hud.show_ability_glyph`), each drawn with mass rather than lines: **swarm** three fat nanites of
+three sizes overlapping, each with a darker lower band and a white highlight, the largest in front
+with a white "+" on it, in nanite green; **emp** three thick concentric arcs opening upward, each
+with a lighter inner edge, and a slim white zigzag bolt down through them, its jog below the
+innermost arc so all three show either side of it, in arc blue; **strike** a thick white crosshair
+(a ring in four arcs between four bars) round a dot of defence red, broken by a hazard-yellow bolt
+falling into it from the upper right, its corner kept inside a coin's ring.
 
 **One draw call each.** The renderer draws every `draw_colored_polygon` and `draw_polyline` on
 its own, so an icon drawn with them would cost a draw call per part. `HudIcon.Pen` builds a whole
