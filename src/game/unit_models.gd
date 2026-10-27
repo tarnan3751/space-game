@@ -8,7 +8,7 @@ extends RefCounted
 ## A model is what BuildingModels.create makes: a Node3D holding the body's MeshInstance3D and its
 ## ink outline's, and no moving part (MAX_MOVING): the battle draws every unit of a type from one
 ## MultiMesh (BattleView), so a unit is one mesh and its outline. What turns is a part tagged with
-## LowPolyMesh.spin (the gunship's rotors), which the shaders spin; what moves is a part tagged with
+## LowPolyMesh.set_motion (the gunship's rotors), which the shaders spin; what moves is a part tagged with
 ## LowPolyMesh.rig (the ranger's legs, arms and rifle), which the shaders turn by the battle
 ## instance's state (Rig); hovering, bobbing, flames and lamps are surface flags (Surf.BOB, PULSE,
 ## BLINK). A unit's muzzle is a socket (LowPolyMesh.socket), which the battle fires from. The
@@ -39,7 +39,7 @@ const AircraftModels := preload("res://src/game/models/aircraft.gd")
 const FAR_DETAIL := 0.5
 
 ## Moving parts a unit model may have: none, since a unit is drawn from a MultiMesh of its one
-## mesh; a rotor spins through LowPolyMesh.spin instead.
+## mesh; a rotor spins through LowPolyMesh.set_motion instead.
 const MAX_MOVING := 0
 
 ## The glows' tint per tier: the kit's energy cyan to Chrome, then near-white violets, a pale one

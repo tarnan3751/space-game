@@ -4,7 +4,7 @@ extends HarnessScenario
 ## bottom and each higher tier a row further back, a level 1 Cadet Academy (a Base-tier 3x3) at the
 ## end of each row for scale. The base's own views are hidden; the units are turned a little off the
 ## camera so their depth shows. A unit has no moving part (UnitModels.MAX_MOVING); the gunship's
-## rotors are tagged with LowPolyMesh.spin and spun by the shaders. Any moving part a model did have
+## rotors are stamped with a spin (LowPolyMesh.set_motion) and spun by the shaders. Any moving part a model did have
 ## the scenario would turn itself, each frame, as BuildingView turns a building's.
 ##
 ## Checks every type at every tier: the triangles (the body and the moving parts) within its

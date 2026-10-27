@@ -95,13 +95,6 @@ var flags: int = 0
 ## A tint the parts added from now on take in place of their own (Surf.tint), as `ink` is kept:
 ## none (alpha 0), but where a caller paints a whole figure one colour, a hologram's.
 var tint := Color(0, 0, 0, 0)
-## The spin given to the parts added from now on, as `ink` is kept: (pivot x, y, z, radians a
-## second) about the mesh's +Y; a zero rate, the default, spins nothing. Sets the motion
-## (set_motion) to a Motion.spin about +Y.
-var spin: Vector4 = Vector4.ZERO:
-	set(value):
-		spin = value
-		set_motion(Vector3(value.x, value.y, value.z), Motion.spin(Vector3.UP, value.w) if value.w != 0.0 else null)
 ## The motion given to the parts added from now on (set_motion), null for none, and its pivot.
 var _motion: Motion = null
 var _motion_pivot := Vector3.ZERO

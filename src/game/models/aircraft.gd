@@ -105,7 +105,7 @@ static func _gun_pod(m: LowPolyMesh, xf: Transform3D, tier: int, muzzle: String)
 ## deck plate on the roof (UnitModels.deck), a nose with a colonist pilot sunk behind the glass
 ## windscreen, a twin chin gun, stub wings of the tier's panels carrying a nacelle at each tip with a
 ## band of the tier's glow and a cap of the tier's trim, the two rotors spinning on them (parts of
-## the body tagged with LowPolyMesh.spin, which the shaders turn), and a tail boom (the hull, the
+## the body moving with LowPolyMesh.set_motion, which the shaders turn), and a tail boom (the hull, the
 ## trim from Obsidian) with orange fins; hovering and bobbing. The nacelles' backs are its `exhaust`
 ## (right) and `exhaust_2` (left) sockets.
 static func build_gunship(p: Parts) -> void:
@@ -131,9 +131,9 @@ static func build_gunship(p: Parts) -> void:
 		var hub := Vector3(side * 0.48, bottom + 0.06, -0.02)
 		_nacelle(m, UnitModels.pivot(hub), tier, "exhaust" if side > 0.0 else "exhaust_2")
 		var pivot := hub + Vector3(0, 0.34, 0)
-		m.spin = Vector4(pivot.x, pivot.y, pivot.z, side * ROTOR_RATE)
+		m.set_motion(pivot, Motion.spin(Vector3.UP, side * ROTOR_RATE))
 		_rotor(m, UnitModels.pivot(pivot), tier)
-		m.spin = Vector4.ZERO
+		m.set_motion(Vector3.ZERO, null)
 	m.rig = Vector4.ZERO
 	m.flags = 0
 
