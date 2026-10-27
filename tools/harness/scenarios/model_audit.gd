@@ -104,6 +104,10 @@ const RING_GAP := 0.002
 const WELD := 0.0005
 ## How far an edge is shrunk at each end, and rays start off a face.
 const EPS := 0.0005
+## A folded part's corners, read back in its own space (the model's less its pivot), are snapped to
+## this (world units), so the float32 rounding of pivot plus corner taken away again does not move a
+## corner off a face it was built flush with (_local).
+const LOCAL_SNAP := 0.000001
 ## Units between the samples along an edge when its length inside another part is measured.
 const EDGE_SAMPLE := 0.02
 ## A part floats when its lowest point is higher than this and its grown bounds meet no other's.
@@ -168,10 +172,6 @@ const KNOWN := {
 	"heavy_fabricator": "each press head strikes its anvil's face at the bottom of its stroke",
 	"drydock": "the welds and the welder bots' beams touch the hull and its bands where they work as they slide",
 	"crystal_harvester": "the laser beams cut into the crystals as the ring turns, the shard they aim at and its neighbours",
-	"cloaked_sentry 6 obsidian":
-		"the hovering cloak ring touches the hex shoulder seam at the top of its travel, seen since the moving parts were folded, the render lane checking whether the fold or the audit's decode brings it",
-	"cloaked_sentry 7 crown":
-		"the hovering cloak ring touches the hex shoulder seam at the top of its travel, seen since the moving parts were folded, the render lane checking whether the fold or the audit's decode brings it",
 }
 ## The surface flags that make a part a projection, which anything may pass through: a hologram, a
 ## spark (FLICKER or JITTER).
@@ -503,9 +503,9 @@ func _read(mesh: Mesh, soup: Soup, folded: Dictionary = {}) -> void:
 					folded[key] = part
 				soup = folded[key]
 				origin = soup.pivot
-			var a := vertices[k] - origin
-			var b := vertices[k + 1] - origin
-			var c := vertices[k + 2] - origin
+			var a := _local(vertices[k], origin)
+			var b := _local(vertices[k + 1], origin)
+			var c := _local(vertices[k + 2], origin)
 			soup.points.append(a)
 			soup.points.append(b)
 			soup.points.append(c)
@@ -519,6 +519,15 @@ func _read(mesh: Mesh, soup: Soup, folded: Dictionary = {}) -> void:
 			soup.degen.append(1 if (c - a).cross(b - a).length() * 0.5 < DEGEN_AREA else 0)
 			soup.layers.append(roundi(uv2s[k].x))
 			soup.flags.append(roundi(uv2s[k].y))
+
+
+## A corner `vertex` of the model's space in the space of a folded part pivoted at `origin`: less
+## the pivot, snapped to LOCAL_SNAP, so it lands where the part built it (the shader's own pivot less
+## the stamped corner rounds the same way, a fraction of a micron off). A body's (origin zero) as it is.
+func _local(vertex: Vector3, origin: Vector3) -> Vector3:
+	if origin == Vector3.ZERO:
+		return vertex
+	return (vertex - origin).snapped(Vector3.ONE * LOCAL_SNAP)
 
 
 ## Adds an outline mesh's triangles to `keys`; returns how many it has.
