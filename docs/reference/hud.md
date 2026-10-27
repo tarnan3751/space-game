@@ -20,34 +20,45 @@ row, the build panel's rows, the army panel's rows and pages — are set to `MOU
 default and block, which is what they should do. A new container must be IGNORE unless it is
 meant to block. The meters and the drone ring block too, like the panels: an opaque part of the
 HUD never lets a tap through to select or drag what lies under it. Each meter's root and the
-ring are `MOUSE_FILTER_STOP`, and a meter's own parts (trough, fill, amount, icon) are IGNORE,
-so the root is what a touch lands on. The toast is IGNORE, so it never blocks the world while it
+ring are `MOUSE_FILTER_STOP`, and a meter's own parts (trough, fill, amount, coin) are IGNORE,
+so the root is what a touch lands on; the strip they sit on stops a touch between them. The toast is IGNORE, so it never blocks the world while it
 shows. The Expedition button's badge is IGNORE, so a touch on it presses the button. The sector map
 is `STOP` over the whole safe area and its layout containers IGNORE (**Sector map**).
 
 The build cards are the one exception: they are `MOUSE_FILTER_PASS`, so a drag that starts on
 a card also reaches the `ScrollContainer` and scrolls the strip (with the default `STOP` it
 does not). The build panel's `PanelContainer` behind them is `STOP`, so a touch anywhere on the
-open panel never reaches the world. Each card's content (its stripe, its picture and a
-`VBoxContainer` of labels) is IGNORE, so the button itself is what a touch lands on. The army
+open panel never reaches the world. Each card's content (its drawn parts, its picture, its chips
+and a `VBoxContainer` of labels) is IGNORE, so the button itself is what a touch lands on. The army
 panel's unit cards and queue entries are the same: `PASS` buttons whose content is IGNORE, on a
 `STOP` panel.
 
 ## Theme
 
 One `Theme`, built in `_make_theme`, styles every part: its fonts, sizes, colours and
-`StyleBoxFlat`s. Controls take their style from it by type variation (`theme_type_variation`:
-`BuildButton`, `TabButton`, `MeterText` and so on), not by overrides of their own; only a cost
-amount takes its resource's colour as an override, since that colour is data. The buttons take
-no focus.
+`StyleBoxFlat`s, in the skin `Hud.skin` names (**Skins**). Controls take their style from it by
+type variation (`theme_type_variation`: `BuildButton`, `TabButton`, `MeterText` and so on), not by
+overrides of their own; only a cost amount takes its resource's colour as an override, since that
+colour is data, and a full meter its digits' gold. The buttons take no focus. The build and army
+cards take `CardButton`, a button's shape in skin A, so a skin can give them one of their own.
 
 **Fonts** (`assets/fonts/`, Google Fonts under the SIL Open Font License, each with its
 `OFL.txt`, imported with Godot's default dynamic font settings): **Bangers** for the Build
-button, the category tabs, the panel's close button, the info panel's title and the place bar's
-and the debug row's buttons; **Lilita One**, the theme's default, for every other text. No text is
-smaller than 15 px at 720p. Lilita One has no `∞`, which the meters show under the dev cheats,
-so the meters' amounts take a `FontVariation` of it (`_meter_font`) whose fallback is the
-engine's own font, `ThemeDB.fallback_font`: the sign draws the same on every platform rather
+and Expedition buttons, the category tabs, the panel's close button, the info panel's title and
+the place bar's buttons; **Lilita One**, the theme's default, for every other text, the debug
+row's included.
+
+**Type scale** (720p): nothing smaller than 17 px but the debug row's (**Layout**); body lines 19
+to 20 (`CardCost` 20, `CardCount` and `CardReason` 19, `MeterText` 20, `InfoDetail`, `InfoNote`,
+`QueueName`, `HousingText`, `ToastText` and `BadgeText` 19); the build cards' small lines 17
+(`CardTime`, `CardWarning`, `CardChip`, `LockText`); names 22 (`CardName`); titles 30
+(`InfoTitle`); button labels 24 to 30 (the tabs, `BarButton`, `ConfirmButton`, `CommitButton` and
+`UpgradeButton` 24, `CloseButton` 28, `BuildButton` and `ExpeditionButton` 30). The HUD is 720 px
+tall under the `canvas_items` stretch, so on a 6.1-inch phone a pixel is about 0.09 mm: 17 px is a
+1.5 mm em, 22 a 2 mm one, and a 56 px button 5 mm.
+
+Lilita One has no `∞`, which the meters show under the dev cheats, so the meters' amounts take a
+`FontVariation` of it (`_meter_font`) whose fallback is the engine's own font, `ThemeDB.fallback_font`: the sign draws the same on every platform rather
 than from whatever font the system has. Only the meters fall back. The shared Lilita One
 resource has no fallback, since a fallback's taller line metrics would space every other text,
 the building view's timer label included, wider.
@@ -58,27 +69,80 @@ the building view's timer label included, wider.
 | --- | --- | --- |
 | Ink `INK` | `1B1A2E` | every outline, text outlines; `SHADOW` is the ink at 60 %, every flat shadow |
 | Panel `PANEL` | `262348` at 96 % | the build panel, the info panel, the place bar, the toast |
-| Card `CARD` | `3B3670` | cards, unselected tabs, the close button, Cancel, Close, Practice raid, Template base, Reset base |
-| Card disabled `CARD_DISABLED` | `2E2B55` | a card or button that cannot be pressed now, a busy drone |
+| Card `CARD` | `3B3670` | cards, unselected tabs, the close button, Cancel, Close |
+| Card disabled `CARD_DISABLED` | `2E2B55` | a card or button that cannot be pressed now, a busy drone, a card's count chip, the debug row's chips |
 | Text `TEXT` | `F4F2FF` | names, amounts |
 | Text dim `TEXT_DIM` | `9A95C4` | counts, reasons, the scroll bar's grabber |
-| Accent `ACCENT` | `58E8FF` | the selected tab, Place, Train and Research, the Expedition button and Scan, free drones, the unit glyphs' visors, canopies and eyes |
-| Build gold `GOLD` | `FFC13B`, pressed `E0A52A` | the Build button, the upgrade button, Attack, the cleared stamp, storages on the minimap |
+| Accent `ACCENT` | `58E8FF` | the selected and the safe: the selected tab, Done, Train, Make and Research, Scan, Keep fighting, free drones, the unit glyphs' visors, canopies and eyes |
+| Build gold `GOLD` | `FFC13B` | commit and spend: the Build button, Place, the upgrade button, Attack, a full meter's line and digits, the cleared stamp, storages on the minimap |
 | Trough `TROUGH` | `17162A` | the meters' troughs |
-| Warning `WARNING` | `FFB37A` | the info panel's note, a research card's lab level the lab lacks |
+| Warning `WARNING` | `FFB37A` | the info panel's note, a research card's lab level the lab lacks, a build card's reason and its Command Center chip |
 | Resource colours | `rules.json`, `Catalog.resource_color` | costs, the meters' fills and icons |
-| Category stripes `CATEGORY_STRIPE` | `MaterialKit` roles: resources `ENERGY`, army `ARMY`, defense `DEFENCE`, traps `HAZARD` | the stripe along a card's top; a category not listed takes `ACCENT` |
-| Army accent | `MaterialKit.ARMY`, `FF7F11` | the training header's housing bar and figure, the unit glyphs, the stripe along a unit card's top |
+| Category stripes `CATEGORY_STRIPE` | `MaterialKit` roles: resources `ENERGY`, army `ARMY`, defense `DEFENCE`, traps `HAZARD` | the stripe along a card's top and its plinth; a category not listed takes `ACCENT` |
+| Army accent | `MaterialKit.ARMY`, `FF7F11` | raid and battle: the Expedition button; the training header's housing bar and figure, the unit glyphs, the stripe along a unit card's top |
+
+**Colour roles.** Gold commits a spend (Build, Place, Upgrade, Attack), the army's orange starts
+a raid (Expedition), cyan is the selected or the safe choice only (the selected tab, Done, Keep
+fighting); each of the three carries ink text. Place takes `CommitButton` and swaps to the cyan
+`ConfirmButton` while walls are painted, when it reads Done.
 
 **Shapes.** A `StyleBoxFlat` with a flat fill, a 3 px ink border (`BORDER`), round corners
-(12; tabs, the meters and the toast 10) and a flat shadow, the ink at 60 % offset 4 px down
-and right (`_shape`). A pressed button sinks: the shape and its text move 2 px down and right,
-onto a shadow then 2 px away. Hover is a shade lighter; disabled takes the disabled fill with
-its text at 55 %. Text gets an ink outline where it sits on a bright fill or over the world —
-the Build label 4 px at 30 px, the tabs and the close button 3 px, the upgrade button 3 px, card
-names and meter amounts 2 px — and none on a dark panel. A label's `outline_size` is four times
-the outline's width in pixels (`OUTLINE_PER_PX`), since the font's stroke reaches a quarter of
-`outline_size` out from each glyph.
+(12; tabs and the toast 10, the meters a pill) and a flat shadow, the ink at 60 % offset 4 px down
+and right (`_shape`). A pressed button or card is 15 % lighter (`PRESSED_LIGHTEN`) and sinks 4 px
+(`PRESSED_SINK`) down and right onto its shadow, its text with it; a card's content, which is not
+the button's text, sinks with it (`_sink`, on the button's draw). Hover is a shade lighter;
+disabled takes the disabled fill with its text at 55 %. The panels have a cel edge, drawn over
+their shape as one triangle array (`_draw_edge`): a 1 px light line just inside the ink border
+(`EDGE_LIGHT`, the text colour at 12 %), and on the bottom panels (the build panel and the army
+panel) a band a shade lighter across their top, down to the gap under the tabs (`MENU_BAND`, 74 px
+at 720p). The build cards draw the same line themselves.
+
+**The outline rule.** White text takes an ink outline only over a bright fill or over the world:
+the meters' digits (2.5 px), the badge's count (2 px), the debug row's "DEV" (2 px). Text on a dark
+panel or card (the tabs, the close button, card names, costs, titles) takes none, and ink text on a
+bright fill (Build, Expedition, Place, the upgrade button, the selected tab) needs none. A label's
+`outline_size` is four times the outline's width in pixels (`OUTLINE_PER_PX`), since the font's
+stroke reaches a quarter of `outline_size` out from each glyph.
+
+**Touch sizes.** The tabs are 160×56, the close buttons 56×56, Build 136×72 and Expedition 184×72,
+the info panel's Train, Make or Research 112×56 and its Close 96×56 (`ACTION_SIZE`,
+`INFO_CLOSE_SIZE`), the place bar's Cancel and Place 170×72; the build cards 200×200.
+
+## Skins
+
+The UI pass's three directions for the menu family (the top bar, the build panel and its cards,
+the tabs and buttons, the army panel's frame), for the owner to pick from (`Hud.Look`; the
+engine's own `Skin` class takes that name). `Hud.skin`, static, names the one `_make_theme` builds
+and the parts that draw themselves read: set it before `setup`, or call `set_skin(look)` on a HUD
+already built, which builds the theme again, hands it to the root and the two bottom panels, and
+redraws what the cards, the panels and the meters draw themselves. The `hud_directions` scenario
+shoots each (`tools/harness/README.md`). The battle's HUD takes whatever theme is current when a
+battle opens; the in-field surfaces are not designed for B or C yet.
+
+- **A, the comic console** (the default): everything above.
+- **B, the halftone console**: the bottom panels, the cards and the buttons drawn from 9-slice
+  `StyleBoxTexture`s that `tools/gen_textures.gd` draws into `assets/textures/kit/hud_*.png`
+  (panel, card, card-disabled, button, button-bright): two bands meeting in a hard edge at 40 %
+  of the height, the lower one with a dot screen at an 8 px pitch darkening it by 10 %, a 3 px ink
+  border, a 1 px light line and the flat shadow outside the shape (`SLICE_SHADOW`). Each 9-slice's
+  middle is tile-fitted on both axes (`TILE_FIT`: a whole number of tiles scaled to fit), so where
+  a control's middle is not a whole number of tiles the dots are scaled a little. The dark shapes are drawn in their
+  own fills; the bright buttons share one near-white texture with its top right corner cut,
+  tinted to their role (`modulate_color`); anything disabled takes the flat card-disabled shape.
+  Pressed, a shape is 15 % lighter and squashes 4 % about its centre (`SQUASH`, `_squash`)
+  instead of sinking; a toggle (a tab) never squashes. The panels' and cards' light line and band
+  are the textures'. The info panel, the place bar, the toast and the sector map keep A's shapes.
+- **C, the pulp page**: the menu family in the buildings' cream (`CREAM`, `MaterialKit.HULL_LIGHT`)
+  with ink text and no outlines, a 4 px ink border, a disabled shape a darker cream, dim text and
+  warnings in inks that read on cream; the bright buttons in their roles' colours with ink. The
+  bottom panels are a cream tray the panel draws itself (`_draw_tray`, one triangle array): its
+  top edge stepped every 168 px and torn every 42, inked. A build card is a trading card: its
+  category's colour across its top third under an ink dot screen and an ink line, the picture
+  standing on it with no plinth, the name on an ink ribbon (`CardName`'s `normal` style), the
+  costs in ink (`_cost_color`, which a card's amounts take when built and on `set_skin`). The
+  meters are cream troughs with saturated fills and ink digits on an ink strip; a full meter keeps
+  its gold line, its digits ink. The info panel and the sector map go cream
+  too, as they share the titles' and the lines' variations; the toast stays dark.
 
 ## Layout
 
@@ -89,14 +153,14 @@ so its parts — the Build button above all — draw over the panel.
 | Part | Where | Contents |
 | --- | --- | --- |
 | Top bar | top, `MARGIN` (16) in, a column across the width | First row, from the left: a meter per resource in catalog order, then the drone ring (**Top bar**). The army's housing is not here: it shows in the training facilities' UI (**Info panel**, **Army panel**). |
-| Build button | bottom right, `MARGIN` from the safe area's corner, 128×64 | "BUILD" on gold; toggles the build panel (**Build panel**). Hidden while placing or painting. |
-| Expedition button | bottom left, `MARGIN` from the safe area's corner, 176×64 | "EXPEDITION" in Bangers 30 on the accent cyan, ink text, with a badge on its top right corner: the open fields' count in `BadgeText` (Lilita One 17, 2 px of ink) on a defence-red circle (`Badge`, 30×30), hidden at none. Emits `expedition_pressed`. Shown with Build, and hidden while the build panel or the army panel is open across its corner (`_show_expedition`). |
+| Build button | bottom right, `MARGIN` from the safe area's corner, 136×72 | "BUILD" in ink on gold; toggles the build panel (**Build panel**). Hidden while placing or painting. |
+| Expedition button | bottom left, `MARGIN` from the safe area's corner, 184×72 | "EXPEDITION" in Bangers 30 on the army's orange, ink text, with a badge centred on its top right corner: the open fields' count in `BadgeText` (Lilita One 19, 2 px of ink) on a defence-red circle (`Badge`, 36×36) with a 2 px light ring inside its ink (`BadgeRing`), hidden at none. Emits `expedition_pressed`. Shown with Build, and hidden while the build panel or the army panel is open across its corner (`_show_expedition`). |
 | Build panel | bottom, the screen's full width | Slides up over the bottom of the screen (**Build panel**). |
-| Place bar | bottom centre | A panel holding `Cancel` and `Place` (170×72); `Place` is disabled unless the ghost is valid. While walls are painted it reads `Done` and is always enabled: there is nothing to confirm. |
+| Place bar | bottom centre | A panel holding `Cancel` and `Place` (170×72); `Place`, gold, is disabled unless the ghost is valid. While walls are painted it reads `Done`, cyan, and is always enabled: there is nothing to confirm. |
 | Info panel | bottom centre, 460 wide | Title `"Name   Lv N"` with Train, Make or Research (a finished producer, Foundry or research building only) and a `Close` button; detail lines (**Info panel**); the upgrade button; a note under it. |
 | Army panel | bottom, the screen's full width | Slides up in the build panel's place: a producer's training or the lab's research (**Army panel**). |
 | Toast | top centre, 96 down | A small panel with a centred line that fades out after 1.8 s over 0.6 s, then hides. |
-| Debug row | debug builds only (`OS.is_debug_build()`): the top bar's second row, right-aligned | Practice raid, which emits `practice_pressed`, Template base, which emits `template_pressed`, then Reset base, which emits `reset_pressed`, 16 apart. On a row of its own so a long top bar never runs under it. |
+| Debug row | debug builds only (`OS.is_debug_build()`): under the top bar's strip, at the left | A "DEV" label (Lilita One 14, dim, outlined over the world) over three grey chips, 132×40 (`DEBUG_SIZE`; `CARD_DISABLED`, a 2 px ink border, dim Lilita One 16), 10 apart: Practice raid, which emits `practice_pressed`, Template base, which emits `template_pressed`, then Reset base, which emits `reset_pressed`. Demoted so a tester never takes them for the game's; the only text under 17 px. |
 
 The army panel is built after the build panel and before the root, outside it like the build
 panel, so the Build button draws over it too. `add_screen(control)` adds a full screen (the sector
@@ -104,34 +168,48 @@ map) under the root, so it sits on the safe area and takes the theme, and moves 
 it, so a toast shows over it. The place bar and the info panel are anchored to the bottom edge and grow upward
 (`_anchor_bottom`).
 
+The game is landscape only (`window/handheld/orientation`). Narrower than 16:9 the build and army
+panels scroll; the sector map's 3×2 grid needs about 1,180 px across, so a 4:3 tablet (960×720
+under `aspect` expand) is too narrow for it; portrait fits none of the bottom panels, the top bar
+or the sector map.
+
 ## Top bar
 
-**Meters.** One per resource, 220×36 (`METER_SIZE`), hidden while the resource's capacity
-(`state.capacities()`, **Refresh**) is 0, so antimatter appears once something stores it. A trough (`TROUGH`, radius 10, its shadow) starts
-20 px in from the meter's left; inside its border a fill grows from the left to `amount /
-capacity` of the track (full at the cap), resized only on `refresh`. The fill is a `Control`
-with `clip_contents` holding a `TextureRect` that tiles a 16×16 stripe image across the whole
-track — a 45-degree white band over a grey 25 % darker, built once in `setup`
-(`_make_stripe`) and tinted by the resource's colour over that grey, so the base reads as the
-colour itself and the band 25 % lighter — and a gloss band (white at 25 %) across its top
-third. The trough's ink border is drawn again over the fill, so the fill's square ends never
-cover its round corners. The amount, `"750 / 1,000"` (`Format.short`: in full below a million,
-then `"1.2M"`, `"4M"`, `"12.5M"` and from a thousand million `"1.2B"`, one decimal cut and its `.0`
-dropped, so the widest text fits the label's 180 px; the cards and the info panel keep full
-numbers), set only when the amount or the capacity changed, sits centred on the
-part of the trough right of the icon, in Lilita One 18 px white with a 2 px ink outline. The
-resource's icon (a `HudIcon`, 40×40) sits over the trough's left end like a badge. With the dev
-cheats on (`Hud.cheats`, set by `main.gd`) every meter shows, full, reading `∞` (Lilita One has
-no `∞`; the meters' fallback, the engine's font, draws it, **Theme**).
+**Meters.** One per resource, 240×44 (`METER_SIZE`), hidden while the resource's capacity
+(`state.capacities()`, **Refresh**) is 0, so antimatter appears once something stores it. The
+meters and the drone ring sit on one strip (`MeterStrip`: the panel's fill at 60 %, radius 24, 8 px
+of padding), so the top bar reads as one instrument; the ring keeps the strip's right end. A
+meter's trough (`TROUGH`, a pill: its radius half its height, its shadow) starts 24 px in from the
+meter's left, under the resource's icon on its coin (a `HudIcon` 48 across wearing a coin in the
+trough's colour, **Coins**), whose centre sits on the trough's left edge, so the coin overlaps
+the pill's end by half. Inside its border a fill grows from the left to `amount / capacity` of
+the track (full at the cap), resized only on `refresh`. The fill is a `Control` with
+`clip_contents` holding a `TextureRect` that tiles a 16×16 stripe image across the whole track —
+a 45-degree white band over a grey 12 % darker, built once in `setup` (`_make_stripe`) and tinted
+by the fill's colour over that grey, so the base reads as the colour itself and the band 12 %
+lighter. The fill's colour is the resource's at 85 % of its value (`METER_VALUE`), so it stays a
+colour under the white digits. The shader cuts the stripes to the pill's round ends and lays a
+gloss (white at 10 %) across the track's top third. The trough's ink border is drawn again over
+the fill. The amount, `"750 / 1,000"` (`Format.short`: in full below a million, then `"1.2M"`,
+`"4M"`, `"12.5M"` and from a thousand million `"1.2B"`, one decimal cut and its `.0` dropped; the
+cards and the info panel keep full numbers), set only when the amount or the capacity changed,
+sits right-aligned 12 px in from the trough's end (`METER_TEXT_RIGHT`), clear of the coin, in
+Lilita One 20 px white with a 2.5 px ink outline. **Full:** when the amount reaches the cap, a 2 px
+gold line runs inside the pill (the shader's `full`) and the digits turn gold, set only when that
+changes (`_set_full`). With the dev cheats on (`Hud.cheats`, set by `main.gd`) every meter shows,
+full, reading `∞` (Lilita One has no `∞`; the meters' fallback, the engine's font, draws it,
+**Theme**), with no full state.
 
 **The meters move.** The stripes are drawn through `meter.gdshader`, one `ShaderMaterial` per
-meter (its tint, its phase, the fill's width), all on the one animation clock, `anim_time`
-(`art-style.md`, **Animation**, "One clock"), so nothing animates them per frame in GDScript. The
-stripes drift along the bar, one tile (16 px) every 4 s. Once every 3.5 s a glint sweeps across
-the filled part from left to right in 0.6 s: a hard-edged band 26 px wide, leaning right at the
-top, in the near-white text colour at 70 % with a 6 px core at full, each with a 1 px soft edge.
-Each meter's glint comes a third of the period after the one before it (`GLINT_STAGGER`), so they
-never flash together. When a refresh finds a meter's amount dropped (a purchase), or
+meter (its tint, its phase, the track's size, the fill's width, the full state), all on the one
+animation clock, `anim_time` (`art-style.md`, **Animation**, "One clock"), so nothing animates them
+per frame in GDScript. The stripes drift along the bar, one tile (16 px) every 4 s. Once every 8 s
+a glint sweeps across the filled part from left to right in 0.6 s: a hard-edged band 26 px wide,
+leaning right at the top, in the near-white text colour at 35 % with a 6 px core at 50 %, each
+with a 1 px soft edge (the owner likes the motion; it is kept at half its old strength and less
+often, for a value that changes once an hour). Each meter's glint comes a third of the period
+after the one before it (`GLINT_STAGGER`), so they never flash together. When a refresh finds a
+meter's amount dropped (a purchase), or
 risen (a payout, an offline catch-up, loot) by more than 1.5 times what the resource produces in
 the seconds the state advanced since the last refresh, counted as at least one and at most five
 (`FLASH_RISE_TICKS`, `FLASH_MAX_SECONDS`) and rounded up to a whole unit, since a slow trickle
@@ -139,9 +217,9 @@ still rises a whole unit at a time, its whole fill flashes once, brightening 45 
 and fading back over 0.25 s (`flash_time`, set to `Motion.clock()`). The per-tick trickle, a
 stalled tick's included, never flashes; a longer gap's catch-up does. The first refresh only records the
 amounts, and under the cheats, whose meters read `∞`, nothing flashes. The glint and the flash
-are in the stripes, so the fill's clip keeps them off the border, the shadow and the icon. The
-drift's period divides the clock's hour; the glint's does not, so it jumps once an hour. The
-shader adds no draw call (`art-style.md`, **Cost**).
+are in the stripes, so the fill's clip keeps them off the border, the shadow and the coin. The
+drift's and the glint's periods both divide the clock's hour. The shader adds no draw call
+(`art-style.md`, **Cost**).
 
 **Icons.** `HudIcon` draws its silhouette in `_draw`, vector, from no asset file, and only when it
 is built or resized. Each part is a flat fill in the icon's colour with a lighter highlight facet
@@ -282,16 +360,15 @@ caught up with its content before its size has (`_slide`, which the army panel s
 
 **Shape.** A `PanelContainer` under the `CanvasLayer` itself, outside the root: it spans the
 screen's whole width and reaches its bottom edge, and a `MarginContainer` pads its content into
-the safe area (`apply_safe_area`). It is 300 px high at 720p (`MENU_HEIGHT`), never more than
-40 % of the screen's height (`MENU_MAX_SHARE`, so 288 at 720p), and grows upward if its content
+the safe area (`apply_safe_area`). It is 324 px high at 720p (`MENU_HEIGHT`), never more than
+45 % of the screen's height (`MENU_MAX_SHARE`, so 324 at 720p), and grows upward if its content
 needs more. Panel fill, a 3 px ink border along its top edge only, its top corners rounded 16,
-no shadow.
+no shadow, and the cel edge (**Shapes**): the light line and the lighter band behind the tabs.
 
-**Tabs.** The top row: one toggle button (140×48, Bangers 24) per `catalog.categories` id, in
+**Tabs.** The top row: one toggle button (160×56, Bangers 24) per `catalog.categories` id, in
 that order, labelled with `catalog.category_name`, in one `ButtonGroup`; then, at the right, the
-close button (48×48, "X" in Bangers 28). An unselected tab is a card with white text in a 3 px
-ink outline (`TabButton`); the selected one is cyan with ink text and no outline
-(`TabSelected`). The first is selected when the HUD is built; the selection is remembered while
+close button (56×56, "X" in Bangers 28). An unselected tab is a card with white text and no
+outline (`TabButton`); the selected one is cyan with ink text (`TabSelected`). The first is selected when the HUD is built; the selection is remembered while
 the game runs (not saved). Selecting a tab shows the cards of the `catalog.menu_order` types
 whose `catalog.category_of(type)` is that tab, in `menu_order` order, scrolls the strip back to
 its start, and refreshes those cards from the last state `refresh` was given. Pressing the tab
@@ -301,31 +378,48 @@ selected.
 
 **Cards.** Under the tabs, a horizontal `ScrollContainer` of cards, scrolled by a drag, with a
 thin scroll bar under it; to its right a column as wide as the Build button stays clear, since
-Build stays over the open panel at the safe area's corner. Every menu type gets a 200×176 card
-when the HUD is built; a tab only shows or hides them. A card is a card-filled button with the
-ink border and shadow, its category's stripe (6 px, `CATEGORY_STRIPE`) along its top inside the
-border, the building's picture (84×84, `PREVIEW_SIZE`; **Pictures**), and three centred lines
-under it:
+Build stays over the open panel at the safe area's corner. Every menu type gets a 200×200 card
+(`CARD_SIZE`) when the HUD is built; a tab only shows or hides them. A card is a card-filled
+button (`CardButton`) with the ink border and shadow, and on it:
 
-1. the display name (Lilita One 20 px, white, a 2 px ink outline);
-2. the level 1 cost, each amount in its resource's colour (`resource_color`, the text colour
-   when there is none), or "Free" (18 px);
-3. the status: `"built / max"` (16 px, dim), from `state.count_of(type)` and
-   `catalog.max_count(type, state.cc_level())`, when `state.check_can_build(type)` passes; else
-   the reason (15 px, dim), and the card is disabled: the disabled fill, its picture, name and
-   cost at 55 %:
+- its category's stripe (6 px, `CATEGORY_STRIPE`) along its top inside the border;
+- the building's picture (112×112, `PREVIEW_SIZE`; **Pictures**) on a round plinth, a disc 120
+  across (`PLINTH`) of the category's colour at 22 % over the card with a 2 px ink ring;
+- its count on a chip at the top right, `"0/2"` (`CardChip`, 17 px, on a `CARD_DISABLED` pill
+  with a 2 px ink ring): the buildings of its type, counted once for every card by
+  `_refresh_entries`, over `catalog.max_count(type, state.cc_level())`;
+- three centred lines under the plinth: the display name (Lilita One 22, white, no outline); the
+  level 1 cost, each amount (20 px) in its resource's colour (`resource_color`, the text colour
+  when there is none) after its resource's icon on a coin of that colour (22 px, the coin
+  darkened to `HudIcon`'s value cap, so the colour says which resource it is), or
+  "Free"; and the build time, level 1's `build_seconds` through `Format.duration` (the dev
+  cheats' times show as they do everywhere else) after the `clock` mark (`CardTime`, 17 px, dim),
+  or in its place, while the card cannot be built, the reason in the warning colour
+  (`CardWarning`, 17 px).
 
-| `check_can_build` | Status line |
+Everything the card draws itself (the light edge, the stripe, the plinth, the chip's pill, the
+coins with their icons, the clock) is one triangle array under the picture (`Hud.CardArt`,
+through `HudIcon.Pen`), redrawn only when the card's rows are laid out or its state changes, so a
+card costs the draw calls it did with its plain stripe. When `state.check_can_build(type)` fails
+the card is disabled (the disabled fill) and its last line gives the reason:
+
+| `check_can_build` | Last line |
 | --- | --- |
-| `needs_command_center_level` | Needs Command Center N (N is level 1's `requires_cc`) |
+| `needs_command_center_level` | (none: the card is locked, below) |
 | `limit_reached` | Max built |
 | `no_free_builder` | No free drone |
 | `insufficient_resources` | Not enough <name of the first resource, in catalog order, the base is short of> |
 | anything else | `error_text(code)` |
 
-A type the Command Center has not unlocked (`max_count` 0 at the current level) is still
-listed, disabled with its "Needs Command Center N" line. Pressing a card closes the panel and
-emits `build_pressed(type)`; a drag across the strip scrolls it and presses nothing. The Barrier
+**Locked.** A type the Command Center has not unlocked (`max_count` 0 at the current level) is
+still listed, its picture at full alpha but greyed half way towards a violet grey
+(`locked.gdshader`, one material shared by every locked card), a warning chip over the plinth's
+foot with the `lock` mark and the Command Center level it needs, "CC 4" (`LockChip`, `LockText`
+17 px in ink), its name at 70 % and no count; its last line keeps the build time. Nothing on a
+card fades to 55 %. `entry_status(type)` keeps the card's state in words: `"built / max"`, or
+"Needs Command Center N" (N is level 1's `requires_cc`) or the reason above.
+
+Pressing a card closes the panel and emits `build_pressed(type)`; a drag across the strip scrolls it and presses nothing. The Barrier
 Wall, the Defence tab's last card, is a card like any other, and placement paints it
 (`input-camera.md`).
 
@@ -403,8 +497,8 @@ glyph and " > " when it does not (Lilita One does not), checked once in `setup`.
 named with `catalog.resource_name`. While busy, a last line reads "Under construction: 10s left" or
 "Upgrading to Lv N: 1m 00s left".
 
-The title is in Bangers 24 and the detail lines in Lilita One 17. The upgrade button, gold
-like Build with its text in a 3 px ink outline, reads "Under construction" (disabled) while
+The title is in Bangers 30 and the detail lines in Lilita One 19. The upgrade button, gold
+like Build with its text in ink (Lilita One 24), reads "Under construction" (disabled) while
 busy, "Max level" (disabled) at
 the top level, else "Upgrade to Lv N   cost   (duration)", disabled with the reason in the
 note when `state.check_upgrade` fails. Pressing emits `upgrade_pressed`; `Close` emits
@@ -413,7 +507,7 @@ note when `state.check_upgrade` fails. Pressing emits `upgrade_pressed`; `Close`
 Beside `Close`, a finished producer (a type `catalog.units_of_producer` names, at level 1 or
 more) shows **Train**, the finished Foundry (`catalog.foundry_type`) **Make** and the finished
 research building (`catalog.research_type`) **Research**,
-112×44, cyan with ink text in Bangers 22 like Place. Pressing it opens the army panel on that page
+112×56, cyan with ink text in Bangers 24 (`ConfirmButton`, like Done); `Close` is 96×56. Pressing it opens the army panel on that page
 in the info panel's place (**Army panel**).
 
 ## Army panel
@@ -421,9 +515,8 @@ in the info panel's place (**Army panel**).
 Shaped like the build panel and in its place: a `PanelContainer` outside the root, the screen's
 full width at its bottom edge, its content padded into the safe area (`apply_safe_area`), the same
 slide (`_slide`, **Build panel**), and the same column kept clear on the right for the Build
-button. Its height is its content's, with the build panel's (288 at 720p) as the minimum: the
-training page is about 308 at 720p (310 once the queue strip scrolls and shows its bar), the
-research page about 290. A header, the building's `"Name   Lv N"` in Bangers 24 with the close button (48×48,
+button. Its height is its content's, with the build panel's (324 at 720p) as the minimum, which
+the training and research pages fit in. A header, the building's `"Name   Lv N"` in Bangers 30 with the close button (56×56,
 "X") at the right, over one of three pages: training, making (the training page's, its unit
 cards swapped for the ability cards) or research. The panel stops every touch on it; its layout
 containers take none. The close button slides it down and shows the building's info panel again,
@@ -431,30 +524,29 @@ still selected. Hidden while closed.
 
 On the training page the header carries a second line under the title, the army's housing
 (`_refresh_housing`, rebuilt with the panel after every `BaseState.changed`): the army's figure
-(`HudIcon` "army", 20×20, the army accent), "Housing 12 / 280" (16 px, `HousingText`:
+(`HudIcon` "army", 20×20, the army accent), "Housing 12 / 280" (19 px, `HousingText`:
 `housing_used()` / `housing_capacity()`, `Format.amount`) and after it a bar 120×14
 (`HOUSING_BAR_SIZE`), a meter's trough and ink frame round a flat fill in the army accent with the
 meters' gloss, grown across its track by used over capacity, and at least 2 px
 (`HOUSING_MIN_FILL`) while any unit is housed. With no Hangar (capacity 0) the line
 reads "No Hangar: build one to house units" (`NO_HANGAR`) in the dim style (`CardCount`) and the
 bar hides. The
-making and research pages leave the line out. The title and the line together stand no taller
-than the close button, so the panel keeps its height.
+making and research pages leave the line out.
 
 **Training panel.** A horizontal strip of unit cards (200×140), one per unit the producer's type
 trains, in `units.json` order (`catalog.unit_types()`; a card per unit is built up front and the
 page shows its producer's). A card has the army accent's stripe along its top, the unit's picture
-(48×48, `PICTURE_SIZE`, **Pictures**: the unit at its researched level's tier), its name (Lilita One 20, a 2 px ink outline), a row of its train cost at
+(48×48, `PICTURE_SIZE`, **Pictures**: the unit at its researched level's tier), its name (Lilita One 22), a row of its train cost at
 its current level (`unit_level`), each amount in its resource's colour, or "Free", and its train
-time (`Format.duration`, dim), then "Housing N   Housed M" (16 px, dim: the unit's housing and
+time (`Format.duration`, dim), then "Housing N   Housed M" (19 px, dim: the unit's housing and
 `army_count`). A unit the producer's finished level does not train yet (`unit_producer_level`) is
 locked: the card is disabled, its picture, name and cost at 55 %, its last line "Needs <producer>
-<level>" (15 px, dim). Tapping a card emits `train_pressed(id, unit)`; `main.gd` queues one through
+<level>" (19 px, dim). Tapping a card emits `train_pressed(id, unit)`; `main.gd` queues one through
 `PlacementController.train` and toasts the error when it fails.
 
 Under the cards, the **queue strip**, scrolled like the cards: an entry (180×48) per queued unit,
-oldest first (`queue_of`), each a 32 px glyph beside the unit's name (16 px); the head adds its
-state under the name (15 px, dim): its time left, "12s left" (`training_seconds_left`), "Waiting
+oldest first (`queue_of`), each a 32 px glyph beside the unit's name (19 px); the head adds its
+state under the name (19 px, dim): its time left, "12s left" (`training_seconds_left`), "Waiting
 for room" (`training_status` `waiting`) or "Paused" (`paused`, its producer upgrading). With no
 queue the strip reads "Nothing in training". Tapping an entry emits
 `cancel_training_pressed(id, unit)`; `main.gd` cancels the newest queued unit of that type
@@ -478,7 +570,7 @@ that ability (`PlacementController.cancel_making`) and toasts "Refunded".
 **Research panel.** Under the header a line naming the research running, "Researching Ranger to
 Lv 2: 30s left" (`research_unit`, `research_seconds_left`), or "No research running"; under it a
 strip of cards (200×164), one per unit the base has unlocked (`is_unit_unlocked`), in `units.json`
-order: the picture, the name, "Level N" (18 px), then the next level's research cost and time, and
+order: the picture, the name, "Level N" (20 px), then the next level's research cost and time, and
 "Needs Lab L" (its `requires_lab`), "Researching" on the unit being researched, or, at the unit's
 top level, "Max level" with no cost. A card whose lab level the lab lacks, or at the top, is shown
 at 55 % with its lab level in the warning colour, but still takes a tap. Tapping a card emits
@@ -621,15 +713,17 @@ Read-only, so a scenario never reads a private member (`tools/harness/README.md`
 `build_button()` is the Build button; `is_menu_open()` whether the build panel is open or opening;
 `build_panel()` the panel itself; `close_button()` the panel's close button;
 `tab_button(category)` and `entry_button(type)` return the tab's and the card's `Button`;
-`entry_status(type)` is a card's status line; `entry_preview(type)` its picture (null until
+`entry_status(type)` is a card's state in words (**Cards**); `entry_preview(type)` its picture (null until
 rendered); `previews_done()` whether every type's picture has been made (in a headless run,
 gone through); `entry_strip()` the `ScrollContainer` the cards scroll in; `resource_panel(res)`
-is the top bar's meter for a resource and `resource_fill(res)` its fill, whose parent is the track it grows across;
+is the top bar's meter for a resource and `resource_fill(res)` its fill, whose parent is the track it grows across
+(its first child carries the stripes' `ShaderMaterial`, whose `full` is the full state);
 `place_button()` is the place bar's `Place` (or `Done`); `drones_panel()` is the `DroneRing`,
 whose `free_count()` and `total_count()` are the counts it shows; `reset_button()` and
 `template_button()` are the debug row's Reset base and Template base, and `practice_button()` its
 Practice raid (null in a release build). `ui_theme()` and `preview()` hand the theme and the
-pictures to the battle's HUD.
+pictures to the battle's HUD. `Hud.skin` is the skin the theme is built in and `set_skin(look)`
+restyles the HUD in another (**Skins**).
 The army: `housing_text()`, `housing_bar()` and `housing_fill()` are the training header's
 housing line, its bar (hidden with no Hangar) and the bar's fill, whose parent is the track it
 grows across; `action_button()` is the info panel's Train, Make or Research and `info_detail()` its

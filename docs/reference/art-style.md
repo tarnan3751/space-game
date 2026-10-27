@@ -1789,25 +1789,30 @@ unmeasured. Nothing runs per frame beyond the shaders.
 
 The HUD follows the same comic look in 2D (`hud.md`, **Theme**): two display fonts, Bangers
 for its loudest labels and Lilita One for the rest; a UI palette of the same ink (`1B1A2E`), deep
-violet panels and cards, a near-white text, the energy cyan for the selected and the confirming
-and a build gold; every shape a flat fill with a 3 px ink border, round corners and a flat ink
-shadow offset down and right; text on a bright fill or over the world outlined in ink. Its
+violet panels and cards, a near-white text, the energy cyan for the selected and the safe, a
+build gold for a spend and the army's orange for a raid; every shape a flat fill with a 3 px ink
+border, round corners and a flat ink shadow offset down and right, the panels with a cel edge (a
+light line inside the ink, a lighter band across a bottom panel's top); white text over a bright
+fill or the world outlined in ink, ink text on the bright fills. Its
 icons (the resource meters' ingot, shards and orb, seen from an angle, and the drone ring's
 quadcopter, seen from above)
 are vector shapes drawn in code, flat fills with a lighter facet and an ink outline, with no
-asset file. The meters' stripes drift, a hard-edged glint crosses each fill in turn and a change
-flashes it, all from `anim_time` (`meter.gdshader`, `hud.md`, **Top bar**).
-The build cards carry their category's accent from **Colour** as a stripe.
+asset file, the meters' on coins. The meters' stripes drift, a soft glint crosses each fill in
+turn every 8 s and a change flashes it, all from `anim_time` (`meter.gdshader`, `hud.md`, **Top
+bar**). The build cards carry their category's accent from **Colour** as a stripe and as the
+plinth their picture stands on. Two other skins of the menu family, a halftone console and a
+cream pulp page, wait on the owner's pick (`hud.md`, **Skins**).
 
 ## Cost
 
 A building's body instances draw for the light and into the shadow map; its outline instances
 draw once and never cast. Measured with `Performance.RENDER_TOTAL_DRAW_CALLS_IN_FRAME`: a fresh
-base is 48 draw calls with the HUD's build panel closed (46 before the perimeter gained its
+base is 49 draw calls with the HUD's build panel closed (48 before the UI pass's meter strip, 46 before the perimeter gained its
 hologram fence and its shadow; earlier, 63 with the always-visible build bar it replaced, 57 of
 those before the environment's curb, terrain outline and outcrops). The panel costs only while
-it is open: a fresh base with it open is 107 draw calls on a full tab (resources, army, defence)
-and 91 on traps, the cards' pictures included (110, 94 and 73 on a walls tab while it had five
+it is open: a fresh base with it open is 101 to 109 draw calls on a full tab (resources, army,
+defence: one more for each locked card's padlock) and 91 on traps, the cards' pictures included (103
+and 87 before the UI pass's cards, whose drawn parts are one triangle array each; 110, 94 and 73 on a walls tab while it had five
 tabs; 100, 86 and 68 before the pictures). The pictures cost one 160×160 render per type, built off
 the main thread, in the base's idle frames after boot or the first time the panel opens, each read back into a 100 KB texture (about 3 MB for
 today's menu), and nothing per frame once every type is cached and the preview's viewport is

@@ -98,7 +98,7 @@ through the game layer as the player would, and read the state through `BaseStat
 | `main.placement` | `begin_place(type)`, `confirm_place()`, `cancel_place()`, `select(id)`, `upgrade_selected()`, `train(id, unit)`, `cancel_training(id, unit)`, `research(unit)`, `make(id, ability)`, `cancel_making(id, ability)`, `research_ability(ability)`, `scan()`, `raid_result(setup, result, expedition)`, `is_placing()`, `is_painting()`, `ghost_is_valid()`, `ghost_cell()`, `selected_id` |
 | `main.world_input` signals | `tapped`, `drag_started`, `dragged`, `drag_ended`, `pinched`, `panned`; emit them to simulate a gesture (`tap_cell` below does) |
 | `main.hud` signals | `build_pressed`, `confirm_pressed`, `cancel_pressed`, `upgrade_pressed`, `close_pressed`, `reset_pressed`, `template_pressed`, `practice_pressed`, `train_pressed`, `cancel_training_pressed`, `research_pressed`, `make_pressed`, `cancel_making_pressed`, `research_ability_pressed`, `expedition_pressed`; emit them to press a button |
-| `main.hud` queries | `build_button()`, `is_menu_open()`, `build_panel()`, `close_button()`, `tab_button(category)`, `entry_button(type)`, `entry_status(type)`, `entry_preview(type)`, `previews_done()`, `entry_strip()`, `resource_panel(res)`, `resource_fill(res)`, `place_button()`, `drones_panel()` (the `DroneRing`: `free_count()`, `total_count()`), `reset_button()`, `template_button()`, `practice_button()`, `action_button()`, `army_panel()`, `is_training_open()`, `is_research_open()`, `army_close_button()`, `army_title()`, `housing_text()`, `housing_bar()`, `housing_fill()`, `train_card(unit)`, `train_card_info(unit)`, `queue_shown()`, `queue_entry(index)`, `queue_head_status()`, `research_card(unit)`, `research_card_lines(unit)`, `research_line()`, `is_making_open()`, `make_card(ability)`, `make_card_info(ability)`, `research_ability_card(ability)`, `research_ability_card_lines(ability)`, `info_detail()`, `toast_text()`, `expedition_button()`, `expedition_badge()` (`docs/reference/hud.md`); `apply_safe_area(inset)` to try a notch-like inset |
+| `main.hud` queries | `build_button()`, `is_menu_open()`, `build_panel()`, `close_button()`, `tab_button(category)`, `entry_button(type)`, `entry_status(type)`, `entry_preview(type)`, `previews_done()`, `entry_strip()`, `resource_panel(res)`, `resource_fill(res)`, `place_button()`, `drones_panel()` (the `DroneRing`: `free_count()`, `total_count()`), `reset_button()`, `template_button()`, `practice_button()`, `action_button()`, `army_panel()`, `is_training_open()`, `is_research_open()`, `army_close_button()`, `army_title()`, `housing_text()`, `housing_bar()`, `housing_fill()`, `train_card(unit)`, `train_card_info(unit)`, `queue_shown()`, `queue_entry(index)`, `queue_head_status()`, `research_card(unit)`, `research_card_lines(unit)`, `research_line()`, `is_making_open()`, `make_card(ability)`, `make_card_info(ability)`, `research_ability_card(ability)`, `research_ability_card_lines(ability)`, `info_detail()`, `toast_text()`, `expedition_button()`, `expedition_badge()` (`docs/reference/hud.md`); `apply_safe_area(inset)` to try a notch-like inset; `set_skin(look)` to restyle it in another skin (`Hud.Look`) |
 | `main.state` | the `BaseState`: `buildings`, `resources`, `capacity()`, `builders_free()`, `seconds_left(id)`, `check_*` |
 | `main.camera`, `main.base_view` | `IsoCamera` and `BaseView`, for cell and screen mapping |
 | `main.sector_map` | the `SectorMap`: `open(state)`, `close()`, `show_field(index)`, `is_open()`, `is_detail_open()`, `detail_index()`, `detail_field()`, `card(index)`, `card_cleared(index)`, `card_lines(index)`, `scan_button()`, `close_button()`, `attack_button()`, `hint_shown()`, `minimap()` (`drawn()`, `walls_drawn()`), `card_thumbnail(index)`, `layouts_done()`, its signals `scan_pressed`, `attack_pressed`, `closed`; `main.open_sector_map()` (`docs/reference/hud.md`, **Sector map**) |
@@ -589,6 +589,20 @@ routing, a scenario sends real events with `Input.parse_input_event` (`InputEven
 `InputEventScreenDrag`): they arrive in window pixels, so map a HUD point through
 `get_viewport().get_final_transform()`. They are delivered headless too, so those checks run in
 both modes.
+
+`scenarios/hud_directions.gd` shoots the UI pass's three skins (`docs/reference/hud.md`,
+**Skins**) for the owner to pick from, rendered. For each of A, B and C, set through
+`hud.set_skin`: the debug build's Template base with the build panel closed (`<skin>-01-top`, the
+meters at their caps, each checked to show its full state exactly when it is at its cap); the
+build panel on the Army tab with its pictures made (`<skin>-02-build-army`); the Cadet Academy's
+training page with two Rangers queued (`<skin>-04-training`); then, on a fresh base (Reset base,
+as every card on the template is maxed and disabled), the Hangar's card held down by a real
+touch (`<skin>-03-pressed`: its content sunk 4 px, or under skin B the card squashed, checked in
+a rendered run, as a headless one never draws the press) and the Resources tab with its locked
+cards (`<skin>-05-locked`, checked disabled with their "Needs Command Center" state). It also
+checks that the cards' shape is a texture under skin B only. Fifteen shots, numbered in the order
+taken (01, 02, 04, 03, 05 per skin); about a minute and a half rendered. Headless it checks the
+wiring and the full states.
 
 `scenarios/hud_layout.gd` checks the HUD's layout on a fresh base. The top bar's row holds the
 resource meters and then the drone ring, and nothing else. Under a notch-like safe-area

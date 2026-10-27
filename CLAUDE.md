@@ -89,7 +89,7 @@ or `data/`.
 | Input and camera: the scene, camera, gestures, placement, views | `src/game/` (all but the HUD's, the art style's, the battle view's and the profile's files) | `docs/reference/input-camera.md` |
 | Battle view: the battle scene, driving the sim, the field and its falls, the units' MultiMeshes, the weapons, shots and impacts, deploying, the practice raid | `src/game/battle_view.gd`, `battle_units.gd`, `battle_effects.gd`, `weapons.gd`, `src/game/models/rubble.gd` | `docs/reference/battle-view.md` |
 | Art style: the look, light, colours, the material kit, `LowPolyMesh`, outlines, models, unit models, animation, the construction drone, view states | `src/game/models/`, `unit_models.gd`, `construction_drone.gd`, `src/game/*.gdshader*`, `material_kit.gd`, `surf.gd`, `motion.gd`, `rig.gd`, `low_poly_mesh.gd`, `assets/textures/kit/`, `assets/textures/*.png`, `tools/gen_textures.gd` | `docs/reference/art-style.md` |
-| HUD: the theme and fonts, top bar (meters, drone ring), Build button and build panel, place bar, info panel, toasts, the cards' pictures, the attack HUD, the Expedition button and the sector map | `src/game/hud.gd`, `battle_hud.gd`, `hud_icon.gd`, `drone_ring.gd`, `model_preview.gd`, `sector_map.gd`, `meter.gdshader`, `format.gd`, `assets/fonts/` | `docs/reference/hud.md` |
+| HUD: the theme and fonts, top bar (meters, drone ring), Build button and build panel, place bar, info panel, toasts, the cards' pictures, the attack HUD, the Expedition button and the sector map | `src/game/hud.gd`, `battle_hud.gd`, `hud_icon.gd`, `drone_ring.gd`, `model_preview.gd`, `sector_map.gd`, `meter.gdshader`, `locked.gdshader`, `format.gd`, `assets/fonts/`, `assets/textures/kit/hud_*.png` | `docs/reference/hud.md` |
 | Testing and tools: runner, fixtures, gate, harness, the profile, landing, API dump | `test/`, `tools/`, `src/game/profile.gd` | `docs/reference/testing-tools.md`, `tools/harness/README.md` |
 
 ## Architecture rules
@@ -156,7 +156,7 @@ src/game/        main, template_base, iso_camera, world_input, placement_control
                  motion, rig, material_kit, hud, hud_icon, drone_ring, sector_map, format, model_preview, profile, toon.gdshader,
                  toon_move.gdshader, toon_body.gdshaderinc, toon_common.gdshaderinc, effects.gdshaderinc, ink.gdshader,
                  ink_move.gdshader, ink_body.gdshaderinc, holo.gdshader, holo_move.gdshader, holo_body.gdshaderinc,
-                 ground.gdshader, terrain.gdshader, field_marks.gdshaderinc, meter.gdshader
+                 ground.gdshader, terrain.gdshader, field_marks.gdshaderinc, meter.gdshader, locked.gdshader
 src/game/models/ parts (the model being built, shared helpers and surfaces), then one file of
                  model builders per category: core, resources, army, defense, traps; walls, the wall's own; and
                  drone, the construction drone and its laser; and the units': infantry, vehicles,
@@ -167,7 +167,7 @@ tools/           run_tests.sh, test_runner.gd, gates.sh, land_series.sh, dump_ap
                  gen_textures.gd, gen_outposts.gd, sim_battles.gd, sim_matrix.sh
 tools/harness/   driver.gd, scenario.gd, scenarios/, run.sh, README.md (output in out/, gitignored)
 .claude/agents/  scout, researcher, developer, reviewer
-assets/          textures/kit/ (the material kit, generated); textures/field.png and
+assets/          textures/kit/ (the material kit and the HUD's skin B shapes, generated); textures/field.png and
                  terrain_rock.png (the ground's and the terrain's, generated); fonts/ (the HUD's two
                  fonts, each with its OFL.txt); real models/audio later
 server/          Nakama TypeScript runtime later (.gdignore keeps Godot out)
@@ -307,7 +307,7 @@ Constraints:
 - If `data/*.json` goes missing in an export, add it to the preset's include filter.
 - The material kit's PNGs under `assets/textures/kit/`, and the field and rock textures beside
   it, are loaded by path (`MaterialKit`, `BaseView`), so a preset that exports selected resources
-  only must include them.
+  only must include them; so are the HUD's skin B shapes there, `hud_*.png` (`Hud._texture_box`).
 - The HUD's fonts under `assets/fonts/` are imported resources (each `.ttf` with its `.import`),
   preloaded by `hud.gd`, so they export with it; the `OFL.txt` beside each is not a resource and
   needs the preset's include filter to ship.
