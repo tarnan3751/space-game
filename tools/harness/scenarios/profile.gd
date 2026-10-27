@@ -28,7 +28,8 @@ extends HarnessScenario
 ## BuildingView._process over every view, BattleView._process and its sections, the sim's step,
 ## BattleUnits' buffer uploads, BattleEffects.draw by list group). The HUD's refresh, BaseView.sync
 ## and the whole `changed` chain (state.changed emitted, as a command does; then a second of
-## production paid through it, advance(1)) are timed here, REPEATS calls each, as are the save's JSON, the sector map's outposts (one laid out a frame as it opens)
+## production paid through it, advance(1)) are timed here, REPEATS calls each, as are the save's JSON, each of the sector map's outposts laid out
+## by OutpostGenerator.generate called directly (the map itself lays them out on worker threads)
 ## and MultiMesh buffer uploads of the effect lists' sizes (UPLOAD_SIZES instances).
 ##
 ## Also logged: the triangles a frame draws by source (_split: the buildings' bodies, outlines and
@@ -393,14 +394,15 @@ func _time_save(main: MainScript) -> void:
 		% [(Time.get_ticks_usec() - started) / 1000.0 / REPEATS, size / 1024])
 
 
-## The sector map's per-frame work while it opens: one field laid out a frame (OutpostGenerator).
+## Each field of the sector laid out by OutpostGenerator.generate, called directly on the main thread:
+## the generator's own cost, which the sector map pays on worker threads (SectorMap.LayoutJob).
 func _time_outposts(main: MainScript) -> void:
 	var parts := PackedStringArray()
 	for index: int in main.catalog.expedition_field_count():
 		var started := Time.get_ticks_usec()
 		OutpostGenerator.generate(main.catalog, main.state, index)
 		parts.append("%.1f" % ((Time.get_ticks_usec() - started) / 1000.0))
-	say("the sector map's outposts laid out, one a frame as it opens: %s ms" % ", ".join(parts))
+	say("OutpostGenerator.generate called directly, one field each: %s ms" % ", ".join(parts))
 
 
 ## A MultiMesh buffer upload (an effect list's each frame) of each of UPLOAD_SIZES instances,

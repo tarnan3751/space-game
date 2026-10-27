@@ -12,11 +12,17 @@ extends PanelContainer
 ##     targets; a cleared field is stamped with a star, dimmed and cannot be pressed;
 ##   a field's detail, opened from its card: a minimap of the outpost, the field's header again,
 ##     its loot, what it holds, the minimap's legend, Back and Attack.
-## The fields are laid out (OutpostGenerator.generate, up to 25 ms for a hard field, about 100 ms
-## for six at Command Center 10) one a frame while the map is open, kept for the sector's seed and
-## epoch, so a scan or another base lays them out again; each card's thumbnail is drawn as its
-## field arrives, and the detail takes the field kept (laying it out then if it has not come yet).
-## Nothing is laid out or drawn per frame once they are all in.
+## The fields are laid out (OutpostGenerator.generate_field, up to 25 ms for a hard field, about
+## 100 ms for six at Command Center 10) off the main thread, one WorkerThreadPool task per field
+## (LayoutJob), started the frame after the map opens and collected in _process as they finish,
+## one a frame. They are kept for the sector's seed and epoch, so a scan or another base lays them
+## out again (a task of an older epoch is collected and dropped). The generator touches only its
+## own state, its SeededRng and the Catalog, which nothing writes after loading, and a task is
+## handed the sector's numbers, not the BaseState. Each card's thumbnail is drawn as its field
+## arrives, and the detail takes the field kept (waiting for its task, or laying it out then if
+## none is running). Closing the map leaves the tasks running and collected; leaving the tree waits
+## for every one, so the game quits cleanly with tasks in flight. Nothing is laid out or drawn per
+## frame once they are all in.
 ## Under the header, "Scan to refresh: your Command Center has grown" while the sector's snapshot
 ## is of a lower Command Center than the base's.
 ##
@@ -77,6 +83,25 @@ var _scan_seconds: int = -1
 var _layouts: Array[Dictionary] = []
 var _layouts_seed: int = -1
 var _layouts_epoch: int = -1
+## The layout tasks running or finished and not collected yet, oldest first.
+var _jobs: Array[LayoutJob] = []
+
+
+## One field laid out on a WorkerThreadPool thread: its inputs, copied from the sector on the main
+## thread, and, once the task has finished, its layout. Only the task writes `field`, and the main
+## thread reads it only after wait_for_task_completion.
+class LayoutJob:
+	var catalog: Catalog
+	var sector_seed: int
+	var epoch: int
+	var index: int
+	var cc: int
+	var capacity: Dictionary[String, int]
+	var task: int = -1
+	var field: Dictionary = {}
+
+	func run() -> void:
+		field = OutpostGenerator.generate_field(catalog, sector_seed, epoch, index, cc, capacity)
 
 
 ## A field's band, its outpost and its loot, on a card or over the detail: what dims while it is
@@ -186,7 +211,8 @@ func refresh(state: BaseState) -> void:
 		for i: int in _layouts.size():
 			_layouts[i] = {}
 			_cards[i].thumbnail.show_field(_catalog, {})
-	set_process(visible and _layouts.has({}))
+	# The tasks start in the next frame, not in the one the map opens and is laid out in.
+	set_process(not _jobs.is_empty() or (visible and _layouts.has({})))
 	tick(state)
 
 
@@ -206,7 +232,7 @@ func show_field(index: int) -> bool:
 	if _state == null or index < 0 or index >= _cards.size() or _state.sector.is_cleared(index):
 		return false
 	if _layouts[index].is_empty():
-		_lay_out(index)
+		_lay_out_now(index)
 	_field = _layouts[index]
 	if _field.is_empty():
 		return false
@@ -222,16 +248,67 @@ func show_field(index: int) -> bool:
 	return true
 
 
-## While the map is open: the next field not laid out yet, one a frame, and its card's thumbnail.
+## While the map is open with fields missing, or tasks run: the missing fields' tasks started, and
+## one finished task a frame collected, its field kept and its card's thumbnail drawn when it is of
+## the sector shown; it stops once none is left.
 func _process(_delta: float) -> void:
-	var next := _layouts.find({})
-	if not visible or _state == null or next < 0:
+	if visible and _state != null:
+		_start_jobs()
+	for i: int in _jobs.size():
+		if WorkerThreadPool.is_task_completed(_jobs[i].task):
+			_collect(i)
+			break
+	if _jobs.is_empty():
 		set_process(false)
+
+
+func _exit_tree() -> void:
+	for i: int in range(_jobs.size() - 1, -1, -1):
+		_collect(i)
+
+
+## A task for every field of the sector shown that is not laid out and has no task running.
+func _start_jobs() -> void:
+	var sector := _state.sector
+	for index: int in _layouts.size():
+		if _layouts[index].is_empty() and _running(index) == -1:
+			var job := LayoutJob.new()
+			job.catalog = _catalog
+			job.sector_seed = sector.sector_seed
+			job.epoch = sector.epoch
+			job.index = index
+			job.cc = sector.cc
+			job.capacity = sector.capacity.duplicate()
+			job.task = WorkerThreadPool.add_task(job.run, false, "Lay out an expedition field")
+			_jobs.append(job)
+
+
+## The position in _jobs of field `index`'s task for the sector shown, -1 for none.
+func _running(index: int) -> int:
+	for i: int in _jobs.size():
+		var job := _jobs[i]
+		if job.index == index and job.sector_seed == _layouts_seed and job.epoch == _layouts_epoch:
+			return i
+	return -1
+
+
+## Waits for task `i` of _jobs (at once when it has finished) and takes it out; its field is kept
+## when it is of the sector shown and still missing.
+func _collect(i: int) -> void:
+	var job := _jobs[i]
+	_jobs.remove_at(i)
+	WorkerThreadPool.wait_for_task_completion(job.task)
+	if job.sector_seed == _layouts_seed and job.epoch == _layouts_epoch and _layouts[job.index].is_empty():
+		_layouts[job.index] = job.field
+		_cards[job.index].thumbnail.show_field(_catalog, job.field)
+
+
+## Field `index` now, for the detail: its task's result, waited for, or laid out here with none.
+func _lay_out_now(index: int) -> void:
+	var running := _running(index)
+	if running >= 0:
+		_collect(running)
 		return
-	_lay_out(next)
-
-
-func _lay_out(index: int) -> void:
 	_layouts[index] = OutpostGenerator.generate(_catalog, _state, index)
 	_cards[index].thumbnail.show_field(_catalog, _layouts[index])
 
