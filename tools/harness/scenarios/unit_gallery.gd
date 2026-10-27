@@ -296,10 +296,11 @@ func _check_unit(type: String, tier: int) -> AABB:
 				var bob := BOB_HEIGHT if (roundi(uv2s[i].y) & Surf.BOB) != 0 else 0.0
 				var y := pivot.y + v.y
 				# A spinning part about +Y sweeps each point round a circle of its distance from the axis:
-				# a moving part's about its node, a part tagged with LowPolyMesh.spin about its pivot.
+				# a moving part's about its node, a part moving in the shaders (Surf.MOVE, a rotor's spin
+				# about +Y) about its pivot.
 				var reach := Vector2(v.x, v.z).length() if motion != null and motion.kind == Motion.Kind.SPIN else 0.0
 				var at := pivot + v if reach == 0.0 else pivot + Vector3(0, v.y, 0)
-				if (roundi(uv2s[i].y) & Surf.SPIN) != 0 and not spins.is_empty():
+				if (roundi(uv2s[i].y) & Surf.MOVE) != 0 and not spins.is_empty():
 					var axis := Vector3(spins[i * 4], 0.0, spins[i * 4 + 2])
 					reach = Vector2(v.x - axis.x, v.z - axis.z).length()
 					at = axis + Vector3(0, v.y, 0)

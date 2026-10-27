@@ -103,6 +103,48 @@ func angle_at(time: float) -> float:
 	return 0.0
 
 
+## The part's motion about `pivot` as the shaders read it per vertex (Surf.MOVE,
+## effects.gdshaderinc's effect_move): CUSTOM0, the pivot and a code, (kind * 4 + easing) * 2 plus
+## the phase (0 to 1, exclusive); CUSTOM3 (channel3) the axis times the magnitude, and the period.
+func channel0(pivot: Vector3) -> Vector4:
+	return Vector4(pivot.x, pivot.y, pivot.z, (kind * 4 + easing) * 2.0 + fposmod(phase, 1.0))
+
+
+## CUSTOM3: the axis times the rate (SPIN, radians a second), the amplitude in radians (SWING) or
+## in units (SLIDE); and the period (SWING and SLIDE, seconds).
+func channel3() -> Vector4:
+	var magnitude := rate
+	if kind == Kind.SWING:
+		magnitude = deg_to_rad(amplitude)
+	elif kind == Kind.SLIDE:
+		magnitude = amplitude
+	var along := axis * magnitude
+	return Vector4(along.x, along.y, along.z, period)
+
+
+## The Motion two vertex channels carry (channel0, channel3), its pivot left out: for a tool that
+## reads a mesh back (the clash check). A negative rate or amplitude comes back as a positive one
+## about the opposite axis, the same motion.
+static func from_channels(c0: Vector4, c3: Vector4) -> Motion:
+	var code := floori(c0.w * 0.5)
+	var motion := Motion.new()
+	motion.kind = (code / 4) as Kind
+	motion.easing = (code % 4) as Ease
+	motion.phase = c0.w - code * 2.0
+	var along := Vector3(c3.x, c3.y, c3.z)
+	var magnitude := along.length()
+	motion.axis = along / magnitude if magnitude > 0.0 else Vector3.UP
+	match motion.kind:
+		Kind.SPIN:
+			motion.rate = magnitude
+		Kind.SWING:
+			motion.amplitude = rad_to_deg(magnitude)
+		_:
+			motion.amplitude = magnitude
+	motion.period = c3.w
+	return motion
+
+
 ## SWING and SLIDE: where in its swing the part is at `time`, from -1 to 1.
 func wave(time: float) -> float:
 	var u := fposmod(time / period + phase, 1.0)

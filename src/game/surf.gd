@@ -38,9 +38,10 @@ const LIGHTNING := 1024
 ## RISE_DRIFT sideways, then starts again; on the hologram surface it fades out as it climbs, so
 ## smoke puffs rise from a stack's mouth (on an opaque surface the restart shows).
 const RISE := 2048
-## The part spins about the vertical line through a pivot at a rate, both carried per vertex in
-## CUSTOM0: set through LowPolyMesh.spin, never by a Surf, since the pivot is the part's.
-const SPIN := 4096
+## The part moves about a pivot as a Motion does (spins, swings or slides, eased), the pivot and
+## the motion carried per vertex in CUSTOM0 and CUSTOM3: set through LowPolyMesh.set_motion or
+## stamp_motion, never by a Surf, since the pivot is the part's.
+const MOVE := 4096
 ## The part turns with a rig channel (Rig), its pivots and channels carried per vertex in CUSTOM1
 ## and CUSTOM2: set through LowPolyMesh.rig, never by a Surf, since the pivots are the part's.
 const RIG := 8192

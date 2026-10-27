@@ -27,11 +27,13 @@ extends RefCounted
 ## the figures' parts (Figures.FIGURE_INK and FIGURE_INK_MASS). It goes into the outline's UV as
 ## the line's thinning, 1 - ink, so a mesh without UV draws the full line.
 ##
-## A part added while `spin` is set spins in the shaders (Surf.SPIN): about the vertical line
-## through spin's xyz, at spin.w radians a second on the animation clock, as Motion.spin turns a
-## moving part about +Y. The pivot and the rate go into a CUSTOM0 channel (four floats a vertex) on
-## the body and the outline, which a mesh with no spinning part leaves out, so the rotor is part
-## of the one mesh and costs no draw of its own.
+## A part added while a Motion is set (set_motion) moves in the shaders (Surf.MOVE) about the
+## pivot set with it, on the animation clock, as BuildingView moves a moving part's node: it spins,
+## swings or slides, eased. The motion goes into CUSTOM0 and CUSTOM3 (four floats a vertex each,
+## Motion.channel0 and channel3) on the body and the outline, which a mesh with no moving part leaves
+## out, so the part is part of the one mesh and costs no draw of its own (the gunship's rotors).
+## stamp_motion() does the same to a moving part built on its own, with its pivot at its origin,
+## and append_arrays() merges it into a model's body (BuildingModels folds its idle parts so).
 ##
 ## A part added while `rig` is set turns with a rig channel (Rig, Surf.RIG): rig is the part's own
 ## joint (pivot x, y, z, channel), rig2 the joint it hangs from, so a shin turns about the knee and
@@ -57,6 +59,10 @@ const MIN_RINGS := 2
 const FAR_SMOOTH_COS := 0.423
 ## Corners closer than this (world units) are one point when normals are averaged.
 const WELD := 0.001
+## The custom vertex channels and their format shifts, in step.
+const CUSTOM_CHANNELS: Array[int] = [Mesh.ARRAY_CUSTOM0, Mesh.ARRAY_CUSTOM1, Mesh.ARRAY_CUSTOM2, Mesh.ARRAY_CUSTOM3]
+const CUSTOM_SHIFTS: Array[int] = [Mesh.ARRAY_FORMAT_CUSTOM0_SHIFT, Mesh.ARRAY_FORMAT_CUSTOM1_SHIFT,
+	Mesh.ARRAY_FORMAT_CUSTOM2_SHIFT, Mesh.ARRAY_FORMAT_CUSTOM3_SHIFT]
 
 var _vertices := PackedVector3Array()
 var _normals := PackedVector3Array()
@@ -70,9 +76,10 @@ var _outlined := PackedByteArray()
 var _hard := PackedByteArray()
 ## Per triangle: `ink` when it was added.
 var _inks := PackedFloat32Array()
-## Per triangle: 0, or 1 + the index in _spin_list of the spin it was added with.
-var _spin_of := PackedByteArray()
-var _spin_list: Array[Vector4] = []
+## Per triangle: 0, or 1 + the index in _move_list of the motion it was added with; the list holds
+## each motion's two channels (CUSTOM0, CUSTOM3) as two entries.
+var _move_of := PackedByteArray()
+var _move_list := PackedVector4Array()
 ## Per triangle: 0, or 1 + the index in _rig_list of the pair (rig, rig2) it was added with; the
 ## list holds each pair as two entries.
 var _rig_of := PackedByteArray()
@@ -89,8 +96,15 @@ var flags: int = 0
 ## none (alpha 0), but where a caller paints a whole figure one colour, a hologram's.
 var tint := Color(0, 0, 0, 0)
 ## The spin given to the parts added from now on, as `ink` is kept: (pivot x, y, z, radians a
-## second) about the mesh's +Y; a zero rate, the default, spins nothing.
-var spin: Vector4 = Vector4.ZERO
+## second) about the mesh's +Y; a zero rate, the default, spins nothing. Sets the motion
+## (set_motion) to a Motion.spin about +Y.
+var spin: Vector4 = Vector4.ZERO:
+	set(value):
+		spin = value
+		set_motion(Vector3(value.x, value.y, value.z), Motion.spin(Vector3.UP, value.w) if value.w != 0.0 else null)
+## The motion given to the parts added from now on (set_motion), null for none, and its pivot.
+var _motion: Motion = null
+var _motion_pivot := Vector3.ZERO
 ## The rig given to the parts added from now on, as `ink` is kept: the part's own joint (pivot x,
 ## y, z, channel; Rig.part) and the joint it hangs from (rig2); channel 0, the default, turns
 ## nothing.
@@ -122,6 +136,13 @@ func socket(name: String, position: Vector3, direction: Vector3) -> void:
 	sockets[name] = s
 
 
+## Moves the parts added from now on as `motion` says about `pivot` (in the mesh's space), in the
+## shaders, as `ink` is kept; a null motion, the default, moves nothing.
+func set_motion(pivot: Vector3, motion: Motion) -> void:
+	_motion = motion
+	_motion_pivot = pivot
+
+
 ## Whether any part added carries the surface flag `flag` (Surf).
 func has_flag(flag: int) -> bool:
 	for uv2: Vector2 in _uv2s:
@@ -139,19 +160,32 @@ func triangle_count() -> int:
 ## on the hologram material, each a surface; with no opaque part the holograms are surface 0.
 ## Call once the parts are added.
 func to_mesh() -> ArrayMesh:
+	return body_mesh(to_arrays(), holo_arrays())
+
+
+## A body from its opaque surface's arrays and its HOLO surface's (to_arrays, holo_arrays, or
+## merged ones, append_arrays), each a surface when it has a triangle, on the toon and the hologram
+## material.
+static func body_mesh(opaque: Array, holo: Array) -> ArrayMesh:
 	var mesh := ArrayMesh.new()
-	var opaque := to_arrays()
-	if not (opaque[Mesh.ARRAY_VERTEX] as PackedVector3Array).is_empty():
-		mesh.add_surface_from_arrays(Mesh.PRIMITIVE_TRIANGLES, opaque, [], {}, format())
-		mesh.surface_set_material(mesh.get_surface_count() - 1, MaterialKit.toon())
-	if _has_holo():
-		mesh.add_surface_from_arrays(Mesh.PRIMITIVE_TRIANGLES, _select(true), [], {}, format())
-		mesh.surface_set_material(mesh.get_surface_count() - 1, MaterialKit.holo())
+	var surfaces: Array[Array] = [opaque, holo]
+	for k: int in surfaces.size():
+		var arrays := surfaces[k]
+		if arrays.is_empty() or (arrays[Mesh.ARRAY_VERTEX] as PackedVector3Array).is_empty():
+			continue
+		mesh.add_surface_from_arrays(Mesh.PRIMITIVE_TRIANGLES, arrays, [], {}, format_of(arrays))
+		mesh.surface_set_material(mesh.get_surface_count() - 1, MaterialKit.holo() if k == 1 else MaterialKit.toon())
 	return mesh
 
 
-## The opaque body's surface arrays (vertex, normal, UV, UV2, colour, and the spins' CUSTOM0 when
-## a part spins), for a caller that merges meshes itself (WallMesh); HOLO parts are left out.
+## The HOLO parts' surface arrays, as to_arrays() gives the others'; empty when there is none.
+func holo_arrays() -> Array:
+	return _select(true) if _has_holo() else []
+
+
+## The opaque body's surface arrays (vertex, normal, UV, UV2, colour, and the motions' CUSTOM0 and
+## CUSTOM3 when a part moves), for a caller that merges meshes itself (WallMesh); HOLO parts are left
+## out.
 func to_arrays() -> Array:
 	if _has_holo():
 		return _select(false)
@@ -162,46 +196,58 @@ func to_arrays() -> Array:
 	arrays[Mesh.ARRAY_TEX_UV] = _uvs
 	arrays[Mesh.ARRAY_TEX_UV2] = _uv2s
 	arrays[Mesh.ARRAY_COLOR] = _colors
-	if not _spin_list.is_empty():
+	if not _move_list.is_empty() or not _rig_list.is_empty():
 		var triangles := PackedInt32Array()
 		for i: int in _vertices.size():
 			triangles.append(i / 3)
-		arrays[Mesh.ARRAY_CUSTOM0] = _spins_of(triangles)
-	if not _rig_list.is_empty():
-		var triangles := PackedInt32Array()
-		for i: int in _vertices.size():
-			triangles.append(i / 3)
+		_add_moves(arrays, triangles)
 		_add_rigs(arrays, triangles)
 	return arrays
 
 
-## The format flags add_surface_from_arrays takes for these arrays: CUSTOM0 as four floats a
-## vertex when a part spins, CUSTOM1 and CUSTOM2 likewise when a part is rigged, else none.
+## The format flags add_surface_from_arrays takes for these arrays: CUSTOM0 and CUSTOM3 as four
+## floats a vertex when a part moves, CUSTOM1 and CUSTOM2 likewise when a part is rigged, else none.
 func format() -> int:
 	var bits := 0
-	if not _spin_list.is_empty():
+	if not _move_list.is_empty():
 		bits |= Mesh.ARRAY_CUSTOM_RGBA_FLOAT << Mesh.ARRAY_FORMAT_CUSTOM0_SHIFT
+		bits |= Mesh.ARRAY_CUSTOM_RGBA_FLOAT << Mesh.ARRAY_FORMAT_CUSTOM3_SHIFT
 	if not _rig_list.is_empty():
 		bits |= Mesh.ARRAY_CUSTOM_RGBA_FLOAT << Mesh.ARRAY_FORMAT_CUSTOM1_SHIFT
 		bits |= Mesh.ARRAY_CUSTOM_RGBA_FLOAT << Mesh.ARRAY_FORMAT_CUSTOM2_SHIFT
 	return bits
 
 
+## The format flags for surface arrays as they are: four floats a vertex for each custom channel
+## they carry.
+static func format_of(arrays: Array) -> int:
+	var bits := 0
+	for c: int in CUSTOM_CHANNELS.size():
+		if typeof(arrays[CUSTOM_CHANNELS[c]]) != TYPE_NIL:
+			bits |= Mesh.ARRAY_CUSTOM_RGBA_FLOAT << CUSTOM_SHIFTS[c]
+	return bits
+
+
 ## The ink outline, with the ink material; null when no part is outlined.
 func to_outline_mesh() -> ArrayMesh:
-	var arrays := to_outline_arrays()
+	return outline_mesh(to_outline_arrays())
+
+
+## An outline from its surface arrays (to_outline_arrays, or merged ones), with the ink material;
+## null when they are empty.
+static func outline_mesh(arrays: Array) -> ArrayMesh:
 	if arrays.is_empty():
 		return null
 	var mesh := ArrayMesh.new()
-	mesh.add_surface_from_arrays(Mesh.PRIMITIVE_TRIANGLES, arrays, [], {}, format())
+	mesh.add_surface_from_arrays(Mesh.PRIMITIVE_TRIANGLES, arrays, [], {}, format_of(arrays))
 	mesh.surface_set_material(0, MaterialKit.ink())
 	return mesh
 
 
 ## The outline's surface arrays (vertex, normal, each part's UV2 and colour, which carry the flags
 ## and the phase, so the ink shader moves the outline with a bobbing or jittering part, its
-## UV, which carries its line's thinning, (1 - ink, 0), the spins' CUSTOM0 when a part spins
-## and the rigs' CUSTOM1 and CUSTOM2 when a part is rigged); empty when no part is outlined.
+## UV, which carries its line's thinning, (1 - ink, 0), the motions' CUSTOM0 and CUSTOM3 when a part
+## moves and the rigs' CUSTOM1 and CUSTOM2 when a part is rigged); empty when no part is outlined.
 func to_outline_arrays() -> Array:
 	var vertices := PackedVector3Array()
 	var uvs := PackedVector2Array()
@@ -234,25 +280,108 @@ func to_outline_arrays() -> Array:
 	arrays[Mesh.ARRAY_TEX_UV] = uvs
 	arrays[Mesh.ARRAY_TEX_UV2] = uv2s
 	arrays[Mesh.ARRAY_COLOR] = colors
-	if not _spin_list.is_empty():
-		arrays[Mesh.ARRAY_CUSTOM0] = _spins_of(triangles)
+	_add_moves(arrays, triangles)
 	_add_rigs(arrays, triangles)
 	return arrays
 
 
-## The CUSTOM0 channel for vertices of the triangles `triangles` (one entry a vertex): each
-## triangle's spin, pivot and rate, zeros where it does not spin.
-func _spins_of(triangles: PackedInt32Array) -> PackedFloat32Array:
-	var spins := PackedFloat32Array()
-	spins.resize(triangles.size() * 4)
+## The CUSTOM0 and CUSTOM3 channels for vertices of the triangles `triangles` (one entry a vertex),
+## into `arrays`: each triangle's motion (Motion.channel0 and channel3), zeros where it does not
+## move. Nothing when no part moves.
+func _add_moves(arrays: Array, triangles: PackedInt32Array) -> void:
+	if _move_list.is_empty():
+		return
+	var first := PackedFloat32Array()
+	var second := PackedFloat32Array()
+	first.resize(triangles.size() * 4)
+	second.resize(triangles.size() * 4)
 	for i: int in triangles.size():
-		var t := triangles[i]
-		var at := _spin_list[_spin_of[t] - 1] if _spin_of[t] > 0 else Vector4.ZERO
-		spins[i * 4] = at.x
-		spins[i * 4 + 1] = at.y
-		spins[i * 4 + 2] = at.z
-		spins[i * 4 + 3] = at.w
-	return spins
+		var k := _move_of[triangles[i]]
+		var a := _move_list[(k - 1) * 2] if k > 0 else Vector4.ZERO
+		var b := _move_list[(k - 1) * 2 + 1] if k > 0 else Vector4.ZERO
+		for c: int in 4:
+			first[i * 4 + c] = a[c]
+			second[i * 4 + c] = b[c]
+	arrays[Mesh.ARRAY_CUSTOM0] = first
+	arrays[Mesh.ARRAY_CUSTOM3] = second
+
+
+## Stamps surface arrays of a part built in its own space, its pivot at the origin (to_arrays,
+## holo_arrays, to_outline_arrays of a moving part), with `motion` about `pivot`: its vertices
+## moved by the pivot into the model's space, Surf.MOVE on every vertex and the motion in CUSTOM0
+## and CUSTOM3, so the shaders move it as BuildingView would move its node. The normals, the
+## outline's averaged ones included, are kept as they are. Empty arrays are left alone.
+static func stamp_motion(arrays: Array, pivot: Vector3, motion: Motion) -> void:
+	if arrays.is_empty():
+		return
+	assert(typeof(arrays[Mesh.ARRAY_CUSTOM0]) == TYPE_NIL, "a part already moving in the shaders cannot be stamped again")
+	var vertices: PackedVector3Array = arrays[Mesh.ARRAY_VERTEX]
+	var uv2s: PackedVector2Array = arrays[Mesh.ARRAY_TEX_UV2]
+	var moved := PackedVector3Array()
+	moved.resize(vertices.size())
+	var flagged := PackedVector2Array()
+	flagged.resize(uv2s.size())
+	for i: int in vertices.size():
+		moved[i] = vertices[i] + pivot
+		flagged[i] = Vector2(uv2s[i].x, roundi(uv2s[i].y) | Surf.MOVE)
+	var first := motion.channel0(pivot)
+	var second := motion.channel3()
+	var c0 := PackedFloat32Array()
+	var c3 := PackedFloat32Array()
+	c0.resize(vertices.size() * 4)
+	c3.resize(vertices.size() * 4)
+	for i: int in vertices.size():
+		for c: int in 4:
+			c0[i * 4 + c] = first[c]
+			c3[i * 4 + c] = second[c]
+	arrays[Mesh.ARRAY_VERTEX] = moved
+	arrays[Mesh.ARRAY_TEX_UV2] = flagged
+	arrays[Mesh.ARRAY_CUSTOM0] = c0
+	arrays[Mesh.ARRAY_CUSTOM3] = c3
+
+
+## Surface arrays that are `into` followed by `more` (both of the kit's layout: vertex, normal, UV,
+## UV2 and colour, the outline's or the body's, and any custom channels), the custom channels
+## that only one carries filled with zeros for the other's vertices. `into` may be empty. Neither
+## is changed.
+static func append_arrays(into: Array, more: Array) -> Array:
+	if more.is_empty():
+		return into
+	if into.is_empty():
+		return more
+	var count := (into[Mesh.ARRAY_VERTEX] as PackedVector3Array).size()
+	var added := (more[Mesh.ARRAY_VERTEX] as PackedVector3Array).size()
+	var arrays := []
+	arrays.resize(Mesh.ARRAY_MAX)
+	var vertices: PackedVector3Array = into[Mesh.ARRAY_VERTEX].duplicate()
+	vertices.append_array(more[Mesh.ARRAY_VERTEX])
+	arrays[Mesh.ARRAY_VERTEX] = vertices
+	var normals: PackedVector3Array = into[Mesh.ARRAY_NORMAL].duplicate()
+	normals.append_array(more[Mesh.ARRAY_NORMAL])
+	arrays[Mesh.ARRAY_NORMAL] = normals
+	for slot: int in [Mesh.ARRAY_TEX_UV, Mesh.ARRAY_TEX_UV2]:
+		var pairs: PackedVector2Array = into[slot].duplicate()
+		pairs.append_array(more[slot])
+		arrays[slot] = pairs
+	var colors: PackedColorArray = into[Mesh.ARRAY_COLOR].duplicate()
+	colors.append_array(more[Mesh.ARRAY_COLOR])
+	arrays[Mesh.ARRAY_COLOR] = colors
+	for slot: int in CUSTOM_CHANNELS:
+		var in_into := typeof(into[slot]) != TYPE_NIL
+		var in_more := typeof(more[slot]) != TYPE_NIL
+		if not in_into and not in_more:
+			continue
+		var channel := PackedFloat32Array()
+		if in_into:
+			channel.append_array(into[slot])
+		else:
+			channel.resize(count * 4)
+		if in_more:
+			channel.append_array(more[slot])
+		else:
+			channel.resize((count + added) * 4)
+		arrays[slot] = channel
+	return arrays
 
 
 ## The CUSTOM1 and CUSTOM2 channels for vertices of the triangles `triangles` (one entry a
@@ -307,8 +436,7 @@ func _select(holo: bool) -> Array:
 	arrays[Mesh.ARRAY_TEX_UV] = uvs
 	arrays[Mesh.ARRAY_TEX_UV2] = uv2s
 	arrays[Mesh.ARRAY_COLOR] = colors
-	if not _spin_list.is_empty():
-		arrays[Mesh.ARRAY_CUSTOM0] = _spins_of(triangles)
+	_add_moves(arrays, triangles)
 	_add_rigs(arrays, triangles)
 	return arrays
 
@@ -703,9 +831,9 @@ func _emit(a: Vector3, b: Vector3, c: Vector3, uv_a: Vector2, uv_b: Vector2, uv_
 	_normals.append(normal)
 	_normals.append(normal)
 	_normals.append(normal)
-	var spinning := spin.w != 0.0
+	var moving := _motion != null
 	var rigged := rig.w != 0.0 or rig2.w != 0.0
-	var uv2 := Vector2(surf.layer, surf.flags | flags | (Surf.SPIN if spinning else 0) | (Surf.RIG if rigged else 0))
+	var uv2 := Vector2(surf.layer, surf.flags | flags | (Surf.MOVE if moving else 0) | (Surf.RIG if rigged else 0))
 	_uv2s.append(uv2)
 	_uv2s.append(uv2)
 	_uv2s.append(uv2)
@@ -719,15 +847,22 @@ func _emit(a: Vector3, b: Vector3, c: Vector3, uv_a: Vector2, uv_b: Vector2, uv_
 	_outlined.append(1 if surf.outline and ((surf.flags | flags) & Surf.NO_OUTLINE) == 0 else 0)
 	_hard.append(1 if hard else 0)
 	_inks.append(ink)
-	if spinning:
-		var index := _spin_list.find(spin)
-		if index < 0:
-			assert(_spin_list.size() < 255, "a mesh has at most 255 spins")
-			_spin_list.append(spin)
-			index = _spin_list.size() - 1
-		_spin_of.append(index + 1)
+	if moving:
+		var first := _motion.channel0(_motion_pivot)
+		var second := _motion.channel3()
+		var found := -1
+		for k: int in _move_list.size() / 2:
+			if _move_list[k * 2] == first and _move_list[k * 2 + 1] == second:
+				found = k
+				break
+		if found < 0:
+			assert(_move_list.size() / 2 < 255, "a mesh has at most 255 motions")
+			_move_list.append(first)
+			_move_list.append(second)
+			found = _move_list.size() / 2 - 1
+		_move_of.append(found + 1)
 	else:
-		_spin_of.append(0)
+		_move_of.append(0)
 	if rigged:
 		var found := -1
 		for k: int in _rig_list.size() / 2:

@@ -4,7 +4,9 @@
 // hologram moves like any other. The flags are bits of the integer in UV2.y; a part's phase, 0 to
 // 1 in 1/254 steps, is in COLOR.a (surf_phase) and offsets its effect's cycle. No per-instance
 // uniforms: every instance of a mesh animates alike, from anim_time, but for a battle's MultiMesh
-// instances, whose custom data carries their gait, hit flash and fade (effect_gait, below).
+// instances, whose custom data carries their gait, hit flash and fade (effect_gait, below), and for
+// MOVE parts, which hold still while the shader's own move_hold instance uniform is set
+// (move_clock, below).
 
 // The game's animation clock in seconds, wrapping every hour: main.gd sets it once a frame from
 // the clock Motion.clock() returns, so the moving parts BuildingView poses keep step with these
@@ -24,7 +26,7 @@ const int FLAG_JITTER = 256;
 const int FLAG_HOLO = 512;
 const int FLAG_LIGHTNING = 1024;
 const int FLAG_RISE = 2048;
-const int FLAG_SPIN = 4096;
+const int FLAG_MOVE = 4096;
 const int FLAG_RIG = 8192;
 const int FLAG_MARCH = 16384;
 
@@ -80,19 +82,61 @@ float effect_hash(vec3 p) {
 	return fract((p.x + p.y) * p.z);
 }
 
-// SPIN (LowPolyMesh.spin): a vertex turned about the vertical line through spin.xyz by spin.w
-// radians a second on the clock, as Motion.spin turns a moving part about +Y (Basis(UP, angle));
-// a normal is turned the same way with a zero pivot. The pivot and the rate are in CUSTOM0, which a
-// mesh with no spinning part does not carry, so it is read only under the flag.
-vec3 effect_spin(vec3 vertex, int flags, vec4 spin) {
-	if (!has_flag(flags, FLAG_SPIN)) {
-		return vertex;
+// MOVE (LowPolyMesh.set_motion and stamp_motion, Motion.channel0 and channel3): a part that moves
+// about its pivot as Motion.transform_at moves a moving part's node, a building's idle part folded
+// into its body (BuildingModels) or a unit's rotor. Per vertex, CUSTOM0 is the pivot (xyz, in the
+// mesh's space) and a code, (kind * 4 + easing) * 2 + phase, the phase 0 to 1; CUSTOM3 is the axis
+// times the magnitude (xyz: a SPIN's radians a second, a SWING's amplitude in radians, a SLIDE's in
+// units) and the period in seconds (w; a SPIN's is unused). The kinds and the easings are Motion's,
+// in its order: SPIN, SWING, SLIDE; LINEAR, SMOOTH, HAMMER, RECOIL. A mesh with no moving part
+// carries neither channel, so they are read only under the flag.
+//
+// The part moves on move_clock(hold): anim_time, or while the instance's move_hold is set (not 0)
+// that time, at which it holds its pose (BuildingView, while the building is busy or disabled); its
+// surface effects run on anim_time either way. Its FLICKER and JITTER act in its own space, before
+// it moves, and its BOB and RISE after, as on a moving part's node (move_after_flags).
+const int MOVE_SPIN = 0;
+const int MOVE_SWING = 1;
+const int MOVE_EASE_LINEAR = 0;
+const int MOVE_EASE_SMOOTH = 1;
+const int MOVE_EASE_HAMMER = 2;
+
+float move_clock(float hold) {
+	return hold != 0.0 ? hold : anim_time;
+}
+
+// Motion.wave's shape at the cycle's share u, from -1 to 1 (Motion.recoil for RECOIL).
+float move_wave(int easing, float u) {
+	if (easing == MOVE_EASE_LINEAR) {
+		return 1.0 - 4.0 * abs(u - 0.5);
 	}
-	float angle = spin.w * anim_time;
-	float c = cos(angle);
-	float s = sin(angle);
-	vec3 off = vertex - spin.xyz;
-	return spin.xyz + vec3(off.x * c + off.z * s, off.y, -off.x * s + off.z * c);
+	if (easing == MOVE_EASE_SMOOTH) {
+		return sin(TAU * u);
+	}
+	if (easing == MOVE_EASE_HAMMER) {
+		if (u < 0.7) {
+			return -1.0 + 2.0 * smoothstep(0.0, 0.7, u);
+		}
+		if (u < 0.8) {
+			float fall = (u - 0.7) / 0.1;
+			return 1.0 - 2.0 * fall * fall;
+		}
+		return -1.0;
+	}
+	if (u < 0.1) {
+		float kick = u / 0.1;
+		return -1.0 + 2.0 * (1.0 - (1.0 - kick) * (1.0 - kick));
+	}
+	if (u < 0.8) {
+		return 1.0 - 2.0 * smoothstep(0.1, 0.8, u);
+	}
+	return -1.0;
+}
+
+// The flags effect_vertex takes after a vertex has moved: a MOVE part's FLICKER and JITTER are
+// done (effect_move).
+int move_after_flags(int flags) {
+	return has_flag(flags, FLAG_MOVE) ? flags & ~(FLAG_FLICKER | FLAG_JITTER) : flags;
 }
 
 // The battle's per-instance state (BattleUnits and BattleEffects draw from MultiMeshes whose
@@ -367,4 +411,34 @@ vec2 effect_uv(vec2 uv, int flags, float phase) {
 		uv.x -= shift;
 	}
 	return uv;
+}
+
+// A MOVE vertex `v` and its normal `n` moved at `time` (move_clock): in its own space, its FLICKER
+// and JITTER, then turned about the axis through the pivot as Godot's Basis(axis, angle) turns
+// (SPIN, SWING; the normal too) or slid along it (SLIDE).
+void effect_move(int flags, vec4 c0, vec4 c3, float time, float phase, inout vec3 v, inout vec3 n) {
+	if (!has_flag(flags, FLAG_MOVE)) {
+		return;
+	}
+	int code = int(floor(c0.w * 0.5));
+	float move_phase = c0.w - 2.0 * float(code);
+	int kind = code / 4;
+	int easing = code - kind * 4;
+	vec3 local = effect_vertex(v - c0.xyz, flags & (FLAG_FLICKER | FLAG_JITTER | FLAG_LIGHTNING), phase, mat4(1.0));
+	float wave = move_wave(easing, fract(time / c3.w + move_phase));
+	float magnitude = length(c3.xyz);
+	if (kind > MOVE_SWING) {
+		v = c0.xyz + local + c3.xyz * wave;
+		return;
+	}
+	if (magnitude <= 0.0) {
+		v = c0.xyz + local;
+		return;
+	}
+	vec3 k = c3.xyz / magnitude;
+	float a = kind == MOVE_SPIN ? magnitude * time : magnitude * wave;
+	float c = cos(a);
+	float s = sin(a);
+	v = c0.xyz + local * c + cross(k, local) * s + k * dot(k, local) * (1.0 - c);
+	n = n * c + cross(k, n) * s + k * dot(k, n) * (1.0 - c);
 }

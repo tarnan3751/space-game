@@ -25,17 +25,22 @@ const float HOLO_DIP_ALPHA = 0.2;
 const float RIM_BRIGHTEN = 0.3;
 
 uniform sampler2DArray kit : source_color, filter_linear_mipmap, repeat_enable;
+// While set (not 0), the anim_time at which this instance's MOVE parts hold their pose
+// (effects.gdshaderinc, move_clock): BuildingView sets it while the building is busy or disabled.
+instance uniform float move_hold = 0.0;
 
 varying float world_y;
 varying float fade;
 
 void vertex() {
 	int flags = surf_flags(UV2);
-	vec3 rigged = effect_spin(VERTEX, flags, CUSTOM0);
+	float phase = surf_phase(COLOR);
+	vec3 rigged = VERTEX;
+	effect_move(flags, CUSTOM0, CUSTOM3, move_clock(move_hold), phase, rigged, NORMAL);
 	vec3 normal = NORMAL;
 	effect_rig(flags, CUSTOM1, CUSTOM2, INSTANCE_CUSTOM, rigged, normal);
 	vec3 spun = effect_gait(rigged, INSTANCE_CUSTOM);
-	VERTEX = effect_vertex(spun, flags, surf_phase(COLOR), MODEL_MATRIX);
+	VERTEX = effect_vertex(spun, move_after_flags(flags), phase, MODEL_MATRIX);
 	world_y = (MODEL_MATRIX * vec4(VERTEX, 1.0)).y;
 	fade = INSTANCE_CUSTOM.w;
 }

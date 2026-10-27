@@ -11,8 +11,9 @@ extends HarnessScenario
 ## (Geometry3D.segment_intersects_triangle), tested only inside the overlap of their posed bounds
 ## and through a spatial hash of CELL-sized cells.
 ##
-## A part of the body tagged with LowPolyMesh.spin (the gunship's rotors) is read back as a moving
-## part of its own, spinning about +Y through its pivot at its rate, as the shaders spin it.
+## A part of the body that moves in the shaders (Surf.MOVE: a building's idle part folded into its
+## body, the gunship's rotors) is read back as a moving part of its own, its pivot and Motion
+## decoded from CUSTOM0 and CUSTOM3 (Motion.from_channels), as the shaders move it.
 ##
 ## - Every pair of moving parts is posed together on the clock, as BuildingView poses them
 ##   (Motion.transform_at): sampled every pair step (the smaller part's step: a SPIN's
@@ -173,9 +174,9 @@ func _check_model(label: String, model: Node3D) -> void:
 
 
 ## Adds a mesh's triangles, every surface, to `shape`, with its distinct edges and its BOB corners.
-## With `spins`, a triangle tagged with LowPolyMesh.spin (Surf.SPIN, its pivot and rate in CUSTOM0)
-## goes instead to the part of its pivot in `spins` (made on first use, keyed by the spin), in that
-## part's own space: a spinning part of the body is checked as a moving part spinning about +Y.
+## With `spins`, a triangle that moves in the shaders (Surf.MOVE, its pivot and motion in CUSTOM0 and
+## CUSTOM3) goes instead to the part of its motion in `spins` (made on first use, keyed by the two
+## channels), in that part's own space: a moving part of the body is checked as a moving part.
 func _read(mesh: Mesh, shape: Shape, spins: Dictionary = {}) -> void:
 	var seen := {}
 	for surface: int in mesh.get_surface_count():
@@ -185,17 +186,21 @@ func _read(mesh: Mesh, shape: Shape, spins: Dictionary = {}) -> void:
 		var colours: PackedColorArray = arrays[Mesh.ARRAY_COLOR]
 		var custom: Variant = arrays[Mesh.ARRAY_CUSTOM0]
 		var spin_data: PackedFloat32Array = custom if typeof(custom) == TYPE_PACKED_FLOAT32_ARRAY else PackedFloat32Array()
+		var custom3: Variant = arrays[Mesh.ARRAY_CUSTOM3]
+		var motion_data: PackedFloat32Array = custom3 if typeof(custom3) == TYPE_PACKED_FLOAT32_ARRAY else PackedFloat32Array()
 		for k: int in range(0, vertices.size(), 3):
 			var into := shape
 			var origin := Vector3.ZERO
-			if (roundi(uv2s[k].y) & Surf.SPIN) != 0 and not spin_data.is_empty():
-				var spin := Vector4(spin_data[k * 4], spin_data[k * 4 + 1], spin_data[k * 4 + 2], spin_data[k * 4 + 3])
-				if not spins.has(spin):
+			if (roundi(uv2s[k].y) & Surf.MOVE) != 0 and not spin_data.is_empty():
+				var c0 := Vector4(spin_data[k * 4], spin_data[k * 4 + 1], spin_data[k * 4 + 2], spin_data[k * 4 + 3])
+				var c3 := Vector4(motion_data[k * 4], motion_data[k * 4 + 1], motion_data[k * 4 + 2], motion_data[k * 4 + 3])
+				var key := [c0, c3]
+				if not spins.has(key):
 					var part := Shape.new()
-					part.pivot = Vector3(spin.x, spin.y, spin.z)
-					part.motion = Motion.spin(Vector3.UP, spin.w)
-					spins[spin] = [part, {}]
-				var entry: Array = spins[spin]
+					part.pivot = Vector3(c0.x, c0.y, c0.z)
+					part.motion = Motion.from_channels(c0, c3)
+					spins[key] = [part, {}]
+				var entry: Array = spins[key]
 				into = entry[0]
 				origin = into.pivot
 				_add_triangle(into, entry[1], vertices, uv2s, colours, k, origin)
