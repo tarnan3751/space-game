@@ -2653,6 +2653,23 @@ func _make_theme() -> Theme:
 	# Both disabled once the battle is over: the dark family's dim text, whatever a skin gave Button.
 	for type: StringName in [&"BattleBarButton", &"EndButton"]:
 		ui.set_color("font_disabled_color", type, Color(TEXT, DISABLED_ALPHA))
+	# The deploy and abilities bars: skin A's bottom panel. Their cards: a button's shape, and the
+	# selected one cyan in every state with an ink ring inside its border (BattleCardRing).
+	ui.set_type_variation(&"BattleBar", &"PanelContainer")
+	ui.set_stylebox("panel", &"BattleBar", menu)
+	_button_variation(ui, &"BattleCard", CARD, 12, BODY_FONT, 20, 0)
+	_button_variation(ui, &"BattleCardSelected", ACCENT, 12, BODY_FONT, 20, 0, INK)
+	for item: String in ["normal", "hover", "pressed", "hover_pressed"]:
+		ui.set_stylebox(item, &"BattleCardSelected", _shape(ACCENT, 12, BUTTON_MARGIN))
+	var ring := StyleBoxFlat.new()
+	ring.draw_center = false
+	ring.border_color = INK
+	ring.set_border_width_all(BORDER)
+	ring.set_corner_radius_all(8)
+	ui.set_type_variation(&"BattleCardRing", &"Panel")
+	ui.set_stylebox("panel", &"BattleCardRing", ring)
+	_label_variation(ui, &"BattleCardName", 17, TEXT, 0)
+	_label_variation(ui, &"BattleCount", 22, TEXT, 0)
 	return ui
 
 

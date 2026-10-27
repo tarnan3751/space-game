@@ -12,7 +12,8 @@ extends CanvasLayer
 ## - Along the bottom, the deploy bar: a card per unit type the attacker brought, its picture
 ##   (ModelPreview, the unit at the attacker's level's tier), its name and how many are left; a
 ##   press selects it (BattleView.select_unit) or, pressed again, lets it go. The first type is
-##   selected at the start; a type that runs out is let go and its card dimmed.
+##   selected at the start, cyan with an ink ring inside its border; a type that runs out is let go
+##   and its card dimmed. Right of it, the abilities bar, the same for each ability brought.
 ## - When the battle ends, the result panel: the stars, the destruction, the loot per resource, the
 ##   units deployed by type, and Return, which leaves the battle (BattleView.leave).
 ## - A toast for a refused deploy.
@@ -34,6 +35,10 @@ const ICON_SIZE := Vector2(40, 40)
 ## A star not won yet: dark, but clear of the panel under it.
 const UNEARNED := MaterialKit.HULL_DARK
 const CARD_GAP := 10
+## The selected card's ink ring, this far inside the card's edge; a card's content, this far in
+## from its sides, clear of the ring.
+const RING_INSET := 5
+const CONTENT_INSET := 9
 ## Between the deploy bar and the abilities bar.
 const BAR_GAP := 16
 ## The dim behind the End confirmation, which takes every touch while it is open.
@@ -296,7 +301,7 @@ func _build_top() -> void:
 ## The deploy bar along the bottom: a card per unit type brought, in sorted order.
 func _build_deploy_bar() -> void:
 	_bar = PanelContainer.new()
-	_bar.theme_type_variation = &"MenuPanel"
+	_bar.theme_type_variation = &"BattleBar"
 	_bar.mouse_filter = Control.MOUSE_FILTER_STOP
 	_root.add_child(_bar)
 	_bar.set_anchors_preset(Control.PRESET_BOTTOM_LEFT)
@@ -333,7 +338,7 @@ func _build_deploy_bar() -> void:
 ## catalog's order; hidden when none is.
 func _build_ability_bar() -> void:
 	_ability_bar = PanelContainer.new()
-	_ability_bar.theme_type_variation = &"MenuPanel"
+	_ability_bar.theme_type_variation = &"BattleBar"
 	_ability_bar.mouse_filter = Control.MOUSE_FILTER_STOP
 	_root.add_child(_ability_bar)
 	_ability_bar.set_anchors_preset(Control.PRESET_BOTTOM_LEFT)
@@ -365,9 +370,10 @@ func _build_ability_bar() -> void:
 
 
 ## A card in `row`: a button CARD_SIZE calling `pressed`, holding a centred column (its child 0)
-## the caller fills. PASS, as the HUD's cards, so a drag on a card scrolls its strip.
+## the caller fills and the selected card's ring (child 1, hidden). PASS, as the HUD's cards, so a
+## drag on a card scrolls its strip.
 func _card(row: Control, pressed: Callable) -> Button:
-	var button := _button("", CARD_SIZE)
+	var button := _button("", CARD_SIZE, &"BattleCard")
 	button.mouse_filter = Control.MOUSE_FILTER_PASS
 	button.pressed.connect(pressed)
 	row.add_child(button)
@@ -377,19 +383,29 @@ func _card(row: Control, pressed: Callable) -> Button:
 	content.add_theme_constant_override("separation", 0)
 	button.add_child(content)
 	content.set_anchors_preset(Control.PRESET_FULL_RECT)
-	content.offset_left = 6
-	content.offset_right = -6
+	content.offset_left = CONTENT_INSET
+	content.offset_right = -CONTENT_INSET
 	content.offset_top = Hud.BORDER + 2
 	content.offset_bottom = -Hud.BORDER - 2
+	var ring := Panel.new()
+	ring.theme_type_variation = &"BattleCardRing"
+	ring.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	ring.visible = false
+	button.add_child(ring)
+	ring.set_anchors_preset(Control.PRESET_FULL_RECT)
+	ring.offset_left = RING_INSET
+	ring.offset_top = RING_INSET
+	ring.offset_right = -RING_INSET
+	ring.offset_bottom = -RING_INSET
 	return button
 
 
 ## A card's name and, under it, its count, which it returns.
 func _card_lines(content: Control, title: String) -> Label:
-	var name := _label(content, title, &"QueueName")
+	var name := _label(content, title, &"BattleCardName")
 	name.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	name.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
-	var count := _label(content, "", &"CardCost")
+	var count := _label(content, "", &"BattleCount")
 	count.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	return count
 
@@ -617,7 +633,8 @@ func _on_ability_card(ability: String) -> void:
 	_select_ability("" if _view.cast_ability == ability else ability)
 
 
-## The selected card, unit or ability, takes the accent fill and ink text; the others the card's.
+## The selected card, unit or ability, takes the accent fill, its ring and ink text; the others the
+## card's.
 func _highlight() -> void:
 	for type: String in _cards:
 		_mark(_cards[type], type == _view.deploy_unit)
@@ -626,7 +643,8 @@ func _highlight() -> void:
 
 
 func _mark(card: Button, on: bool) -> void:
-	card.theme_type_variation = &"TabSelected" if on else &""
+	card.theme_type_variation = &"BattleCardSelected" if on else &"BattleCard"
+	(card.get_child(1) as Control).visible = on
 	var name_color := Hud.INK if on else Hud.TEXT
 	for child: Node in card.get_child(0).get_children():
 		if child is Label:

@@ -163,7 +163,7 @@ func run(main: MainScript) -> void:
 
 	# The Ranger's card selects it; a tap deploys one; a tap in the zone is refused with a toast.
 	hud.card("ranger").pressed.emit()
-	check(view.deploy_unit == "ranger" and hud.card("ranger").theme_type_variation == &"TabSelected",
+	check(view.deploy_unit == "ranger" and hud.card("ranger").theme_type_variation == &"BattleCardSelected",
 		"the Ranger's card selected the Ranger")
 	var tap_cell: Vector2i = spots[0][0]
 	view.input.tapped.emit(_screen(main, view, tap_cell))
