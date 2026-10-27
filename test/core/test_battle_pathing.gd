@@ -239,6 +239,26 @@ func test_searches_are_budgeted_and_shared() -> void:
 	assert_eq(sim.unit_state(6), BattleArmy.WALKING)
 
 
+func test_no_search_runs_when_nothing_stands() -> void:
+	# Four units round the only building (a shield generator, which does not fire), hitting it in
+	# id order: the hit that fells it leaves the units after the hitter wanting another target in
+	# that tick, and none stands, so none searches (a search would settle every cell it can reach).
+	var commands := [Fixtures.deploy(0, "melee", 8, 10), Fixtures.deploy(0, "melee", 12, 10),
+		Fixtures.deploy(0, "melee", 10, 8), Fixtures.deploy(0, "melee", 10, 12)]
+	var sim := Fixtures.battle([["shield", 10, 10], ["wall", 2, 2]], {"melee": 4}, commands)
+	var searches := 0
+	while not sim.is_over():
+		searches = sim.pathing.searches
+		sim.step()
+	assert_true(sim.is_destroyed(1))
+	assert_eq(sim.pathing.searches, searches, "the last tick searched nothing")
+	var waiting := 0
+	for id: int in [1, 2, 3, 4]:
+		if sim.unit_state(id) == BattleArmy.IDLE:
+			waiting += 1
+	assert_true(waiting > 0, "a unit that noticed the fall waits")
+
+
 func _step_until(sim: BattleSim, done: Callable) -> void:
 	var guard := 0
 	while not done.call() and not sim.is_over() and guard < 5000:

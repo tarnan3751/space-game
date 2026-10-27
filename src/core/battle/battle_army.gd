@@ -450,9 +450,15 @@ func _aim_ground(u: int, budget: int) -> int:
 	return budget
 
 
+## A search from `cell` on map `m`, kept for the units that ask the same this tick; returns its
+## place. With no candidate of the map's set standing it finds nothing without searching, which a
+## search would have done only after settling every cell it can reach.
 func _search(cell: int, m: int) -> int:
-	var path := _pathing.find(cell, m)
-	var aim := _pathing.found
+	var path := PackedInt32Array()
+	var aim := -1
+	if _standing[_pathing.map_set(m)] > 0:
+		path = _pathing.find(cell, m)
+		aim = _pathing.found
 	for k: int in range(1, path.size()):
 		if _field.kind[path[k]] == BattleField.WALL:
 			aim = _field.building[path[k]] - 1

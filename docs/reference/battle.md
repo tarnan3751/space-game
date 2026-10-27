@@ -137,7 +137,9 @@ unit's cell.
 - If the path walks into a wall, it is cut at the cell before it and that wall becomes the
   target: a blocking wall is in reach from any of its eight neighbours. When it falls, the unit
   searches again.
-- A unit that finds nothing waits, IDLE, and searches again after the next fall.
+- A unit that finds nothing waits, IDLE, and searches again after the next fall. With no
+  candidate of its set standing (the battle's last tick, when everything counted has fallen), it
+  finds nothing without a search, which would have settled every cell it can reach.
 
 **Reach maps.** "A candidate in reach" is read from a map per (candidate set, reach): per cell,
 the number of standing candidates within that reach of the cell's centre. Every map the army can
