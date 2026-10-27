@@ -484,7 +484,7 @@ static func _helmet(m: LowPolyMesh, xf: Transform3D, b: Body) -> void:
 	# The stripe: a band round the helmet's X axis, from the nape over the crown to the visor's top.
 	var half := 0.024 * k
 	m.tube(r * 0.9, r * 1.025, half * 2.0, 12, xf * (centre + Vector3(half, 0, 0)), ARMY_SMALL,
-		_rot(xf, Vector3(0, 0, 90)), -120.0, 46.0)
+		_rot(xf, Vector3(0, 0, 90)), -115.0, 46.0)
 
 
 ## The torso on the waist joint `xf`: the suit broad at the chest, in at the waist and out again
@@ -681,4 +681,5 @@ static func _robot_shin(m: LowPolyMesh, xf: Transform3D, b: Body) -> void:
 static func _foot_pad(m: LowPolyMesh, xf: Transform3D, b: Body) -> void:
 	var k := b.k
 	m.box_chamfered(Vector3(0.12, 0.07, 0.18) * k, 0.03 * k, xf * Vector3(0, -b.ankle, 0.03 * k), Parts.HULL_MID, _rot(xf))
-	m.box_chamfered(Vector3(0.128, 0.078, 0.05) * k, 0.024 * k, xf * Vector3(0, -b.ankle, 0.095 * k), ARMY_SMALL, _rot(xf))
+	# A step proud of the pad's front, so their faces never share a plane.
+	m.box_chamfered(Vector3(0.128, 0.078, 0.05) * k, 0.024 * k, xf * Vector3(0, -b.ankle, 0.105 * k), ARMY_SMALL, _rot(xf))
