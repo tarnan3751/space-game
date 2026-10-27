@@ -15,7 +15,9 @@ extends RefCounted
 ## kept as the part had them; the shaders move it, at no draw of its own. The meshes' custom_aabb
 ## covers its whole sweep, so it is never culled as it moves, and the root carries FOLDS_META, the
 ## static body's top (top_of), which the folded parts leave out. hold() holds the folded parts'
-## pose, for a view that freezes them (BuildingView, while busy or disabled).
+## pose, for a view that freezes them (BuildingView, while busy or disabled). The fold, like every
+## array of the meshes, is worked out as arrays alone (mesh_data), and the meshes are made from the
+## arrays after (meshes_from).
 ##
 ## Every other moving part is a Node3D at its pivot carrying the MOVE_META meta (its Motion),
 ## which BuildingView moves while the building is finished and idle, with the part's mesh and its
@@ -116,6 +118,33 @@ static var _cache: Dictionary[String, Meshes] = {}
 static var _warned: Dictionary[String, bool] = {}
 
 
+## A model's surfaces as arrays (mesh_data), before any mesh is made of them: the body's, with the
+## folded parts in, their sweep and the body's top without them; and each kept moving part's.
+class MeshData:
+	var opaque: Array = []
+	var holo: Array = []
+	var outline: Array = []
+	var sockets: Dictionary[String, LowPolyMesh.Socket] = {}
+	var folds := false
+	var top: float = 0.0
+	## The box the folded parts sweep, which the body's and the outline's AABBs take in.
+	var sweep := AABB()
+	var moving: Array[MovingData] = []
+
+
+## A kept moving part's arrays, its pivot, Motion, sockets, the index of the part it rides and
+## its marching, as Moving carries them.
+class MovingData:
+	var opaque: Array = []
+	var holo: Array = []
+	var outline: Array = []
+	var pivot := Vector3.ZERO
+	var motion: Motion
+	var sockets: Dictionary[String, LowPolyMesh.Socket] = {}
+	var rides: int = -1
+	var marches := false
+
+
 ## A built model's meshes, shared by every view that shows it.
 class Meshes:
 	var body: ArrayMesh
@@ -169,30 +198,45 @@ static func tier_of(catalog: Catalog, type: String, level: int) -> int:
 ## The model of `type` at `level`, built for its `tier` (tier_of) and scaled to `size` cells.
 static func create(type: String, level: int, size: int, tier: int) -> Node3D:
 	var root := Node3D.new()
-	var shown := 0
 	var key := "?/%d" % size
 	if MODELS.has(type):
-		var spec: Array = MODELS[type]
-		var built_for: int = spec[0]
-		var top: int = spec[1]
-		shown = clampi(level, 1, top)
-		key = "%s/%d/%d" % [type, shown, tier]
-		if built_for != size:
-			root.scale = Vector3.ONE * (float(size) / built_for)
+		key = "%s/%d/%d" % [type, _shown(type, level), tier]
 	elif not _warned.has(type):
 		_warned[type] = true
 		push_warning("No model for building type '%s'; showing a generic block" % type)
+	root.scale = Vector3.ONE * scale_of(type, size)
 	var meshes: Meshes = _cache.get(key)
 	if meshes == null:
-		var p := Parts.new()
-		p.tier = tier
-		if shown > 0:
-			_build(p, type, shown)
-		else:
-			CoreModels.build_generic(p, size)
-		meshes = _store(key, p)
+		meshes = _store(key, parts_of(type, level, size, tier))
 	_add_parts(root, meshes)
 	return root
+
+
+## The parts of `type`'s model at `level` for `tier`, at its built size (scale_of scales it to
+## `size` cells), uncached; a type with no model is the generic block. They read no cache, write
+## none and make no resource or node.
+static func parts_of(type: String, level: int, size: int, tier: int) -> Parts:
+	var p := Parts.new()
+	p.tier = tier
+	if MODELS.has(type):
+		_build(p, type, _shown(type, level))
+	else:
+		CoreModels.build_generic(p, size)
+	return p
+
+
+## The scale a model of `type`, built for its own size, takes at `size` cells: 1 when they match.
+static func scale_of(type: String, size: int) -> float:
+	if not MODELS.has(type):
+		return 1.0
+	var built_for: int = (MODELS[type] as Array)[0]
+	return 1.0 if built_for == size else float(size) / built_for
+
+
+## The level of `type`'s models shown for `level`: a level above its models shows its top one.
+static func _shown(type: String, level: int) -> int:
+	var top: int = (MODELS[type] as Array)[1]
+	return clampi(level, 1, top)
 
 
 ## A model's nodes for meshes built from `p`, uncached: for a caller that builds its own parts
@@ -295,49 +339,76 @@ static func _store(key: String, p: Parts) -> Meshes:
 
 
 static func _meshes(p: Parts) -> Meshes:
-	var meshes := Meshes.new()
-	meshes.sockets = p.body.sockets
-	var opaque := p.body.to_arrays()
-	var holo := p.body.holo_arrays()
-	var outline := p.body.to_outline_arrays()
-	var sweep := AABB()
-	# Each kept part's index in meshes.moving, by its index in p.movers (an empty part is dropped).
+	return meshes_from(mesh_data(p))
+
+
+## The surfaces of the model built as `p`, as arrays: the body's, with the idle moving parts folded
+## in (stamped with their motion, _folds), and each kept moving part's. Works out every array of
+## the meshes without making a resource or a node and without touching a cache; meshes_from() makes
+## the meshes from them.
+static func mesh_data(p: Parts) -> MeshData:
+	var data := MeshData.new()
+	data.sockets = p.body.sockets
+	data.opaque = p.body.to_arrays()
+	data.holo = p.body.holo_arrays()
+	data.outline = p.body.to_outline_arrays()
+	# Each kept part's index in data.moving, by its index in p.movers (an empty part is dropped).
 	var kept: Dictionary[int, int] = {}
 	for i: int in p.movers.size():
 		if p.movers[i].triangle_count() == 0:
 			continue
 		if _folds(p, i):
-			if not meshes.folds:
-				meshes.folds = true
-				meshes.top = _top(opaque, holo)
+			if not data.folds:
+				data.folds = true
+				data.top = _top(data.opaque, data.holo)
 			var part := p.movers[i]
 			var arrays: Array[Array] = [part.to_arrays(), part.holo_arrays(), part.to_outline_arrays()]
 			var reach := _sweep(arrays, p.pivots[i], p.motions[i])
-			sweep = reach if sweep.size == Vector3.ZERO else sweep.merge(reach)
+			data.sweep = reach if data.sweep.size == Vector3.ZERO else data.sweep.merge(reach)
 			for k: int in arrays.size():
 				if arrays[k].is_empty() or (arrays[k][Mesh.ARRAY_VERTEX] as PackedVector3Array).is_empty():
 					continue
 				LowPolyMesh.stamp_motion(arrays[k], p.pivots[i], p.motions[i])
-			opaque = LowPolyMesh.append_arrays(opaque, _filled(arrays[0]))
-			holo = LowPolyMesh.append_arrays(holo, _filled(arrays[1]))
-			outline = LowPolyMesh.append_arrays(outline, _filled(arrays[2]))
+			data.opaque = LowPolyMesh.append_arrays(data.opaque, _filled(arrays[0]))
+			data.holo = LowPolyMesh.append_arrays(data.holo, _filled(arrays[1]))
+			data.outline = LowPolyMesh.append_arrays(data.outline, _filled(arrays[2]))
 			continue
-		kept[i] = meshes.moving.size()
-		var moving := Moving.new()
-		moving.body = p.movers[i].to_mesh()
-		moving.outline = p.movers[i].to_outline_mesh()
+		kept[i] = data.moving.size()
+		var moving := MovingData.new()
+		moving.opaque = p.movers[i].to_arrays()
+		moving.holo = p.movers[i].holo_arrays()
+		moving.outline = p.movers[i].to_outline_arrays()
 		moving.pivot = p.pivots[i]
 		moving.motion = p.motions[i]
 		moving.sockets = p.movers[i].sockets
 		moving.rides = kept.get(p.rides[i], -1)
 		moving.marches = p.movers[i].has_flag(Surf.MARCH)
+		data.moving.append(moving)
+	return data
+
+
+## The meshes of `data` (mesh_data), each surface on the kit's material.
+static func meshes_from(data: MeshData) -> Meshes:
+	var meshes := Meshes.new()
+	meshes.sockets = data.sockets
+	meshes.folds = data.folds
+	meshes.top = data.top
+	for part: MovingData in data.moving:
+		var moving := Moving.new()
+		moving.body = LowPolyMesh.body_mesh(part.opaque, part.holo)
+		moving.outline = LowPolyMesh.outline_mesh(part.outline)
+		moving.pivot = part.pivot
+		moving.motion = part.motion
+		moving.sockets = part.sockets
+		moving.rides = part.rides
+		moving.marches = part.marches
 		meshes.moving.append(moving)
-	meshes.body = LowPolyMesh.body_mesh(opaque, holo)
-	meshes.outline = LowPolyMesh.outline_mesh(outline)
+	meshes.body = LowPolyMesh.body_mesh(data.opaque, data.holo)
+	meshes.outline = LowPolyMesh.outline_mesh(data.outline)
 	if meshes.folds:
-		meshes.body.custom_aabb = meshes.body.get_aabb().merge(sweep)
+		meshes.body.custom_aabb = meshes.body.get_aabb().merge(data.sweep)
 		if meshes.outline != null:
-			meshes.outline.custom_aabb = meshes.outline.get_aabb().merge(sweep)
+			meshes.outline.custom_aabb = meshes.outline.get_aabb().merge(data.sweep)
 	return meshes
 
 
