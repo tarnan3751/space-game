@@ -267,7 +267,10 @@ static func build_hangar(p: Parts, level: int) -> void:
 	m.prism(0.31, 0.3, 0.32, 16, tower + Vector3(0, shaft - 0.2, 0), ORANGE_ROUND)
 	var cab := tower + Vector3(0, 0.3 + shaft, 0)
 	m.prism(0.42, 0.42, 0.1, 16, cab, HULL_ROUND)
+	# The cab's base fills the ring: no camera sees its inner wall (LowPolyMesh.inner_unseen).
+	m.inner_unseen = true
 	m.ring(0.41, 0.44, 0.05, 16, cab + Vector3(0, 0.03, 0), GLOW)
+	m.inner_unseen = false
 	m.prism(0.42, 0.5, 0.34, 16, cab + Vector3(0, 0.1, 0), CAB_GLASS)
 	m.lathe(PackedVector2Array([
 		Vector2(0.56, 0), Vector2(0.56, 0.06), Vector2(0.4, 0.16), Vector2(0, 0.16),
@@ -519,8 +522,11 @@ static func _vault(p: Parts, back: Vector3, width: float, length: float, wall: f
 	var reach := rad_to_deg(asin(minf(1.0, wall / (radius - 0.02))))
 	for k: int in 3:
 		var rib_z := back.z + length * (0.18 + 0.32 * k)
+		# The rib's inner wall runs under the roof, inside the closed bay: no camera sees its inner wall (LowPolyMesh.inner_unseen).
+		m.inner_unseen = true
 		m.ring(radius - 0.02, radius + 0.07, 0.14, 24, Vector3(back.x, axis.y, rib_z), rib, Vector3(90, 0, 0),
 			180.0 - reach, 360.0 + reach)
+		m.inner_unseen = false
 	if chrome:
 		m.box(Vector3(0.02, 0.07, length - 0.1), Vector3(back.x + width * 0.5 + 0.005, back.y + wall - 0.17, back.z + length * 0.5),
 			_glow(p.tier))
@@ -992,10 +998,19 @@ static func _hover_tank(m: LowPolyMesh, foot: Vector3, tier: int) -> void:
 static func _stack(m: LowPolyMesh, foot: Vector3, radius: float, height: float, gold: bool,
 		collar: Surf = null) -> void:
 	m.prism(radius, radius * 0.8, height, 16, foot, PIPE)
+	# The stack fills its band: no camera sees its inner wall (LowPolyMesh.inner_unseen).
+	m.inner_unseen = true
 	m.ring(radius * 0.8, radius * 1.12, 0.07, 16, foot + Vector3(0, height * 0.55, 0), ORANGE_ROUND)
+	m.inner_unseen = false
 	if collar != null:
+		# The stack fills its collar: no camera sees its inner wall (LowPolyMesh.inner_unseen).
+		m.inner_unseen = true
 		m.ring(radius * 0.95, radius * 1.3, 0.1, 16, foot, collar)
+		m.inner_unseen = false
+		# The stack fills its collar: no camera sees its inner wall (LowPolyMesh.inner_unseen).
+		m.inner_unseen = true
 		m.ring(radius * 0.8, radius * 1.15, 0.08, 16, foot + Vector3(0, height * 0.82, 0), collar)
+		m.inner_unseen = false
 	var mouth := foot + Vector3(0, height, 0)
 	m.ring(radius * 0.55, radius * 0.95, 0.06, 16, mouth, GOLD_ROUND if gold else Parts.GUNMETAL)
 	m.disc(radius * 0.56, 16, mouth + Vector3(0, 0.03, 0), GLOW)
@@ -1164,10 +1179,17 @@ static func build_research_lab(p: Parts, level: int) -> void:
 	var crown := p.tier >= Parts.Tier.CROWN
 	var screen := CYAN_SCREEN if chrome else SCREEN_FLOW
 	Parts.foundation(m, 3)
+	# The lab's ring wall fills the orange ring: no camera sees its inner wall (LowPolyMesh.inner_unseen).
+	m.inner_unseen = true
 	m.ring(1.08, 1.13, 0.1, 24, Vector3(0, g, 0), ORANGE_ROUND)
+	m.inner_unseen = false
+	# From L6 the second ring and the tower hide the inner walls of both rings
+	# (LowPolyMesh.inner_unseen); below it a sliver of them shows past the dome.
+	m.inner_unseen = level >= 6
 	m.lathe(PackedVector2Array([
 		Vector2(1.08, 0), Vector2(1.08, 0.42), Vector2(1.0, 0.5), Vector2(0.66, 0.5), Vector2(0.66, 0),
 	]), 24, Vector3(0, g, 0), _plating(p.tier, HULL_ROUND, true))
+	m.inner_unseen = false
 	_screen(m, 1.085, 5.0, g + 0.15, 0.36, 0.22, 0.6, screen)
 	_screen(m, 1.085, 45.0, g + 0.15, 0.36, 0.22, 0.7, screen)
 	m.box_chamfered(Vector3(0.28, 0.34, 0.08), 0.03, Parts.around(1.07, 92, g), DARK_PLATE, Vector3(0, -2, 0))
@@ -1186,9 +1208,11 @@ static func build_research_lab(p: Parts, level: int) -> void:
 			_lab_band(p.tier))
 	var drum := 0.75
 	if level >= 3:
+		m.inner_unseen = level >= 6
 		m.lathe(PackedVector2Array([
 			Vector2(0.95, 0), Vector2(0.95, 0.24), Vector2(0.88, 0.3), Vector2(0.66, 0.3), Vector2(0.66, 0),
 		]), 24, Vector3(0, g + 0.5, 0), _plating(p.tier, MID_ROUND, true))
+		m.inner_unseen = false
 		_screen(m, 0.955, 25.0, g + 0.56, 0.3, 0.16, 0.65, screen)
 		_screen(m, 0.955, 65.0, g + 0.56, 0.3, 0.16, 0.8, screen)
 		drum = 1.05
@@ -1970,11 +1994,17 @@ static func build_alliance_beacon(p: Parts, level: int) -> void:
 		var y := foot + height * stops[k]
 		var radius := lerpf(base, crown_width, stops[k]) * 1.42 + 0.1
 		m.ring(radius - 0.12, radius, 0.12, 24, Vector3(0, y - 0.06, 0), Parts.CHROME_ROUND if chrome else HULL_ROUND)
+		# The housing fills the ring of lights: no camera sees its inner wall (LowPolyMesh.inner_unseen).
+		m.inner_unseen = true
 		m.ring(radius, radius + 0.035, 0.05, 24, Vector3(0, y - 0.025, 0),
 			lamp.phased(fposmod(-float(k - 1) / rings, 1.0)))
+		m.inner_unseen = false
 		if level >= 5:
 			# From 5 a broad band of light under each ring, cyan, violet from the Obsidian tier.
+			# The housing and the legs hide the band's inside: no camera sees its inner wall (LowPolyMesh.inner_unseen).
+			m.inner_unseen = true
 			m.ring(radius - 0.01, radius + 0.06, 0.07, 24, Vector3(0, y - 0.13, 0), _glow(p.tier).phased(k / 8.0))
+			m.inner_unseen = false
 	# The big dish facing out from the tower on a collar that turns about it, between the rings
 	# of lights at every level, so the dish circles the tower slowly; bigger from 5.
 	# The collar a little wider than the rings of lights, so the dish's arm, rooted in it, clears the
