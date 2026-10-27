@@ -153,7 +153,8 @@ const MENU_OPEN_SECONDS := 0.18
 const MENU_CLOSE_SECONDS := 0.14
 ## Pressing the selected tab again scrolls its strip back to the start over this long.
 const STRIP_RETURN_SECONDS := 0.2
-## Each ability effect's glyph colour (HudIcon kinds "swarm", "emp", "strike").
+## Each ability effect's colour (HudIcon kinds "swarm", "emp", "strike"): its glyph's, and its
+## coin's, which HudIcon holds to its coin value.
 const ABILITY_COLORS := {
 	"swarm": MaterialKit.NANITE_GREEN,
 	"emp": MaterialKit.ARC_BLUE,
@@ -1038,6 +1039,7 @@ func _refresh_queue(state: BaseState) -> void:
 		else:
 			if entry.glyph.color != MaterialKit.ARMY:
 				entry.glyph.color = MaterialKit.ARMY
+				entry.glyph.coin = MaterialKit.ARMY
 				entry.glyph.queue_redraw()
 			entry.glyph.show_icon(_catalog.unit_crew(unit), _catalog.unit_class(unit) == "air")
 			entry.title.text = _catalog.unit_name(unit)
@@ -1991,25 +1993,27 @@ func _build_queue_entry(index: int) -> ArmyCard:
 	return entry
 
 
-## A unit's glyph (HudIcon, by its crew, winged for an air unit) in the army accent, `glyph_size`,
-## centred across `parent`; `unit` "" leaves it blank until show_icon.
+## A unit's glyph (HudIcon, by its crew, winged for an air unit) in the army accent on an army
+## coin, `glyph_size`, centred across `parent`; `unit` "" leaves it blank until show_icon.
 func _glyph(parent: Control, unit: String, glyph_size: Vector2) -> HudIcon:
 	var glyph := HudIcon.new()
 	glyph.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	glyph.custom_minimum_size = glyph_size
 	glyph.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
 	glyph.color = MaterialKit.ARMY
+	glyph.coin = MaterialKit.ARMY
 	if unit != "":
 		glyph.show_icon(_catalog.unit_crew(unit), _catalog.unit_class(unit) == "air")
 	parent.add_child(glyph)
 	return glyph
 
 
-## Shows `ability`'s glyph on `glyph` (HudIcon): its effect's shape in its effect's colour
-## (ABILITY_COLORS). Shared with the battle's abilities bar (BattleHud).
+## Shows `ability`'s glyph on `glyph` (HudIcon): its effect's emblem in its effect's colour
+## (ABILITY_COLORS) on a coin of it. Shared with the battle's abilities bar and result (BattleHud).
 static func show_ability_glyph(glyph: HudIcon, catalog: Catalog, ability: String) -> void:
 	var effect := catalog.ability_effect(ability)
 	glyph.color = ABILITY_COLORS.get(effect, MaterialKit.ARMY)
+	glyph.coin = glyph.color
 	glyph.show_icon(effect, false)
 	glyph.queue_redraw()
 

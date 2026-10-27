@@ -177,10 +177,11 @@ box's 20) in the coin's colour held to at most 55 % HSV value (`COIN_VALUE`), a 
 across its upper 40 % (the cel band, the fill lightened 15 %), a 3 px ink ring and the icon's
 2 px ink offset shadow, with the silhouette inset on it to 70 % of the rect (`COIN_INSET`).
 The coin is part of the icon's one triangle array. A coin keeps its own backing on any fill, so a
-selected card's cyan does not swallow the emblem on it.
+selected card's cyan does not swallow the emblem on it. The unit glyphs wear the army orange's
+coin, the abilities their effect's.
 
 **Unit glyphs.** The queue entries show a unit by its crew (`catalog.unit_crew`), drawn the same
-way in the army accent (the army panel's cards show the unit's picture instead, **Pictures**): **human** a space helmet from the front, a dome over two cheek guards
+way in the army accent on an army coin (the army panel's cards show the unit's picture instead, **Pictures**): **human** a space helmet from the front, a dome over two cheek guards
 with a cyan visor across it; **piloted** a cyan cockpit canopy on a hull over a track with three
 wheels; **autonomous** a block head with an ink sensor slit and a cyan eye, an antenna with a cyan
 bulb on top, over a darker shoulder bar. An air unit (`unit_class` `air`, `HudIcon.winged`) adds a
@@ -190,8 +191,8 @@ the queue moves.
 
 **Ability glyphs.** An ability has no model, so the making and research cards, the making queue's
 entries and the battle's abilities bar and result panel show its emblem by its effect
-(`catalog.ability_effect`), in its effect's colour (`Hud.ABILITY_COLORS`, set by
-`Hud.show_ability_glyph`), each drawn with mass rather than lines: **swarm** three fat nanites of
+(`catalog.ability_effect`), in its effect's colour on a coin of that colour (`Hud.ABILITY_COLORS`,
+set by `Hud.show_ability_glyph`), each drawn with mass rather than lines: **swarm** three fat nanites of
 three sizes overlapping, each with a darker lower band and a white highlight, the largest in front
 with a white "+" on it, in nanite green; **emp** three thick concentric arcs opening upward, each
 with a lighter inner edge, and a slim white zigzag bolt down through them, its jog below the
