@@ -147,8 +147,11 @@ shader adds no draw call (`art-style.md`, **Cost**).
 is built or resized. Each part is a flat fill in the icon's colour with a lighter highlight facet
 and a 2.5 px ink outline, over a 2 px ink offset shadow under the whole icon, laid out in a
 40-unit box scaled to its rect: **metal** an ingot (a trapezoid bar with a lighter top face and a
-darker end), **crystal** a pair of shards (a tall kite and a smaller one leaning on it, each with
-a lighter left face), **antimatter** an orb with an orbit ring tilted across it, **drones** a
+darker end), always in steel `7FA6CC` (`HudIcon.STEEL`) whatever the icon's colour, deeper than
+the metal's text colour so it does not match the crystal in value; **crystal** a pair of shards (a
+tall kite and a smaller one leaning on it, each with a lighter left face); **antimatter** an orb
+with an orbit ring tilted across it, a lighter band over the orb's upper half and a white
+highlight, so it is no dark blob when small; **drones** a
 quadcopter seen from above, the classic drone glyph: a large light rotor disc on each diagonal
 with a white highlight and an ink hub, round a rounded square body in the icon's colour with a
 lighter facet and an ink eye at its front. Its parts keep inside a circle of about 18.5 units
@@ -158,6 +161,15 @@ four rotors round a small body. Any other
 resource gets a plain cut gem. **army**, in front of the training header's housing line (**Army
 panel**), is a figure: a head over a pair of rounded shoulders, each with a lighter facet.
 `HudIcon.paint(pen, kind, rect, color, wing, coin)` adds one to a `HudIcon.Pen`.
+
+**Marks.** Small glyphs for the surfaces that need them, drawn the same way: **lock** a padlock, a
+lighter thick shackle over a chunky body with a lighter left face and an ink keyhole; **clock** a
+disc with a lighter band across its top, four ink ticks, a long ink hand up, a short one to the
+right and an ink hub; **chevron** a right-pointing chevron, two thick arms meeting 12 units ahead
+of their notch, the upper arm lighter; **star** a five-point star with a lighter facet down one
+side of each point, filled in its colour (gold for a star won, `MaterialKit.HULL_DARK` for one not
+yet); **skull** a comic skull, a round cranium over a narrower jaw with ink eye sockets, nose and
+teeth, for difficulty marks.
 
 **Coins.** Any icon can wear a coin, the badge the icon families share (`HudIcon.coin`, or
 `paint`'s `coin`; transparent, the default, for none): a disc filling the rect (18.5 units of the

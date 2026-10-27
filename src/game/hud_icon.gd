@@ -25,10 +25,14 @@ const COIN_VALUE := 0.55
 const COIN_BAND_LIGHT := 0.15
 const COIN_BAND := 0.4
 const COIN_INSET := 0.7
+## The metal ingot's own colour, whatever the icon's: deeper than the metal's text colour, so the
+## ingot does not match the crystal's shards in value.
+const STEEL := Color("7fa6cc")
 
 ## "metal", "crystal", "antimatter", "drones", "army" (the army's figure, on the training panel's
 ## housing line), or a unit's crew, "human", "piloted" or "autonomous", or an ability's effect,
-## "swarm", "emp" or "strike"; anything else draws a plain gem.
+## "swarm", "emp" or "strike", or a mark, "lock", "clock", "chevron", "star" or "skull"; anything
+## else draws a plain gem.
 var kind: String = ""
 var color: Color = Color.WHITE
 ## A wing mark at the lower right: an air unit.
@@ -67,7 +71,7 @@ static func paint(pen: Pen, icon: String, rect: Rect2, tint: Color, wing: bool =
 		pen.shadow = shadow
 		match icon:
 			"metal":
-				_ingot(pen, tint)
+				_ingot(pen, STEEL)
 			"crystal":
 				_shards(pen, tint)
 			"antimatter":
@@ -88,6 +92,16 @@ static func paint(pen: Pen, icon: String, rect: Rect2, tint: Color, wing: bool =
 				_burst(pen, tint)
 			"strike":
 				_strike(pen, tint)
+			"lock":
+				_padlock(pen, tint)
+			"clock":
+				_clock(pen, tint)
+			"chevron":
+				_chevron(pen, tint)
+			"star":
+				_star(pen, tint)
+			"skull":
+				_skull(pen, tint)
 			_:
 				_gem(pen, tint)
 		if wing:
@@ -143,7 +157,8 @@ static func _kite(pen: Pen, tint: Color, top: Vector2, right: Vector2, bottom: V
 
 
 ## An orb with an orbit ring tilted across it: the ring's far half behind the orb, its near
-## half in front.
+## half in front; a lighter cel band over the orb's upper half and a white highlight, so it is no
+## dark blob when small.
 static func _orb(pen: Pen, tint: Color) -> void:
 	var centre := Vector2(20, 20)
 	var ring_radii := Vector2(18, 6.5)
@@ -152,7 +167,8 @@ static func _orb(pen: Pen, tint: Color) -> void:
 	pen.band(_ellipse(centre, ring_radii, PI, TAU, 12, tilt), ring_color)
 	var orb := _ellipse(centre, Vector2(11, 11), 0.0, TAU, 24)
 	pen.shape(orb, tint)
-	pen.facet(_ellipse(Vector2(16.5, 15.5), Vector2(4.5, 3.5), 0.0, TAU, 12, -0.6), tint.lightened(0.55))
+	pen.facet(_cap(centre, 11.0, 1.0, true, 12), tint.lightened(0.3))
+	pen.facet(_ellipse(Vector2(15.5, 14.5), Vector2(4.5, 3), 0.0, TAU, 12, -0.6), Color.WHITE)
 	pen.outline(orb)
 	pen.band(_ellipse(centre, ring_radii, 0.0, PI, 12, tilt), ring_color)
 
@@ -351,6 +367,93 @@ static func _arc_band(centre: Vector2, inner: float, outer: float, from: float, 
 	var back := _ellipse(centre, Vector2(inner, inner), from, to, steps)
 	back.reverse()
 	points.append_array(back)
+	return points
+
+
+## A padlock: a thick shackle arch over a chunky body with a lighter left face and an ink keyhole.
+static func _padlock(pen: Pen, tint: Color) -> void:
+	var shackle := _ellipse(Vector2(20, 18), Vector2(11.5, 11.5), PI, TAU, 12)
+	shackle.append_array(PackedVector2Array([Vector2(31.5, 22), Vector2(26.5, 22)]))
+	var inside := _ellipse(Vector2(20, 18), Vector2(6.5, 6.5), PI, TAU, 12)
+	inside.reverse()
+	shackle.append_array(inside)
+	shackle.append_array(PackedVector2Array([Vector2(13.5, 22), Vector2(8.5, 22)]))
+	pen.shape(shackle, tint.lightened(0.35))
+	pen.outline(shackle)
+	var body := _rounded_rect(Rect2(6, 19, 28, 19), 4.0)
+	pen.shape(body, tint)
+	pen.facet(PackedVector2Array([Vector2(9, 21), Vector2(15, 21), Vector2(15, 36), Vector2(9, 36)]),
+		tint.lightened(0.4))
+	pen.outline(body)
+	pen.facet(PackedVector2Array([Vector2(18.2, 27), Vector2(21.8, 27), Vector2(22.5, 33), Vector2(17.5, 33)]),
+		Hud.INK)
+	pen.facet(_ellipse(Vector2(20, 26), Vector2(3, 3), 0.0, TAU, 10), Hud.INK)
+
+
+## A clock: a disc with a lighter cel band across its top, four ink ticks, a long ink hand up, a
+## short one to the right and an ink hub.
+static func _clock(pen: Pen, tint: Color) -> void:
+	var centre := Vector2(20, 20)
+	var face := _ellipse(centre, Vector2(17, 17), 0.0, TAU, 28)
+	pen.shape(face, tint)
+	pen.facet(_cap(centre, 17.0, 4.0, true, 14), tint.lightened(0.35))
+	pen.outline(face)
+	for along: Vector2 in [Vector2(1, 0), Vector2(-1, 0), Vector2(0, 1), Vector2(0, -1)]:
+		pen.edge(PackedVector2Array([centre + along * 11.5, centre + along * 14.5]))
+	pen.band(PackedVector2Array([centre, centre + Vector2(0, -11)]), Hud.INK)
+	pen.band(PackedVector2Array([centre, centre + Vector2(8, 3.5)]), Hud.INK)
+	pen.facet(_ellipse(centre, Vector2(3, 3), 0.0, TAU, 10), Hud.INK)
+
+
+## A right-pointing chevron: two thick arms meeting at a point 12 units ahead of their notch, the
+## upper arm lighter.
+static func _chevron(pen: Pen, tint: Color) -> void:
+	var outline := PackedVector2Array([Vector2(10, 5), Vector2(20, 5), Vector2(32, 20), Vector2(20, 35),
+		Vector2(10, 35), Vector2(22, 20)])
+	pen.shape(outline, tint)
+	pen.facet(PackedVector2Array([Vector2(10, 5), Vector2(20, 5), Vector2(32, 20), Vector2(22, 20)]),
+		tint.lightened(0.4))
+	pen.outline(outline)
+
+
+## A five-point star: a lighter facet down one side of each point, and the ink outline.
+static func _star(pen: Pen, tint: Color) -> void:
+	var centre := Vector2(20, 21.5)
+	var points := PackedVector2Array()
+	for k: int in 10:
+		var radius := 19.0 if k % 2 == 0 else 8.0
+		var angle := -PI / 2.0 + PI * k / 5.0
+		points.append(centre + Vector2(cos(angle), sin(angle)) * radius)
+	pen.shape(points, tint)
+	for k: int in 5:
+		pen.facet(PackedVector2Array([points[k * 2], centre, points[(k * 2 + 9) % 10]]), tint.lightened(0.35))
+	pen.outline(points)
+
+
+## A comic skull: a round cranium over a narrower jaw, a lighter facet on the brow, ink eye
+## sockets, nose and teeth.
+static func _skull(pen: Pen, tint: Color) -> void:
+	var outline := _ellipse(Vector2(20, 17), Vector2(15, 14), PI * 0.72, PI * 2.28, 20)
+	outline.append_array(PackedVector2Array([Vector2(28, 30), Vector2(27, 37), Vector2(13, 37), Vector2(12, 30)]))
+	pen.shape(outline, tint)
+	pen.facet(_ellipse(Vector2(13, 9.5), Vector2(4.5, 2.6), 0.0, TAU, 10, -0.6), tint.lightened(0.6))
+	pen.outline(outline)
+	for x: float in [13.5, 26.5]:
+		pen.facet(_ellipse(Vector2(x, 19.5), Vector2(4.6, 5), 0.0, TAU, 12), Hud.INK)
+	pen.facet(PackedVector2Array([Vector2(20, 24.5), Vector2(22.5, 28.5), Vector2(17.5, 28.5)]), Hud.INK)
+	for x: float in [16.5, 20.0, 23.5]:
+		pen.edge(PackedVector2Array([Vector2(x, 31.5), Vector2(x, 37)]))
+
+
+## `rect` with its corners rounded to `radius`.
+static func _rounded_rect(rect: Rect2, radius: float) -> PackedVector2Array:
+	var points := PackedVector2Array()
+	var corners: Array[Vector2] = [rect.position + Vector2(radius, radius),
+		Vector2(rect.end.x - radius, rect.position.y + radius), rect.end - Vector2(radius, radius),
+		Vector2(rect.position.x + radius, rect.end.y - radius)]
+	for k: int in 4:
+		var angle := PI + k * PI / 2.0
+		points.append_array(_ellipse(corners[k], Vector2(radius, radius), angle, angle + PI / 2.0, 4))
 	return points
 
 
