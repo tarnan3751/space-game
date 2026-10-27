@@ -128,6 +128,22 @@ const SQUASH := Vector2(1.04, 0.96)
 const SKIN_B_TEXTURES := "res://assets/textures/kit/hud_%s.png"
 const SLICE := 20.0
 const SLICE_SHADOW := 4.0
+## Skin C, the pulp page: the menu family in the buildings' cream with ink text and no outlines,
+## a thicker ink border, the bottom panels a cream tray with a stepped, torn top edge; a disabled
+## shape a darker cream; dim text and warnings in inks that read on cream; a full meter's digits
+## stay ink, which reads on the saturated fills where gold does not (its gold line stays).
+const CREAM := MaterialKit.HULL_LIGHT
+const CREAM_DISABLED := Color("c4bdae")
+const CREAM_BORDER := 4
+const INK_DIM := Color("5d5875")
+const WARNING_INK := Color("b4470c")
+## The tray's top edge: a step up or down every TRAY_STEP px, TRAY_RISE high, with a small tear
+## every TRAY_TEAR px; the band across the cards' top third carries an ink dot screen, TRAY_DOTS apart.
+const TRAY_STEP := 168.0
+const TRAY_RISE := 5.0
+const TRAY_TEAR := 42.0
+const BAND_DOT_PITCH := 8.0
+const BAND_DOT_RADIUS := 1.4
 ## The bottom panels' top band, a shade lighter than the rest, down to the gap under the tabs.
 const MENU_BAND := 74.0
 const MENU_BAND_LIGHTEN := 0.06
@@ -258,6 +274,10 @@ var _meter_labels: Dictionary[String, Label] = {}
 var _meter_shaders: Dictionary[String, ShaderMaterial] = {}
 ## Whether each meter shows its full state (its amount at its cap).
 var _meter_full: Dictionary[String, bool] = {}
+## Each meter's fill's colour, which skin C saturates.
+var _meter_colors: Dictionary[String, Color] = {}
+## Every cost amount on a card and its resource's colour, which skin C swaps for ink.
+var _cost_labels: Dictionary[Label, Color] = {}
 var _meter_amounts: Dictionary[String, int] = {}
 ## The capacity each meter's text last showed (-1 before the first), so a refresh sets the text
 ## only when its amount or its capacity changed.
@@ -425,24 +445,45 @@ class CardArt:
 	func _draw() -> void:
 		var pen := HudIcon.Pen.new()
 		var inside := Rect2(Vector2.ZERO, size).grow(-Hud.BORDER)
-		# Skin B's card texture has its own.
-		if Hud.skin != Hud.Look.B:
+		if Hud.skin == Hud.Look.C:
+			_draw_band(pen, inside)
+		# Skin B's card texture has its own; skin C's cream needs none.
+		elif Hud.skin != Hud.Look.B:
 			pen.add_stroke(Hud._round_rect(inside.grow(-0.5), Vector2.ONE * (12 - Hud.BORDER - 0.5), false), 1.0,
 				Hud.EDGE_LIGHT, true)
-		var stripe := Rect2(inside.position, Vector2(inside.size.x, Hud.STRIPE_HEIGHT))
-		pen.add_fill(Hud._round_rect(stripe, Vector2(12 - Hud.BORDER, Hud.STRIPE_HEIGHT), true), tint, false)
-		var centre := plinth_centre()
-		var radius := Hud.PLINTH / 2.0
-		pen.add_fill(Hud._circle(centre, radius, SIDES), Color(tint, Hud.PLINTH_ALPHA), false)
-		pen.add_stroke(Hud._circle(centre, radius - Hud.PLINTH_RING / 2.0, SIDES), Hud.PLINTH_RING, Hud.INK, true)
+		if Hud.skin != Hud.Look.C:
+			var stripe := Rect2(inside.position, Vector2(inside.size.x, Hud.STRIPE_HEIGHT))
+			pen.add_fill(Hud._round_rect(stripe, Vector2(12 - Hud.BORDER, Hud.STRIPE_HEIGHT), true), tint, false)
+			var centre := plinth_centre()
+			var radius := Hud.PLINTH / 2.0
+			pen.add_fill(Hud._circle(centre, radius, SIDES), Color(tint, Hud.PLINTH_ALPHA), false)
+			pen.add_stroke(Hud._circle(centre, radius - Hud.PLINTH_RING / 2.0, SIDES), Hud.PLINTH_RING, Hud.INK, true)
 		if card.count.visible:
 			_chip(pen, _rect_of(card.count).grow_individual(Hud.CHIP_PAD.x, Hud.CHIP_PAD.y, Hud.CHIP_PAD.x,
-				Hud.CHIP_PAD.y), Hud.CARD_DISABLED)
+				Hud.CHIP_PAD.y), Hud.CREAM_DISABLED if Hud.skin == Hud.Look.C else Hud.CARD_DISABLED)
 		for i: int in card.icons.size():
 			HudIcon.paint(pen, card.kinds[i], _rect_of(card.icons[i]), card.colors[i], false, card.colors[i])
 		if card.clock.visible:
 			HudIcon.paint(pen, "clock", _rect_of(card.clock), Hud.TEXT_DIM)
 		pen.draw(self)
+
+	## Skin C's trading-card band: the category's colour across the card's top third, inside its
+	## border, with an ink dot screen over it and an ink line under it.
+	func _draw_band(pen: HudIcon.Pen, inside: Rect2) -> void:
+		var inner := inside.grow(-(Hud.CREAM_BORDER - Hud.BORDER))
+		var band := Rect2(inner.position, Vector2(inner.size.x, roundf(Hud.CARD_SIZE.y / 3.0) - inner.position.y))
+		pen.add_fill(Hud._round_rect(band, Vector2.ONE * (12 - Hud.CREAM_BORDER), true), tint, false)
+		var dot := Color(Hud.INK, 0.22)
+		var row := 0
+		var y := band.position.y + Hud.BAND_DOT_PITCH / 4.0
+		while y < band.end.y - 1.0:
+			var x := band.position.x + Hud.BAND_DOT_PITCH / 2.0 + (Hud.BAND_DOT_PITCH / 2.0 if row % 2 == 1 else 0.0)
+			while x < band.end.x - 1.0:
+				pen.add_fill(Hud._circle(Vector2(x, y), Hud.BAND_DOT_RADIUS, 6), dot, false)
+				x += Hud.BAND_DOT_PITCH
+			y += Hud.BAND_DOT_PITCH / 2.0
+			row += 1
+		pen.add_stroke(PackedVector2Array([Vector2(band.position.x, band.end.y), band.end]), 2.0, Hud.INK, false)
 
 	## A pill round `rect`: `fill`, an ink ring.
 	func _chip(pen: HudIcon.Pen, rect: Rect2, fill: Color) -> void:
@@ -1607,8 +1648,8 @@ func _build_meter(parent: Control, key: String, icon_kind: String, color: Color,
 	stripes.texture_repeat = CanvasItem.TEXTURE_REPEAT_ENABLED
 	var shader := ShaderMaterial.new()
 	shader.shader = METER_SHADER
-	var deep := Color.from_hsv(color.h, color.s, color.v * METER_VALUE)
-	shader.set_shader_parameter(&"tint", Color(deep.r / STRIPE_BASE, deep.g / STRIPE_BASE, deep.b / STRIPE_BASE))
+	_meter_colors[key] = color
+	_tint_meter(shader, color)
 	shader.set_shader_parameter(&"phase", phase)
 	shader.set_shader_parameter(&"track_height", METER_TRACK.y)
 	shader.set_shader_parameter(&"track_width", METER_TRACK.x)
@@ -1645,6 +1686,19 @@ func _build_meter(parent: Control, key: String, icon_kind: String, color: Color,
 	_meter_shaders[key] = shader
 
 
+## A cost amount's colour: its resource's (`color`), or ink under skin C, whose cards are cream.
+static func _cost_color(color: Color) -> Color:
+	return INK if skin == Look.C else color
+
+
+## A meter's fill: its resource's colour at METER_VALUE, or under skin C saturated at full value.
+static func _tint_meter(shader: ShaderMaterial, color: Color) -> void:
+	var deep := Color.from_hsv(color.h, color.s, color.v * METER_VALUE)
+	if skin == Look.C:
+		deep = Color.from_hsv(color.h, minf(color.s * 1.6, 1.0), 1.0)
+	shader.set_shader_parameter(&"tint", Color(deep.r / STRIPE_BASE, deep.g / STRIPE_BASE, deep.b / STRIPE_BASE))
+
+
 ## The full state, when a meter's amount reaches its cap: a gold line inside the pill and the
 ## digits in gold. Set only when it changes.
 func _set_full(key: String, full: bool) -> void:
@@ -1653,7 +1707,7 @@ func _set_full(key: String, full: bool) -> void:
 	_meter_full[key] = full
 	_meter_shaders[key].set_shader_parameter(&"full", full)
 	if full:
-		_meter_labels[key].add_theme_color_override("font_color", GOLD)
+		_meter_labels[key].add_theme_color_override("font_color", INK if skin == Look.C else GOLD)
 	else:
 		_meter_labels[key].remove_theme_color_override("font_color")
 
@@ -1882,7 +1936,8 @@ func _build_entry(type: String) -> Button:
 		card.kinds.append(str(res))
 		card.colors.append(_resource_color(str(res)))
 		var amount := _card_label(cost_row, Format.amount(int(cost[res])), &"CardCost")
-		amount.add_theme_color_override("font_color", _resource_color(str(res)))
+		_cost_labels[amount] = _resource_color(str(res))
+		amount.add_theme_color_override("font_color", _cost_color(_cost_labels[amount]))
 	cost_row.sort_children.connect(card.art.queue_redraw)
 	var last_row := HBoxContainer.new()
 	last_row.mouse_filter = Control.MOUSE_FILTER_IGNORE
@@ -2203,7 +2258,8 @@ func _build_army_card(unit: String, card_size: Vector2, ability: bool = false) -
 	card.cost_row = cost_row
 	for res: String in _catalog.resources:
 		var amount := _card_label(cost_row, "", &"CardCost")
-		amount.add_theme_color_override("font_color", _resource_color(res))
+		_cost_labels[amount] = _resource_color(res)
+		amount.add_theme_color_override("font_color", _cost_color(_cost_labels[amount]))
 		card.costs[res] = amount
 	card.free = _card_label(cost_row, "Free", &"CardCost")
 	card.time = _card_label(cost_row, "", &"CardCount")
@@ -2575,6 +2631,8 @@ func _make_theme() -> Theme:
 	ui.set_stylebox("grabber_pressed", "HScrollBar", _flat(ACCENT, 4))
 	if skin == Look.B:
 		_skin_b(ui)
+	elif skin == Look.C:
+		_skin_c(ui)
 	return ui
 
 
@@ -2589,6 +2647,12 @@ func set_skin(new_skin: Look) -> void:
 		_cards[type].art.queue_redraw()
 	for panel: Control in [_menu, _army, _info_panel, _place_bar]:
 		panel.queue_redraw()
+	for key: String in _meter_shaders:
+		_tint_meter(_meter_shaders[key], _meter_colors[key])
+		if _meter_full.get(key, false):
+			_meter_labels[key].add_theme_color_override("font_color", INK if skin == Look.C else GOLD)
+	for label: Label in _cost_labels:
+		label.add_theme_color_override("font_color", _cost_color(_cost_labels[label]))
 
 
 ## Skin B, the halftone console: the menu family's shapes from the textures tools/gen_textures.gd
@@ -2625,6 +2689,69 @@ static func _skin_b(ui: Theme) -> void:
 		for item: String in ["pressed", "hover_pressed"]:
 			ui.set_stylebox(item, type, _texture_box("button_bright", pressed, BUTTON_MARGIN))
 		ui.set_stylebox("disabled", type, _texture_box("card_disabled", Color.WHITE, BUTTON_MARGIN))
+
+
+## Skin C, the pulp page: the menu family cream with ink text and no outlines, a 4 px ink border,
+## the bright buttons in their roles' colours with ink; the bottom panels a cream tray drawn by the
+## panel itself (_draw_edge); a card's name on an ink ribbon. The toast, over the field, stays dark.
+static func _skin_c(ui: Theme) -> void:
+	for type: StringName in [&"PanelContainer", &"ScreenPanel"]:
+		ui.set_stylebox("panel", type, _shape_c(CREAM, 12, 12.0))
+	var tray := StyleBoxEmpty.new()
+	tray.content_margin_left = MARGIN
+	tray.content_margin_right = MARGIN
+	tray.content_margin_top = 12 + TRAY_RISE
+	tray.content_margin_bottom = MARGIN
+	ui.set_stylebox("panel", &"MenuPanel", tray)
+	ui.set_stylebox("panel", &"MeterStrip", _flat(Color(INK, 0.5), STRIP_RADIUS))
+	ui.get_stylebox("panel", &"MeterStrip").set_content_margin_all(STRIP_PADDING)
+	ui.set_stylebox("panel", &"MeterTrough", _shape_c(CREAM, roundi(METER_SIZE.y / 2.0), 0.0))
+	var dark := {&"Button": 12, &"CardButton": 12, &"TabButton": 10, &"CloseButton": 12, &"BarButton": 12}
+	var bright := {&"BuildButton": GOLD, &"ExpeditionButton": MaterialKit.ARMY, &"UpgradeButton": GOLD,
+		&"CommitButton": GOLD, &"ConfirmButton": ACCENT, &"TabSelected": ACCENT}
+	for type: StringName in dark:
+		_buttons_c(ui, type, CREAM, dark[type])
+	for type: StringName in bright:
+		_buttons_c(ui, type, bright[type], 10 if type == &"TabSelected" else 12)
+	for item: String in ["normal", "hover", "pressed", "hover_pressed"]:
+		ui.set_stylebox(item, &"TabSelected", _shape_c(ACCENT, 10, BUTTON_MARGIN))
+	for type: StringName in [&"Button"] + dark.keys() + bright.keys():
+		for item: String in BUTTON_TEXT_COLORS:
+			ui.set_color(item, type, INK)
+		ui.set_color("font_disabled_color", type, Color(INK, DISABLED_ALPHA))
+		ui.set_constant("outline_size", type, 0)
+	var ribbon := _flat(INK, 4)
+	ribbon.content_margin_left = 6
+	ribbon.content_margin_right = 6
+	ribbon.content_margin_top = 0
+	ribbon.content_margin_bottom = 1
+	ui.set_stylebox("normal", &"CardName", ribbon)
+	ui.set_color("font_color", &"CardName", CREAM)
+	for type: StringName in [&"CardCost", &"CardChip", &"QueueName", &"HousingText", &"InfoTitle", &"InfoDetail",
+			&"MeterText"]:
+		ui.set_color("font_color", type, INK)
+		ui.set_constant("outline_size", type, 0)
+	for type: StringName in [&"CardCount", &"CardReason", &"CardTime"]:
+		ui.set_color("font_color", type, INK_DIM)
+	for type: StringName in [&"CardWarning", &"InfoNote"]:
+		ui.set_color("font_color", type, WARNING_INK)
+
+
+## Skin C's states of a button filled `fill`: hover a shade lighter, pressed lighter still and
+## sunk, disabled the darker cream.
+static func _buttons_c(ui: Theme, type: StringName, fill: Color, radius: int) -> void:
+	ui.set_stylebox("normal", type, _shape_c(fill, radius, BUTTON_MARGIN))
+	ui.set_stylebox("hover", type, _shape_c(fill.lightened(0.08), radius, BUTTON_MARGIN))
+	for item: String in ["pressed", "hover_pressed"]:
+		ui.set_stylebox(item, type, _shape_c(fill.lightened(PRESSED_LIGHTEN), radius, BUTTON_MARGIN, true))
+	ui.set_stylebox("disabled", type, _shape_c(CREAM_DISABLED, radius, BUTTON_MARGIN))
+
+
+## Skin C's shape: skin A's with the thicker ink border.
+static func _shape_c(fill: Color, radius: int, margin: float, sunk: bool = false) -> StyleBoxFlat:
+	var box := _shape(fill, radius, margin, sunk)
+	box.set_border_width_all(CREAM_BORDER)
+	return box
 
 
 ## A skin B shape: the texture `shape`, tinted `tint`, its 9-slice's middle tile-fitted on both
@@ -2731,6 +2858,10 @@ func _draw_edge(panel: Control, menu: bool) -> void:
 	# Skin B's bottom panels carry their band and line in their texture.
 	if skin == Look.B and menu:
 		return
+	if skin == Look.C:
+		if menu:
+			_draw_tray(panel)
+		return
 	var pen := HudIcon.Pen.new()
 	var inside := Rect2(Vector2.ZERO, panel.size).grow(-BORDER)
 	if menu:
@@ -2743,6 +2874,35 @@ func _draw_edge(panel: Control, menu: bool) -> void:
 		pen.add_stroke(_round_rect(line, Vector2(16, 16 - BORDER - 0.5), true), 1.0, EDGE_LIGHT, false)
 	else:
 		pen.add_stroke(_round_rect(inside.grow(-0.5), Vector2.ONE * (12 - BORDER - 0.5), false), 1.0, EDGE_LIGHT, true)
+	pen.draw(panel)
+
+
+## Skin C's bottom panel: a cream tray from a stepped, slightly torn top edge down to the panel's
+## bottom, its edge inked; one triangle array, drawn when the panel is.
+func _draw_tray(panel: Control) -> void:
+	var edge := PackedVector2Array()
+	var x := 0.0
+	var step := 0
+	while x < panel.size.x:
+		var y := TRAY_RISE if step % 2 == 1 else 0.0
+		edge.append(Vector2(x, y))
+		var end := minf(x + TRAY_STEP, panel.size.x)
+		# The tears: a small notch every TRAY_TEAR along the step.
+		var tear := x + TRAY_TEAR
+		while tear < end - 8.0:
+			edge.append(Vector2(tear - 3.0, y))
+			edge.append(Vector2(tear, y + 2.5))
+			edge.append(Vector2(tear + 4.0, y))
+			tear += TRAY_TEAR
+		edge.append(Vector2(end, y))
+		x = end
+		step += 1
+	var fill := edge.duplicate()
+	fill.append(Vector2(panel.size.x, panel.size.y))
+	fill.append(Vector2(0, panel.size.y))
+	var pen := HudIcon.Pen.new()
+	pen.add_fill(fill, CREAM, false)
+	pen.add_stroke(edge, CREAM_BORDER, INK, false)
 	pen.draw(panel)
 
 
