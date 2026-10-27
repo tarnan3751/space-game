@@ -4,7 +4,7 @@ extends HarnessScenario
 ## and finished; no two footprints overlapping and all inside the grid; every wall
 ## (PlacementController.PAINT_TYPE) joined to another (each is part of a fence); every resource
 ## at its cap; every drone free, on the ring too; every moving part moving (a node's pose changing,
-## a part folded into its body unheld, BuildingModels.hold, and carrying a motion that moves), but
+## a part folded into its body unheld, BuildingModels.held_at, and carrying a motion that moves), but
 ## for the aiming parts whose idle is still by design (_idles); the save written to
 ## the run's own file, user://base.json untouched. Screenshots: the whole base at the widest zoom
 ## in a WIDE window, then each band, framed on its buildings but the walls, with the fence under
@@ -125,8 +125,7 @@ func run(main: MainScript) -> void:
 	check(moved.size() > 0 and moved.size() == turning.size(), "%d of %d moving parts moved within %.1f s (%d aiming parts still at idle by design)"
 		% [moved.size(), turning.size(), MOVE_SAMPLE_SECONDS, still.size()])
 	var held := folding.filter(func(model: Node3D) -> bool:
-		var value: Variant = (model.get_child(0) as MeshInstance3D).get_instance_shader_parameter(BuildingModels.HOLD_PARAMETER)
-		return typeof(value) == TYPE_FLOAT and value != 0.0)
+		return BuildingModels.held_at(model) != 0.0)
 	check(folding.size() > 0 and held.is_empty(), "%d of %d models with folded moving parts hold them"
 		% [held.size(), folding.size()])
 	var folded := 0

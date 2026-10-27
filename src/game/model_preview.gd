@@ -231,7 +231,6 @@ func _stage(job: PictureJob) -> void:
 	_model = BuildingModels.assemble(BuildingModels.meshes_from(job.data))
 	if job.unit == "":
 		_model.scale = Vector3.ONE * BuildingModels.scale_of(job.type, job.size)
-		BuildingModels.hold(_model, 0.0)
 	var bounds := AABB()
 	var first := true
 	for child: Node in _model.find_children("*", "MeshInstance3D", true, false):

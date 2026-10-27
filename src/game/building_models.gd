@@ -14,8 +14,9 @@ extends RefCounted
 ## Surf.MOVE) and appended to the body's surfaces and the outline, the outline's averaged normals
 ## kept as the part had them; the shaders move it, at no draw of its own. The meshes' custom_aabb
 ## covers its whole sweep, so it is never culled as it moves, and the root carries FOLDS_META, the
-## static body's top (top_of), which the folded parts leave out. hold() holds the folded parts'
-## pose, for a view that freezes them (BuildingView, while busy or disabled). The fold, like every
+## static body's top (top_of), which the folded parts leave out. A view that freezes them
+## (BuildingView, while busy or disabled) puts copies of its materials on the move shaders on them
+## with the time they hold at (MaterialKit.moving); held_at() reads it back. The fold, like every
 ## array of the meshes, is worked out in thread-safe array work (mesh_data), and the meshes are made
 ## from the arrays on the main thread (meshes_from); ModelPreview runs the first on a worker thread.
 ##
@@ -63,7 +64,7 @@ const MARCH_META := "march"
 ## Set on a model's root when moving parts are folded into its body: the static body's top, in
 ## the model's space (top_of).
 const FOLDS_META := "folds"
-## The shaders' instance uniform that holds the folded parts' pose (hold()).
+## The move shaders' uniform that holds the folded parts' pose (MaterialKit.moving, held_at()).
 const HOLD_PARAMETER := &"move_hold"
 ## The least clock a hold takes, since 0 is the shaders' "not held".
 const HOLD_LEAST := 0.0001
@@ -460,16 +461,18 @@ static func _sweep(arrays: Array[Array], pivot: Vector3, motion: Motion) -> AABB
 	return AABB(pivot - Vector3.ONE * radius, Vector3.ONE * radius * 2.0)
 
 
-## Holds the folded moving parts of the model `root` (FOLDS_META) at the clock `time`, seconds
-## (at least HOLD_LEAST), or lets them run on the clock again for a negative `time`: the shaders'
-## move_hold on its body and outline (effects.gdshaderinc). Nothing for a model with none folded.
-static func hold(root: Node3D, time: float) -> void:
+## The clock at which the folded moving parts of the model `root` hold now: the move_hold of the
+## material its body wears on its first surface, a held copy on a move shader (MaterialKit.moving,
+## BuildingView); 0 while they move on the clock, or for a model with none folded. For the harness.
+static func held_at(root: Node3D) -> float:
 	if not root.has_meta(FOLDS_META):
-		return
-	var value := maxf(time, HOLD_LEAST) if time >= 0.0 else 0.0
+		return 0.0
 	for child: Node in root.get_children():
-		if child is MeshInstance3D:
-			(child as MeshInstance3D).set_instance_shader_parameter(HOLD_PARAMETER, value)
+		if child is MeshInstance3D and not child.has_meta(OUTLINE_META):
+			var worn := (child as MeshInstance3D).get_surface_override_material(0) as ShaderMaterial
+			if worn != null and worn.shader == MaterialKit.TOON_MOVE_SHADER:
+				return float(worn.get_shader_parameter(HOLD_PARAMETER))
+	return 0.0
 
 
 ## The top of the model `site`'s static body, in its parent's space: FOLDS_META's when moving parts

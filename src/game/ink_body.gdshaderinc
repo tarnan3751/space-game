@@ -1,0 +1,49 @@
+// The ink outline (MaterialKit.ink and ink_selected): an inverted hull. The outline mesh holds
+// the body's triangles with position-averaged normals (LowPolyMesh.to_outline_mesh); this
+// pushes each vertex out along its normal and draws only the back faces, in ink_color.
+//
+// The line is ink_px pixels wide at a 720 px viewport height and scales with the viewport
+// height. The camera is orthographic, so that is a fixed share of its vertical extent:
+// 2 / |PROJECTION_MATRIX[1][1]| world units span the viewport (abs, because the Compatibility
+// renderer flips the projection's Y when it draws into a render target). Each part's line is
+// that times its ink factor, which the outline mesh carries in UV.x as the line's thinning,
+// 1 - ink (LowPolyMesh.ink): 0, the full line, but on a figure's parts (Figures.FIGURE_INK and
+// FIGURE_INK_MASS), and on any mesh with no UV at all (the terrain's hull). One material, one width uniform; the factor lives in
+// the vertices, so the selected outline's override keeps it.
+//
+// The push never takes a vertex below the ground (world y = 0) unless it already was, so a
+// building's bottom edge does not dip into the ground. Instances scale uniformly, and only
+// moving parts turn about any axis but Y, high enough above the ground that the clamp does not
+// reach them, so the ground's height in model space is -origin.y / scale.
+//
+// The outline carries its parts' flags (UV2.y) and phases (COLOR.a), and moves each vertex as
+// the body's shader does (effects.gdshaderinc: MOVE, held by move_hold as the body is, RIG, BOB and
+// JITTER) before the push, so an outline never comes off a moving, bobbing or jittering part. Parts that flicker are never
+// outlined. A battle's MultiMesh instance (INSTANCE_CUSTOM) moves its outline with its gait, and
+// its fade thins the line to nothing.
+
+#include "res://src/game/effects.gdshaderinc"
+
+uniform float ink_px = 2.2;
+uniform vec4 ink_color : source_color = vec4(0.106, 0.102, 0.18, 1.0);
+
+void vertex() {
+	float width = ink_px * 2.0 / (720.0 * abs(PROJECTION_MATRIX[1][1])) * (1.0 - UV.x)
+		* (1.0 - INSTANCE_CUSTOM.w);
+	float scale = length(MODEL_MATRIX[0].xyz);
+	int flags = surf_flags(UV2);
+	float phase = surf_phase(COLOR);
+	vec3 normal = NORMAL;
+	vec3 rigged = VERTEX;
+	effect_move(flags, CUSTOM0, CUSTOM3, move_clock(MOVE_HOLD), phase, rigged, normal);
+	effect_rig(flags, CUSTOM1, CUSTOM2, INSTANCE_CUSTOM, rigged, normal);
+	vec3 spun = effect_gait(rigged, INSTANCE_CUSTOM);
+	vec3 moved = effect_vertex(spun, move_after_flags(flags), phase, MODEL_MATRIX);
+	vec3 pushed = moved + normalize(normal) * width / scale;
+	pushed.y = max(pushed.y, min(moved.y, -MODEL_MATRIX[3][1] / scale));
+	VERTEX = pushed;
+}
+
+void fragment() {
+	ALBEDO = ink_color.rgb;
+}

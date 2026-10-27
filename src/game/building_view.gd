@@ -34,7 +34,7 @@ extends Node3D
 ##
 ## Only the moving parts that need the view's state are nodes it poses: the aiming head and what
 ## rides it, and the marching figures. The model's idle parts are folded into its body
-## (BuildingModels) and move in the shaders, held by BuildingModels.hold while the building is busy
+## (BuildingModels) and move in the shaders, held on copies of its materials while the building is busy
 ## or disabled (_update_hold); a view whose parts all folded does no work a frame.
 ##
 ## While the building is busy a ConstructionDrone works over it, driven from _process, and a moving
@@ -112,9 +112,15 @@ var _rests: PackedVector3Array = PackedVector3Array()
 ## rides one made before it, so posing in order poses the carrier first.
 var _rides := PackedInt32Array()
 var _animate: bool = true
-## Whether the model's folded moving parts hold their pose (BuildingModels.hold): while it is busy or
-## disabled.
+## Whether the model's folded moving parts hold their pose: while it is busy or disabled; and the
+## clock they hold at (at least BuildingModels.HOLD_LEAST).
 var _held: bool = false
+var _hold_time: float = 0.0
+## The model's own body and outline instances (its root's), which carry its folded moving parts and
+## wear held copies of their materials while they hold (MaterialKit.moving); null for a model with
+## none folded.
+var _fold_body: MeshInstance3D = null
+var _fold_outline: MeshInstance3D = null
 ## The moving parts whose figures march on the clock (BuildingModels.MARCH_META), hidden while busy.
 var _marching: Array[Node3D] = []
 ## BaseView's merged wall mesh draws this building, so its own model is hidden (set_merged).
@@ -167,6 +173,13 @@ func setup(id: int, type: String, level: int, size: int, tier: int) -> void:
 	add_child(_model)
 	_collect_movers(_model)
 	_collect_sockets(_model)
+	if _model.has_meta(BuildingModels.FOLDS_META):
+		for child: Node in _model.get_children():
+			if child is MeshInstance3D:
+				if child.has_meta(BuildingModels.OUTLINE_META):
+					_fold_outline = child as MeshInstance3D
+				else:
+					_fold_body = child as MeshInstance3D
 	_scaffold = BuildingModels.create_scaffold(size)
 	add_child(_scaffold)
 	_collect_meshes(_model)
@@ -303,13 +316,20 @@ func set_disabled(on: bool) -> void:
 
 ## Holds the folded moving parts at the clock now while the building is busy or disabled, as the
 ## nodes hold, and lets them run on the clock again, snapping to its pose, when it is neither: once
-## a change, never a frame.
+## a change, never a frame. While held, the model's body (every surface) and outline wear copies of
+## the materials their state gives them on the move shaders, the hold set on each (MaterialKit.moving),
+## made again with the same hold when the state changes while it holds (_tint_folded, _ink_outlines);
+## released, they go back to the shared plain materials and the copies are freed with their last
+## reference. A material uniform, not an instance uniform, so nothing is taken from the global
+## shader buffer. A placement ghost never holds.
 func _update_hold() -> void:
-	var held := not _animate or _disabled
+	var held := (not _animate or _disabled) and _fold_body != null and _ghost_tint == null
 	if held == _held:
 		return
 	_held = held
-	BuildingModels.hold(_model, Motion.clock() if held else -1.0)
+	_hold_time = maxf(Motion.clock(), BuildingModels.HOLD_LEAST)
+	_apply_tint()
+	_ink_outlines()
 
 
 ## Whether the building shows as disabled (set_disabled).
@@ -356,8 +376,22 @@ func _apply_tint() -> void:
 	elif _disabled:
 		material = MaterialKit.disabled_rival() if _rival else MaterialKit.disabled()
 	for body: MeshInstance3D in _bodies:
-		if body.mesh.surface_get_material(0) == MaterialKit.toon():
+		if body == _fold_body:
+			_tint_folded(material)
+		elif body.mesh.surface_get_material(0) == MaterialKit.toon():
 			body.set_surface_override_material(0, material)
+
+
+## The model's own body, which carries its folded parts, takes `material` (null for its own) on its
+## toon surface, and while it holds them every surface wears a held copy of its material
+## (MaterialKit.moving), the hologram surface included.
+func _tint_folded(material: Material) -> void:
+	for surface: int in _fold_body.mesh.get_surface_count():
+		var own := _fold_body.mesh.surface_get_material(surface)
+		var worn: Material = material if own == MaterialKit.toon() else null
+		if _held:
+			worn = MaterialKit.moving(worn if worn != null else own, _hold_time)
+		_fold_body.set_surface_override_material(surface, worn)
 
 
 ## The builder drone over the site (working or leaving), null when there is none.
@@ -606,9 +640,18 @@ func _update_outlines() -> void:
 	if inked == _inked:
 		return
 	_inked = inked
-	var material: Material = MaterialKit.ink_selected() if inked else null
+	_ink_outlines()
+
+
+## The outlines' material: the selected ink while inked, else their own; the model's own outline,
+## while its folded parts hold, a held copy of it (MaterialKit.moving).
+func _ink_outlines() -> void:
+	var material: Material = MaterialKit.ink_selected() if _inked else null
 	for outline: MeshInstance3D in _outlines:
-		outline.set_surface_override_material(0, material)
+		var worn := material
+		if outline == _fold_outline and _held:
+			worn = MaterialKit.moving(worn if worn != null else outline.mesh.surface_get_material(0), _hold_time)
+		outline.set_surface_override_material(0, worn)
 
 
 func _collect_meshes(node: Node) -> void:

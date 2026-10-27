@@ -36,7 +36,7 @@ extends HarnessScenario
 ## Runner, an EMP Burst cast on it, the strip (EMP_FRAMES at EMP_STEP_MS) over the stun and the wake.
 ## Checks: while it is disabled no moving part moves (the muzzle socket and the radar stand still
 ## from frame to frame: the radar, folded into the body, by the clock its pose is drawn at, the body's
-## hold or the clock, BuildingModels.hold); once awake they move again. And "reveal": a cloaked sentry hidden until the
+## worn material's hold or the clock, BuildingModels.held_at); once awake they move again. And "reveal": a cloaked sentry hidden until the
 ## Dune Runner comes within its range, the strip (REVEAL_FRAMES at REVEAL_STEP_MS) over its fade in.
 ## Checks: it shows every step of the fade (BuildingView.reveal_step) and ends as itself.
 
@@ -415,13 +415,12 @@ func _radar(defence: BuildingView) -> MeshInstance3D:
 	return model.get_child(0) as MeshInstance3D if model.has_meta(BuildingModels.FOLDS_META) else null
 
 
-## The clock the frozen defence's radar is drawn at: its body's hold (BuildingModels.hold) while set,
-## else the clock.
+## The clock the frozen defence's radar is drawn at: the hold of the material its body wears while
+## it holds (BuildingModels.held_at, a held copy's move_hold), else the clock.
 func _radar_clock() -> float:
 	if _frozen_radar == null:
 		return 0.0
-	var value: Variant = _frozen_radar.get_instance_shader_parameter(BuildingModels.HOLD_PARAMETER)
-	var hold: float = value if typeof(value) == TYPE_FLOAT else 0.0
+	var hold := BuildingModels.held_at(_frozen_radar.get_parent() as Node3D)
 	return hold if hold != 0.0 else Motion.clock()
 
 

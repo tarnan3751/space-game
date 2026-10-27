@@ -5,8 +5,8 @@
 // 1 in 1/254 steps, is in COLOR.a (surf_phase) and offsets its effect's cycle. No per-instance
 // uniforms: every instance of a mesh animates alike, from anim_time, but for a battle's MultiMesh
 // instances, whose custom data carries their gait, hit flash and fade (effect_gait, below), and for
-// MOVE parts, which hold still while the shader's own move_hold instance uniform is set
-// (move_clock, below).
+// MOVE parts, which hold still on a held building's own material copies (MOVE_HELD, move_clock,
+// below).
 
 // The game's animation clock in seconds, wrapping every hour: main.gd sets it once a frame from
 // the clock Motion.clock() returns, so the moving parts BuildingView poses keep step with these
@@ -91,10 +91,23 @@ float effect_hash(vec3 p) {
 // in its order: SPIN, SWING, SLIDE; LINEAR, SMOOTH, HAMMER, RECOIL. A mesh with no moving part
 // carries neither channel, so they are read only under the flag.
 //
-// The part moves on move_clock(hold): anim_time, or while the instance's move_hold is set (not 0)
+// The part moves on move_clock(hold): anim_time, or while a held copy's move_hold is set (not 0)
 // that time, at which it holds its pose (BuildingView, while the building is busy or disabled); its
 // surface effects run on anim_time either way. Its FLICKER and JITTER act in its own space, before
 // it moves, and its BOB and RISE after, as on a moving part's node (move_after_flags).
+// The hold: a shader that defines MOVE_HELD before including this file (toon_move, ink_move and
+// holo_move) declares the move_hold uniform, a plain material uniform set on a held building's own
+// copies of its materials (MaterialKit.moving), and moves its parts on move_clock(move_hold); any
+// other moves them on the clock alone. No instance uniform: those take a block of the global shader
+// buffer per instance, which runs out (255 instances on the development Mac, fewer on a phone) and
+// is not given back when the material changes.
+#ifdef MOVE_HELD
+uniform float move_hold = 0.0;
+#define MOVE_HOLD move_hold
+#else
+#define MOVE_HOLD 0.0
+#endif
+
 const int MOVE_SPIN = 0;
 const int MOVE_SWING = 1;
 const int MOVE_EASE_LINEAR = 0;

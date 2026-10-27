@@ -81,6 +81,11 @@ const REVEAL_MIXES: Array[float] = [0.8, 0.55, 0.3]
 const TOON_SHADER := preload("res://src/game/toon.gdshader")
 const INK_SHADER := preload("res://src/game/ink.gdshader")
 const HOLO_SHADER := preload("res://src/game/holo.gdshader")
+## The same shaders with the move_hold uniform (effects.gdshaderinc, MOVE_HELD), for the copies a
+## building wears while it holds its folded moving parts (moving()).
+const TOON_MOVE_SHADER := preload("res://src/game/toon_move.gdshader")
+const INK_MOVE_SHADER := preload("res://src/game/ink_move.gdshader")
+const HOLO_MOVE_SHADER := preload("res://src/game/holo_move.gdshader")
 const TERRAIN_SHADER := preload("res://src/game/terrain.gdshader")
 ## The rock texture the terrain's steep faces are drawn from, imported as an Image
 ## (tools/gen_textures.gd).
@@ -233,6 +238,32 @@ static func terrain() -> ShaderMaterial:
 		_terrain.set_shader_parameter("rock_lit", ROCK_LIT)
 		_terrain.set_shader_parameter("ink_color", INK)
 	return _terrain
+
+
+## A copy of `material` (one of the kit's toon, ink or hologram materials, its variants included)
+## that holds a building's folded moving parts at the clock `hold` (seconds, not 0): the same
+## parameters on the shader with the move_hold uniform (toon_move, ink_move, holo_move), move_hold
+## set. A new copy each call, for one held building's surface (BuildingView makes them as it holds
+## and as its state changes while it holds, never a frame, and drops them on release); any other
+## material comes back as it is.
+static func moving(material: Material, hold: float) -> Material:
+	var shader_material := material as ShaderMaterial
+	if shader_material == null:
+		return material
+	var shader: Shader = null
+	match shader_material.shader:
+		TOON_SHADER:
+			shader = TOON_MOVE_SHADER
+		INK_SHADER:
+			shader = INK_MOVE_SHADER
+		HOLO_SHADER:
+			shader = HOLO_MOVE_SHADER
+	if shader == null:
+		return material
+	var held := shader_material.duplicate() as ShaderMaterial
+	held.shader = shader
+	held.set_shader_parameter(&"move_hold", hold)
+	return held
 
 
 static func _toon_material(ghost_tint: Color) -> ShaderMaterial:
