@@ -209,7 +209,12 @@ var _ground_material: ShaderMaterial
 ## The field texture, which the ground and the terrain draw their marks from.
 var _field_texture: ImageTexture
 ## The walls `walls` draws, as (x << 32 | y << 16 | level) in id order: unchanged, no rebuild.
+## Compared and rewritten in place by _sync_walls, so a sync builds no array.
 var _wall_signature: PackedInt64Array = PackedInt64Array()
+## sync's scratch, kept so a sync allocates nothing: the views gone stale, and a freed view's
+## construction drone by building id, which leaves over the new view's site.
+var _stale: Array[int] = []
+var _leaving: Dictionary[int, ConstructionDrone] = {}
 ## The state the pending wall rebuild reads; null when none is pending.
 var _walls_state: BaseState = null
 ## NOISE_SIZE x NOISE_SIZE heights in [0, 1], wrapping.
@@ -301,9 +306,7 @@ func is_grid_shown() -> bool:
 
 ## Creates, updates and removes building views to match the state.
 func sync(state: BaseState) -> void:
-	# A freed view's construction drone, by building id: it leaves over the new view's site.
-	var leaving: Dictionary[int, ConstructionDrone] = {}
-	for id: int in views.keys():
+	for id: int in views:
 		var stale: bool = not state.buildings.has(id)
 		if not stale:
 			var building: BuildingState = state.buildings[id]
@@ -311,11 +314,14 @@ func sync(state: BaseState) -> void:
 			stale = views[id].building_type != building.type \
 				or (views[id].building_level != building.level and id != dragging_id)
 		if stale:
-			var drone := views[id].release_drone(self)
-			if drone != null:
-				leaving[id] = drone
-			views[id].queue_free()
-			views.erase(id)
+			_stale.append(id)
+	for id: int in _stale:
+		var drone := views[id].release_drone(self)
+		if drone != null:
+			_leaving[id] = drone
+		views[id].queue_free()
+		views.erase(id)
+	_stale.clear()
 
 	for id: int in state.buildings:
 		var building: BuildingState = state.buildings[id]
@@ -333,8 +339,10 @@ func sync(state: BaseState) -> void:
 		view.set_lifted(false)
 		var mode := BuildingView.Footprint.SELECTED if id == selected_id else BuildingView.Footprint.NONE
 		view.set_footprint(mode)
-	for id: int in leaving:
-		leaving[id].leave(views[id].site_height() if views.has(id) else 0.0)
+	if not _leaving.is_empty():
+		for id: int in _leaving:
+			_leaving[id].leave(views[id].site_height() if views.has(id) else 0.0)
+		_leaving.clear()
 	_sync_walls(state)
 
 
@@ -343,15 +351,25 @@ func sync(state: BaseState) -> void:
 ## level, changed, and at the end of the frame, once however many changed in it (a fast paint
 ## stroke places several walls in one drag event).
 func _sync_walls(state: BaseState) -> void:
-	var signature := PackedInt64Array()
+	var count := 0
+	var changed := false
 	for id: int in state.buildings:
 		var building: BuildingState = state.buildings[id]
 		var merged := id != dragging_id and WallMesh.draws(building)
 		views[id].set_merged(merged)
 		if merged:
-			signature.append(building.cell.x << 32 | building.cell.y << 16 | building.level)
-	if signature != _wall_signature:
-		_wall_signature = signature
+			var entry := building.cell.x << 32 | building.cell.y << 16 | building.level
+			if count == _wall_signature.size():
+				_wall_signature.append(entry)
+				changed = true
+			elif _wall_signature[count] != entry:
+				_wall_signature[count] = entry
+				changed = true
+			count += 1
+	if count != _wall_signature.size():
+		_wall_signature.resize(count)
+		changed = true
+	if changed:
 		if _walls_state == null:
 			_rebuild_walls.call_deferred()
 		_walls_state = state

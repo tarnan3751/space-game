@@ -81,6 +81,10 @@ var _scaffold: Node3D
 var _footprint: MeshInstance3D
 var _footprint_material: StandardMaterial3D
 var _label: Label3D
+## What the busy label last read: the level it is built to (0 for a first construction) and the
+## seconds left, so a sync sets its text only when they changed.
+var _label_target: int = -1
+var _label_seconds: int = -1
 ## The models' and the scaffold's mesh instances: bodies and ink outlines.
 var _bodies: Array[MeshInstance3D] = []
 var _outlines: Array[MeshInstance3D] = []
@@ -220,7 +224,10 @@ func show_status(level: int, busy: bool, target_level: int, seconds_left: int) -
 		set_process(true)
 	elif not busy and _drone != null:
 		_drone.leave(site_height())
-	if busy:
+	var shown_target := target_level if level >= 1 else 0
+	if busy and (shown_target != _label_target or seconds_left != _label_seconds):
+		_label_target = shown_target
+		_label_seconds = seconds_left
 		var what := "Building" if level < 1 else "Lv %d" % target_level
 		_label.text = "%s  %s" % [what, Format.duration(seconds_left)]
 
