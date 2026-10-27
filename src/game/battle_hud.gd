@@ -201,10 +201,6 @@ func stars_lit() -> int:
 	return lit
 
 
-func loot_text(res: String) -> String:
-	return _loot[res].text
-
-
 func speed_button() -> Button:
 	return _speed_button
 

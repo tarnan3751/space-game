@@ -305,10 +305,6 @@ func close_button() -> Button:
 	return _close_button
 
 
-func back_button() -> Button:
-	return _back_button
-
-
 func attack_button() -> Button:
 	return _attack_button
 

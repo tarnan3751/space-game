@@ -664,11 +664,6 @@ func train_card(unit: String) -> Button:
 	return _train_cards[unit].button
 
 
-## A training card's picture of its unit, null until rendered (always, headless).
-func train_card_picture(unit: String) -> Texture2D:
-	return _train_cards[unit].picture.texture
-
-
 ## The HUD's theme, for the battle's HUD (BattleHud), which takes its look.
 func ui_theme() -> Theme:
 	return _theme
