@@ -3,7 +3,8 @@ extends RefCounted
 ## Builds a model out of simple parts painted from the material kit
 ## (docs/reference/art-style.md): the body mesh, drawn with MaterialKit.toon() (its HOLO parts in
 ## a second surface on MaterialKit.holo()), and its ink outline, a second mesh drawn with
-## MaterialKit.ink(). Both are unindexed triangle lists.
+## MaterialKit.ink(). Both are unindexed triangle lists. A triangle with no area (a part collapsed
+## to a line) is never emitted; `degenerates` counts them.
 ##
 ## A part is placed by `pos`, the centre of its base (an orb's centre), and `rot`, Euler
 ## degrees applied Z, then X, then Y (Godot's default order); its size arguments scale it.
@@ -63,6 +64,8 @@ const WELD := 0.001
 const CUSTOM_CHANNELS: Array[int] = [Mesh.ARRAY_CUSTOM0, Mesh.ARRAY_CUSTOM1, Mesh.ARRAY_CUSTOM2, Mesh.ARRAY_CUSTOM3]
 const CUSTOM_SHIFTS: Array[int] = [Mesh.ARRAY_FORMAT_CUSTOM0_SHIFT, Mesh.ARRAY_FORMAT_CUSTOM1_SHIFT,
 	Mesh.ARRAY_FORMAT_CUSTOM2_SHIFT, Mesh.ARRAY_FORMAT_CUSTOM3_SHIFT]
+## A triangle with less area than this (square world units) is degenerate: _emit drops it.
+const DEGENERATE_AREA := 1e-8
 
 var _vertices := PackedVector3Array()
 var _normals := PackedVector3Array()
@@ -107,6 +110,9 @@ var rig2: Vector4 = Vector4.ZERO
 var detail: float = 1.0
 ## The named points added with socket(), by name.
 var sockets: Dictionary[String, Socket] = {}
+## How many degenerate triangles (DEGENERATE_AREA) the parts added would have had: dropped, not
+## emitted.
+var degenerates := 0
 
 
 ## A named point on a model with the direction it faces (a muzzle and where it fires), in the
@@ -811,9 +817,14 @@ func _tri(a: Vector3, b: Vector3, c: Vector3, uv_a: Vector2, uv_b: Vector2, uv_c
 	_emit(a, b, c, uv_a, uv_b, uv_c, (b - a).cross(c - a).normalized(), surf, hard)
 
 
-## Appends one triangle with its flat normal. Unrolled: every triangle of every mesh comes here.
+## Appends one triangle with its flat normal, unless it has no area (a part collapsed to a line
+## or a point), which it counts in `degenerates` instead. Unrolled: every triangle of every mesh
+## comes here.
 func _emit(a: Vector3, b: Vector3, c: Vector3, uv_a: Vector2, uv_b: Vector2, uv_c: Vector2,
 		normal: Vector3, surf: Surf, hard: bool) -> void:
+	if (b - a).cross(c - a).length() * 0.5 < DEGENERATE_AREA:
+		degenerates += 1
+		return
 	# Godot's front faces wind clockwise.
 	_vertices.append(a)
 	_vertices.append(c)
