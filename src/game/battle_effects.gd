@@ -209,6 +209,10 @@ class Timed:
 	var lift := PackedFloat32Array()
 	## Whether the buffer was last handed over with nothing in it.
 	var _empty := false
+	## MARK only, whose entries stand still most of their life: whether an entry was added since the
+	## last draw, and whether that draw wrote one still to start or shrinking.
+	var _added := false
+	var _moving := false
 
 	func _init(mesh: MultiMesh, capacity: int, how: Mode = Mode.GROUND) -> void:
 		mode = how
@@ -231,6 +235,7 @@ class Timed:
 		color[count] = tint
 		lift[count] = rise
 		count += 1
+		_added = true
 
 	## Ends now every entry at `point`'s ground spot (x and z), so it is dropped on the next draw.
 	func end_at(point: Vector3, now: float) -> void:
@@ -250,16 +255,23 @@ class Timed:
 	## Drops the entries ended by `now` and writes the rest by `mode` (scaled by their radius, its
 	## height `height` times it on the ground, faded by their share of their life raised to
 	## `fade_power`, 0 for none); an entry whose start is still to come is written at no size. Hands
-	## the buffer to the MultiMesh, unless it was empty and still is.
+	## the buffer to the MultiMesh, unless it was empty and still is, or (MARK) nothing in it changed:
+	## none added, and none starting, shrinking or ending now or at the last draw.
 	func draw(now: float, height: float, fade_power: float) -> void:
 		if count == 0 and _empty:
 			return
+		if mode == Mode.MARK and not _added and not _moving and not _marks_moving(now):
+			return
+		_added = false
+		_moving = false
 		var i := 0
 		while i < count:
 			var t := (now - start[i]) / seconds[i]
 			if t >= 1.0:
 				remove(i)
 				continue
+			if t < 0.0 or t >= 1.0 - MARK_SHRINK:
+				_moving = true
 			var fade := pow(clampf(t, 0.0, 1.0), fade_power) if fade_power > 0.0 else 0.0
 			var r := radius[i] if t >= 0.0 else 0.0
 			var k := clampf(t, 0.0, 1.0)
@@ -307,6 +319,14 @@ class Timed:
 		multimesh.visible_instance_count = count
 		_empty = count == 0
 
+	## Whether a MARK entry is still to start, shrinking or ended at `now`.
+	func _marks_moving(now: float) -> bool:
+		for i: int in count:
+			var t := (now - start[i]) / seconds[i]
+			if t < 0.0 or t >= 1.0 - MARK_SHRINK:
+				return true
+		return false
+
 
 ## A POP entry's swell: its life's share raised to this, so it is near its full size a third of the
 ## way in and shrinks slowly after.
@@ -350,6 +370,16 @@ class Instances:
 		data[k + 17] = custom.g
 		data[k + 18] = custom.b
 		data[k + 19] = custom.a
+
+	## Whether instance `i` holds this basis, origin and colour now.
+	func same(i: int, basis: Basis, origin: Vector3, color: Color) -> bool:
+		var k := i * FLOATS
+		return data[k] == basis.x.x and data[k + 1] == basis.y.x and data[k + 2] == basis.z.x \
+			and data[k + 3] == origin.x and data[k + 4] == basis.x.y and data[k + 5] == basis.y.y \
+			and data[k + 6] == basis.z.y and data[k + 7] == origin.y and data[k + 8] == basis.x.z \
+			and data[k + 9] == basis.y.z and data[k + 10] == basis.z.z and data[k + 11] == origin.z \
+			and data[k + 12] == color.r and data[k + 13] == color.g and data[k + 14] == color.b \
+			and data[k + 15] == color.a
 
 
 ## Projectiles in flight from one MultiMesh, each from a start to an end over its seconds: on an
@@ -720,6 +750,8 @@ var _impact_start := PackedFloat32Array()
 var _impact_radius := PackedFloat32Array()
 var _impact_color := PackedColorArray()
 var _impact_seconds := PackedFloat32Array()
+## Whether the impacts' buffer was last handed over with nothing in it.
+var _impacts_empty := true
 
 var _arcs: MultiMesh
 var _arc_buffer: Instances
@@ -728,6 +760,9 @@ var _arc_from := PackedVector3Array()
 var _arc_to := PackedVector3Array()
 var _arc_start := PackedFloat32Array()
 var _arc_width := PackedFloat32Array()
+## Whether an arc was added or dropped since the buffer was last handed over (an arc stands still
+## for its life; its shader moves it).
+var _arcs_changed := false
 
 ## The scorch marks, each from its start for SCORCH_SECONDS (a Timed list, MARK).
 var _scorches: Timed
@@ -740,6 +775,10 @@ var _wall_rubble_count := 0
 var _bars: MultiMesh
 var _bar_buffer: Instances
 var _bar_count := 0
+## How many bar instances were last handed over, and whether a bar written this frame differs from
+## what its slot held.
+var _bars_shown := 0
+var _bars_changed := false
 ## The camera's right and up, which every bar faces along (the camera never turns).
 var _across := Vector3.RIGHT
 var _up := Vector3.UP
@@ -772,6 +811,10 @@ var _shield_radius: Dictionary[int, float] = {}
 var _shield_pool: Dictionary[int, int] = {}
 var _shield_flicker: Dictionary[int, float] = {}
 var _shield_drop: Dictionary[int, float] = {}
+## Whether a shield was added or its pool moved since the domes were last handed over, and whether
+## that draw wrote one flickering or fading.
+var _shields_changed := false
+var _shields_moving := false
 
 
 ## Call once, before adding to the tree. `walls` is how many walls could fall, `area` the field's
@@ -1232,6 +1275,7 @@ func lightning(from: Vector3, to: Vector3, now: float, width: float = 1.0) -> vo
 	_arc_to[i] = to
 	_arc_start[i] = now
 	_arc_width[i] = width
+	_arcs_changed = true
 
 
 ## A scorch mark on the ground at `at`, `radius` across, from `start` (seconds of battle; at once
@@ -1297,13 +1341,15 @@ func add_shield(id: int, at: Vector3, radius: float) -> void:
 	_shield_flicker[id] = -1.0
 	_shield_drop[id] = -1.0
 	_shield_domes.visible_instance_count = _shields.size()
+	_shields_changed = true
 
 
 ## Shows generator `id`'s dome while its `pool` is up, flickering from `now` when it fell and
 ## fading out in a ring from `now` when it is gone.
 func set_shield(id: int, pool: int, now: float) -> void:
-	if not _shields.has(id):
+	if not _shields.has(id) or pool == _shield_pool[id]:
 		return
+	_shields_changed = true
 	if pool < _shield_pool[id]:
 		_shield_flicker[id] = now
 		if pool <= 0:
@@ -1365,15 +1411,23 @@ func bar(at: Vector3, fraction: float, color: Color) -> void:
 	if _bar_count + 2 > MAX_BARS:
 		return
 	var back := Basis(_across * (BAR_SIZE.x + 2.0 * BAR_BORDER), _up * (BAR_SIZE.y + 2.0 * BAR_BORDER), Vector3.BACK)
-	_bar_buffer.put(_bar_count, back, at, MaterialKit.INK, Color(0, 0, 0, 0))
 	var fill := clampf(fraction, 0.0, 1.0)
 	var front := Basis(_across * (BAR_SIZE.x * fill), _up * BAR_SIZE.y, Vector3.BACK)
-	_bar_buffer.put(_bar_count + 1, front, at - _across * (BAR_SIZE.x * (1.0 - fill) * 0.5), color, Color(0, 0, 0, 0))
+	var front_at := at - _across * (BAR_SIZE.x * (1.0 - fill) * 0.5)
+	if not _bars_changed and not (_bar_buffer.same(_bar_count, back, at, MaterialKit.INK)
+			and _bar_buffer.same(_bar_count + 1, front, front_at, color)):
+		_bars_changed = true
+	_bar_buffer.put(_bar_count, back, at, MaterialKit.INK, Color(0, 0, 0, 0))
+	_bar_buffer.put(_bar_count + 1, front, front_at, color, Color(0, 0, 0, 0))
 	_bar_count += 2
 
 
-## Ends a frame's health bars and draws them.
+## Ends a frame's health bars and draws them, when any was added, dropped or moved.
 func end_bars() -> void:
+	if not _bars_changed and _bar_count == _bars_shown:
+		return
+	_bars_changed = false
+	_bars_shown = _bar_count
 	_bars.buffer = _bar_buffer.data
 	_bars.visible_instance_count = _bar_count
 
@@ -1390,10 +1444,21 @@ static func along(forward: Vector3, width: float, length: float) -> Basis:
 
 
 ## Each shield's dome: up, flickering (never hidden) for SHIELD_FLICKER_SECONDS after it absorbs,
-## fading out after it drops, gone at no size.
+## fading out after it drops, gone at no size. Handed over only when a shield was added or its pool
+## moved, or one flickers or fades now or did at the last draw.
 func _draw_shields(now: float) -> void:
 	if _shields.is_empty():
 		return
+	var moving := false
+	for id: int in _shields:
+		if (_shield_flicker[id] >= 0.0 and now - _shield_flicker[id] < SHIELD_FLICKER_SECONDS) \
+				or (_shield_drop[id] >= 0.0 and now - _shield_drop[id] < SHIELD_DROP_SECONDS):
+			moving = true
+			break
+	if not moving and not _shields_moving and not _shields_changed:
+		return
+	_shields_moving = moving
+	_shields_changed = false
 	for id: int in _shields:
 		var r := _shield_radius[id]
 		var fade := 0.0
@@ -1583,6 +1648,8 @@ func _draw_flights(list: Flights, now: float) -> void:
 
 
 func _draw_impacts(now: float) -> void:
+	if _impact_count == 0 and _impacts_empty:
+		return
 	var i := 0
 	while i < _impact_count:
 		var t := (now - _impact_start[i]) / _impact_seconds[i]
@@ -1602,6 +1669,7 @@ func _draw_impacts(now: float) -> void:
 		i += 1
 	_impacts.buffer = _impact_buffer.data
 	_impacts.visible_instance_count = _impact_count
+	_impacts_empty = _impact_count == 0
 
 
 func _draw_arcs(now: float) -> void:
@@ -1614,17 +1682,22 @@ func _draw_arcs(now: float) -> void:
 			_arc_to[i] = _arc_to[last]
 			_arc_start[i] = _arc_start[last]
 			_arc_width[i] = _arc_width[last]
+			_arcs_changed = true
 			continue
-		var from := _arc_from[i]
-		var along_arc := _arc_to[i] - from
+		i += 1
+	if not _arcs_changed:
+		return
+	_arcs_changed = false
+	for k: int in _arc_count:
+		var from := _arc_from[k]
+		var along_arc := _arc_to[k] - from
 		var forward := along_arc.normalized()
 		var side := forward.cross(Vector3.UP)
 		if side.length_squared() < 0.0001:
 			side = Vector3.RIGHT
 		side = side.normalized()
-		var w := _arc_width[i]
-		_arc_buffer.put(i, Basis(side * w, side.cross(forward) * w, along_arc), from, ARC_TINT, Color(0, 0, 0, 0))
-		i += 1
+		var w := _arc_width[k]
+		_arc_buffer.put(k, Basis(side * w, side.cross(forward) * w, along_arc), from, ARC_TINT, Color(0, 0, 0, 0))
 	_arcs.buffer = _arc_buffer.data
 	_arcs.visible_instance_count = _arc_count
 
