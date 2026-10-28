@@ -245,8 +245,12 @@ const ARMY_LINES_TOP := 108.0
 const ARMY_COST_ICON := Vector2(20, 20)
 const ARMY_TIME_GAP := 10
 ## An entry of the queue strip under the training cards, and its glyph.
-const QUEUE_ENTRY_SIZE := Vector2(180, 48)
-const QUEUE_GLYPH_SIZE := Vector2(32, 32)
+const QUEUE_ENTRY_SIZE := Vector2(220, 56)
+const QUEUE_GLYPH_SIZE := Vector2(36, 36)
+## The "x" at an entry's right end, which says a tap on the entry takes one back.
+const QUEUE_CROSS := 16.0
+## The head entry's progress fill's key among the meters' shaders (Fill).
+const QUEUE_KEY := "queue"
 ## The training header's housing meter, a top bar meter in small: the army's figure on its coin,
 ## HOUSING_COIN across, over the trough's left end.
 const HOUSING_SIZE := Vector2(220, 32)
@@ -382,10 +386,11 @@ var _research_ability_cards: Dictionary[String, ArmyCard] = {}
 ## One card per unit type, in units.json order; the panel shows its producer's.
 var _train_cards: Dictionary[String, ArmyCard] = {}
 ## The queue strip's entries, made as the queue first grows that long and reused after; the
-## units they show, oldest first.
+## units they show, oldest first; the head's progress fill.
 var _queue_strip: HBoxContainer
 var _queue_entries: Array[ArmyCard] = []
 var _queue_units: PackedStringArray = PackedStringArray()
+var _queue_fill: Fill
 ## The producer whose queue the strip last showed, 0 when the panel has opened since: a rebuild
 ## whose queue is the one shown only counts the head down.
 var _queue_id: int = 0
@@ -1265,6 +1270,10 @@ func _refresh_queue(state: BaseState) -> void:
 	_queue_units = units
 	while _queue_entries.size() < _queue_units.size():
 		_queue_entries.append(_build_queue_entry(_queue_entries.size()))
+	# The head's fill: the army's for a unit, the Foundry's green for an ability.
+	if _queue_fill != null:
+		_meter_colors[QUEUE_KEY] = MaterialKit.NANITE_GREEN if making else MaterialKit.ARMY
+		_tint_meter(_queue_fill.shader, _meter_colors[QUEUE_KEY])
 	for i: int in _queue_entries.size():
 		var entry := _queue_entries[i]
 		entry.button.visible = i < _queue_units.size()
@@ -1288,8 +1297,9 @@ func _refresh_queue(state: BaseState) -> void:
 	_queue_empty.text = "Nothing being made" if making else "Nothing in training"
 
 
-## The head entry's state: its time left, "Waiting for room" or "Paused". The queries it reads
-## build nothing; the text is set only when the status or the seconds changed.
+## The head entry's state: its time left, "Waiting for room" or "Paused", and its fill, the share of
+## its time gone. The queries it reads build nothing; the text and the fill are set only when the
+## status or the seconds changed.
 func _refresh_head(state: BaseState) -> void:
 	if _queue_units.is_empty():
 		return
@@ -1300,6 +1310,9 @@ func _refresh_head(state: BaseState) -> void:
 		return
 	_head_status = status
 	_head_seconds = seconds
+	var unit := _queue_units[0]
+	var total := _catalog.ability_make_seconds(unit) if making else _catalog.unit_train_seconds(unit)
+	_queue_fill.set_fraction(1.0 - float(seconds) / total if total > 0 else 1.0)
 	var head := _queue_entries[0].info
 	if status == BaseState.TRAINING_WAITING:
 		head.text = "Waiting for room"
@@ -2416,19 +2429,28 @@ func _build_army_card(id: String, ability: bool, tint: Color, right_chip: bool) 
 	return card
 
 
-## A queue strip entry: a small glyph beside the unit's name and, on the head, its state. A press
-## cancels one of its unit (_on_queue_entry). PASS, so a drag on it scrolls the strip.
+## A queue strip entry: the unit's glyph on its coin beside its name and, on the head (`index` 0),
+## its state, over a progress fill across the entry (the meters' stripes, a Fill) that its time left
+## draws down; at its right end an "x". A press takes one of its unit back (_on_queue_entry). PASS,
+## so a drag on it scrolls the strip.
 func _build_queue_entry(index: int) -> ArmyCard:
 	var entry := ArmyCard.new()
 	entry.button = _button("", QUEUE_ENTRY_SIZE)
 	entry.button.mouse_filter = Control.MOUSE_FILTER_PASS
 	entry.button.pressed.connect(_on_queue_entry.bind(index))
+	if index == 0:
+		var track := Control.new()
+		track.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		track.position = Vector2(BORDER, BORDER)
+		track.size = QUEUE_ENTRY_SIZE - Vector2(2 * BORDER, 2 * BORDER)
+		entry.button.add_child(track)
+		_queue_fill = _build_fill(track, QUEUE_KEY, track.size, MaterialKit.ARMY, 0.0)
 	var row := HBoxContainer.new()
 	row.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	row.add_theme_constant_override("separation", 8)
+	row.add_theme_constant_override("separation", 6)
 	entry.button.add_child(row)
 	row.set_anchors_preset(Control.PRESET_FULL_RECT)
-	row.offset_left = 10
+	row.offset_left = 8
 	row.offset_top = BORDER
 	row.offset_right = -10
 	row.offset_bottom = -BORDER
@@ -2440,14 +2462,22 @@ func _build_queue_entry(index: int) -> ArmyCard:
 	lines.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	lines.add_theme_constant_override("separation", -2)
 	row.add_child(lines)
+	# Over the head's fill, its text is outlined as any text over a bright fill is.
 	entry.title = Label.new()
-	entry.title.theme_type_variation = &"QueueName"
+	entry.title.theme_type_variation = &"QueueHeadName" if index == 0 else &"QueueName"
 	entry.title.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
 	lines.add_child(entry.title)
 	entry.info = Label.new()
-	entry.info.theme_type_variation = &"CardReason"
+	entry.info.theme_type_variation = &"QueueHeadTime"
 	entry.info.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
 	lines.add_child(entry.info)
+	var cross := HudIcon.new()
+	cross.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	cross.kind = "cross"
+	cross.color = TEXT_DIM
+	cross.custom_minimum_size = Vector2.ONE * QUEUE_CROSS
+	cross.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	row.add_child(cross)
 	_queue_strip.add_child(entry.button)
 	return entry
 
@@ -2777,6 +2807,10 @@ func _make_theme() -> Theme:
 	ui.set_stylebox("grabber", "HScrollBar", _flat(TEXT_DIM, 4))
 	ui.set_stylebox("grabber_highlight", "HScrollBar", _flat(TEXT, 4))
 	ui.set_stylebox("grabber_pressed", "HScrollBar", _flat(ACCENT, 4))
+	# Army and info: the army panel's and the info panel's own variations. The queue's head entry
+	# lies over its progress fill, so its text is outlined.
+	_label_variation(ui, &"QueueHeadName", 19, TEXT, 2)
+	_label_variation(ui, &"QueueHeadTime", 17, TEXT_DIM, 2)
 	if skin == Look.B:
 		_skin_b(ui)
 	elif skin == Look.C:
@@ -2971,7 +3005,11 @@ static func _skin_c(ui: Theme) -> void:
 			&"MeterText"]:
 		ui.set_color("font_color", type, INK)
 		ui.set_constant("outline_size", type, 0)
-	for type: StringName in [&"CardCount", &"CardReason", &"CardTime"]:
+	# The queue's head, its text over its fill: ink, no outline, as the other entries'.
+	ui.set_color("font_color", &"QueueHeadName", INK)
+	ui.set_constant("outline_size", &"QueueHeadName", 0)
+	ui.set_constant("outline_size", &"QueueHeadTime", 0)
+	for type: StringName in [&"CardCount", &"CardReason", &"CardTime", &"QueueHeadTime"]:
 		ui.set_color("font_color", type, INK_DIM)
 	for type: StringName in [&"CardWarning", &"InfoNote"]:
 		ui.set_color("font_color", type, WARNING_INK)

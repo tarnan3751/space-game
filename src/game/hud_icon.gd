@@ -31,7 +31,7 @@ const STEEL := Color("7fa6cc")
 
 ## "metal", "crystal", "antimatter", "drones", "army" (the army's figure, on the training panel's
 ## housing line), or a unit's crew, "human", "piloted" or "autonomous", or an ability's effect,
-## "swarm", "emp" or "strike", or a mark, "lock", "clock", "chevron", "star" or "skull"; anything
+## "swarm", "emp" or "strike", or a mark, "lock", "clock", "chevron", "star", "skull" or "cross"; anything
 ## else draws a plain gem.
 var kind: String = ""
 var color: Color = Color.WHITE
@@ -102,6 +102,8 @@ static func paint(pen: Pen, icon: String, rect: Rect2, tint: Color, wing: bool =
 				_star(pen, tint)
 			"skull":
 				_skull(pen, tint)
+			"cross":
+				_cross(pen, tint)
 			_:
 				_gem(pen, tint)
 		if wing:
@@ -459,6 +461,17 @@ static func _skull(pen: Pen, tint: Color) -> void:
 	pen.facet(PackedVector2Array([Vector2(20, 24.5), Vector2(22.5, 28.5), Vector2(17.5, 28.5)]), Hud.INK)
 	for x: float in [16.5, 20.0, 23.5]:
 		pen.edge(PackedVector2Array([Vector2(x, 31.5), Vector2(x, 37)]))
+
+
+## An "x": two thick bars crossed at the box's centre, the upper left arm lighter.
+static func _cross(pen: Pen, tint: Color) -> void:
+	var centre := Vector2(20, 20)
+	var outline := PackedVector2Array()
+	for point: Vector2 in _plus(centre, 17.0, 5.0):
+		outline.append(centre + (point - centre).rotated(PI / 4.0))
+	pen.shape(outline, tint)
+	pen.facet(PackedVector2Array([outline[9], outline[10], outline[11], centre]), tint.lightened(0.4))
+	pen.outline(outline)
 
 
 ## `rect` with its corners rounded to `radius`.
