@@ -509,10 +509,11 @@ shows changed (`hud.md`, **Battle HUD**).
 
 Measured by the `battle_view` scenario (`tools/harness/README.md`) in a 1600×900 window at the
 widest zoom (camera size 44), the battle paused once the whole scripted army (the battle scenario's
-167 units, 280 housing) is down, the template base standing: 974 draw calls without the HUD and
-about 1,046 with the attack HUD and the abilities bar over it (1,040 before the weapons pass:
-the bolts' sheath, the effect lists live at that moment and one MultiMesh for the shields), 2.00
-million primitives and about 2.1 to 2.4 ms of render CPU a frame, 110 to 120 fps on a loaded
+167 units, 280 housing) is down, the template base standing: 557 draw calls with the attack HUD
+and the abilities bar over it since the performance pass folded the idle parts and the UI pass cut
+the HUD's own draws (974 without and about 1,046 with the HUD before them; 1,040 before the weapons
+pass: the bolts' sheath, the effect lists live at that moment and one MultiMesh for the shields),
+1.92 million primitives and about 2.1 to 2.4 ms of render CPU a frame, 110 to 120 fps on a loaded
 machine (the same as before the pass, measured alternately), against the maxed base's ceilings
 (`art-style.md`, **Cost**: 1,600, 2.1 million, 6 ms). The units in their near versions would have
 been 2.40 million primitives (2.12 million without their shadows). The sim's step averages about

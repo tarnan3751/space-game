@@ -35,8 +35,12 @@ and collapses drawn, and every building idling, all verified from the harness's 
 `docs/plans/performance-pass.md`): the Mac measured with the `profile` and `model_audit` scenarios,
 then the sim's search budget, the battle view's uploads on change, idle building parts moved into
 the vertex shader (the maxed base from 1,198 to 615 draw calls), the base's once-a-frame redraw,
-the models' defects fixed and 9.5% of their triangles trimmed unseen; the UI pass and sound come
-next and are not started.
+the models' defects fixed and 9.5% of their triangles trimmed unseen. **The UI pass is built**
+(2026-10-27; `docs/plans/ui-pass.md`): every surface critiqued against the comic world with the
+phone's measure, the drone meter picked from rendered candidates, a theme foundation (type and touch
+floors, colour roles, pill-and-coin meters, card plinths and chips) with three skins behind `Hud.Look`
+(A the default), emblems on coins, the attack HUD's ceremony, the sector map's scan plates, the army
+and info panels; sound comes next and is not started.
 `docs/project_overview.md` holds the roadmap (§2.2), the known limitations (§2.3) and the
 decisions (§3). The numbers in `data/` are the retune's real timers and economy
 (`docs/plans/retune.md`); a debug build's dev cheats make them free and one second at most.
