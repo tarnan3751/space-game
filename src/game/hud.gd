@@ -2640,8 +2640,11 @@ func _make_theme() -> Theme:
 	elif skin == Look.C:
 		_skin_c(ui)
 
-	# Sector map: the band's word in ink on its ribbon (SectorMap.Minimap).
+	# Sector map: the band's word in ink on its ribbon (SectorMap.Minimap); the detail's loot
+	# amounts and its lines of what a field holds, in ink on skin C's cream.
 	_label_variation(ui, &"SectorRibbon", 20, INK, 0, DISPLAY_FONT)
+	_label_variation(ui, &"SectorLoot", 22, INK if skin == Look.C else TEXT, 0)
+	_label_variation(ui, &"SectorRow", 20, INK if skin == Look.C else TEXT, 0)
 
 	# Battle HUD: the attack HUD's own variations (battle_hud.gd), the dark family over the field.
 	# Built after the skins, so the attack HUD is the same under every one.

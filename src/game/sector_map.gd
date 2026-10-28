@@ -11,8 +11,9 @@ extends PanelContainer
 ##     when a safe-area inset narrows the map: only an inset does), each a scan plate of its outpost (Minimap) carrying its band on a ribbon
 ##     and the outpost's Command Center on a chip, then the outpost and its loot targets; a cleared
 ##     field is stamped with a star, dimmed and cannot be pressed;
-##   a field's detail, opened from its card: a minimap of the outpost, the field's header again,
-##     its loot, what it holds, the minimap's legend, Back and Attack.
+##   a field's detail, opened from its card: a minimap of the outpost with its band and Command
+##     Center, the outpost as a title, its loot, what it holds, the minimap's legend, Back and
+##     Attack.
 ## The fields are laid out (OutpostGenerator.generate_field, up to 25 ms for a hard field, about
 ## 100 ms for six at Command Center 10) off the main thread, one WorkerThreadPool task per field
 ## (LayoutJob), started the frame after the map opens and collected in _process as they finish,
@@ -54,9 +55,11 @@ const LOOT_ICON_SIZE := Vector2(24, 24)
 const STAMP_SIZE := Vector2(60, 60)
 const CLEARED_ALPHA := 0.75
 const MINIMAP_SIZE := Vector2(480, 480)
+## The detail: its loot's coins, the legend's, Back and Attack.
+const DETAIL_COIN_SIZE := Vector2(28, 28)
 const SWATCH_SIZE := Vector2(18, 18)
-const ATTACK_SIZE := Vector2(200, 64)
-const BACK_SIZE := Vector2(140, 64)
+const ATTACK_SIZE := Vector2(240, 72)
+const BACK_SIZE := Vector2(140, 72)
 ## What the minimap draws, by the role of the building: its colour and its legend's word.
 const WALL_COLOR := MaterialKit.HULL_MID
 const DEFENCE_COLOR := MaterialKit.DEFENCE
@@ -81,8 +84,9 @@ var _cards: Array[FieldCard] = []
 var _detail: Control
 var _detail_header: FieldCard
 var _minimap: Minimap
-## What the detail's field holds (_holds).
-var _detail_holds: Label
+## What the detail's field holds (_holds), a line each: its defences, storages, walls and the
+## storages outside the walls.
+var _detail_holds: Array[Label] = []
 var _back_button: Button
 var _attack_button: Button
 ## The field the detail shows, its index and epoch (-1 while the fields show), and its layout.
@@ -284,7 +288,9 @@ func show_field(index: int) -> bool:
 	var summary := OutpostGenerator.summary(_catalog, _state.sector, index)
 	_fill(_detail_header, summary)
 	_minimap.show_field(_catalog, _field)
-	_detail_holds.text = _holds(_field)
+	var holds := _holds(_field)
+	for i: int in holds.size():
+		_detail_holds[i].text = holds[i]
 	_fields.visible = false
 	_scan_button.visible = false
 	_detail.visible = true
@@ -356,8 +362,10 @@ func _lay_out_now(index: int) -> void:
 	_cards[index].thumbnail.show_field(_catalog, _layouts[index])
 
 
-## What a field holds, for the detail: its defences, storages, deposits and walls (traps hidden).
-func _holds(field: Dictionary) -> String:
+## What a field holds, for the detail: its defences, storages, walls and how many of the storages
+## are deposits outside the walls (traps hidden), so in two columns the deposits fall under the
+## storages.
+func _holds(field: Dictionary) -> PackedStringArray:
 	var defences := 0
 	var storages := 0
 	var walls := 0
@@ -373,8 +381,11 @@ func _holds(field: Dictionary) -> String:
 				var storage: Dictionary = _catalog.level_stats(type, int(building["level"])).get("storage", {})
 				if not storage.is_empty():
 					storages += 1
-	return "%d defences   %d storages, %d of them loot deposits outside the walls   %d walls" % [defences,
-		storages, (field["deposits"] as Array).size(), walls]
+	var deposits := (field["deposits"] as Array).size()
+	return PackedStringArray(["%d %s" % [defences, "defence" if defences == 1 else "defences"],
+		"%d %s" % [storages, "storage" if storages == 1 else "storages"],
+		"%d %s" % [walls, "wall" if walls == 1 else "walls"],
+		"%d of them outside the walls" % deposits])
 
 
 # --- Queries for the harness -----------------------------------------------------
@@ -505,7 +516,7 @@ func _build_card() -> FieldCard:
 	lines.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	lines.add_theme_constant_override("separation", 4)
 	content.add_child(lines)
-	_fill_lines(field_card, lines, LOOT_ICON_SIZE, &"CardCost")
+	_fill_lines(field_card, lines, &"InfoDetail", LOOT_ICON_SIZE, &"CardCost")
 	var stamp := Stamp.new()
 	stamp.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	stamp.visible = false
@@ -519,11 +530,13 @@ func _build_card() -> FieldCard:
 	return field_card
 
 
-## The outpost's line and the loot's rows under `parent`: a row per resource, its icon on a coin of
-## its colour `coin_size` across and the amount in `amount_variation`, and "No loot" for none.
-func _fill_lines(field_card: FieldCard, parent: Control, coin_size: Vector2, amount_variation: StringName) -> void:
+## The outpost's line in `colony_variation` and the loot's rows under `parent`: a row per resource,
+## its icon on a coin of its colour `coin_size` across and the amount in `amount_variation`, and
+## "No loot" for none.
+func _fill_lines(field_card: FieldCard, parent: Control, colony_variation: StringName, coin_size: Vector2,
+		amount_variation: StringName) -> void:
 	field_card.colony = Label.new()
-	field_card.colony.theme_type_variation = &"InfoDetail"
+	field_card.colony.theme_type_variation = colony_variation
 	field_card.colony.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
 	parent.add_child(field_card.colony)
 	for res: String in _catalog.resources:
@@ -550,8 +563,9 @@ func _fill_lines(field_card: FieldCard, parent: Control, coin_size: Vector2, amo
 	parent.add_child(field_card.no_loot)
 
 
-## The detail page: the minimap on the left; on the right the field's lines, the legend, Back and
-## Attack.
+## The detail page: the minimap, with the band's ribbon and the Command Center's chip, on the
+## left; on the right the outpost as its title, the loot a row per resource, what the field holds
+## in two columns, the legend, and Back and Attack at the bottom.
 func _build_detail(parent: Control) -> void:
 	var page := HBoxContainer.new()
 	page.mouse_filter = Control.MOUSE_FILTER_IGNORE
@@ -572,11 +586,18 @@ func _build_detail(parent: Control) -> void:
 	side.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	side.add_theme_constant_override("separation", 10)
 	page.add_child(side)
-	_fill_lines(_detail_header, side, LOOT_ICON_SIZE, &"CardCost")
-	_detail_holds = Label.new()
-	_detail_holds.theme_type_variation = &"InfoDetail"
-	_detail_holds.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	side.add_child(_detail_holds)
+	_fill_lines(_detail_header, side, &"InfoTitle", DETAIL_COIN_SIZE, &"SectorLoot")
+	var holds := GridContainer.new()
+	holds.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	holds.columns = 2
+	holds.add_theme_constant_override("h_separation", 32)
+	holds.add_theme_constant_override("v_separation", 2)
+	side.add_child(holds)
+	for i: int in 4:
+		var line := Label.new()
+		line.theme_type_variation = &"SectorRow"
+		holds.add_child(line)
+		_detail_holds.append(line)
 	var legend := GridContainer.new()
 	legend.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	legend.columns = 2
@@ -605,7 +626,7 @@ func _build_detail(parent: Control) -> void:
 	_back_button = _button("Back", BACK_SIZE, &"BarButton")
 	_back_button.pressed.connect(_show_fields)
 	buttons.add_child(_back_button)
-	_attack_button = _button("ATTACK", ATTACK_SIZE, &"BuildButton")
+	_attack_button = _button("ATTACK", ATTACK_SIZE, &"CommitButton")
 	_attack_button.pressed.connect(func() -> void:
 		if _detail_index >= 0:
 			attack_pressed.emit(_detail_index, _field))
@@ -935,20 +956,22 @@ class Minimap:
 			Vector2(a.x, a.y + cut)])
 
 
-## A legend's swatch: a flat fill with an ink outline and a shadow, as the minimap's buildings.
+## A legend's swatch: a coin of its colour, an ink ring and a shadow, as the HUD's icons' coins.
 class Swatch:
 	extends Control
+
+	const SIDES := 24
 
 	var color: Color = Color.WHITE
 
 	func _draw() -> void:
 		var pen := HudIcon.Pen.new()
 		pen.fit(Rect2(Vector2.ZERO, size))
-		var square := PackedVector2Array([Vector2(4, 4), Vector2(36, 4), Vector2(36, 36), Vector2(4, 36)])
+		var disc := Hud._circle(Vector2(20, 20), HudIcon.COIN_RADIUS, SIDES)
 		for shadow: bool in [true, false]:
 			pen.shadow = shadow
-			pen.shape(square, color)
-			pen.outline(square)
+			pen.shape(disc, color)
+			pen.outline(disc, HudIcon.COIN_RING)
 		pen.shadow = false
 		pen.draw(self)
 
