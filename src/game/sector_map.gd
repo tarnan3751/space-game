@@ -7,9 +7,10 @@ extends PanelContainer
 ## applies the scan and starts the battle, through PlacementController.
 ##
 ## One header (the title, Scan with its countdown, the close button) over one of two pages:
-##   the fields: a card per field of state.sector_fields(), three to a row, each a thumbnail of
-##     its outpost, its band as a word and a colour, the outpost's Command Center and its loot
-##     targets; a cleared field is stamped with a star, dimmed and cannot be pressed;
+##   the fields: a card per field of state.sector_fields(), three to a row (two, scrolling,
+##     when a safe-area inset narrows the map: only an inset does), each a scan plate of its outpost (Minimap) carrying its band on a ribbon
+##     and the outpost's Command Center on a chip, then the outpost and its loot targets; a cleared
+##     field is stamped with a star, dimmed and cannot be pressed;
 ##   a field's detail, opened from its card: a minimap of the outpost, the field's header again,
 ##     its loot, what it holds, the minimap's legend, Back and Attack.
 ## The fields are laid out (OutpostGenerator.generate_field, up to 25 ms for a hard field, about
@@ -38,11 +39,20 @@ signal attack_pressed(index: int, field: Dictionary)
 ## Each band's colour; a band not listed takes the HUD's accent.
 const BAND_COLORS := {"easy": MaterialKit.ENERGY, "even": MaterialKit.ARMY, "hard": MaterialKit.DEFENCE}
 const HINT := "Scan to refresh: your Command Center has grown"
-const SCAN_SIZE := Vector2(190, 48)
+const SCAN_SIZE := Vector2(190, 56)
 const CARD_SIZE := Vector2(360, 200)
+## The fields' columns: three on a panel at least WIDE_PANEL across, else two (only a safe-area
+## inset narrows the map), GAP apart; the room left round them for the cards' shadows, which fall outside them.
+const WIDE_PANEL := 1180.0
+const GAP := 16
+const SHADOW_ROOM := 6
+## A card: its plate, the room either side of its content and between plate and lines, its loot's
+## coins, its stamp and how much a cleared card's content keeps.
 const THUMBNAIL_SIZE := Vector2(160, 160)
-const LOOT_ICON_SIZE := Vector2(28, 28)
+const CARD_PAD := 14
+const LOOT_ICON_SIZE := Vector2(24, 24)
 const STAMP_SIZE := Vector2(60, 60)
+const CLEARED_ALPHA := 0.75
 const MINIMAP_SIZE := Vector2(480, 480)
 const SWATCH_SIZE := Vector2(18, 18)
 const ATTACK_SIZE := Vector2(200, 64)
@@ -64,6 +74,8 @@ var _title: Label
 var _scan_button: Button
 var _close_button: Button
 var _hint: Label
+## The fields' page: the cards' grid, in a scroll for a screen too short for its rows.
+var _fields: ScrollContainer
 var _grid: GridContainer
 var _cards: Array[FieldCard] = []
 var _detail: Control
@@ -106,17 +118,16 @@ class LayoutJob:
 		field = OutpostGenerator.generate_field(catalog, sector_seed, epoch, index, cc, capacity)
 
 
-## A field's band, its outpost and its loot, on a card or over the detail: what dims while it is
-## cleared, and the stamp.
+## A field's outpost and its loot, on a card or on the detail, with the plate or the minimap that
+## carries its band: what dims while it is cleared, and the stamp.
 class FieldCard:
 	var button: Button
 	var stripe: Control
 	var content: Control
-	var band: Label
 	var colony: Label
-	var loot_row: Control
+	## Per resource, its loot's row (shown while the target is above 0) and amount.
+	var loot_rows: Dictionary[String, Control] = {}
 	var loot: Dictionary[String, Label] = {}
-	var loot_icons: Dictionary[String, HudIcon] = {}
 	var no_loot: Label
 	var stamp: Control
 	## The card's thumbnail of its outpost, the detail's minimap on the detail; it carries the band.
@@ -158,13 +169,27 @@ func setup(catalog: Catalog) -> void:
 	_hint.text = HINT
 	column.add_child(_hint)
 
+	# A scroll takes the touches it scrolls by; the panel stops them anyway.
+	_fields = ScrollContainer.new()
+	_fields.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+	_fields.vertical_scroll_mode = ScrollContainer.SCROLL_MODE_SHOW_NEVER
+	_fields.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	column.add_child(_fields)
+	var room := MarginContainer.new()
+	room.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	room.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	room.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	room.add_theme_constant_override("margin_right", SHADOW_ROOM)
+	room.add_theme_constant_override("margin_bottom", SHADOW_ROOM)
+	_fields.add_child(room)
 	_grid = GridContainer.new()
 	_grid.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	_grid.columns = 3
-	_grid.size_flags_vertical = Control.SIZE_EXPAND_FILL
-	_grid.add_theme_constant_override("h_separation", 16)
-	_grid.add_theme_constant_override("v_separation", 16)
-	column.add_child(_grid)
+	_grid.add_theme_constant_override("h_separation", GAP)
+	_grid.add_theme_constant_override("v_separation", GAP)
+	# The cards fill the width and keep their height, the rows centred where they leave room.
+	_grid.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	room.add_child(_grid)
 	for index: int in catalog.expedition_field_count():
 		var band := str(catalog.expedition_band(index).get("id", ""))
 		if not _band_skulls.has(band):
@@ -181,8 +206,21 @@ func setup(catalog: Catalog) -> void:
 ## Shows the map on the fields' page.
 func open(state: BaseState) -> void:
 	_show_fields()
+	_fit()
 	visible = true
 	refresh(state)
+
+
+func _notification(what: int) -> void:
+	if what == NOTIFICATION_RESIZED:
+		_fit()
+
+
+## Three columns of cards on a panel WIDE_PANEL across or more, else two. The panel's own width
+## can be held wider by three columns' minimum, so it is read from the area it is laid out in.
+func _fit() -> void:
+	if _grid != null:
+		_grid.columns = 3 if get_parent_area_size().x - 2 * Hud.MARGIN >= WIDE_PANEL else 2
 
 
 ## Hides the map and says so (main.gd gives the world its input back).
@@ -203,7 +241,7 @@ func refresh(state: BaseState) -> void:
 		_fill(_cards[i], fields[i])
 		var cleared: bool = fields[i]["cleared"]
 		_cards[i].button.disabled = cleared
-		var tint := Color(1, 1, 1, Hud.DISABLED_ALPHA) if cleared else Color.WHITE
+		var tint := Color(1, 1, 1, CLEARED_ALPHA) if cleared else Color.WHITE
 		_cards[i].content.modulate = tint
 		_cards[i].stripe.modulate = tint
 		_cards[i].stamp.visible = cleared
@@ -247,7 +285,7 @@ func show_field(index: int) -> bool:
 	_fill(_detail_header, summary)
 	_minimap.show_field(_catalog, _field)
 	_detail_holds.text = _holds(_field)
-	_grid.visible = false
+	_fields.visible = false
 	_scan_button.visible = false
 	_detail.visible = true
 	return true
@@ -369,12 +407,12 @@ func card_cleared(index: int) -> bool:
 	return _cards[index].stamp.visible
 
 
-## A card's lines: its band, its outpost and its loot, as shown.
+## A card's lines: its band (on its plate's ribbon), its outpost and its loot, as shown.
 func card_lines(index: int) -> PackedStringArray:
 	var card_shown := _cards[index]
-	var lines := PackedStringArray([card_shown.band.text, card_shown.colony.text])
+	var lines := PackedStringArray([card_shown.thumbnail.band_text(), card_shown.colony.text])
 	for res: String in card_shown.loot:
-		if card_shown.loot[res].visible:
+		if card_shown.loot_rows[res].visible:
 			lines.append("%s %s" % [res, card_shown.loot[res].text])
 	return lines
 
@@ -416,93 +454,100 @@ func _show_fields() -> void:
 	_detail_epoch = -1
 	_field = {}
 	_detail.visible = false
-	_grid.visible = true
+	_fields.visible = true
 	_scan_button.visible = true
 
 
-## A field card: the band's stripe along its top, the outpost's thumbnail, the band, the outpost,
-## the loot row; the stamp at its top right, over the dimmed content.
+## A field card: the band's stripe along its top; the outpost's plate on the left, the outpost and
+## its loot on the right; the stamp at its bottom right, over the dimmed content. The content sinks
+## with the card while it is pressed, as a build card's does (Hud._sink).
 func _build_card() -> FieldCard:
 	var field_card := FieldCard.new()
-	field_card.button = _button("", CARD_SIZE)
+	field_card.button = _button("", CARD_SIZE, &"CardButton")
+	# PASS, so a drag that starts on a card scrolls the fields where they do not fit (two columns,
+	# when a safe-area inset narrows the map); the panel still stops the touch from reaching the
+	# world.
+	field_card.button.mouse_filter = Control.MOUSE_FILTER_PASS
 	field_card.button.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	field_card.button.size_flags_vertical = Control.SIZE_EXPAND_FILL
-	var content := VBoxContainer.new()
-	content.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	content.alignment = BoxContainer.ALIGNMENT_CENTER
-	content.add_theme_constant_override("separation", 4)
-	field_card.button.add_child(content)
-	content.set_anchors_preset(Control.PRESET_FULL_RECT)
-	content.offset_left = 14
-	content.offset_top = Hud.BORDER + Hud.STRIPE_HEIGHT + 4
-	content.offset_right = -14
-	content.offset_bottom = -Hud.BORDER - 2
+	var body := Control.new()
+	body.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	field_card.button.add_child(body)
+	body.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	field_card.button.draw.connect(Hud._sink.bind(field_card.button, body))
 	var stripe := Panel.new()
 	stripe.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	stripe.theme_type_variation = &"CardStripe"
-	field_card.button.add_child(stripe)
+	body.add_child(stripe)
 	stripe.set_anchors_preset(Control.PRESET_TOP_WIDE)
 	stripe.offset_left = Hud.BORDER
 	stripe.offset_right = -Hud.BORDER
 	stripe.offset_top = Hud.BORDER
 	stripe.offset_bottom = Hud.BORDER + Hud.STRIPE_HEIGHT
 	field_card.stripe = stripe
+	var content := HBoxContainer.new()
+	content.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	content.add_theme_constant_override("separation", CARD_PAD)
+	body.add_child(content)
+	content.set_anchors_preset(Control.PRESET_FULL_RECT)
+	content.offset_left = CARD_PAD
+	content.offset_top = Hud.BORDER + Hud.STRIPE_HEIGHT
+	content.offset_right = -CARD_PAD
+	content.offset_bottom = -Hud.BORDER
 	field_card.content = content
 	field_card.thumbnail = Minimap.new()
 	field_card.thumbnail.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	field_card.thumbnail.custom_minimum_size = THUMBNAIL_SIZE
-	field_card.thumbnail.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
+	field_card.thumbnail.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 	content.add_child(field_card.thumbnail)
-	_fill_lines(field_card, content, BoxContainer.ALIGNMENT_CENTER)
+	var lines := VBoxContainer.new()
+	lines.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	lines.alignment = BoxContainer.ALIGNMENT_CENTER
+	lines.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	lines.add_theme_constant_override("separation", 4)
+	content.add_child(lines)
+	_fill_lines(field_card, lines, LOOT_ICON_SIZE, &"CardCost")
 	var stamp := Stamp.new()
 	stamp.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	stamp.visible = false
-	field_card.button.add_child(stamp)
-	stamp.set_anchors_preset(Control.PRESET_TOP_RIGHT)
+	body.add_child(stamp)
+	stamp.set_anchors_preset(Control.PRESET_BOTTOM_RIGHT)
 	stamp.offset_left = -STAMP_SIZE.x - 10
 	stamp.offset_right = -10
-	stamp.offset_top = 14
-	stamp.offset_bottom = 14 + STAMP_SIZE.y
+	stamp.offset_top = -STAMP_SIZE.y - 10
+	stamp.offset_bottom = -10
 	field_card.stamp = stamp
 	return field_card
 
 
-## The band, the outpost and the loot row under `parent`, aligned by `alignment`.
-func _fill_lines(field_card: FieldCard, parent: Control, alignment: BoxContainer.AlignmentMode) -> void:
-	var horizontal: HorizontalAlignment = HORIZONTAL_ALIGNMENT_CENTER if alignment == BoxContainer.ALIGNMENT_CENTER \
-		else HORIZONTAL_ALIGNMENT_LEFT
-	field_card.band = Label.new()
-	field_card.band.theme_type_variation = &"InfoTitle"
-	field_card.band.horizontal_alignment = horizontal
-	parent.add_child(field_card.band)
+## The outpost's line and the loot's rows under `parent`: a row per resource, its icon on a coin of
+## its colour `coin_size` across and the amount in `amount_variation`, and "No loot" for none.
+func _fill_lines(field_card: FieldCard, parent: Control, coin_size: Vector2, amount_variation: StringName) -> void:
 	field_card.colony = Label.new()
 	field_card.colony.theme_type_variation = &"InfoDetail"
-	field_card.colony.horizontal_alignment = horizontal
+	field_card.colony.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
 	parent.add_child(field_card.colony)
-	var row := HBoxContainer.new()
-	row.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	row.alignment = alignment
-	row.add_theme_constant_override("separation", 6)
-	parent.add_child(row)
-	field_card.loot_row = row
 	for res: String in _catalog.resources:
+		var row := HBoxContainer.new()
+		row.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		row.add_theme_constant_override("separation", 8)
+		parent.add_child(row)
 		var icon := HudIcon.new()
 		icon.mouse_filter = Control.MOUSE_FILTER_IGNORE
 		icon.kind = res
 		icon.color = _resource_color(res)
-		icon.custom_minimum_size = LOOT_ICON_SIZE
+		icon.coin = _resource_color(res)
+		icon.custom_minimum_size = coin_size
 		icon.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 		row.add_child(icon)
 		var amount := Label.new()
-		amount.theme_type_variation = &"CardCost"
-		amount.add_theme_color_override("font_color", _resource_color(res))
+		amount.theme_type_variation = amount_variation
 		row.add_child(amount)
-		field_card.loot_icons[res] = icon
+		field_card.loot_rows[res] = row
 		field_card.loot[res] = amount
 	field_card.no_loot = Label.new()
 	field_card.no_loot.theme_type_variation = &"CardCount"
 	field_card.no_loot.text = "No loot"
-	row.add_child(field_card.no_loot)
+	parent.add_child(field_card.no_loot)
 
 
 ## The detail page: the minimap on the left; on the right the field's lines, the legend, Back and
@@ -527,7 +572,7 @@ func _build_detail(parent: Control) -> void:
 	side.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	side.add_theme_constant_override("separation", 10)
 	page.add_child(side)
-	_fill_lines(_detail_header, side, BoxContainer.ALIGNMENT_BEGIN)
+	_fill_lines(_detail_header, side, LOOT_ICON_SIZE, &"CardCost")
 	_detail_holds = Label.new()
 	_detail_holds.theme_type_variation = &"InfoDetail"
 	_detail_holds.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
@@ -572,8 +617,6 @@ func _build_detail(parent: Control) -> void:
 func _fill(field_card: FieldCard, field: Dictionary) -> void:
 	var band := str(field.get("band", ""))
 	var color: Color = BAND_COLORS.get(band, Hud.ACCENT)
-	field_card.band.text = band.to_upper()
-	field_card.band.add_theme_color_override("font_color", color)
 	if field_card.stripe != null:
 		field_card.stripe.self_modulate = color
 	field_card.thumbnail.show_band(band.to_upper(), color, int(_band_skulls.get(band, 0)), int(field.get("cc", 0)))
@@ -582,8 +625,7 @@ func _fill(field_card: FieldCard, field: Dictionary) -> void:
 	var any := false
 	for res: String in field_card.loot:
 		var amount := int(loot.get(res, 0))
-		field_card.loot[res].visible = amount > 0
-		field_card.loot_icons[res].visible = amount > 0
+		field_card.loot_rows[res].visible = amount > 0
 		field_card.loot[res].text = Format.amount(amount)
 		any = any or amount > 0
 	field_card.no_loot.visible = not any
