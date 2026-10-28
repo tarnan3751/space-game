@@ -92,7 +92,8 @@ func run(main: MainScript) -> void:
 		"cancelling a Ranger leaves %s" % ", ".join(state.queue_of(academy.id)))
 	check(state.resources["crystal"] - crystal_queued == _train_cost(state, "ranger"),
 		"the Ranger was refunded %d crystal" % (state.resources["crystal"] - crystal_queued))
-	check(hud.toast_text() == "Refunded", "the toast reads %s" % hud.toast_text())
+	check(hud.toast_text() == "Refunded" and hud.toast_kind() == Hud.ToastKind.INFO,
+		"the toast reads %s, as information" % hud.toast_text())
 	# Two seconds on (crystal tops up to its cap, so after the refund's check), the game's one-second tick counts the head down (the HUD's tick path).
 	advance(2)
 	await wait_seconds(main, 1.0)
@@ -150,7 +151,7 @@ func run(main: MainScript) -> void:
 	hud.research_card("breacher").pressed.emit()
 	await frames(2)
 	check(state.research_unit == "ranger" and state.resources["crystal"] == crystal_research
-		and hud.toast_text() == "Research already running",
+		and hud.toast_text() == "Research already running" and hud.toast_kind() == Hud.ToastKind.REFUSAL,
 		"a second research is refused while one runs: %s" % hud.toast_text())
 	# Half way, the progress bar's fill is half across its track.
 	var total := state.research_seconds_left()

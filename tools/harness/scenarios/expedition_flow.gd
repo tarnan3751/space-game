@@ -236,6 +236,8 @@ func run(main: MainScript) -> void:
 	if not gains.is_empty():
 		toast += "\n" + ", ".join(gains)
 	check(hud.toast_text() == toast, "the toast: '%s'" % hud.toast_text().replace("\n", " / "))
+	var kind := Hud.ToastKind.REWARD if starred or not gains.is_empty() else Hud.ToastKind.INFO
+	check(hud.toast_kind() == kind, "the toast's edge is a %s's" % Hud.ToastKind.keys()[hud.toast_kind()].to_lower())
 	check(main.battle == null and hud.visible and map.is_open() and not map.is_detail_open()
 		and not main.world_input.is_inside_tree(), "the map opened again over the base")
 	check(map.card_cleared(FIELD) == starred and map.card(FIELD).disabled == starred,

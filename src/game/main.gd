@@ -217,7 +217,7 @@ func _on_cancel_training_pressed(id: int, unit: String) -> void:
 func _on_research_pressed(unit: String) -> void:
 	var error := placement.research(unit)
 	if error != "":
-		hud.show_message(Hud.research_error_text(error))
+		hud.show_message(Hud.research_error_text(error), Hud.ToastKind.REFUSAL)
 
 
 ## A making card: one ability queued, or the reason it was not as a toast.
@@ -240,7 +240,7 @@ func _on_cancel_making_pressed(id: int, ability: String) -> void:
 func _on_research_ability_pressed(ability: String) -> void:
 	var error := placement.research_ability(ability)
 	if error != "":
-		hud.show_message(Hud.research_error_text(error))
+		hud.show_message(Hud.research_error_text(error), Hud.ToastKind.REFUSAL)
 
 
 func _set_state(new_state: BaseState) -> void:
@@ -275,7 +275,7 @@ func _template_base() -> void:
 func _practice_raid() -> void:
 	var setup := practice_setup()
 	if (setup["attacker"]["army"] as Dictionary).is_empty():
-		hud.show_message("Train some units first")
+		hud.show_message("Train some units first", Hud.ToastKind.REFUSAL)
 		return
 	var error := open_battle(setup, true)
 	if error != "":
@@ -340,7 +340,7 @@ func _on_attack_pressed(index: int, field: Dictionary) -> void:
 		if state.army_count(unit) > 0:
 			army[unit] = state.army_count(unit)
 	if army.is_empty():
-		hud.show_message("Train some units first")
+		hud.show_message("Train some units first", Hud.ToastKind.REFUSAL)
 		return
 	var abilities := {}
 	for ability: String in state.ability_stock:
@@ -429,7 +429,8 @@ func _apply_expedition(setup: Dictionary, result: Dictionary, expedition: Dictio
 				gains.append("+%s %s" % [Format.amount(gained), catalog.resource_name(res).to_lower()])
 		if not gains.is_empty():
 			text += "\n" + ", ".join(gains)
-		hud.show_message(text)
+		# A field cleared, or anything brought home, is a reward.
+		hud.show_message(text, Hud.ToastKind.REWARD if stars >= 1 or not gains.is_empty() else Hud.ToastKind.INFO)
 	open_sector_map()
 
 

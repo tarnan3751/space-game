@@ -44,6 +44,8 @@ signal expedition_pressed
 ## What the army panel shows: nothing (closed or closing), a producer's training, the lab's
 ## research, or the Foundry's making.
 enum ArmyPage { NONE, TRAIN, RESEARCH, MAKE }
+## A toast's kind, which colours its left edge (TOAST_EDGES): information, a refusal, or a reward.
+enum ToastKind { INFO, REFUSAL, REWARD }
 ## The menu family's look (docs/reference/hud.md, **Skins**): A, the comic console (the default);
 ## B, the halftone console, its shapes drawn from textures; C, the pulp page, cream and ink.
 enum Look { A, B, C }
@@ -222,6 +224,12 @@ const MENU_OPEN_SECONDS := 0.18
 const MENU_CLOSE_SECONDS := 0.14
 ## Pressing the selected tab again scrolls its strip back to the start over this long.
 const STRIP_RETURN_SECONDS := 0.2
+## Each toast kind's variation and the colour of its left edge, in ToastKind's order.
+const TOAST_EDGES := {
+	&"ToastInfo": ACCENT,
+	&"ToastRefusal": MaterialKit.DEFENCE,
+	&"ToastReward": GOLD,
+}
 ## Each ability effect's colour (HudIcon kinds "swarm", "emp", "strike"): its glyph's, and its
 ## coin's, which HudIcon holds to its coin value.
 const ABILITY_COLORS := {
@@ -374,6 +382,7 @@ var _building_word: String = "Building..."
 var _toast: Control
 var _toast_label: Label
 var _toast_tween: Tween
+var _toast_kind: ToastKind = ToastKind.INFO
 var _reset_button: Button
 var _template_button: Button
 var _practice_button: Button
@@ -770,7 +779,10 @@ func fit_safe_area() -> void:
 	apply_safe_area(area)
 
 
-func show_message(text: String) -> void:
+## Shows the toast: `text`, its left edge in `kind`'s colour (TOAST_EDGES).
+func show_message(text: String, kind: ToastKind = ToastKind.INFO) -> void:
+	_toast_kind = kind
+	_toast.theme_type_variation = TOAST_EDGES.keys()[kind]
 	_toast_label.text = text
 	_toast.modulate.a = 1.0
 	_toast.show()
@@ -781,8 +793,9 @@ func show_message(text: String) -> void:
 	_toast_tween.tween_callback(_toast.hide)
 
 
+## A refused command's toast: `code`'s words (error_text).
 func show_error(code: String) -> void:
-	show_message(error_text(code))
+	show_message(error_text(code), ToastKind.REFUSAL)
 
 
 ## Adds a full screen over the base's parts (the sector map): under the root, so it sits on the
@@ -1035,6 +1048,11 @@ func queue_head_status() -> String:
 ## The toast's text while it shows; "" once it has faded.
 func toast_text() -> String:
 	return _toast_label.text if _toast.visible else ""
+
+
+## The toast's kind, the last one shown.
+func toast_kind() -> ToastKind:
+	return _toast_kind
 
 
 ## A unit's research card; shown while the unit is unlocked.
@@ -2802,10 +2820,11 @@ func _build_info_panel() -> void:
 	_info_panel = panel
 
 
-## Top centre, 96 down. It takes no touch, and is hidden once it has faded.
+## Top centre, 96 down. It takes no touch, and is hidden once it has faded. Its shape shows its
+## kind's edge round the body (ToastBody), which holds the text.
 func _build_toast() -> void:
 	_toast = PanelContainer.new()
-	_toast.theme_type_variation = &"Toast"
+	_toast.theme_type_variation = &"ToastInfo"
 	_toast.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	_toast.visible = false
 	_root.add_child(_toast)
@@ -2815,10 +2834,14 @@ func _build_toast() -> void:
 	_toast.offset_right = 0
 	_toast.offset_top = 96
 	_toast.offset_bottom = 96
+	var body := PanelContainer.new()
+	body.theme_type_variation = &"ToastBody"
+	body.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_toast.add_child(body)
 	_toast_label = Label.new()
 	_toast_label.theme_type_variation = &"ToastText"
 	_toast_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	_toast.add_child(_toast_label)
+	body.add_child(_toast_label)
 
 
 ## Debug builds only: start over without digging through user:// for the save file, swap the
@@ -2939,13 +2962,22 @@ func _make_theme() -> Theme:
 	menu.content_margin_bottom = MARGIN
 	ui.set_type_variation(&"MenuPanel", &"PanelContainer")
 	ui.set_stylebox("panel", &"MenuPanel", menu)
-	var toast := _shape(PANEL, 10)
-	toast.content_margin_left = 18
+	# The toast: its shape in its kind's edge colour (ToastKind: red a refusal, cyan information,
+	# gold a reward), the panel's fill (ToastBody) over all of it but a 4 px band at its left.
+	for kind: StringName in TOAST_EDGES:
+		var rim := _shape(TOAST_EDGES[kind], 10, BORDER)
+		rim.content_margin_left = BORDER + 4
+		ui.set_type_variation(kind, &"PanelContainer")
+		ui.set_stylebox("panel", kind, rim)
+	var toast := _flat(Color(PANEL, 1.0), 7)
+	toast.corner_radius_top_left = 4
+	toast.corner_radius_bottom_left = 4
+	toast.content_margin_left = 14
 	toast.content_margin_right = 18
 	toast.content_margin_top = 8
 	toast.content_margin_bottom = 8
-	ui.set_type_variation(&"Toast", &"PanelContainer")
-	ui.set_stylebox("panel", &"Toast", toast)
+	ui.set_type_variation(&"ToastBody", &"PanelContainer")
+	ui.set_stylebox("panel", &"ToastBody", toast)
 	# A full screen over the base (the sector map, add_screen): the panel's fill, opaque.
 	ui.set_type_variation(&"ScreenPanel", &"PanelContainer")
 	ui.set_stylebox("panel", &"ScreenPanel", _shape(Color(PANEL, 1.0), 12))
