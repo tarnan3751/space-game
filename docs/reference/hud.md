@@ -50,8 +50,9 @@ row's included.
 
 **Type scale** (720p): nothing smaller than 17 px but the debug row's (**Layout**); body lines 19
 to 20 (`CardCost` 20, `CardCount` and `CardReason` 19, `MeterText` 20, `InfoDetail`, `InfoNote`,
-`QueueName`, `HousingText`, `ToastText` and `BadgeText` 19); the build cards' small lines 17
-(`CardTime`, `CardWarning`, `CardChip`, `LockText`); names 22 (`CardName`); titles 30
+`QueueName`, `HousingText`, `ToastText` and `BadgeText` 19; the sector map's `SectorRow` 20 and
+`SectorRibbon`, Bangers 20 in ink); the build cards' small lines 17 (`CardTime`, `CardWarning`,
+`CardChip`, `LockText`); names 22 (`CardName`, and the sector detail's loot, `SectorLoot`); titles 30
 (`InfoTitle`); button labels 24 to 30 (the tabs, `BarButton`, `ConfirmButton`, `CommitButton` and
 `UpgradeButton` 24, `CloseButton` 28, `BuildButton` and `ExpeditionButton` 30). The HUD is 720 px
 tall under the `canvas_items` stretch, so on a 6.1-inch phone a pixel is about 0.09 mm: 17 px is a
@@ -108,7 +109,8 @@ stroke reaches a quarter of `outline_size` out from each glyph.
 
 **Touch sizes.** The tabs are 160×56, the close buttons 56×56, Build 136×72 and Expedition 184×72,
 the info panel's Train, Make or Research 112×56 and its Close 96×56 (`ACTION_SIZE`,
-`INFO_CLOSE_SIZE`), the place bar's Cancel and Place 170×72; the build cards 200×200. In battle (**Battle HUD**): speed
+`INFO_CLOSE_SIZE`), the place bar's Cancel and Place 170×72; the build cards 200×200; the sector
+map's Scan 190×56, its cards 360×200 at least, Back 140×72 and Attack 240×72. In battle (**Battle HUD**): speed
 96×64 and End 140×64, Keep fighting 200×72 and End battle 180×72, Return 240×72, the deploy and
 ability cards 124×136.
 
@@ -136,7 +138,8 @@ every skin: its variations are its own, built after the skin's in a Battle HUD b
   tinted to their role (`modulate_color`); anything disabled takes the flat card-disabled shape.
   Pressed, a shape is 15 % lighter and squashes 4 % about its centre (`SQUASH`, `_squash`)
   instead of sinking; a toggle (a tab) never squashes. The panels' and cards' light line and band
-  are the textures'. The info panel, the place bar, the toast and the sector map keep A's shapes.
+  are the textures'. The info panel, the place bar, the toast and the sector map keep A's shapes, but for the sector
+  map's cards, which take B's card as `CardButton`.
 - **C, the pulp page**: the menu family in the buildings' cream (`CREAM`, `MaterialKit.HULL_LIGHT`)
   with ink text and no outlines, a 4 px ink border, a disabled shape a darker cream, dim text and
   warnings in inks that read on cream; the bright buttons in their roles' colours with ink. The
@@ -173,10 +176,11 @@ map) under the root, so it sits on the safe area and takes the theme, and moves 
 it, so a toast shows over it. The place bar and the info panel are anchored to the bottom edge and grow upward
 (`_anchor_bottom`).
 
-The game is landscape only (`window/handheld/orientation`). Narrower than 16:9 the build and army
-panels scroll; the sector map's 3×2 grid needs about 1,180 px across, so a 4:3 tablet (960×720
-under `aspect` expand) is too narrow for it; portrait fits none of the bottom panels, the top bar
-or the sector map.
+The game is landscape only (`window/handheld/orientation`). Under the `aspect` expand stretch the
+visible rect is never narrower than 1,280 px: a screen squarer than 16:9 grows taller (a 4:3 tablet
+is 1280×960), one wider grows wider. Only the safe area takes width away; the sector map's grid
+drops to two columns, scrolling, when that leaves it under about 1,180 px (**Sector map**).
+Portrait fits none of the bottom panels, the top bar or the sector map.
 
 ## Top bar
 
@@ -607,16 +611,36 @@ the info panel's shape). Hidden until the Expedition button opens it. It reads `
 
 | Part | Contents |
 | --- | --- |
-| Header | "SECTOR" (`InfoTitle`); **Scan** (`ConfirmButton`, 190×48): "SCAN" while a scan is allowed (the first always), else disabled and counting down, "SCAN  3h 00m" (`scan_seconds_left`, `Format.duration`), hidden while a field's detail shows; the close button "X" (`CloseButton`). |
+| Header | "SECTOR" (`InfoTitle`); **Scan** (`ConfirmButton`, 190×56): "SCAN" while a scan is allowed (the first always), else disabled and counting down, "SCAN  3h 00m" (`scan_seconds_left`, `Format.duration`), hidden while a field's detail shows; the close button "X" (`CloseButton`). |
 | Hint | "Scan to refresh: your Command Center has grown" (`InfoNote`) while the sector's snapshot is of a lower Command Center than the base's (`state.sector.cc < state.cc_level()`). |
-| Fields | A card per field of `state.sector_fields()` in a 3×2 grid (`GridContainer`, 16 apart), each filling its cell (360×200 at least): a stripe along its top in the band's colour; a 140×140 thumbnail of its outpost (the minimap's drawing, below, with the buildings as plain fills at that size); the band as a word in Bangers in that colour (easy `MaterialKit.ENERGY` cyan, even `ARMY` orange, hard `DEFENCE` red, any other the accent); "Rival colony · CC N", the outpost's Command Center level; the loot targets, each resource with a target above 0 as its `HudIcon` (28×28) and the amount in its colour ("No loot" when none has one). A cleared field's card is disabled (the disabled fill), its stripe and lines at 55 %, and stamped at its top right with a gold star (60×60, tilted, a lighter facet, ink outline and shadow, drawn as `HudIcon` draws). |
-| Detail | A field's card opens it (`show_field(index)`; a cleared field, or one that is not a field, opens nothing and returns false), with the field already laid out (below), or laid out then if it has not come yet. On the left the **minimap**, 480×480: the field (48×48 cells and one cell of margin) as a field-dark rounded square with an ink outline and a shadow, every building but the traps (hidden) a flat fill in its role's colour inset a little from its footprint, with an ink outline and a shadow: the Command Center violet (`ANTIMATTER`), defences red, storages (deposits among them) gold, other buildings cream (`HULL_LIGHT`), walls a plain grey fill (`HULL_MID`). Drawn with `HudIcon.Pen`, one triangle array, only when the field changes or the map resizes; under 6 px a cell (a card's thumbnail) the buildings are plain fills, which outlines would cover. On the right the field's band, outpost and loot again, what it holds ("N defences   N storages, N of them loot deposits outside the walls   N walls"; traps stay hidden), a legend of the five colours (each a swatch drawn the same way), and at the bottom **Back** (`BarButton`, 140×64), back to the fields, and **ATTACK** (`BuildButton`, 200×64), which emits `attack_pressed(index, field)`. |
+| Fields | A card per field of `state.sector_fields()` in a grid (`GridContainer`, 16 apart) of three columns where the area the panel is laid out in leaves at least 1,180 px across (`WIDE_PANEL`), else two (a narrow safe area), set on `open` and on a resize; the grid sits in a `ScrollContainer` (vertical, its bar hidden) for the third row two columns need, and its rows are centred where they leave room. Each card (`CardButton`, `MOUSE_FILTER_PASS` so a drag on it scrolls) fills its column's width and is 200 tall (360×200 at least): a stripe along its top in the band's colour (easy `MaterialKit.ENERGY` cyan, even `ARMY` orange, hard `DEFENCE` red, any other the accent); on the left a 160×160 **scan plate** of its outpost (the `Minimap` at a card's size, below); beside it "Rival colony · CC N" (`InfoDetail`), the outpost's Command Center level, over a row per resource with a loot target above 0, its icon on a 24 px coin of its colour (as the build cards' costs) and the amount in `CardCost`, in the text colour ("No loot" when none has one). Pressed, a card is 15 % lighter and its content sinks 4 px with it, as a build card's (`Hud._sink`). A cleared field's card is disabled (the disabled fill), its stripe and content at 75 %, and stamped at its bottom right with a gold star (60×60, tilted, a lighter facet, ink outline and shadow, drawn as `HudIcon` draws). |
+| Detail | A field's card opens it (`show_field(index)`; a cleared field, or one that is not a field, opens nothing and returns false), with the field already laid out (below), or laid out then if it has not come yet. On the left the **minimap**, 480×480, in its chunky drawing (below). On the right the outpost as the title, "Rival colony · CC N" (`InfoTitle`); the loot, a row per resource with a target, its icon on a 28 px coin and the amount at 22 (`SectorLoot`); what the field holds as a two-column table at 20 (`SectorRow`): "N defences" and "N storages" over "N walls" and "N of them outside the walls", the deposits under the storages they are among, singular at one (traps stay hidden); a legend of the five colours at 19 (`CardCount`), each swatch an 18 px coin of its colour with an ink ring; and at the bottom **Back** (`BarButton`, 140×72), back to the fields, and **ATTACK** (`CommitButton`, gold, 240×72), which emits `attack_pressed(index, field)`. |
+
+**The minimap** (`SectorMap.Minimap`) draws a field from above with `HudIcon.Pen`, one triangle array,
+in one of two looks by its size. Under 6 px a cell (`BOLD_CELL`: a card's plate) it is a **scan
+plate**: the field's ground (`FIELD_DARK`) in a 4 px frame of the band's colour inside a 2 px ink
+edge, with a flat shadow; a stepped vignette, three discs darkening it towards the rim; a faint 6×6
+ink grid (10 %); the walled compound as one polygon, the convex hull of the wall cells, in the walls'
+grey (`HULL_MID`) at 40 % with a 2 px ink line; then every defence a 6 px red disc with no outline
+(on a hard field they cluster into a red ring inside the compound), every storage (a deposit is one)
+a 7 px gold square, and the Command Center a 16 px violet (`ANTIMATTER`) diamond in a 2 px ink ring,
+drawn over both; nothing else. At the detail's size it keeps the **chunky drawing**: the field (48×48
+cells and one cell of margin) as a field-dark rounded square with an ink outline and a shadow,
+every building but the traps a flat fill in its role's colour inset a little from its footprint,
+with an ink outline and a shadow: the Command Center violet, defences red, storages gold, other
+buildings cream (`HULL_LIGHT`), walls a plain grey fill. Over either, once the band is shown
+(`show_band`), the band's word in `SectorRibbon` on a ribbon of its colour across the top-left
+corner, reaching 6 px out past the left edge and folded round it, notched at its right end, with a
+skull (20 px, `HudIcon`'s mark in the text colour) per step of difficulty, the band's place in
+the catalog's order of bands (easy one, even two, hard three); and "CC N" in `CardChip` on a pill
+(`CARD_DISABLED`, skin C's darker cream, a 2 px ink ring) over the top-right corner. Its drawing is
+kept (**Known cost**).
 
 **Layouts.** The fields are laid out (`OutpostGenerator.generate_field`, up to 25 ms for a hard
 field, about 100 ms for the six at Command Center 10) off the main thread: one `WorkerThreadPool`
 task per field (`SectorMap.LayoutJob`), started the frame after the map opens, handed the sector's
 seed, epoch, Command Center and a copy of its capacity (never the `BaseState`), and collected in
-`_process` as they finish, one a frame, each card's thumbnail drawn as its field arrives. The
+`_process` as they finish, one a frame, each card's plate drawn as its field arrives. The
 generator touches only its own state, its own `SeededRng` and the `Catalog`, which nothing writes
 after loading, so a layout is the same, byte for byte, as on the main thread. The fields are kept
 for the sector's seed and epoch: a scan or another base (Reset, Template) lays them out again, and
@@ -626,10 +650,18 @@ the tasks to finish and be collected (none starts while it is closed); leaving t
 every one, so quitting with tasks in flight is safe. Once all six are in, processing stops and
 nothing is laid out or drawn per frame.
 
-**Known cost.** The frame the map opens in costs about 13 ms on the Mac: `open()` about 2 ms, the
-panel's first layout and its `HudIcon.Pen` drawings in script about 6 ms, and the base drawn behind
-the panel about 5 ms. The levers (caching the drawings, not drawing the world behind the panel) are
-the UI pass's.
+**Known cost.** Every drawing the map holds is kept: a plate or the minimap keeps its `HudIcon.Pen`
+and builds it again only when its field, its band, its size or the skin changes (showing the field
+already shown changes nothing); the stamps and the swatches when their size does, and the loot icons
+(`LootIcon`, a `HudIcon` that keeps its drawing) when their size, kind, colour, wing or coin does. Showing a control draws it again, so without this every
+open rebuilt them all, the 21 loot icons alone about 8 ms. The cards and the detail are built once in
+`setup`. The fields' summaries are kept for the snapshot they come from (the sector's seed, epoch,
+Command Center and capacity), each card's cleared flag read from the sector; the detail's header
+takes the same kept summary. On the development Mac,
+rendered, the frame the map opens in costs about 6.7 ms against an idle frame's 4.7 (it was 13.4
+against 5.5), `open()` itself 0.3 ms (2.7); the base is still drawn behind the panel. The open map
+draws about 78 more draw calls than the base alone (630 against 552). A field's detail, shown for
+another field than last time, builds its minimap's drawing: a frame of about 8 to 12 ms.
 
 `open(state)` shows it on the fields; `refresh(state)` fills the cards and the hint (after
 `BaseState.changed` while it is open, once in the frame, `main._process`: a scan, a raid), and sends a detail whose field is no longer
@@ -637,16 +669,18 @@ open (cleared, or the epoch moved on) back to the fields; `tick(state)` (the one
 Scan's countdown, its text only when the seconds changed; `close()` hides it and emits `closed`.
 
 **Touch.** The panel is `MOUSE_FILTER_STOP` over the whole safe area and every layout container in
-it IGNORE; the cards and buttons keep `STOP`. `main.gd` also takes the base's `WorldInput` out of
+it IGNORE, but the fields' `ScrollContainer`, which takes the drags it scrolls by; the buttons keep
+`STOP` and the cards are `PASS`. `main.gd` also takes the base's `WorldInput` out of
 the tree while the map is open and puts it back on `closed`, so no touch reaches the base, a pinch
 included.
 
 **Queries for the harness** (on `main.sector_map`): `is_open()`, `is_detail_open()`,
 `detail_index()` (-1 for none) and `detail_field()` (the field laid out); `card(index)` and
-`card_cleared(index)`, whether the stamp shows; `card_lines(index)`, the band, the outpost and each
-loot shown; `scan_button()`, `close_button()`, `attack_button()`; `hint_shown()`;
-`minimap()`, whose `drawn()` and `walls_drawn()` count what it draws; `card_thumbnail(index)`, a card's
-own (`Minimap` too); `layouts_done()`, whether all six fields are laid out.
+`card_cleared(index)`, whether the stamp shows; `card_lines(index)`, the band (its plate's ribbon,
+`Minimap.band_text()`), the outpost and each loot shown; `scan_button()`, `close_button()`, `attack_button()`; `hint_shown()`;
+`minimap()`, whose `drawn()` counts the buildings laid out for drawing (walls and traps apart; a
+plate shows only the Command Center, the defences and the storages of them) and `walls_drawn()` the
+walls; `card_thumbnail(index)`, a card's plate (`Minimap` too); `layouts_done()`, whether all six fields are laid out.
 
 ## Safe area
 
