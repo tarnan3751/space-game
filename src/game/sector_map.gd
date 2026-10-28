@@ -97,6 +97,10 @@ var _field: Dictionary = {}
 var _scan_seconds: int = -1
 ## Each band's skulls on the ribbon: its place in the catalog's order of bands, from 1.
 var _band_skulls: Dictionary[String, int] = {}
+## The fields' summaries (OutpostGenerator.summary, without "cleared"), kept for the sector's
+## snapshot they were made from (_summaries_key: its seed, epoch, Command Center and capacity).
+var _summaries: Array[Dictionary] = []
+var _summaries_key: Array = []
 ## The fields laid out, by index ({} until laid out), for the sector's seed and epoch below.
 var _layouts: Array[Dictionary] = []
 var _layouts_seed: int = -1
@@ -240,10 +244,10 @@ func close() -> void:
 ## is no longer open (cleared, or the epoch moved on) goes back to the fields.
 func refresh(state: BaseState) -> void:
 	_state = state
-	var fields := state.sector_fields()
+	var fields := _summaries_of(state.sector)
 	for i: int in mini(fields.size(), _cards.size()):
 		_fill(_cards[i], fields[i])
-		var cleared: bool = fields[i]["cleared"]
+		var cleared := state.sector.is_cleared(i)
 		_cards[i].button.disabled = cleared
 		var tint := Color(1, 1, 1, CLEARED_ALPHA) if cleared else Color.WHITE
 		_cards[i].content.modulate = tint
@@ -261,6 +265,19 @@ func refresh(state: BaseState) -> void:
 	# The tasks start in the next frame, not in the one the map opens and is laid out in.
 	set_process(not _jobs.is_empty() or (visible and _layouts.has({})))
 	tick(state)
+
+
+## The fields' summaries for `sector`, as state.sector_fields() gives them less "cleared": made
+## again only when the snapshot they come from has changed (a scan, another base), not on every
+## open and refresh.
+func _summaries_of(sector: Sector) -> Array[Dictionary]:
+	var key := [sector.sector_seed, sector.epoch, sector.cc, sector.capacity.duplicate()]
+	if key != _summaries_key:
+		_summaries_key = key
+		_summaries.clear()
+		for index: int in _cards.size():
+			_summaries.append(OutpostGenerator.summary(_catalog, sector, index))
+	return _summaries
 
 
 ## The 1 s tick: Scan's countdown.
@@ -285,8 +302,7 @@ func show_field(index: int) -> bool:
 		return false
 	_detail_index = index
 	_detail_epoch = _state.sector.epoch
-	var summary := OutpostGenerator.summary(_catalog, _state.sector, index)
-	_fill(_detail_header, summary)
+	_fill(_detail_header, _summaries_of(_state.sector)[index])
 	_minimap.show_field(_catalog, _field)
 	var holds := _holds(_field)
 	for i: int in holds.size():
@@ -544,7 +560,7 @@ func _fill_lines(field_card: FieldCard, parent: Control, colony_variation: Strin
 		row.mouse_filter = Control.MOUSE_FILTER_IGNORE
 		row.add_theme_constant_override("separation", 8)
 		parent.add_child(row)
-		var icon := HudIcon.new()
+		var icon := LootIcon.new()
 		icon.mouse_filter = Control.MOUSE_FILTER_IGNORE
 		icon.kind = res
 		icon.color = _resource_color(res)
@@ -724,11 +740,18 @@ class Minimap:
 	var _walls: Array[Rect2] = []
 	var _hull: PackedVector2Array = PackedVector2Array()
 	var _grid: Vector2i = Vector2i(48, 48)
+	## The field shown, so showing it again (its detail opened again) changes nothing.
+	var _shown: Dictionary = {}
 	## The band: its colour, its skulls, its word on the ribbon and the Command Center on the chip.
 	var _band_color: Color = Hud.ACCENT
 	var _skulls: int = 0
 	var _ribbon: Label
 	var _chip: Label
+	## The drawing, kept: drawn again as it is when the map opens, built again only once the field,
+	## the band, the size or the skin has changed (_rebuild).
+	var _pen: HudIcon.Pen
+	var _pen_size: Vector2 = Vector2.ZERO
+	var _pen_skin: Hud.Look = Hud.Look.A
 
 	func _init() -> void:
 		_ribbon = Label.new()
@@ -736,7 +759,7 @@ class Minimap:
 		_ribbon.mouse_filter = Control.MOUSE_FILTER_IGNORE
 		_ribbon.position = Vector2(RIBBON_PAD.x - RIBBON_OUT, RIBBON_TOP + RIBBON_PAD.y)
 		_ribbon.visible = false
-		_ribbon.resized.connect(queue_redraw)
+		_ribbon.resized.connect(_rebuild)
 		add_child(_ribbon)
 		_chip = Label.new()
 		_chip.theme_type_variation = &"CardChip"
@@ -747,10 +770,13 @@ class Minimap:
 		_chip.grow_horizontal = Control.GROW_DIRECTION_BEGIN
 		_chip.offset_right = CHIP_CORNER.x - Hud.CHIP_PAD.x
 		_chip.offset_top = CHIP_CORNER.y + Hud.CHIP_PAD.y
-		_chip.resized.connect(queue_redraw)
+		_chip.resized.connect(_rebuild)
 
-	## Lays out `field` (OutpostGenerator.generate) for drawing.
+	## Lays out `field` (OutpostGenerator.generate) for drawing; nothing for the field already shown.
 	func show_field(catalog: Catalog, field: Dictionary) -> void:
+		if is_same(field, _shown):
+			return
+		_shown = field
 		_grid = catalog.grid_size
 		_rects.clear()
 		_roles.clear()
@@ -787,7 +813,7 @@ class Minimap:
 		# The hull comes back closed, its first point again at its end.
 		if _hull.size() > 1 and _hull[0] == _hull[_hull.size() - 1]:
 			_hull.remove_at(_hull.size() - 1)
-		queue_redraw()
+		_rebuild()
 
 	## Shows the band: `word` on the ribbon in `color`, `skulls` skulls on it, and Command Center
 	## `cc` on the chip.
@@ -799,7 +825,7 @@ class Minimap:
 		if color != _band_color or skulls != _skulls:
 			_band_color = color
 			_skulls = skulls
-			queue_redraw()
+			_rebuild()
 
 	## The band's word on the ribbon.
 	func band_text() -> String:
@@ -814,13 +840,21 @@ class Minimap:
 		return _walls.size()
 
 	func _draw() -> void:
-		var pen := HudIcon.Pen.new()
-		if size.x / (maxf(_grid.x, _grid.y) + 2.0 * PAD) < BOLD_CELL:
-			_draw_plate(pen)
-		else:
-			_draw_chunky(pen)
-		_draw_band(pen)
-		pen.draw(self)
+		if _pen == null or _pen_size != size or _pen_skin != Hud.skin:
+			_pen = HudIcon.Pen.new()
+			_pen_size = size
+			_pen_skin = Hud.skin
+			if size.x / (maxf(_grid.x, _grid.y) + 2.0 * PAD) < BOLD_CELL:
+				_draw_plate(_pen)
+			else:
+				_draw_chunky(_pen)
+			_draw_band(_pen)
+		_pen.draw(self)
+
+	## Drops the drawing kept, so the next draw builds it again.
+	func _rebuild() -> void:
+		_pen = null
+		queue_redraw()
 
 	## The scan plate, in pixels.
 	func _draw_plate(pen: HudIcon.Pen) -> void:
@@ -956,6 +990,25 @@ class Minimap:
 			Vector2(a.x, a.y + cut)])
 
 
+## A loot row's resource icon on its coin, its drawing kept while its size and what it shows (kind,
+## colour, wing, coin) stay the same: the map opening draws it again as it is, where a HudIcon would
+## build it again (about 0.4 ms each on the development Mac, and the map holds 21).
+class LootIcon:
+	extends HudIcon
+
+	var _pen: HudIcon.Pen
+	## What the kept drawing was built for.
+	var _pen_key: Array = []
+
+	func _draw() -> void:
+		var key := [size, kind, color, winged, coin]
+		if _pen == null or key != _pen_key:
+			_pen = HudIcon.Pen.new()
+			_pen_key = key
+			HudIcon.paint(_pen, kind, Rect2(Vector2.ZERO, size), color, winged, coin)
+		_pen.draw(self)
+
+
 ## A legend's swatch: a coin of its colour, an ink ring and a shadow, as the HUD's icons' coins.
 class Swatch:
 	extends Control
@@ -963,17 +1016,22 @@ class Swatch:
 	const SIDES := 24
 
 	var color: Color = Color.WHITE
+	## The drawing, kept for its size (the map opening draws it again as it is).
+	var _pen: HudIcon.Pen
+	var _pen_size: Vector2 = Vector2.ZERO
 
 	func _draw() -> void:
-		var pen := HudIcon.Pen.new()
-		pen.fit(Rect2(Vector2.ZERO, size))
-		var disc := Hud._circle(Vector2(20, 20), HudIcon.COIN_RADIUS, SIDES)
-		for shadow: bool in [true, false]:
-			pen.shadow = shadow
-			pen.shape(disc, color)
-			pen.outline(disc, HudIcon.COIN_RING)
-		pen.shadow = false
-		pen.draw(self)
+		if _pen == null or _pen_size != size:
+			_pen = HudIcon.Pen.new()
+			_pen_size = size
+			_pen.fit(Rect2(Vector2.ZERO, size))
+			var disc := Hud._circle(Vector2(20, 20), HudIcon.COIN_RADIUS, SIDES)
+			for shadow: bool in [true, false]:
+				_pen.shadow = shadow
+				_pen.shape(disc, color)
+				_pen.outline(disc, HudIcon.COIN_RING)
+			_pen.shadow = false
+		_pen.draw(self)
 
 
 ## The cleared stamp: a gold star, tilted, with a lighter facet, an ink outline and a shadow, in the
@@ -983,18 +1041,24 @@ class Stamp:
 
 	const TILT := -0.2
 
+	## The drawing, kept for its size (the map opening draws it again as it is).
+	var _pen: HudIcon.Pen
+	var _pen_size: Vector2 = Vector2.ZERO
+
 	func _draw() -> void:
-		var pen := HudIcon.Pen.new()
-		pen.fit(Rect2(Vector2.ZERO, size))
-		var star := PackedVector2Array()
-		for i: int in 10:
-			var angle := TILT - PI / 2.0 + i * PI / 5.0
-			var reach := 18.0 if i % 2 == 0 else 7.5
-			star.append(Vector2(20, 21) + Vector2(cos(angle), sin(angle)) * reach)
-		for shadow: bool in [true, false]:
-			pen.shadow = shadow
-			pen.shape(star, Hud.GOLD)
-			pen.facet(PackedVector2Array([star[9], star[0], star[1], Vector2(20, 21)]), Hud.GOLD.lightened(0.45))
-			pen.outline(star)
-		pen.shadow = false
-		pen.draw(self)
+		if _pen == null or _pen_size != size:
+			_pen = HudIcon.Pen.new()
+			_pen_size = size
+			_pen.fit(Rect2(Vector2.ZERO, size))
+			var star := PackedVector2Array()
+			for i: int in 10:
+				var angle := TILT - PI / 2.0 + i * PI / 5.0
+				var reach := 18.0 if i % 2 == 0 else 7.5
+				star.append(Vector2(20, 21) + Vector2(cos(angle), sin(angle)) * reach)
+			for shadow: bool in [true, false]:
+				_pen.shadow = shadow
+				_pen.shape(star, Hud.GOLD)
+				_pen.facet(PackedVector2Array([star[9], star[0], star[1], Vector2(20, 21)]), Hud.GOLD.lightened(0.45))
+				_pen.outline(star)
+			_pen.shadow = false
+		_pen.draw(self)
