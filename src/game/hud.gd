@@ -868,10 +868,10 @@ func make_card(ability: String) -> Button:
 	return _make_cards[ability].button
 
 
-## A making card's last line: "In stock N", or why it is locked.
+## A making card's stock chip, "In stock N", or, while it is locked, why.
 func make_card_info(ability: String) -> String:
 	var card := _make_cards[ability]
-	return card.reason if card.reason != "" else card.info.text
+	return card.reason if card.reason != "" else card.chip.text
 
 
 ## An ability's research card.
@@ -1227,7 +1227,7 @@ func _refresh_making(state: BaseState, building: BuildingState) -> void:
 		var stats := _catalog.ability_level_stats(ability, level)
 		_set_card_cost(card, stats.get("make_cost", _NO_COST), _catalog.ability_make_seconds(ability))
 		card.level.text = "Lv %d" % level
-		card.info.text = "In stock %d" % state.stock(ability)
+		card.chip.text = "In stock %d" % state.stock(ability)
 		var needed := _catalog.ability_requires_foundry(ability)
 		var locked := building.level < needed
 		card.button.disabled = locked
@@ -2198,7 +2198,9 @@ func _build_army_panel() -> void:
 	var make_cards := _strip(_train_page, ARMY_CARD_SIZE.y + 18)
 	_make_scroll = make_cards.get_parent().get_parent() as ScrollContainer
 	for ability: String in _catalog.ability_types():
-		var card := _build_army_card(ability, true, MaterialKit.ARMY, false)
+		var card := _build_army_card(ability, true, MaterialKit.NANITE_GREEN, true)
+		# The stock is the chip; nothing goes under the cost.
+		card.info.visible = false
 		card.button.pressed.connect(_on_make_card.bind(ability))
 		make_cards.add_child(card.button)
 		_make_cards[ability] = card
@@ -2223,7 +2225,7 @@ func _build_army_panel() -> void:
 		research_cards.add_child(card.button)
 		_research_cards[unit] = card
 	for ability: String in _catalog.ability_types():
-		var card := _build_army_card(ability, true, MaterialKit.ARMY, false)
+		var card := _build_army_card(ability, true, MaterialKit.NANITE_GREEN, false)
 		card.button.pressed.connect(func() -> void: research_ability_pressed.emit(ability))
 		research_cards.add_child(card.button)
 		_research_ability_cards[ability] = card
