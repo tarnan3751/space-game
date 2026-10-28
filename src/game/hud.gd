@@ -231,9 +231,18 @@ const ABILITY_COLORS := {
 }
 ## A unit level with no train_cost, shared so a lookup builds none.
 const _NO_COST := {}
-## The info panel's Train button, and its Close beside it.
-const ACTION_SIZE := Vector2(112, 56)
-const INFO_CLOSE_SIZE := Vector2(96, 56)
+## The info panel's Train button, and its Close beside it; the selected building's picture
+## (ModelPreview's) left of its title, and the upgrade button's height.
+const ACTION_SIZE := Vector2(128, 56)
+const INFO_CLOSE_SIZE := Vector2(112, 56)
+const INFO_PICTURE := Vector2(64, 64)
+const UPGRADE_HEIGHT := 64.0
+## Between a stat's value and the next level's in an info line: the panel draws it as a chevron, the
+## next value after it in the accent (_set_info_row).
+const NEXT_MARK := "→"
+## The chevron, and the upgrade button's progress fill's key (Fill).
+const CHEVRON_SIZE := 18.0
+const UPGRADE_KEY := "upgrade"
 ## An army card (the training, making and research pages): its picture (ModelPreview), or an
 ## ability's emblem on its coin, on a plinth ARMY_PLINTH across; where its lines start; its cost row's
 ## coins, and the room between its cost and its time.
@@ -345,11 +354,23 @@ var _place_bar: Control
 var _place_button: Button
 var _info_panel: Control
 var _info_title: Label
-var _info_detail: Label
+## The selected building's picture, and the type it shows ("" before the first).
+var _info_picture: TextureRect
+var _info_type: String = ""
+## The "MAX" chip beside the title of a building at its top level.
+var _max_chip: Control
+## The stat lines, one row each, made as the lines first grow that many and reused; and the lines
+## in words (info_detail).
+var _info_rows: VBoxContainer
+var _info_lines: PackedStringArray = PackedStringArray()
 var _upgrade_button: Button
 var _upgrade_note: Label
-## Between a stat and the next level's: " → " when the theme's font has the arrow, else " > ".
-var _arrow: String = " > "
+## While the building is busy, the upgrade button's progress fill and its words over it.
+var _upgrade_track: Control
+var _upgrade_fill: Fill
+var _upgrade_progress: Label
+## "Building…" while a building is first constructed, or "..." when the title's font has no "…".
+var _building_word: String = "Building..."
 var _toast: Control
 var _toast_label: Label
 var _toast_tween: Tween
@@ -553,15 +574,34 @@ class ArmyCard:
 ## width changed; nothing is built.
 class Fill:
 	var clip: Control
+	var stripes: Control
 	var shader: ShaderMaterial
 	var track: Vector2
+	var fraction: float = 0.0
 
-	func set_fraction(fraction: float) -> void:
-		var width := roundf(track.x * clampf(fraction, 0.0, 1.0))
-		if clip.size.x == width:
+	func set_fraction(new_fraction: float) -> void:
+		fraction = clampf(new_fraction, 0.0, 1.0)
+		_apply(false)
+
+	## Sizes the clip and sets fill_width to the fraction of the track: only when the width changed,
+	## unless `force`.
+	func _apply(force: bool) -> void:
+		var width := roundf(track.x * fraction)
+		if clip.size.x == width and not force:
 			return
 		clip.size = Vector2(width, track.y)
 		shader.set_shader_parameter(&"fill_width", width)
+
+	## The track has grown or shrunk to `new_track`: the stripes span it and the fill keeps its share,
+	## its width set again whatever it was.
+	func resize(new_track: Vector2) -> void:
+		if new_track == track:
+			return
+		track = new_track
+		stripes.size = track
+		shader.set_shader_parameter(&"track_width", track.x)
+		shader.set_shader_parameter(&"track_height", track.y)
+		_apply(true)
 
 
 func setup(catalog: Catalog) -> void:
@@ -577,8 +617,8 @@ func setup(catalog: Catalog) -> void:
 	_root.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	_root.theme = _theme
 	add_child(_root)
-	if _root.get_theme_default_font().has_char(0x2192):
-		_arrow = " → "
+	if DISPLAY_FONT.has_char(0x2026):
+		_building_word = "Building…"
 	_build_top_bar()
 	_build_build_button()
 	_build_expedition_button()
@@ -645,11 +685,15 @@ func refresh(state: BaseState, selected_id: int, placing: bool, ghost_ok: bool, 
 		_place_button.text = place_text
 		_place_button.theme_type_variation = &"ConfirmButton" if painting else &"CommitButton"
 	_place_button.disabled = not ghost_ok and not painting
+	var info_shown := _info_panel.visible
 	_info_panel.visible = not placing and has_selection and _army_page == ArmyPage.NONE
 	if _menu_open:
 		_refresh_entries(state)
 	if _info_panel.visible:
 		_refresh_info(state, state.buildings[selected_id])
+	# The preview runs for the info panel's picture only while the panel shows.
+	if _info_panel.visible != info_shown:
+		_run_preview()
 	# Its content is rebuilt after a state change (_on_state_changed); the tick only counts down.
 	if _army_page != ArmyPage.NONE:
 		if _army_stale:
@@ -891,9 +935,30 @@ func research_ability_card_lines(ability: String) -> PackedStringArray:
 	return PackedStringArray([_research_ability_cards[ability].level.text, _research_ability_cards[ability].info.text])
 
 
-## The info panel's lines of stats, one a line.
+## The info panel's lines of stats, one a line, a change to the next level written "600 → 800".
 func info_detail() -> String:
-	return _info_detail.text
+	return "\n".join(_info_lines).replace(NEXT_MARK, " → ")
+
+
+## The info panel's upgrade button: hidden at the top level; while the building is busy, its
+## progress (upgrade_progress()).
+func upgrade_button() -> Button:
+	return _upgrade_button
+
+
+## The busy upgrade button's words, "Upgrading to Lv 2: 1m 00s left", and its fill, whose parent is
+## the track it grows across; "" when the building is not busy.
+func upgrade_progress() -> String:
+	return _upgrade_progress.text if _upgrade_progress.visible else ""
+
+
+func upgrade_fill() -> Control:
+	return _upgrade_fill.clip
+
+
+## Whether the info panel's title carries the "MAX" chip.
+func info_maxed() -> bool:
+	return _max_chip.visible
 
 
 ## Whether the army panel shows the research (open or opening).
@@ -1027,7 +1092,8 @@ func _slide_menu(open: bool) -> void:
 ## The pictures render while a panel that shows them is open: the build panel or the army panel;
 ## and while the base is idle (prerender).
 func _run_preview() -> void:
-	_preview.run(_menu_open or _army_page != ArmyPage.NONE or _prerender)
+	var info := _info_panel != null and _info_panel.visible and _info_picture.texture == null
+	_preview.run(_menu_open or _army_page != ArmyPage.NONE or _prerender or info)
 
 
 ## main.gd: whether the base is idle (no drag, no placing, no battle or map, after the first
@@ -1557,6 +1623,9 @@ func _on_preview_rendered(key: String, texture: Texture2D) -> void:
 		_entry_preview[key].texture = texture
 	elif _army_page != ArmyPage.NONE and _state != null:
 		_set_pictures(_state)
+	if key == _info_type:
+		_info_picture.texture = texture
+		_run_preview()
 
 
 func _refresh_info(state: BaseState, building: BuildingState) -> void:
@@ -1567,7 +1636,15 @@ func _refresh_info(state: BaseState, building: BuildingState) -> void:
 		_refresh_upgrade(state, building, false)
 		return
 	_info_key = key
-	_info_title.text = "%s   Lv %d" % [_catalog.display_name(type), building.level]
+	# While it is first constructed a building has no level to show yet.
+	var level := _building_word if building.level == 0 else "Lv %d" % building.level
+	_info_title.text = "%s   %s" % [_catalog.display_name(type), level]
+	if type != _info_type:
+		_info_type = type
+		_info_picture.texture = _preview.texture_of(type)
+		if _info_picture.texture == null:
+			_preview.request(PackedStringArray([type]))
+			_run_preview()
 
 	# The current level's stats (level 1's while it is first being built), each with the
 	# next level's value after an arrow where it changes. `next` is {} at the top level,
@@ -1621,10 +1698,14 @@ func _refresh_info(state: BaseState, building: BuildingState) -> void:
 		lines.append("Targets %s" % ("air and ground" if targets == "both" else targets))
 	if _catalog.is_hidden(type):
 		lines.append("Hidden from attackers")
-	if building.is_busy():
-		var what := "Under construction" if building.level == 0 else "Upgrading to Lv %d" % building.target_level
-		lines.append("%s: %s left" % [what, Format.duration(state.seconds_left(building.id))])
-	_info_detail.text = "\n".join(lines)
+	_info_lines = lines
+	while _info_rows.get_child_count() < lines.size():
+		_build_info_row()
+	for i: int in _info_rows.get_child_count():
+		var row := _info_rows.get_child(i) as HBoxContainer
+		row.visible = i < lines.size()
+		if row.visible:
+			_set_info_row(row, lines[i])
 	# A finished producer trains; a finished research building researches.
 	var page := _page_for(type)
 	_action_button.visible = page != ArmyPage.NONE and building.level >= 1
@@ -1638,19 +1719,34 @@ func _refresh_info(state: BaseState, building: BuildingState) -> void:
 
 ## The info panel's upgrade button and its note: its text (`with_text`, when the panel's text is
 ## rebuilt) from the level, and whether it can be pressed from the state's check, which the
-## resources move every second.
+## resources move every second. While the building is busy the button is a disabled progress fill
+## across it, the share of the build's time gone, with the time left on it; at the top level it
+## hides and the title carries the "MAX" chip.
 func _refresh_upgrade(state: BaseState, building: BuildingState, with_text: bool) -> void:
 	var type := building.type
+	var busy := building.is_busy()
+	var top := not busy and building.level >= _catalog.max_level(type)
 	_upgrade_note.text = ""
-	if building.is_busy():
-		_upgrade_button.text = "Under construction"
-		_upgrade_button.disabled = true
+	_upgrade_note.visible = false
+	_max_chip.visible = top
+	_upgrade_button.visible = not top
+	_upgrade_track.visible = busy
+	_upgrade_progress.visible = busy
+	if top:
 		return
-	if building.level >= _catalog.max_level(type):
-		_upgrade_button.text = "Max level"
+	if busy:
 		_upgrade_button.disabled = true
+		if with_text:
+			_upgrade_button.theme_type_variation = &"ProgressButton"
+			_upgrade_button.text = ""
+			var left := state.seconds_left(building.id)
+			var what := "Under construction" if building.level == 0 else "Upgrading to Lv %d" % building.target_level
+			_upgrade_progress.text = "%s: %s left" % [what, Format.duration(left)]
+			var total := int(_catalog.level_stats(type, building.target_level).get("build_seconds", 0))
+			_upgrade_fill.set_fraction(1.0 - float(left) / total if total > 0 else 1.0)
 		return
 	if with_text:
+		_upgrade_button.theme_type_variation = &"UpgradeButton"
 		var next := _catalog.level_stats(type, building.level + 1)
 		_upgrade_button.text = "Upgrade to Lv %d   %s   (%s)" % [
 			building.level + 1,
@@ -1660,6 +1756,7 @@ func _refresh_upgrade(state: BaseState, building: BuildingState, with_text: bool
 	var error := state.check_upgrade(building.id)
 	_upgrade_button.disabled = error != ""
 	_upgrade_note.text = "" if error == "" else error_text(error)
+	_upgrade_note.visible = error != ""
 
 
 ## A whole-number stat of this level, with the next level's after an arrow when it changes.
@@ -1668,9 +1765,56 @@ func _level_stat(stats: Dictionary, next: Dictionary, field: String) -> String:
 	return _with_next(Format.amount(value), Format.amount(int(next.get(field, value))))
 
 
-## "600", or "600 → 800" when the next level's value differs.
+## "600", or "600→800" (NEXT_MARK) when the next level's value differs, which the row draws as a
+## chevron before the next value.
 func _with_next(value: String, next_value: String) -> String:
-	return value if next_value == value else value + _arrow + next_value
+	return value if next_value == value else value + NEXT_MARK + next_value
+
+
+## One info line's row: a label for the line up to its first NEXT_MARK, then for each mark (two at
+## most, "Damage 12→14   Range 7→8") a chevron, the next value in the accent and the rest of the line.
+func _build_info_row() -> void:
+	var row := HBoxContainer.new()
+	row.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	row.add_theme_constant_override("separation", 5)
+	_info_rows.add_child(row)
+	var first := Label.new()
+	first.theme_type_variation = &"InfoDetail"
+	row.add_child(first)
+	for k: int in 2:
+		var chevron := HudIcon.new()
+		chevron.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		chevron.kind = "chevron"
+		chevron.color = ACCENT
+		chevron.custom_minimum_size = Vector2.ONE * CHEVRON_SIZE
+		chevron.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+		row.add_child(chevron)
+		var next := Label.new()
+		next.theme_type_variation = &"InfoNext"
+		row.add_child(next)
+		var rest := Label.new()
+		rest.theme_type_variation = &"InfoDetail"
+		row.add_child(rest)
+
+
+## Shows `line` on `row` (_build_info_row): the next value after each NEXT_MARK runs to the first
+## space, the rest of that part after it.
+func _set_info_row(row: HBoxContainer, line: String) -> void:
+	var parts := line.split(NEXT_MARK)
+	(row.get_child(0) as Label).text = parts[0]
+	for k: int in 2:
+		var shown := k + 1 < parts.size()
+		var next := row.get_child(2 + 3 * k) as Label
+		var rest := row.get_child(3 + 3 * k) as Label
+		row.get_child(1 + 3 * k).visible = shown
+		next.visible = shown
+		rest.visible = false
+		if shown:
+			var after := parts[k + 1]
+			var space := after.find(" ")
+			next.text = after if space < 0 else after.substr(0, space)
+			rest.text = "" if space < 0 else after.substr(space + 1)
+			rest.visible = rest.text != ""
 
 
 ## 800 -> "0.8", 5000 -> "5"
@@ -2367,6 +2511,7 @@ func _build_fill(track: Control, key: String, size: Vector2, color: Color, phase
 	fill.shader.set_shader_parameter(&"track_width", size.x)
 	fill.shader.set_shader_parameter(&"full_color", GOLD)
 	stripes.material = fill.shader
+	fill.stripes = stripes
 	_meter_shaders[key] = fill.shader
 	fill.clip.add_child(stripes)
 	return fill
@@ -2578,6 +2723,9 @@ func _build_place_bar() -> void:
 	_place_bar = panel
 
 
+## The info panel, bottom centre: a header of the building's picture, its title (and the "MAX" chip
+## at its top level), Train, Make or Research, and Close; its stat rows; the upgrade button, with
+## its progress fill and words for a busy building; and the note under it.
 func _build_info_panel() -> void:
 	var panel := PanelContainer.new()
 	panel.custom_minimum_size = Vector2(460, 0)
@@ -2589,24 +2737,65 @@ func _build_info_panel() -> void:
 	panel.add_child(column)
 
 	var header := HBoxContainer.new()
+	header.add_theme_constant_override("separation", 10)
 	column.add_child(header)
+	_info_picture = TextureRect.new()
+	_info_picture.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_info_picture.custom_minimum_size = INFO_PICTURE
+	_info_picture.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	_info_picture.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+	header.add_child(_info_picture)
 	_info_title = Label.new()
 	_info_title.theme_type_variation = &"InfoTitle"
-	_info_title.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	_info_title.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 	header.add_child(_info_title)
+	_max_chip = PanelContainer.new()
+	_max_chip.theme_type_variation = &"MaxChip"
+	_max_chip.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_max_chip.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	_max_chip.visible = false
+	header.add_child(_max_chip)
+	var max_text := Label.new()
+	max_text.theme_type_variation = &"LockText"
+	max_text.text = "MAX"
+	_max_chip.add_child(max_text)
+	var gap := Control.new()
+	gap.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	gap.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	header.add_child(gap)
 	_action_button = _button("Train", ACTION_SIZE, &"ConfirmButton")
+	_action_button.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 	_action_button.pressed.connect(_on_action_pressed)
 	header.add_child(_action_button)
 	var close := _button("Close", INFO_CLOSE_SIZE)
+	close.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 	close.pressed.connect(func() -> void: close_pressed.emit())
 	header.add_child(close)
 
-	_info_detail = Label.new()
-	_info_detail.theme_type_variation = &"InfoDetail"
-	column.add_child(_info_detail)
-	_upgrade_button = _button("", Vector2(0, 64), &"UpgradeButton")
+	_info_rows = VBoxContainer.new()
+	_info_rows.add_theme_constant_override("separation", 0)
+	column.add_child(_info_rows)
+	_upgrade_button = _button("", Vector2(0, UPGRADE_HEIGHT), &"UpgradeButton")
 	_upgrade_button.pressed.connect(func() -> void: upgrade_pressed.emit())
 	column.add_child(_upgrade_button)
+	# The progress fill across the button's inside, under the words, both shown while busy.
+	_upgrade_track = Control.new()
+	_upgrade_track.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_upgrade_button.add_child(_upgrade_track)
+	_upgrade_track.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	_upgrade_track.offset_left = BORDER
+	_upgrade_track.offset_top = BORDER
+	_upgrade_track.offset_right = -BORDER
+	_upgrade_track.offset_bottom = -BORDER
+	_upgrade_fill = _build_fill(_upgrade_track, UPGRADE_KEY, Vector2(0, UPGRADE_HEIGHT - 2 * BORDER), GOLD, 0.5)
+	_upgrade_track.resized.connect(func() -> void: _upgrade_fill.resize(_upgrade_track.size))
+	_upgrade_progress = Label.new()
+	_upgrade_progress.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_upgrade_progress.theme_type_variation = &"ProgressText"
+	_upgrade_progress.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	_upgrade_progress.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	_upgrade_button.add_child(_upgrade_progress)
+	_upgrade_progress.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	_upgrade_note = Label.new()
 	_upgrade_note.theme_type_variation = &"InfoNote"
 	column.add_child(_upgrade_note)
@@ -2863,6 +3052,22 @@ func _make_theme() -> Theme:
 	# lies over its progress fill, so its text is outlined.
 	_label_variation(ui, &"QueueHeadName", 19, TEXT, 2)
 	_label_variation(ui, &"QueueHeadTime", 17, TEXT_DIM, 2)
+	# The info panel: a next level's value in the accent after the chevron; the "MAX" chip, gold
+	# with ink text, as the lock chip is shaped; a busy building's upgrade button, a trough the
+	# progress fill grows across, its words outlined over the fill.
+	_label_variation(ui, &"InfoNext", 19, ACCENT, 0)
+	var max_chip := _flat(GOLD, 12)
+	max_chip.border_color = INK
+	max_chip.set_border_width_all(roundi(CHIP_RING))
+	max_chip.content_margin_left = CHIP_PAD.x + CHIP_RING
+	max_chip.content_margin_right = CHIP_PAD.x + CHIP_RING
+	max_chip.content_margin_top = CHIP_PAD.y
+	max_chip.content_margin_bottom = CHIP_PAD.y
+	ui.set_type_variation(&"MaxChip", &"PanelContainer")
+	ui.set_stylebox("panel", &"MaxChip", max_chip)
+	ui.set_type_variation(&"ProgressButton", &"Button")
+	ui.set_stylebox("disabled", &"ProgressButton", _shape(TROUGH, 12, BUTTON_MARGIN))
+	_label_variation(ui, &"ProgressText", 20, TEXT, 2.5)
 	if skin == Look.B:
 		_skin_b(ui)
 	elif skin == Look.C:
@@ -3063,6 +3268,13 @@ static func _skin_c(ui: Theme) -> void:
 	ui.set_constant("outline_size", &"QueueHeadTime", 0)
 	for type: StringName in [&"CardCount", &"CardReason", &"CardTime", &"QueueHeadTime"]:
 		ui.set_color("font_color", type, INK_DIM)
+	# The info panel: the next level's value in ink (the chevron marks it), and a busy building's
+	# upgrade button a disabled cream with its words in ink over the gold fill. The "MAX" chip, gold
+	# with an ink ring and ink text, is the lock chip's family and reads on cream as it is.
+	ui.set_color("font_color", &"InfoNext", INK)
+	ui.set_stylebox("disabled", &"ProgressButton", _shape_c(CREAM_DISABLED, 12, BUTTON_MARGIN))
+	ui.set_color("font_color", &"ProgressText", INK)
+	ui.set_constant("outline_size", &"ProgressText", 0)
 	for type: StringName in [&"CardWarning", &"InfoNote"]:
 		ui.set_color("font_color", type, WARNING_INK)
 
