@@ -411,11 +411,8 @@ class BuildCard:
 	## The count chip's text, and the chip of the Command Center level a locked card needs.
 	var count: Label
 	var lock: Control
-	## The cost row's room for each icon (its resource in `kinds`, its colour in `colors`), and the
-	## clock's on the last line, which reads the build time (`time`) or why the card cannot be built.
-	var icons: Array[Control] = []
-	var kinds: PackedStringArray = PackedStringArray()
-	var colors: PackedColorArray = PackedColorArray()
+	## The clock's room on the last line, which reads the build time (`time`) or why the card cannot
+	## be built.
 	var clock: Control
 	var line: Label
 	var time: String = ""
@@ -425,22 +422,35 @@ class BuildCard:
 	var reason: bool = false
 
 
-## What a build card draws under its picture, as one triangle array (HudIcon.Pen): a light line
-## inside its border, its category's stripe along its top, the plinth, the count chip's shape,
-## the cost row's icons on their coins and the clock. Redrawn when the card's rows are laid out
-## or its state changes, never per frame.
+## What a card (a build card, an army card) draws under its picture, as one triangle array
+## (HudIcon.Pen): a light line inside its border, its stripe along its top in `tint`, the plinth, its
+## chips' shapes, and its icons (a cost row's on their coins, the clock). Redrawn when the card's
+## rows are laid out or its state changes, never per frame.
 class CardArt:
 	extends Control
 
 	const SIDES := 48
 
-	var card: BuildCard
-	## The category's colour.
+	## The card's colour: its category's.
 	var tint: Color = Color.WHITE
+	## The plinth's centre, under the stripe, and how wide it is.
+	var plinth_centre: Vector2 = Vector2.ZERO
+	var plinth: float = Hud.PLINTH
+	## The labels drawn on a chip, each one only while it shows.
+	var chips: Array[Label] = []
+	## The room left for each icon in the card's rows, with its HudIcon kind, its colour and its coin's
+	## (transparent for none); an icon whose room is hidden is not drawn.
+	var icons: Array[Control] = []
+	var kinds: PackedStringArray = PackedStringArray()
+	var colors: PackedColorArray = PackedColorArray()
+	var coins: PackedColorArray = PackedColorArray()
 
-	## The plinth's centre, under the stripe.
-	func plinth_centre() -> Vector2:
-		return Vector2(Hud.CARD_SIZE.x / 2.0, Hud.BORDER + Hud.STRIPE_HEIGHT + 4 + Hud.PLINTH / 2.0)
+	## Adds an icon `kind` in `color` on a coin of `coin` (transparent for none), drawn in `room`.
+	func add_icon(room: Control, kind: String, color: Color, coin: Color) -> void:
+		icons.append(room)
+		kinds.append(kind)
+		colors.append(color)
+		coins.append(coin)
 
 	func _draw() -> void:
 		var pen := HudIcon.Pen.new()
@@ -454,24 +464,24 @@ class CardArt:
 		if Hud.skin != Hud.Look.C:
 			var stripe := Rect2(inside.position, Vector2(inside.size.x, Hud.STRIPE_HEIGHT))
 			pen.add_fill(Hud._round_rect(stripe, Vector2(12 - Hud.BORDER, Hud.STRIPE_HEIGHT), true), tint, false)
-			var centre := plinth_centre()
-			var radius := Hud.PLINTH / 2.0
-			pen.add_fill(Hud._circle(centre, radius, SIDES), Color(tint, Hud.PLINTH_ALPHA), false)
-			pen.add_stroke(Hud._circle(centre, radius - Hud.PLINTH_RING / 2.0, SIDES), Hud.PLINTH_RING, Hud.INK, true)
-		if card.count.visible:
-			_chip(pen, _rect_of(card.count).grow_individual(Hud.CHIP_PAD.x, Hud.CHIP_PAD.y, Hud.CHIP_PAD.x,
-				Hud.CHIP_PAD.y), Hud.CREAM_DISABLED if Hud.skin == Hud.Look.C else Hud.CARD_DISABLED)
-		for i: int in card.icons.size():
-			HudIcon.paint(pen, card.kinds[i], _rect_of(card.icons[i]), card.colors[i], false, card.colors[i])
-		if card.clock.visible:
-			HudIcon.paint(pen, "clock", _rect_of(card.clock), Hud.TEXT_DIM)
+			var radius := plinth / 2.0
+			pen.add_fill(Hud._circle(plinth_centre, radius, SIDES), Color(tint, Hud.PLINTH_ALPHA), false)
+			pen.add_stroke(Hud._circle(plinth_centre, radius - Hud.PLINTH_RING / 2.0, SIDES), Hud.PLINTH_RING, Hud.INK,
+				true)
+		for chip: Label in chips:
+			if chip.visible:
+				_chip(pen, _rect_of(chip).grow_individual(Hud.CHIP_PAD.x, Hud.CHIP_PAD.y, Hud.CHIP_PAD.x,
+					Hud.CHIP_PAD.y), Hud.CREAM_DISABLED if Hud.skin == Hud.Look.C else Hud.CARD_DISABLED)
+		for i: int in icons.size():
+			if icons[i].is_visible_in_tree():
+				HudIcon.paint(pen, kinds[i], _rect_of(icons[i]), colors[i], false, coins[i])
 		pen.draw(self)
 
 	## Skin C's trading-card band: the category's colour across the card's top third, inside its
 	## border, with an ink dot screen over it and an ink line under it.
 	func _draw_band(pen: HudIcon.Pen, inside: Rect2) -> void:
 		var inner := inside.grow(-(Hud.CREAM_BORDER - Hud.BORDER))
-		var band := Rect2(inner.position, Vector2(inner.size.x, roundf(Hud.CARD_SIZE.y / 3.0) - inner.position.y))
+		var band := Rect2(inner.position, Vector2(inner.size.x, roundf(size.y / 3.0) - inner.position.y))
 		pen.add_fill(Hud._round_rect(band, Vector2.ONE * (12 - Hud.CREAM_BORDER), true), tint, false)
 		var dot := Color(Hud.INK, 0.22)
 		var row := 0
@@ -1865,8 +1875,8 @@ func _build_entry(type: String) -> Button:
 	var card := BuildCard.new()
 	var body := _card_body(button)
 	card.art = CardArt.new()
-	card.art.card = card
 	card.art.tint = CATEGORY_STRIPE.get(_catalog.category_of(type), ACCENT)
+	card.art.plinth_centre = Vector2(CARD_SIZE.x / 2.0, BORDER + STRIPE_HEIGHT + 4 + PLINTH / 2.0)
 	card.art.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	body.add_child(card.art)
 	card.art.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
@@ -1874,46 +1884,15 @@ func _build_entry(type: String) -> Button:
 	card.picture.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	card.picture.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
 	card.picture.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
-	card.picture.position = card.art.plinth_centre() - PREVIEW_SIZE / 2.0
+	card.picture.position = card.art.plinth_centre - PREVIEW_SIZE / 2.0
 	card.picture.size = PREVIEW_SIZE
 	body.add_child(card.picture)
 	_entry_preview[type] = card.picture
 
-	card.count = Label.new()
-	card.count.theme_type_variation = &"CardChip"
-	card.count.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	body.add_child(card.count)
-	card.count.set_anchors_preset(Control.PRESET_TOP_RIGHT)
-	card.count.grow_horizontal = Control.GROW_DIRECTION_BEGIN
-	card.count.offset_right = -BORDER - 4 - CHIP_PAD.x
-	card.count.offset_top = BORDER + STRIPE_HEIGHT + 4 + CHIP_PAD.y
-	card.count.resized.connect(card.art.queue_redraw)
-	# Over the plinth's foot, centred.
-	var lock_row := CenterContainer.new()
-	lock_row.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	body.add_child(lock_row)
-	lock_row.set_anchors_preset(Control.PRESET_TOP_WIDE)
-	lock_row.offset_top = card.art.plinth_centre().y + PLINTH / 2.0 - 30
-	card.lock = PanelContainer.new()
-	card.lock.theme_type_variation = &"LockChip"
-	card.lock.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	card.lock.visible = false
-	lock_row.add_child(card.lock)
-	var lock_line := HBoxContainer.new()
-	lock_line.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	lock_line.add_theme_constant_override("separation", 3)
-	card.lock.add_child(lock_line)
-	var padlock := HudIcon.new()
-	padlock.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	padlock.kind = "lock"
-	padlock.color = TEXT
-	padlock.custom_minimum_size = Vector2.ONE * LOCK_ICON
-	padlock.size_flags_vertical = Control.SIZE_SHRINK_CENTER
-	lock_line.add_child(padlock)
-	var level := Label.new()
-	level.theme_type_variation = &"LockText"
+	card.count = _chip_label(body, card.art, true)
+	var level := _lock_chip(body, card.art.plinth_centre.y + PLINTH / 2.0 - 30)
 	level.text = "CC %d" % int(_catalog.level_stats(type, 1).get("requires_cc", 1))
-	lock_line.add_child(level)
+	card.lock = level.get_parent().get_parent()
 
 	var lines := VBoxContainer.new()
 	lines.mouse_filter = Control.MOUSE_FILTER_IGNORE
@@ -1938,9 +1917,7 @@ func _build_entry(type: String) -> Button:
 	for res: Variant in cost:
 		if cost_row.get_child_count() > 0:
 			_spacer(cost_row, Vector2(8, 0))
-		card.icons.append(_spacer(cost_row, COST_ICON))
-		card.kinds.append(str(res))
-		card.colors.append(_resource_color(str(res)))
+		card.art.add_icon(_spacer(cost_row, COST_ICON), str(res), _resource_color(str(res)), _resource_color(str(res)))
 		var amount := _card_label(cost_row, Format.amount(int(cost[res])), &"CardCost")
 		_cost_labels[amount] = _resource_color(str(res))
 		amount.add_theme_color_override("font_color", _cost_color(_cost_labels[amount]))
@@ -1951,12 +1928,64 @@ func _build_entry(type: String) -> Button:
 	last_row.add_theme_constant_override("separation", 4)
 	lines.add_child(last_row)
 	card.clock = _spacer(last_row, Vector2.ONE * CLOCK_SIZE)
+	card.art.add_icon(card.clock, "clock", TEXT_DIM, Color.TRANSPARENT)
 	card.time = Format.duration(int(stats.get("build_seconds", 0)))
 	card.line = _card_label(last_row, card.time, &"CardTime")
 	last_row.sort_children.connect(card.art.queue_redraw)
 	_cards[type] = card
 	_entries[type] = button
 	return button
+
+
+## A chip's text at the card's top right (`right`) or top left, under the stripe, its pill drawn by
+## the card's `art`.
+func _chip_label(body: Control, art: CardArt, right: bool) -> Label:
+	var label := Label.new()
+	label.theme_type_variation = &"CardChip"
+	label.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	body.add_child(label)
+	if right:
+		label.set_anchors_preset(Control.PRESET_TOP_RIGHT)
+		label.grow_horizontal = Control.GROW_DIRECTION_BEGIN
+		label.offset_right = -BORDER - 4 - CHIP_PAD.x
+	else:
+		label.set_anchors_preset(Control.PRESET_TOP_LEFT)
+		label.offset_left = BORDER + 4 + CHIP_PAD.x
+	label.offset_top = BORDER + STRIPE_HEIGHT + 4 + CHIP_PAD.y
+	label.resized.connect(art.queue_redraw)
+	art.chips.append(label)
+	return label
+
+
+## A locked card's chip, hidden until the card is locked: the padlock and the text it returns, which
+## says what unlocks the card, on a warning pill centred across the card `top` px down. The chip is
+## the text's parent's parent.
+func _lock_chip(body: Control, top: float) -> Label:
+	var row := CenterContainer.new()
+	row.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	body.add_child(row)
+	row.set_anchors_preset(Control.PRESET_TOP_WIDE)
+	row.offset_top = top
+	var chip := PanelContainer.new()
+	chip.theme_type_variation = &"LockChip"
+	chip.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	chip.visible = false
+	row.add_child(chip)
+	var line := HBoxContainer.new()
+	line.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	line.add_theme_constant_override("separation", 3)
+	chip.add_child(line)
+	var padlock := HudIcon.new()
+	padlock.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	padlock.kind = "lock"
+	padlock.color = TEXT
+	padlock.custom_minimum_size = Vector2.ONE * LOCK_ICON
+	padlock.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	line.add_child(padlock)
+	var text := Label.new()
+	text.theme_type_variation = &"LockText"
+	line.add_child(text)
+	return text
 
 
 ## A card's content, which sinks with the card's shape while it is pressed (_sink).
