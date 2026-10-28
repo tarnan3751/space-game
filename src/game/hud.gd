@@ -251,6 +251,9 @@ const QUEUE_GLYPH_SIZE := Vector2(36, 36)
 const QUEUE_CROSS := 16.0
 ## The head entry's progress fill's key among the meters' shaders (Fill).
 const QUEUE_KEY := "queue"
+## The research page's progress bar beside the title, under the research's line, and its fill's key.
+const RESEARCH_BAR_SIZE := Vector2(420, 20)
+const RESEARCH_KEY := "research"
 ## The training header's housing meter, a top bar meter in small: the army's figure on its coin,
 ## HOUSING_COIN across, over the trough's left end.
 const HOUSING_SIZE := Vector2(220, 32)
@@ -405,8 +408,12 @@ var _watched: BaseState
 var _army_stale: bool = false
 var _research_page: Control
 var _research_scroll: ScrollContainer
-## The research running and its time left, or that none is.
+## The research running and its time left over its progress bar, beside the title; hidden with no
+## research running. The research's whole time, which the bar's fill is the share gone of.
+var _research_box: Control
 var _research_line: Label
+var _research_fill: Fill
+var _research_total: int = 0
 ## One card per unit type, in units.json order; the panel shows the unlocked ones.
 var _research_cards: Dictionary[String, ArmyCard] = {}
 ## The research line's words before its time left, "" with no research running, and the seconds it
@@ -975,9 +982,15 @@ func research_card_lines(unit: String) -> PackedStringArray:
 	return PackedStringArray([_research_cards[unit].level.text, _research_cards[unit].info.text])
 
 
-## The research panel's progress line.
+## The research page's progress line, "Researching Ranger to Lv 2: 15m 00s left"; "" while no
+## research runs, when it hides with its bar.
 func research_line() -> String:
-	return _research_line.text
+	return _research_line.text if _research_box.visible else ""
+
+
+## The research page's progress bar's fill; its parent is the track it grows across.
+func research_fill() -> Control:
+	return _research_fill.clip
 
 
 # --- The build panel -------------------------------------------------------------
@@ -1088,6 +1101,8 @@ func _open_army(page: ArmyPage) -> void:
 	_queue_id = 0
 	_train_page.visible = page == ArmyPage.TRAIN or page == ArmyPage.MAKE
 	_housing_row.visible = page == ArmyPage.TRAIN
+	# The research page shows it while a research runs (_refresh_research).
+	_research_box.visible = false
 	_train_scroll.visible = page == ArmyPage.TRAIN
 	_make_scroll.visible = page == ArmyPage.MAKE
 	_make_scroll.scroll_horizontal = 0
@@ -1329,14 +1344,17 @@ func _refresh_research(state: BaseState) -> void:
 	var running := state.research_unit
 	var running_ability := state.research_ability
 	_research_prefix = ""
-	if running == "" and running_ability == "":
-		_research_line.text = "No research running"
-	else:
+	_research_box.visible = running != "" or running_ability != ""
+	if _research_box.visible:
+		var next: Dictionary
 		if running != "":
 			_research_prefix = "Researching %s to Lv %d: " % [_catalog.unit_name(running), state.unit_level(running) + 1]
+			next = _catalog.unit_level_stats(running, state.unit_level(running) + 1)
 		else:
 			_research_prefix = "Researching %s to Lv %d: " % [_catalog.ability_name(running_ability),
 				state.ability_level(running_ability) + 1]
+			next = _catalog.ability_level_stats(running_ability, state.ability_level(running_ability) + 1)
+		_research_total = int(next.get("research_seconds", 0))
 		_research_seconds = -1
 		_tick_research(state)
 	var lab_name := _short_name(_catalog.research_type)
@@ -1390,7 +1408,8 @@ func _refresh_research(state: BaseState) -> void:
 		_lock_card(card, reason, chip)
 
 
-## The research line's time left; text only when the seconds changed.
+## The research line's time left and its bar's fill, the share of the research's time gone; set
+## only when the seconds changed.
 func _tick_research(state: BaseState) -> void:
 	if _research_prefix == "":
 		return
@@ -1399,6 +1418,7 @@ func _tick_research(state: BaseState) -> void:
 		return
 	_research_seconds = seconds
 	_research_line.text = "%s%s left" % [_research_prefix, Format.duration(seconds)]
+	_research_fill.set_fraction(1.0 - float(seconds) / _research_total if _research_total > 0 else 1.0)
 
 
 ## A card's cost, each amount after its coin in its resource's colour, or "Free"; and its time.
@@ -2161,6 +2181,7 @@ func _build_army_panel() -> void:
 	_army_title.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 	header.add_child(_army_title)
 	_build_housing_line(header)
+	_build_research_bar(header)
 	var gap := Control.new()
 	gap.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	gap.size_flags_horizontal = Control.SIZE_EXPAND_FILL
@@ -2214,9 +2235,6 @@ func _build_army_panel() -> void:
 	_research_page.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	_research_page.add_theme_constant_override("separation", 6)
 	pages.add_child(_research_page)
-	_research_line = Label.new()
-	_research_line.theme_type_variation = &"InfoDetail"
-	_research_page.add_child(_research_line)
 	var research_cards := _strip(_research_page, ARMY_CARD_SIZE.y + 18)
 	_research_scroll = research_cards.get_parent().get_parent() as ScrollContainer
 	for unit: String in _catalog.unit_types():
@@ -2285,6 +2303,38 @@ func _build_housing_line(parent: Control) -> void:
 	_no_hangar.text = NO_HANGAR
 	_no_hangar.visible = false
 	_housing_row.add_child(_no_hangar)
+
+
+## The research page's line and progress bar in `parent`, the line over the bar: the bar a meter's
+## trough (RESEARCH_BAR_SIZE), the accent's fill growing across it (a Fill), its ink border again over
+## the fill. Hidden until a research runs on the research page.
+func _build_research_bar(parent: Control) -> void:
+	_research_box = VBoxContainer.new()
+	_research_box.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_research_box.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	_research_box.add_theme_constant_override("separation", 2)
+	_research_box.visible = false
+	parent.add_child(_research_box)
+	_research_line = Label.new()
+	_research_line.theme_type_variation = &"InfoDetail"
+	_research_box.add_child(_research_line)
+	var trough := Panel.new()
+	trough.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	trough.theme_type_variation = &"MeterTrough"
+	trough.custom_minimum_size = RESEARCH_BAR_SIZE
+	trough.size_flags_horizontal = Control.SIZE_SHRINK_BEGIN
+	_research_box.add_child(trough)
+	var track := Control.new()
+	track.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	track.position = Vector2(BORDER, BORDER)
+	track.size = RESEARCH_BAR_SIZE - Vector2(2 * BORDER, 2 * BORDER)
+	trough.add_child(track)
+	_research_fill = _build_fill(track, RESEARCH_KEY, track.size, ACCENT, 0.0)
+	var frame := Panel.new()
+	frame.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	frame.theme_type_variation = &"MeterFrame"
+	trough.add_child(frame)
+	frame.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 
 
 ## A progress fill across `track` (a Control `size` big) in `color`'s meter fill (meter_fill): the

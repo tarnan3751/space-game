@@ -106,7 +106,7 @@ func run(main: MainScript) -> void:
 	await screenshot("research")
 	advance(state.research_seconds_left())
 	await frames(2)
-	check(state.ability_level(FIRST) == 2 and hud.research_line() == "No research running"
+	check(state.ability_level(FIRST) == 2 and hud.research_line() == ""
 		and hud.research_ability_card_lines(FIRST)[0] == "Level 2",
 		"the %s reached level 2: %s" % [FIRST, " / ".join(hud.research_ability_card_lines(FIRST))])
 

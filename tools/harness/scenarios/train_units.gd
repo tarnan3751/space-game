@@ -8,7 +8,8 @@ extends HarnessScenario
 ## line.
 ## Then the Research Lab selected, which closes the training panel, its Research opening the
 ## research page; the Ranger's next level researched from its card, paid for and shown on the
-## progress line, a second research refused while it runs, and the level reached. Last, a tap on
+## progress line and bar, a second research refused while it runs, the bar half filled half way, and
+## the level reached. Last, a tap on
 ## the panel that reaches nothing behind it, a real tap on another building above the panel that
 ## selects it and closes the panel, and a Hangar's info panel with the army housed. Then, on a
 ## fresh base (Reset base) with a Cadet Academy placed and finished at level 1 and no Hangar: the
@@ -123,7 +124,7 @@ func run(main: MainScript) -> void:
 		"its info panel offers Research")
 	hud.action_button().pressed.emit()
 	await wait_seconds(main, Hud.MENU_OPEN_SECONDS)
-	check(hud.is_research_open() and hud.research_line() == "No research running",
+	check(hud.is_research_open() and hud.research_line() == "",
 		"Research opened the research panel: %s" % hud.research_line())
 	shown.clear()
 	var unlocked := PackedStringArray()
@@ -151,10 +152,18 @@ func run(main: MainScript) -> void:
 	check(state.research_unit == "ranger" and state.resources["crystal"] == crystal_research
 		and hud.toast_text() == "Research already running",
 		"a second research is refused while one runs: %s" % hud.toast_text())
+	# Half way, the progress bar's fill is half across its track.
+	var total := state.research_seconds_left()
+	advance(total / 2)
+	await wait_seconds(main, 1.0)
+	var bar := (hud.research_fill().get_parent() as Control).size.x
+	var half := roundf(bar * (1.0 - float(state.research_seconds_left()) / total))
+	check(hud.research_fill().size.x == half, "half way the research bar is filled %d of %d px (expected %d)"
+		% [hud.research_fill().size.x, bar, half])
 	await screenshot("research")
 	advance(state.research_seconds_left())
 	await frames(2)
-	check(state.unit_level("ranger") == 2 and hud.research_line() == "No research running"
+	check(state.unit_level("ranger") == 2 and hud.research_line() == ""
 		and hud.research_card_lines("ranger")[0] == "Level 2", "the Ranger reached level 2: %s"
 		% " / ".join(hud.research_card_lines("ranger")))
 
