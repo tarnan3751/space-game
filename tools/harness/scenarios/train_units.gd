@@ -104,8 +104,9 @@ func run(main: MainScript) -> void:
 	await frames(2)
 	check(state.army_count("ranger") == 1 and state.queue_of(academy.id) == PackedStringArray(["breacher"]),
 		"the first Ranger is housed, the Breacher next")
-	check(hud.train_card_info("ranger") == "Housing %d   Housed 1" % catalog.unit_housing("ranger"),
-		"the Ranger card counts it: %s" % hud.train_card_info("ranger"))
+	check(hud.train_card_chip("ranger") == "Housed 1"
+		and hud.train_card_info("ranger") == "Housing %d" % catalog.unit_housing("ranger"),
+		"the Ranger card counts it: %s, %s" % [hud.train_card_chip("ranger"), hud.train_card_info("ranger")])
 	_check_housing(hud, state)
 	await screenshot("trained")
 
@@ -245,18 +246,16 @@ func _fresh_academy(main: MainScript) -> void:
 		and main.placement.selected_id == 0, "Build closed the training panel, cleared the selection and opened the build panel")
 
 
-## The training header's housing line and bar against the state's housing.
+## The training header's housing meter, its count and its fill, against the state's housing.
 func _check_housing(hud: Hud, state: BaseState) -> void:
 	var used := state.housing_used()
 	var capacity := state.housing_capacity()
-	var expected := "Housing %s / %s" % [Format.amount(used), Format.amount(capacity)]
+	var expected := "%s / %s" % [Format.amount(used), Format.amount(capacity)]
 	check(hud.housing_text() == expected, "the header reads %s (expected %s)" % [hud.housing_text(), expected])
 	var track := (hud.housing_fill().get_parent() as Control).size.x
 	var width := roundf(track * used / capacity)
-	if used > 0:
-		width = maxf(width, Hud.HOUSING_MIN_FILL)
 	check(hud.housing_bar().is_visible_in_tree() and hud.housing_fill().size.x == width,
-		"the housing bar is filled %d of %d px (expected %d)" % [hud.housing_fill().size.x, track, width])
+		"the housing meter is filled %d of %d px (expected %d)" % [hud.housing_fill().size.x, track, width])
 
 
 func _first(state: BaseState, type: String) -> BuildingState:

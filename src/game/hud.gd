@@ -206,8 +206,6 @@ const STRIP_PADDING := 8
 const STRIPE_TILE := 16
 const STRIPE_BAND := 6
 const STRIPE_BASE := 1.0 / 1.12
-## Across the top third of the training header's housing bar.
-const GLOSS := Color(1, 1, 1, 0.25)
 ## The stripes' shader: their drift, the glint and the flash on a change (meter.gdshader).
 const METER_SHADER: Shader = preload("res://src/game/meter.gdshader")
 ## Each meter glints this share of the glint's period after the one before it.
@@ -236,22 +234,28 @@ const _NO_COST := {}
 ## The info panel's Train button, and its Close beside it.
 const ACTION_SIZE := Vector2(112, 56)
 const INFO_CLOSE_SIZE := Vector2(96, 56)
-## A unit card in the army panel, and its picture (ModelPreview) at the top.
-const TRAIN_CARD_SIZE := Vector2(200, 140)
-const PICTURE_SIZE := Vector2(48, 48)
+## An army card (the training, making and research pages): its picture (ModelPreview), or an
+## ability's emblem on its coin, on a plinth ARMY_PLINTH across; where its lines start; its cost row's
+## coins, and the room between its cost and its time.
+const ARMY_CARD_SIZE := Vector2(200, 184)
+const PICTURE_SIZE := Vector2(96, 96)
+const EMBLEM_SIZE := Vector2(64, 64)
+const ARMY_PLINTH := 104.0
+const ARMY_LINES_TOP := 108.0
+const ARMY_COST_ICON := Vector2(20, 20)
+const ARMY_TIME_GAP := 10
 ## An entry of the queue strip under the training cards, and its glyph.
 const QUEUE_ENTRY_SIZE := Vector2(180, 48)
 const QUEUE_GLYPH_SIZE := Vector2(32, 32)
-## A research card: a training card's with a line for the unit's level and one for the lab level
-## its next level needs.
-const RESEARCH_CARD_SIZE := Vector2(200, 164)
-## The training header's housing line: the army's figure in front of it and the bar at its end.
-const HOUSING_ICON := Vector2(20, 20)
-const HOUSING_BAR_SIZE := Vector2(120, 14)
+## The training header's housing meter, a top bar meter in small: the army's figure on its coin,
+## HOUSING_COIN across, over the trough's left end.
+const HOUSING_SIZE := Vector2(220, 32)
+const HOUSING_COIN := 36.0
+## The housing meter's key among the meters' shaders and labels, so a skin tints it and its full
+## state shows as theirs does.
+const HOUSING_KEY := "housing"
 ## The training header's and a producer's info panel's line while the base has no Hangar.
 const NO_HANGAR := "No Hangar: build one to house units"
-## The bar's fill while any unit is housed, however few, in pixels.
-const HOUSING_MIN_FILL := 2.0
 
 ## The dev cheats are on (main.gd): every meter shows, full, reading "∞" instead of amount / cap.
 var cheats: bool = false
@@ -359,12 +363,15 @@ var _army_id: int = 0
 var _army_tween: Tween
 var _army_title: Label
 var _army_close: Button
-## The training page's housing line under the title: its text, and its bar, whose fill grows
-## across the track by housing used over capacity.
+## The training page's housing line beside the title: its meter, whose fill grows across the track
+## by housing used over capacity, and the meter's text; with no Hangar, a line saying so instead.
 var _housing_row: HBoxContainer
 var _housing_label: Label
 var _housing_bar: Control
-var _housing_fill: Control
+var _housing_fill: Fill
+var _no_hangar: Label
+## The progress fills' stripe tile (Fill), made with the first.
+var _fill_stripe: Texture2D
 var _train_page: Control
 var _train_scroll: ScrollContainer
 ## The making page's cards, in the training page's place over the same queue strip.
@@ -507,22 +514,42 @@ class CardArt:
 		return get_global_transform().affine_inverse() * control.get_global_rect()
 
 
-## A unit card or a queue entry: the button, what dims while it cannot be pressed, the picture
-## (a card's) or the glyph (an entry's), the name, the cost (a label per resource, "Free" when it
-## has none) and the time, and the lines under them.
+## An army card or a queue entry: the button, the card's drawn parts, the picture (a unit card's) or
+## the glyph (an ability card's emblem, an entry's), the name, the level chip and the chip at the top
+## right, the lock chip and its text, the cost (an amount per resource after its coin, "Free" when it
+## has none) and the time, and the line under them; and why the card is locked, "" while it is not.
 class ArmyCard:
 	var button: Button
-	var heading: Control
+	var art: CardArt
 	var picture: TextureRect
 	var glyph: HudIcon
 	var title: Label
-	## A research card's "Level N"; null on a training card.
 	var level: Label
+	var chip: Label
+	var lock: Control
+	var lock_text: Label
 	var cost_row: Control
 	var costs: Dictionary[String, Label] = {}
 	var free: Label
 	var time: Label
 	var info: Label
+	var reason: String = ""
+
+
+## A progress fill: the meters' stripes (meter.gdshader) grown across a `track` by a fraction, cut to
+## the track's pill. Setting it sizes the clip and sets the shader's fill_width, and only when the
+## width changed; nothing is built.
+class Fill:
+	var clip: Control
+	var shader: ShaderMaterial
+	var track: Vector2
+
+	func set_fraction(fraction: float) -> void:
+		var width := roundf(track.x * clampf(fraction, 0.0, 1.0))
+		if clip.size.x == width:
+			return
+		clip.size = Vector2(width, track.y)
+		shader.set_shader_parameter(&"fill_width", width)
 
 
 func setup(catalog: Catalog) -> void:
@@ -838,7 +865,8 @@ func make_card(ability: String) -> Button:
 
 ## A making card's last line: "In stock N", or why it is locked.
 func make_card_info(ability: String) -> String:
-	return _make_cards[ability].info.text
+	var card := _make_cards[ability]
+	return card.reason if card.reason != "" else card.info.text
 
 
 ## An ability's research card.
@@ -870,19 +898,19 @@ func army_title() -> String:
 	return _army_title.text
 
 
-## The training header's housing line: "Housing used / capacity", or, with no Hangar, why none.
+## The training header's housing meter's text, "used / capacity", or, with no Hangar, why none.
 func housing_text() -> String:
-	return _housing_label.text
+	return _housing_label.text if _housing_bar.visible else _no_hangar.text
 
 
-## The training header's housing bar; hidden while the base has no Hangar.
+## The training header's housing meter; hidden while the base has no Hangar.
 func housing_bar() -> Control:
 	return _housing_bar
 
 
-## The housing bar's fill; its parent is the track it grows across.
+## The housing meter's fill; its parent is the track it grows across.
 func housing_fill() -> Control:
-	return _housing_fill
+	return _housing_fill.clip
 
 
 ## A unit's training card.
@@ -900,9 +928,16 @@ func preview() -> ModelPreview:
 	return _preview
 
 
-## A training card's last line: the housing and the count housed, or why it is locked.
+## A training card's last line, the unit's housing, or, while it is locked, why (its lock chip's
+## reason in words).
 func train_card_info(unit: String) -> String:
-	return _train_cards[unit].info.text
+	var card := _train_cards[unit]
+	return card.reason if card.reason != "" else card.info.text
+
+
+## A training card's chip of the count housed, "Housed N".
+func train_card_chip(unit: String) -> String:
+	return _train_cards[unit].chip.text
 
 
 ## The units the queue strip shows, oldest first.
@@ -1140,66 +1175,80 @@ func _set_pictures(state: BaseState) -> void:
 		_run_preview()
 
 
-## The producer's unit cards, then its queue. A card is locked, disabled with its picture, name
-## and cost dimmed, until the producer's finished level trains the unit.
+## The producer's unit cards, then its queue. A card is locked, disabled with its picture greyed
+## under a chip of the producer's level it needs, until the producer's finished level trains the unit.
 func _refresh_training(state: BaseState, building: BuildingState) -> void:
 	for unit: String in _train_cards:
 		var card := _train_cards[unit]
 		card.button.visible = _catalog.unit_producer(unit) == building.type
 		if not card.button.visible:
 			continue
-		var stats := _catalog.unit_level_stats(unit, state.unit_level(unit))
+		var level := state.unit_level(unit)
+		var stats := _catalog.unit_level_stats(unit, level)
 		_set_card_cost(card, stats.get("train_cost", _NO_COST), _catalog.unit_train_seconds(unit))
+		card.level.text = "Lv %d" % level
+		card.chip.text = "Housed %d" % state.army_count(unit)
+		card.info.text = "Housing %d" % _catalog.unit_housing(unit)
 		var needed := _catalog.unit_producer_level(unit)
 		var locked := building.level < needed
 		card.button.disabled = locked
-		card.heading.modulate.a = DISABLED_ALPHA if locked else 1.0
-		card.info.theme_type_variation = &"CardReason" if locked else &"CardCount"
-		if locked:
-			card.info.text = "Needs %s %d" % [_catalog.display_name(building.type), needed]
-		else:
-			card.info.text = "Housing %d   Housed %d" % [_catalog.unit_housing(unit), state.army_count(unit)]
+		_lock_card(card, "Needs %s %d" % [_catalog.display_name(building.type), needed] if locked else "",
+			"%s %d" % [_short_name(building.type), needed])
 	_refresh_housing(state)
 	_refresh_queue(state)
 
 
-## The header's housing line: the army's housing used over its capacity, on the line and the bar;
-## with no Hangar, in the dim style, why no unit can be housed, and no bar.
+## The header's housing meter: the army's housing used over its capacity, its digits and fill, gold
+## when full; with no Hangar, in the dim style, why no unit can be housed, and no meter.
 func _refresh_housing(state: BaseState) -> void:
 	var capacity := state.housing_capacity()
 	_housing_bar.visible = capacity > 0
+	_no_hangar.visible = capacity == 0
 	if capacity == 0:
-		_housing_label.theme_type_variation = &"CardCount"
-		_housing_label.text = NO_HANGAR
 		return
 	var used := state.housing_used()
-	_housing_label.theme_type_variation = &"HousingText"
-	_housing_label.text = "Housing %s / %s" % [Format.amount(used), Format.amount(capacity)]
-	var track := HOUSING_BAR_SIZE - Vector2(2 * BORDER, 2 * BORDER)
-	var width := roundf(track.x * clampf(float(used) / capacity, 0.0, 1.0))
-	# One unit housed still shows on the bar.
-	if used > 0:
-		width = maxf(width, HOUSING_MIN_FILL)
-	_housing_fill.size = Vector2(width, track.y)
+	_housing_label.text = "%s / %s" % [Format.amount(used), Format.amount(capacity)]
+	_housing_fill.set_fraction(float(used) / capacity)
+	_set_full(HOUSING_KEY, used >= capacity)
 
 
 ## The Foundry's ability cards, then its queue (the training page's strip). A card is locked,
-## disabled and dimmed, until the Foundry's finished level makes the ability.
+## disabled with its emblem greyed under a chip of the Foundry's level it needs, until the
+## Foundry's finished level makes the ability.
 func _refresh_making(state: BaseState, building: BuildingState) -> void:
 	for ability: String in _make_cards:
 		var card := _make_cards[ability]
-		var stats := _catalog.ability_level_stats(ability, state.ability_level(ability))
+		var level := state.ability_level(ability)
+		var stats := _catalog.ability_level_stats(ability, level)
 		_set_card_cost(card, stats.get("make_cost", _NO_COST), _catalog.ability_make_seconds(ability))
+		card.level.text = "Lv %d" % level
+		card.info.text = "In stock %d" % state.stock(ability)
 		var needed := _catalog.ability_requires_foundry(ability)
 		var locked := building.level < needed
 		card.button.disabled = locked
-		card.heading.modulate.a = DISABLED_ALPHA if locked else 1.0
-		card.info.theme_type_variation = &"CardReason" if locked else &"CardCount"
-		if locked:
-			card.info.text = "Needs %s %d" % [_catalog.display_name(building.type), needed]
-		else:
-			card.info.text = "In stock %d" % state.stock(ability)
+		_lock_card(card, "Needs %s %d" % [_catalog.display_name(building.type), needed] if locked else "",
+			"%s %d" % [_short_name(building.type), needed])
 	_refresh_queue(state)
+
+
+## Shows `card` locked, for `reason` (in words; "" unlocks it): its picture or emblem greyed
+## (locked.gdshader), its lock chip reading `chip`, its name dimmed. Nothing on it fades further, and
+## whether it takes a tap is the caller's.
+func _lock_card(card: ArmyCard, reason: String, chip: String) -> void:
+	card.reason = reason
+	var locked := reason != ""
+	card.lock.visible = locked
+	if locked:
+		card.lock_text.text = chip
+	var image: CanvasItem = card.picture if card.picture != null else card.glyph
+	image.material = _locked_material if locked else null
+	card.title.modulate.a = LOCKED_NAME_ALPHA if locked else 1.0
+
+
+## The last word of a building's name, for a lock chip: "Lab" for the Research Lab.
+func _short_name(type: String) -> String:
+	var words := _catalog.display_name(type).split(" ")
+	return words[words.size() - 1]
 
 
 ## The queue strip: an entry per queued unit (or ability, on the making page), oldest first, the head's with its state. Entries
@@ -1261,8 +1310,8 @@ func _refresh_head(state: BaseState) -> void:
 
 
 ## The research running, then a card per unlocked unit: its level and its next level's cost, time
-## and the lab level it needs, or "Max level". A card whose next level the lab cannot research
-## yet, or at the top, is dimmed but still takes a tap, which toasts why.
+## and the lab level it needs, or "Max level". A card whose next level the lab cannot research yet
+## is shown locked under a chip of the lab level it needs, but still takes a tap, which toasts why.
 func _refresh_research(state: BaseState) -> void:
 	var running := state.research_unit
 	var running_ability := state.research_ability
@@ -1277,6 +1326,7 @@ func _refresh_research(state: BaseState) -> void:
 				state.ability_level(running_ability) + 1]
 		_research_seconds = -1
 		_tick_research(state)
+	var lab_name := _short_name(_catalog.research_type)
 	for unit: String in _research_cards:
 		var card := _research_cards[unit]
 		card.button.visible = state.is_unit_unlocked(unit)
@@ -1286,41 +1336,45 @@ func _refresh_research(state: BaseState) -> void:
 		card.level.text = "Level %d" % level
 		var top := level >= _catalog.unit_max_level(unit)
 		card.cost_row.visible = not top
-		var dim := top
+		card.time.get_parent().visible = not top
+		var lab := 0
 		if top:
 			card.info.text = "Max level"
-			card.info.theme_type_variation = &"CardCount"
 		else:
 			var stats := _catalog.unit_level_stats(unit, level + 1)
 			_set_card_cost(card, stats.get("research_cost", _NO_COST), int(stats.get("research_seconds", 0)))
-			var lab := int(stats.get("requires_lab", 1))
-			dim = state.lab_level() < lab
+			lab = int(stats.get("requires_lab", 1))
 			card.info.text = "Researching" if unit == running else "Needs Lab %d" % lab
-			card.info.theme_type_variation = &"CardWarning" if dim else &"CardCount"
-		card.heading.modulate.a = DISABLED_ALPHA if dim else 1.0
+		var short := state.lab_level() < lab
+		card.info.theme_type_variation = &"CardWarning" if short else &"CardTime"
+		_lock_card(card, "Needs Lab %d" % lab if short else "", "%s %d" % [lab_name, lab])
 	for ability: String in _research_ability_cards:
 		var card := _research_ability_cards[ability]
 		var level := state.ability_level(ability)
 		card.level.text = "Level %d" % level
 		var top := level >= _catalog.ability_max_level(ability)
 		card.cost_row.visible = not top
-		var dim := top
+		card.time.get_parent().visible = not top
+		var reason := ""
+		var chip := ""
 		if top:
 			card.info.text = "Max level"
-			card.info.theme_type_variation = &"CardCount"
 		else:
 			var stats := _catalog.ability_level_stats(ability, level + 1)
 			_set_card_cost(card, stats.get("research_cost", _NO_COST), int(stats.get("research_seconds", 0)))
 			var lab := int(stats.get("requires_lab", 1))
 			if not state.is_ability_unlocked(ability):
-				dim = true
-				card.info.text = "Needs %s %d" % [_catalog.display_name(_catalog.foundry_type),
-					_catalog.ability_requires_foundry(ability)]
+				var needed := _catalog.ability_requires_foundry(ability)
+				chip = "%s %d" % [_short_name(_catalog.foundry_type), needed]
+				reason = "Needs " + chip
+				card.info.text = reason
 			else:
-				dim = state.lab_level() < lab
+				if state.lab_level() < lab:
+					reason = "Needs Lab %d" % lab
+					chip = "%s %d" % [lab_name, lab]
 				card.info.text = "Researching" if ability == running_ability else "Needs Lab %d" % lab
-			card.info.theme_type_variation = &"CardWarning" if dim else &"CardCount"
-		card.heading.modulate.a = DISABLED_ALPHA if dim else 1.0
+		card.info.theme_type_variation = &"CardWarning" if reason != "" else &"CardTime"
+		_lock_card(card, reason, chip)
 
 
 ## The research line's time left; text only when the seconds changed.
@@ -1334,13 +1388,14 @@ func _tick_research(state: BaseState) -> void:
 	_research_line.text = "%s%s left" % [_research_prefix, Format.duration(seconds)]
 
 
-## A card's cost, each amount in its resource's colour, or "Free"; and its time.
+## A card's cost, each amount after its coin in its resource's colour, or "Free"; and its time.
 func _set_card_cost(card: ArmyCard, cost: Dictionary, seconds: int) -> void:
 	var free := true
 	for res: String in _catalog.resources:
 		var amount := int(cost.get(res, 0))
 		var label := card.costs[res]
-		label.visible = amount > 0
+		# The amount's row, which holds its coin's room too.
+		label.get_parent().visible = amount > 0
 		if amount > 0:
 			label.text = Format.amount(amount)
 			free = false
@@ -2086,19 +2141,17 @@ func _build_army_panel() -> void:
 
 	var header := HBoxContainer.new()
 	header.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	header.add_theme_constant_override("separation", 10)
+	header.add_theme_constant_override("separation", 16)
 	column.add_child(header)
-	var heading := VBoxContainer.new()
-	heading.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	heading.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	# Centred on the close button, as the title alone was on the pages without the housing line.
-	heading.size_flags_vertical = Control.SIZE_SHRINK_CENTER
-	heading.add_theme_constant_override("separation", 0)
-	header.add_child(heading)
 	_army_title = Label.new()
 	_army_title.theme_type_variation = &"InfoTitle"
-	heading.add_child(_army_title)
-	_build_housing_line(heading)
+	_army_title.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	header.add_child(_army_title)
+	_build_housing_line(header)
+	var gap := Control.new()
+	gap.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	gap.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	header.add_child(gap)
 	_army_close = _button("X", CLOSE_SIZE, &"CloseButton")
 	_army_close.pressed.connect(_on_army_close)
 	header.add_child(_army_close)
@@ -2122,17 +2175,17 @@ func _build_army_panel() -> void:
 	_train_page.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	_train_page.add_theme_constant_override("separation", 6)
 	pages.add_child(_train_page)
-	var cards := _strip(_train_page, TRAIN_CARD_SIZE.y + 18)
+	var cards := _strip(_train_page, ARMY_CARD_SIZE.y + 18)
 	_train_scroll = cards.get_parent().get_parent() as ScrollContainer
 	for unit: String in _catalog.unit_types():
-		var card := _build_army_card(unit, TRAIN_CARD_SIZE)
+		var card := _build_army_card(unit, false, MaterialKit.ARMY, true)
 		card.button.pressed.connect(_on_train_card.bind(unit))
 		cards.add_child(card.button)
 		_train_cards[unit] = card
-	var make_cards := _strip(_train_page, TRAIN_CARD_SIZE.y + 18)
+	var make_cards := _strip(_train_page, ARMY_CARD_SIZE.y + 18)
 	_make_scroll = make_cards.get_parent().get_parent() as ScrollContainer
 	for ability: String in _catalog.ability_types():
-		var card := _build_army_card(ability, TRAIN_CARD_SIZE, true)
+		var card := _build_army_card(ability, true, MaterialKit.ARMY, false)
 		card.button.pressed.connect(_on_make_card.bind(ability))
 		make_cards.add_child(card.button)
 		_make_cards[ability] = card
@@ -2149,72 +2202,109 @@ func _build_army_panel() -> void:
 	_research_line = Label.new()
 	_research_line.theme_type_variation = &"InfoDetail"
 	_research_page.add_child(_research_line)
-	var research_cards := _strip(_research_page, RESEARCH_CARD_SIZE.y + 18)
+	var research_cards := _strip(_research_page, ARMY_CARD_SIZE.y + 18)
 	_research_scroll = research_cards.get_parent().get_parent() as ScrollContainer
 	for unit: String in _catalog.unit_types():
-		var card := _build_army_card(unit, RESEARCH_CARD_SIZE)
-		# "Level N" under the name.
-		card.level = _card_label(card.heading, "", &"CardCost")
-		card.heading.move_child(card.level, card.title.get_index() + 1)
+		var card := _build_army_card(unit, false, MaterialKit.ARMY, false)
 		card.button.pressed.connect(_on_research_card.bind(unit))
 		research_cards.add_child(card.button)
 		_research_cards[unit] = card
 	for ability: String in _catalog.ability_types():
-		var card := _build_army_card(ability, RESEARCH_CARD_SIZE, true)
-		card.level = _card_label(card.heading, "", &"CardCost")
-		card.heading.move_child(card.level, card.title.get_index() + 1)
+		var card := _build_army_card(ability, true, MaterialKit.ARMY, false)
 		card.button.pressed.connect(func() -> void: research_ability_pressed.emit(ability))
 		research_cards.add_child(card.button)
 		_research_ability_cards[ability] = card
 
 
-## The training header's housing line under `parent`: the army's figure, the text the refresh
-## fills, and a small bar like a meter's, the army accent's fill with its gloss in a trough, the
-## ink border drawn again over it.
+## The training header's housing line in `parent`: a meter like the top bar's, smaller (HOUSING_SIZE):
+## the army's figure on its coin over the left end of a pill-shaped trough, the army's fill growing
+## across it (a Fill), the ink border again over it and the count on it; and the line that stands in
+## for it while the base has no Hangar.
 func _build_housing_line(parent: Control) -> void:
 	_housing_row = HBoxContainer.new()
 	_housing_row.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	_housing_row.add_theme_constant_override("separation", 8)
+	_housing_row.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 	parent.add_child(_housing_row)
-	var icon := HudIcon.new()
-	icon.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	icon.kind = "army"
-	icon.color = MaterialKit.ARMY
-	icon.custom_minimum_size = HOUSING_ICON
-	icon.size_flags_vertical = Control.SIZE_SHRINK_CENTER
-	_housing_row.add_child(icon)
-	_housing_label = Label.new()
-	_housing_label.theme_type_variation = &"HousingText"
-	_housing_row.add_child(_housing_label)
-	var bar := Panel.new()
-	bar.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	bar.theme_type_variation = &"MeterTrough"
-	bar.custom_minimum_size = HOUSING_BAR_SIZE
-	bar.size_flags_vertical = Control.SIZE_SHRINK_CENTER
-	_housing_row.add_child(bar)
-	_housing_bar = bar
+	var meter := Control.new()
+	meter.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	meter.custom_minimum_size = HOUSING_SIZE
+	_housing_row.add_child(meter)
+	_housing_bar = meter
+	var trough := Panel.new()
+	trough.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	trough.theme_type_variation = &"MeterTrough"
+	meter.add_child(trough)
+	trough.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	trough.offset_left = HOUSING_COIN / 2.0
 	var track := Control.new()
 	track.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	track.position = Vector2(BORDER, BORDER)
-	track.size = HOUSING_BAR_SIZE - Vector2(2 * BORDER, 2 * BORDER)
-	bar.add_child(track)
-	var fill := ColorRect.new()
-	fill.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	fill.color = MaterialKit.ARMY
-	fill.clip_contents = true
-	fill.size = Vector2(0, track.size.y)
-	track.add_child(fill)
-	_housing_fill = fill
-	var gloss := ColorRect.new()
-	gloss.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	gloss.color = GLOSS
-	gloss.size = Vector2(track.size.x, track.size.y / 3.0)
-	fill.add_child(gloss)
+	track.size = HOUSING_SIZE - Vector2(HOUSING_COIN / 2.0 + 2 * BORDER, 2 * BORDER)
+	trough.add_child(track)
+	_housing_fill = _build_fill(track, HOUSING_KEY, track.size, MaterialKit.ARMY, 0.5)
 	var frame := Panel.new()
 	frame.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	frame.theme_type_variation = &"MeterFrame"
-	bar.add_child(frame)
+	trough.add_child(frame)
 	frame.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	_housing_label = Label.new()
+	_housing_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_housing_label.theme_type_variation = &"HousingText"
+	_housing_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
+	_housing_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	trough.add_child(_housing_label)
+	_housing_label.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	_housing_label.offset_left = HOUSING_COIN / 2.0
+	_housing_label.offset_right = -METER_TEXT_RIGHT
+	_meter_labels[HOUSING_KEY] = _housing_label
+	var coin := HudIcon.new()
+	coin.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	coin.kind = "army"
+	coin.color = MaterialKit.ARMY
+	coin.coin = TROUGH
+	coin.position = Vector2(0, (HOUSING_SIZE.y - HOUSING_COIN) / 2.0)
+	coin.size = Vector2.ONE * HOUSING_COIN
+	meter.add_child(coin)
+	_no_hangar = Label.new()
+	_no_hangar.theme_type_variation = &"CardCount"
+	_no_hangar.text = NO_HANGAR
+	_no_hangar.visible = false
+	_housing_row.add_child(_no_hangar)
+
+
+## A progress fill across `track` (a Control `size` big) in `color`'s meter fill (meter_fill): the
+## meters' stripes, drifting and glinting at `phase` of the glint's period (meter.gdshader), clipped
+## to the fill's width. Its shader is kept with the meters' under `key`, so a skin tints it as it
+## tints them. Empty until set.
+func _build_fill(track: Control, key: String, size: Vector2, color: Color, phase: float) -> Fill:
+	if _fill_stripe == null:
+		_fill_stripe = _make_stripe()
+	var fill := Fill.new()
+	fill.track = size
+	fill.clip = Control.new()
+	fill.clip.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	fill.clip.clip_contents = true
+	fill.clip.size = Vector2(0, size.y)
+	track.add_child(fill.clip)
+	var stripes := TextureRect.new()
+	stripes.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	stripes.texture = _fill_stripe
+	stripes.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	stripes.stretch_mode = TextureRect.STRETCH_TILE
+	stripes.texture_repeat = CanvasItem.TEXTURE_REPEAT_ENABLED
+	stripes.size = size
+	fill.shader = ShaderMaterial.new()
+	fill.shader.shader = METER_SHADER
+	_meter_colors[key] = color
+	_tint_meter(fill.shader, color)
+	fill.shader.set_shader_parameter(&"phase", phase)
+	fill.shader.set_shader_parameter(&"track_height", size.y)
+	fill.shader.set_shader_parameter(&"track_width", size.x)
+	fill.shader.set_shader_parameter(&"full_color", GOLD)
+	stripes.material = fill.shader
+	_meter_shaders[key] = fill.shader
+	fill.clip.add_child(stripes)
+	return fill
 
 
 ## A horizontal ScrollContainer under `parent`, `height` high (its cards' with room for their
@@ -2238,68 +2328,91 @@ func _strip(parent: Control, height: float) -> HBoxContainer:
 	return row
 
 
-## A unit card, `card_size`: the army's stripe along its top, the unit's picture (set by
-## _set_pictures, empty until the preview has rendered it), its name and a
-## row of its cost and time, then the line under them that the refresh fills. PASS, like a build
-## card, so a drag on it scrolls the strip; its content takes no touch.
-func _build_army_card(unit: String, card_size: Vector2, ability: bool = false) -> ArmyCard:
+## An army card (ARMY_CARD_SIZE) for the unit or, with `ability`, the ability `id`, laid out as a build
+## card: the stripe and the plinth in `tint`; on the plinth the unit's picture (set by _set_pictures,
+## empty until the preview has rendered it) or the ability's emblem on its coin; a level chip at the
+## top left and, with `right_chip`, a chip at the top right; the lock chip over the plinth's foot,
+## hidden until the card is locked; then its name, a row of its cost (each amount after its
+## resource's coin), then its time after the clock and beside it the line the refresh fills.
+## Its drawn parts are one CardArt; PASS, like a build card, so a drag on it scrolls the strip, and
+## its content takes no touch and sinks with it when pressed.
+func _build_army_card(id: String, ability: bool, tint: Color, right_chip: bool) -> ArmyCard:
 	var card := ArmyCard.new()
-	card.button = _button("", card_size, &"CardButton")
+	card.button = _button("", ARMY_CARD_SIZE, &"CardButton")
 	card.button.mouse_filter = Control.MOUSE_FILTER_PASS
-	var stripe := Panel.new()
-	stripe.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	stripe.theme_type_variation = &"CardStripe"
-	stripe.self_modulate = MaterialKit.ARMY
-	card.button.add_child(stripe)
-	stripe.set_anchors_preset(Control.PRESET_TOP_WIDE)
-	stripe.offset_left = BORDER
-	stripe.offset_right = -BORDER
-	stripe.offset_top = BORDER
-	stripe.offset_bottom = BORDER + STRIPE_HEIGHT
-	var content := VBoxContainer.new()
-	content.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	content.alignment = BoxContainer.ALIGNMENT_CENTER
-	content.add_theme_constant_override("separation", 0)
-	card.button.add_child(content)
-	content.set_anchors_preset(Control.PRESET_FULL_RECT)
-	content.offset_left = 10
-	content.offset_top = BORDER + STRIPE_HEIGHT + 2
-	content.offset_right = -10
-	content.offset_bottom = -BORDER - 2
-	var heading := VBoxContainer.new()
-	heading.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	heading.add_theme_constant_override("separation", 0)
-	content.add_child(heading)
-	card.heading = heading
+	var body := _card_body(card.button)
+	card.art = CardArt.new()
+	card.art.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	card.art.tint = tint
+	card.art.plinth = ARMY_PLINTH
+	card.art.plinth_centre = Vector2(ARMY_CARD_SIZE.x / 2.0, BORDER + STRIPE_HEIGHT + 4 + ARMY_PLINTH / 2.0)
+	body.add_child(card.art)
+	card.art.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	if ability:
-		card.glyph = _glyph(heading, "", PICTURE_SIZE)
-		show_ability_glyph(card.glyph, _catalog, unit)
+		card.glyph = HudIcon.new()
+		card.glyph.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		card.glyph.position = card.art.plinth_centre - EMBLEM_SIZE / 2.0
+		card.glyph.size = EMBLEM_SIZE
+		show_ability_glyph(card.glyph, _catalog, id)
+		body.add_child(card.glyph)
 	else:
 		card.picture = TextureRect.new()
 		card.picture.mouse_filter = Control.MOUSE_FILTER_IGNORE
-		card.picture.custom_minimum_size = PICTURE_SIZE
-		card.picture.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
 		card.picture.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
 		card.picture.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
-		heading.add_child(card.picture)
-	card.title = _card_label(heading, _catalog.ability_name(unit) if ability else _catalog.unit_name(unit),
-		&"CardName")
+		card.picture.position = card.art.plinth_centre - PICTURE_SIZE / 2.0
+		card.picture.size = PICTURE_SIZE
+		body.add_child(card.picture)
+	card.level = _chip_label(body, card.art, false)
+	if right_chip:
+		card.chip = _chip_label(body, card.art, true)
+	card.lock_text = _lock_chip(body, card.art.plinth_centre.y + ARMY_PLINTH / 2.0 - 30)
+	card.lock = card.lock_text.get_parent().get_parent()
+
+	var lines := VBoxContainer.new()
+	lines.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	lines.add_theme_constant_override("separation", -2)
+	body.add_child(lines)
+	lines.set_anchors_preset(Control.PRESET_FULL_RECT)
+	lines.offset_left = 8
+	lines.offset_top = ARMY_LINES_TOP
+	lines.offset_right = -8
+	lines.offset_bottom = -BORDER - 2
+	card.title = _card_label(lines, _catalog.ability_name(id) if ability else _catalog.unit_name(id), &"CardName")
 	card.title.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
 	var cost_row := HBoxContainer.new()
 	cost_row.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	cost_row.alignment = BoxContainer.ALIGNMENT_CENTER
-	cost_row.add_theme_constant_override("separation", 10)
-	heading.add_child(cost_row)
+	cost_row.add_theme_constant_override("separation", ARMY_TIME_GAP)
+	lines.add_child(cost_row)
 	card.cost_row = cost_row
 	for res: String in _catalog.resources:
-		var amount := _card_label(cost_row, "", &"CardCost")
+		var amount_row := HBoxContainer.new()
+		amount_row.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		amount_row.add_theme_constant_override("separation", 4)
+		cost_row.add_child(amount_row)
+		card.art.add_icon(_spacer(amount_row, ARMY_COST_ICON), res, _resource_color(res), _resource_color(res))
+		var amount := _card_label(amount_row, "", &"CardCost")
 		_cost_labels[amount] = _resource_color(res)
 		amount.add_theme_color_override("font_color", _cost_color(_cost_labels[amount]))
 		card.costs[res] = amount
 	card.free = _card_label(cost_row, "Free", &"CardCost")
-	card.time = _card_label(cost_row, "", &"CardCount")
-	card.info = _card_label(content, "", &"CardCount")
-	card.info.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
+	cost_row.sort_children.connect(card.art.queue_redraw)
+	# The time and the last line share a row: a cost of two resources leaves no room for the time
+	# beside it.
+	var last_row := HBoxContainer.new()
+	last_row.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	last_row.alignment = BoxContainer.ALIGNMENT_CENTER
+	last_row.add_theme_constant_override("separation", 8)
+	lines.add_child(last_row)
+	var time_row := HBoxContainer.new()
+	time_row.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	time_row.add_theme_constant_override("separation", 4)
+	last_row.add_child(time_row)
+	card.art.add_icon(_spacer(time_row, Vector2.ONE * CLOCK_SIZE), "clock", TEXT_DIM, Color.TRANSPARENT)
+	card.time = _card_label(time_row, "", &"CardCount")
+	card.info = _card_label(last_row, "", &"CardTime")
+	last_row.sort_children.connect(card.art.queue_redraw)
 	return card
 
 
@@ -2633,7 +2746,7 @@ func _make_theme() -> Theme:
 	_label_variation(ui, &"CardCount", 19, TEXT_DIM, 0)
 	_label_variation(ui, &"CardReason", 19, TEXT_DIM, 0)
 	_label_variation(ui, &"QueueName", 19, TEXT, 0)
-	_label_variation(ui, &"HousingText", 19, TEXT, 0)
+	_label_variation(ui, &"HousingText", 19, TEXT, 2.5)
 	_label_variation(ui, &"CardWarning", 17, WARNING, 0)
 	_label_variation(ui, &"CardTime", 17, TEXT_DIM, 0)
 	_label_variation(ui, &"CardChip", 17, TEXT, 0)
