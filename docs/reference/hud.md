@@ -50,9 +50,10 @@ row's included.
 
 **Type scale** (720p): nothing smaller than 17 px but the debug row's (**Layout**); body lines 19
 to 20 (`CardCost` 20, `CardCount` and `CardReason` 19, `MeterText` 20, `InfoDetail`, `InfoNote`,
-`QueueName`, `HousingText`, `ToastText` and `BadgeText` 19; the sector map's `SectorRow` 20 and
-`SectorRibbon`, Bangers 20 in ink); the build cards' small lines 17 (`CardTime`, `CardWarning`,
-`CardChip`, `LockText`); names 22 (`CardName`, and the sector detail's loot, `SectorLoot`); titles 30
+`QueueName`, `QueueHeadName`, `HousingText`, `InfoNext`, `ToastText` and `BadgeText` 19,
+`ProgressText` 20; the sector map's `SectorRow` 20 and `SectorRibbon`, Bangers 20 in ink); the
+cards' small lines 17 (`CardTime`, `CardWarning`, `CardChip`, `LockText`, `QueueHeadTime`); names
+22 (`CardName`, and the sector detail's loot, `SectorLoot`); titles 30
 (`InfoTitle`); button labels 24 to 30 (the tabs, `BarButton`, `ConfirmButton`, `CommitButton` and
 `UpgradeButton` 24, `CloseButton` 28, `BuildButton` and `ExpeditionButton` 30). The HUD is 720 px
 tall under the `canvas_items` stretch, so on a 6.1-inch phone a pixel is about 0.09 mm: 17 px is a
@@ -80,7 +81,7 @@ the building view's timer label included, wider.
 | Warning `WARNING` | `FFB37A` | the info panel's note, a research card's lab level the lab lacks, a build card's reason and its Command Center chip |
 | Resource colours | `rules.json`, `Catalog.resource_color` | costs, the meters' fills and icons |
 | Category stripes `CATEGORY_STRIPE` | `MaterialKit` roles: resources `ENERGY`, army `ARMY`, defense `DEFENCE`, traps `HAZARD` | the stripe along a card's top and its plinth; a category not listed takes `ACCENT` |
-| Army accent | `MaterialKit.ARMY`, `FF7F11` | raid and battle: the Expedition button; the training header's housing bar and figure, the unit glyphs, the stripe along a unit card's top |
+| Army accent | `MaterialKit.ARMY`, `FF7F11` | raid and battle: the Expedition button; the training header's housing meter's fill and figure, the training queue's head fill, the unit glyphs, the stripe along a unit card's top |
 
 **Colour roles.** Gold commits a spend (Build, Place, Upgrade, Attack), the army's orange starts
 a raid (Expedition), cyan is the selected or the safe choice only (the selected tab, Done, Keep
@@ -108,9 +109,10 @@ bright fill (Build, Expedition, Place, the upgrade button, the selected tab) nee
 stroke reaches a quarter of `outline_size` out from each glyph.
 
 **Touch sizes.** The tabs are 160×56, the close buttons 56×56, Build 136×72 and Expedition 184×72,
-the info panel's Train, Make or Research 112×56 and its Close 96×56 (`ACTION_SIZE`,
-`INFO_CLOSE_SIZE`), the place bar's Cancel and Place 170×72; the build cards 200×200; the sector
-map's Scan 190×56, its cards 360×200 at least, Back 140×72 and Attack 240×72. In battle (**Battle HUD**): speed
+the info panel's Train, Make or Research 128×56 and its Close 112×56 (`ACTION_SIZE`,
+`INFO_CLOSE_SIZE`) and its upgrade button 64 tall, the place bar's Cancel and Place 170×72; the
+build cards 200×200, the army cards 200×184 and the queue's entries 220×56; the sector map's Scan
+190×56, its cards 360×200 at least, Back 140×72 and Attack 240×72. In battle (**Battle HUD**): speed
 96×64 and End 140×64, Keep fighting 200×72 and End battle 180×72, Return 240×72, the deploy and
 ability cards 124×136.
 
@@ -150,7 +152,11 @@ every skin: its variations are its own, built after the skin's in a Battle HUD b
   costs in ink (`_cost_color`, which a card's amounts take when built and on `set_skin`). The
   meters, the drone meter among them, are cream troughs with saturated fills and ink digits on an ink strip; a full meter keeps
   its gold line, its digits ink. The info panel and the sector map go cream
-  too, as they share the titles' and the lines' variations; the toast stays dark.
+  too, as they share the titles' and the lines' variations; the toast stays dark. The army and
+  info panels' own variations follow: the queue's head in ink with no outline (`QueueHeadName`,
+  `QueueHeadTime`, dim ink), a next level's value in ink (`InfoNext`), a busy upgrade button the
+  darker cream with its words in ink over the gold fill (`ProgressButton`, `ProgressText`); the
+  "MAX" chip, gold with an ink ring and ink text, is unchanged.
 
 ## Layout
 
@@ -165,9 +171,9 @@ so its parts — the Build button above all — draw over the panel.
 | Expedition button | bottom left, `MARGIN` from the safe area's corner, 184×72 | "EXPEDITION" in Bangers 30 on the army's orange, ink text, with a badge centred on its top right corner: the open fields' count in `BadgeText` (Lilita One 19, 2 px of ink) on a defence-red circle (`Badge`, 36×36) with a 2 px light ring inside its ink (`BadgeRing`), hidden at none. Emits `expedition_pressed`. Shown with Build, and hidden while the build panel or the army panel is open across its corner (`_show_expedition`). |
 | Build panel | bottom, the screen's full width | Slides up over the bottom of the screen (**Build panel**). |
 | Place bar | bottom centre | A panel holding `Cancel` and `Place` (170×72); `Place`, gold, is disabled unless the ghost is valid. While walls are painted it reads `Done`, cyan, and is always enabled: there is nothing to confirm. |
-| Info panel | bottom centre, 460 wide | Title `"Name   Lv N"` with Train, Make or Research (a finished producer, Foundry or research building only) and a `Close` button; detail lines (**Info panel**); the upgrade button; a note under it. |
+| Info panel | bottom centre, at least 460 wide | The building's picture and its title `"Name   Lv N"` (a "MAX" chip at its top level) with Train, Make or Research (a finished producer, Foundry or research building only) and a `Close` button; stat rows (**Info panel**); the upgrade button, or its progress while busy; a note under it when the upgrade is refused. |
 | Army panel | bottom, the screen's full width | Slides up in the build panel's place: a producer's training or the lab's research (**Army panel**). |
-| Toast | top centre, 96 down | A small panel with a centred line that fades out after 1.8 s over 0.6 s, then hides. |
+| Toast | top centre, 96 down | A small panel with a centred line, its left edge in its kind's colour (**Messages**), that fades out after 1.8 s over 0.6 s, then hides. |
 | Debug row | debug builds only (`OS.is_debug_build()`): under the top bar's strip, at the left | A "DEV" label (Lilita One 14, dim, outlined over the world) over three grey chips, 132×40 (`DEBUG_SIZE`; `CARD_DISABLED`, a 2 px ink border, dim Lilita One 16), 10 apart: Practice raid, which emits `practice_pressed`, Template base, which emits `template_pressed`, then Reset base, which emits `reset_pressed`. Demoted so a tester never takes them for the game's; the only text under 17 px. |
 
 The army panel is built after the build panel and before the root, outside it like the build
@@ -245,7 +251,7 @@ darker belly, a highlight lobe at its top left and an ink visor band round its m
 white eye; a rotor arm from each upper flank, over the hull, out to a light rotor disc seen at an
 angle; and the tool's nozzle under the belly, a light lens at its end; few, big
 shapes, so it reads on its 48 px coin. Any other
-resource gets a plain cut gem. **army**, in front of the training header's housing line (**Army
+resource gets a plain cut gem. **army**, on the coin of the training header's housing meter (**Army
 panel**), is a figure: a head over a pair of rounded shoulders, each with a lighter facet.
 `HudIcon.paint(pen, kind, rect, color, wing, coin)` adds one to a `HudIcon.Pen`.
 
@@ -256,7 +262,8 @@ right and an ink hub; **chevron** a right-pointing chevron, two thick arms meeti
 of their notch, the upper arm lighter; **star** a five-point star with a lighter facet down one
 side of each point, filled in its colour (gold for a star won, `MaterialKit.HULL_DARK` for one not
 yet); **skull** a comic skull, a round cranium over a narrower jaw with ink eye sockets, nose and
-teeth, for difficulty marks.
+teeth, for difficulty marks; **cross** an "x", two thick bars crossed at the centre, the upper left
+arm lighter, at the end of a queue entry.
 
 **Coins.** Any icon can wear a coin, the badge the icon families share (`HudIcon.coin`, or
 `paint`'s `coin`; transparent, the default, for none): a disc filling the rect (18.5 units of the
@@ -333,12 +340,13 @@ it opens), and only the selected tab's, the buildings counted by type once for e
 "built / max". The army panel's content is rebuilt after `BaseState.changed`, which the HUD
 connects to itself from the state `refresh` is given (`_watch`): a change marks it stale, and the
 next `refresh` (`main.gd`'s, at the end of that frame) rebuilds it once however many changes came;
-and when it opens: the housing line, the cards, the queue (copied once by `queue_of` and kept
+and when it opens: the housing meter, the cards, the queue (copied once by `queue_of` and kept
 until the next change; its entries set again only when the copy differs from the queue shown) and
 the research line's words. A `refresh` while it is open with nothing changed, the one-second
 tick's, only counts down (`_tick_army`): it reads the head's `training_status` and
 `training_seconds_left`, or `research_seconds_left`, none of which copies anything, and sets the
-head's or the research line's text only when the value it shows changed. So a tick with no state
+head's or the research line's text and its progress fill (a size and a shader uniform) only when
+the value it shows changed. So a tick with no state
 change copies nothing from the state and builds one short string, the new time left, while a
 countdown runs; a tick that changes the state (production paid, a unit trained) emits `changed`
 and rebuilds.
@@ -506,99 +514,145 @@ constructed), one line each, only when the level has the stat, in this order:
 | Hidden from attackers | `catalog.is_hidden(type)` |
 
 Once built and below its top level, a value the next level changes is followed by the next
-level's after an arrow: "Hull 600 → 800", "Produces 1,800 → 3,000 Metal/h"; while first being
-built it shows level 1's values with no arrow. The arrow is " → " when the theme's font has the
-glyph and " > " when it does not (Lilita One does not), checked once in `setup`. Resources are
-named with `catalog.resource_name`. While busy, a last line reads "Under construction: 10s left" or
-"Upgrading to Lv N: 1m 00s left".
+level's: "Hull 600 → 800", "Produces 1,800 → 3,000 Metal/h"; while first being built it shows
+level 1's values with no change. Each line is a row of labels (Lilita One 19, `InfoDetail`), the
+change drawn as a `chevron` mark (18 px, the accent) with the next value after it in the accent
+(`InfoNext`): the line's words carry a marker (`NEXT_MARK`) between the two values, and the row
+splits on it, the next value running to the first space; a line holds two at most ("Damage 12 →
+14   Range 7 → 8"). The rows are made as the lines first grow that many and reused. Resources are
+named with `catalog.resource_name`.
 
-The title is in Bangers 30 and the detail lines in Lilita One 19. The upgrade button, gold
-like Build with its text in ink (Lilita One 24), reads "Under construction" (disabled) while
-busy, "Max level" (disabled) at
-the top level, else "Upgrade to Lv N   cost   (duration)", disabled with the reason in the
-note when `state.check_upgrade` fails. Pressing emits `upgrade_pressed`; `Close` emits
-`close_pressed`.
+The header: the building's picture (64×64, its build card's, **Pictures**; asked for, and rendered
+while the panel shows, when it is not made yet), the title in Bangers 30, `"Name   Lv N"`, or
+"Name   Building..." while the building is first constructed (an ellipsis character when Bangers
+has one), and at the top level a "MAX" chip beside it (`MaxChip`: gold, a 2 px ink ring,
+`LockText` in ink). The upgrade button, gold like Build with its text in ink (Lilita One 24),
+reads "Upgrade to Lv N   cost   (duration)", disabled with the reason in the note (`InfoNote`,
+19 px, the warning colour; hidden when there is none) when `state.check_upgrade` fails. At the top
+level it hides. While the building is constructed or upgraded it is disabled and drawn as a trough
+(`ProgressButton`) with a gold progress fill across its inside (the meters' stripes,
+`meter.gdshader`; **Army panel**, "Progress fills"), the share of the level's `build_seconds` gone,
+and over it "Under construction: 10s left" or "Upgrading to Lv N: 1m 00s left" (`ProgressText`,
+20 px, white with 2.5 px of ink). Pressing emits `upgrade_pressed`; `Close` emits `close_pressed`.
 
 Beside `Close`, a finished producer (a type `catalog.units_of_producer` names, at level 1 or
 more) shows **Train**, the finished Foundry (`catalog.foundry_type`) **Make** and the finished
 research building (`catalog.research_type`) **Research**,
-112×56, cyan with ink text in Bangers 24 (`ConfirmButton`, like Done); `Close` is 96×56. Pressing it opens the army panel on that page
-in the info panel's place (**Army panel**).
+128×56, cyan with ink text in Bangers 24 (`ConfirmButton`, like Done); `Close` is 112×56. Pressing it opens the army panel on that page
+in the info panel's place (**Army panel**). The panel is at least 460 wide and grows to fit its
+header.
 
 ## Army panel
 
 Shaped like the build panel and in its place: a `PanelContainer` outside the root, the screen's
 full width at its bottom edge, its content padded into the safe area (`apply_safe_area`), the same
 slide (`_slide`, **Build panel**), and the same column kept clear on the right for the Build
-button. Its height is its content's, with the build panel's (324 at 720p) as the minimum, which
-the training and research pages fit in. A header, the building's `"Name   Lv N"` in Bangers 30 with the close button (56×56,
+button. Its height is its content's, with the build panel's (324 at 720p) as the minimum; unlike
+the build panel it is not held to 45 % of the screen, so a page taller than that grows the panel
+upward past it: the training and making pages, their 184 px cards over the queue, are about 368 px
+at 720p (51 %), more under a bottom inset, the research page a little less. Its header, with the
+close button, stays on screen above the world, so Close is always within reach. A header, the building's `"Name   Lv N"` in Bangers 30 with the close button (56×56,
 "X") at the right, over one of three pages: training, making (the training page's, its unit
 cards swapped for the ability cards) or research. The panel stops every touch on it; its layout
 containers take none. The close button slides it down and shows the building's info panel again,
 still selected. Hidden while closed.
 
-On the training page the header carries a second line under the title, the army's housing
-(`_refresh_housing`, rebuilt with the panel after every `BaseState.changed`): the army's figure
-(`HudIcon` "army", 20×20, the army accent), "Housing 12 / 280" (19 px, `HousingText`:
-`housing_used()` / `housing_capacity()`, `Format.amount`) and after it a bar 120×14
-(`HOUSING_BAR_SIZE`), a meter's trough and ink frame round a flat fill in the army accent with the
-meters' gloss, grown across its track by used over capacity, and at least 2 px
-(`HOUSING_MIN_FILL`) while any unit is housed. With no Hangar (capacity 0) the line
-reads "No Hangar: build one to house units" (`NO_HANGAR`) in the dim style (`CardCount`) and the
-bar hides. The
-making and research pages leave the line out.
+The header carries the page's state beside the title. On the training page that is the army's
+housing (`_refresh_housing`, rebuilt with the panel after every `BaseState.changed`) as a top bar
+meter in small, 220×32 (`HOUSING_SIZE`): the army's figure (`HudIcon` "army", the army accent) on
+a trough coin 36 across over the left end of a pill trough (`MeterTrough`), the army's fill
+(`Hud.meter_fill`) in the meters' stripes grown across it by `housing_used()` over
+`housing_capacity()`, the ink border again over it (`MeterFrame`), and "12 / 280"
+(`Format.amount`) right-aligned on it in `HousingText` (19 px, white with 2.5 px of ink); when the
+Hangars are full, the meters' full state, a gold line inside the pill and the digits in gold (its
+shader and digits are kept with the meters' under `HOUSING_KEY`, so `set_skin` tints it and
+`_set_full` sets it as theirs). With no Hangar (capacity 0) the meter hides and the line reads
+"No Hangar: build one to house units" (`NO_HANGAR`) in the dim style (`CardCount`). On the
+research page it is the research's progress (**Research panel**); the making page shows nothing
+there.
 
-**Training panel.** A horizontal strip of unit cards (200×140), one per unit the producer's type
-trains, in `units.json` order (`catalog.unit_types()`; a card per unit is built up front and the
-page shows its producer's). A card has the army accent's stripe along its top, the unit's picture
-(48×48, `PICTURE_SIZE`, **Pictures**: the unit at its researched level's tier), its name (Lilita One 22), a row of its train cost at
-its current level (`unit_level`), each amount in its resource's colour, or "Free", and its train
-time (`Format.duration`, dim), then "Housing N   Housed M" (19 px, dim: the unit's housing and
-`army_count`). A unit the producer's finished level does not train yet (`unit_producer_level`) is
-locked: the card is disabled, its picture, name and cost at 55 %, its last line "Needs <producer>
-<level>" (19 px, dim). Tapping a card emits `train_pressed(id, unit)`; `main.gd` queues one through
+**Army cards.** The training, making and research pages' cards are one kind, 200×184
+(`ARMY_CARD_SIZE`), built and drawn as a build card is (`Hud.CardArt`, one triangle array, and the
+same chips and lock chip, **Cards**): a `CardButton` with a stripe along its top and a plinth 104
+across (`ARMY_PLINTH`) in its colour, the army's orange for a unit and the Foundry's nanite green
+(`MaterialKit.NANITE_GREEN`) for an ability; on the plinth a unit's picture at 96×96
+(`PICTURE_SIZE`, **Pictures**: the unit at its researched level's tier) or an ability's emblem on
+its coin at 64×64 (**Ability glyphs**); a level chip at the top left (`CardChip`), and a chip at
+the top right where the page has one; then the name (Lilita One 22), the cost row (each amount at
+20 px in its resource's colour after its resource's coin at 20 px, or "Free"), and a last row: the
+time after the `clock` mark (`Format.duration`, 19 px, dim) and beside it the card's last line
+(17 px, dim, `CardTime`; the warning colour, `CardWarning`, for a need not met). The time shares
+the last row because a cost of two resources fills the cost row. A card the building cannot serve
+yet is **locked** as a locked build card is: its picture or emblem greyed (`locked.gdshader`), the
+lock chip over the plinth's foot naming what it needs by the last word of that building's name
+and the level ("Academy 2", "Lab 2", "Foundry 3"), its name at 70 %; nothing fades to 55 %.
+Whether a locked card takes a tap is the page's. Cards `PASS`, their content IGNORE and sinking
+with them when pressed.
+
+**Training panel.** A horizontal strip of unit cards, one per unit the producer's type trains, in
+`units.json` order (`catalog.unit_types()`; a card per unit is built up front and the page shows
+its producer's): the level chip "Lv N" (`unit_level`), the chip "Housed N" (`army_count`), the
+train cost at the unit's level and its `train_seconds`, and the last line "Housing N", the unit's
+housing. A unit the producer's finished level does not train yet (`unit_producer_level`) is
+locked, and disabled; `train_card_info(unit)` reads its reason in words, "Needs Cadet Academy 2".
+Tapping a card emits `train_pressed(id, unit)`; `main.gd` queues one through
 `PlacementController.train` and toasts the error when it fails.
 
-Under the cards, the **queue strip**, scrolled like the cards: an entry (180×48) per queued unit,
-oldest first (`queue_of`), each a 32 px glyph beside the unit's name (19 px); the head adds its
-state under the name (19 px, dim): its time left, "12s left" (`training_seconds_left`), "Waiting
-for room" (`training_status` `waiting`) or "Paused" (`paused`, its producer upgrading). With no
-queue the strip reads "Nothing in training". Tapping an entry emits
-`cancel_training_pressed(id, unit)`; `main.gd` cancels the newest queued unit of that type
-(`PlacementController.cancel_training`, which need not be the entry tapped) and toasts
-"Refunded". Entries are made as the queue first grows that long and kept; after that a rebuild
-only sets text and swaps glyphs, and nothing is allocated per frame (**Refresh**).
+Under the cards, the **queue strip**, scrolled like the cards: an entry (220×56) per queued unit,
+oldest first (`queue_of`), each the unit's glyph on its coin (36 px) beside its name (19 px) and
+an "x" (the `cross` mark, 16 px, dim) at its right end, saying a tap takes it back; the head adds
+its state under the name (17 px, dim): its time left, "12s left" (`training_seconds_left`),
+"Waiting for room" (`training_status` `waiting`) or "Paused" (`paused`, its producer upgrading).
+Across the head lies a progress fill (below) of the share of its `train_seconds` gone, in the
+army's orange (the Foundry's green on the making page), so its name and state take an ink outline
+(`QueueHeadName`, `QueueHeadTime`), as text over a bright fill does. With no queue the strip reads
+"Nothing in training". Tapping an entry, anywhere on it, emits `cancel_training_pressed(id, unit)`;
+`main.gd` cancels the newest queued unit of that type (`PlacementController.cancel_training`,
+which need not be the entry tapped) and toasts "Refunded". Entries are made as the queue first
+grows that long and kept; after that a rebuild only sets text and swaps glyphs, and nothing is
+allocated per frame (**Refresh**).
 
-**Making panel.** The Foundry's page: a strip of ability cards (200×140), one per ability in
-`catalog.ability_types()` order, laid out as a training card: the stripe, the ability's glyph
-(48×48, **Ability glyphs**), its name, its make cost at its current level (`ability_level`) in its
-resources' colours and its make time (`ability_make_seconds`), then "In stock N" (`stock`). An
-ability the Foundry's finished level does not make yet (`ability_requires_foundry`) is locked:
-disabled, at 55 %, its last line "Needs Nanite Foundry L". Tapping a card emits
-`make_pressed(id, ability)`; `main.gd` queues one through `PlacementController.make` and toasts
-the error when it fails. Under the cards the training page's queue strip, its entries the queued
-abilities (`making_queue_of`) with their glyphs and names, the head's state from `making_status`
-and `making_seconds_left` ("Waiting for room": the stock is full), "Nothing being made" when
-empty; tapping an entry emits `cancel_making_pressed(id, ability)`, which cancels the newest of
-that ability (`PlacementController.cancel_making`) and toasts "Refunded".
+**Progress fills.** The housing meter, the queue's head, the research bar and the info panel's
+busy upgrade button share one piece, `Hud.Fill`: a clip `Control` over a `TextureRect` of the
+meters' stripe tile drawn through `meter.gdshader` (the drift, the glint, the round ends of a pill
+track; **Top bar**), tinted by `Hud.meter_fill` of its colour. Setting its fraction sizes the clip
+and sets the shader's `fill_width`, and only when the width in pixels changed; nothing is built.
+Its shader is kept with the meters' (`_meter_shaders`, `_meter_colors`), so a skin tints it.
 
-**Research panel.** Under the header a line naming the research running, "Researching Ranger to
-Lv 2: 30s left" (`research_unit`, `research_seconds_left`), or "No research running"; under it a
-strip of cards (200×164), one per unit the base has unlocked (`is_unit_unlocked`), in `units.json`
-order: the picture, the name, "Level N" (20 px), then the next level's research cost and time, and
-"Needs Lab L" (its `requires_lab`), "Researching" on the unit being researched, or, at the unit's
-top level, "Max level" with no cost. A card whose lab level the lab lacks, or at the top, is shown
-at 55 % with its lab level in the warning colour, but still takes a tap. Tapping a card emits
-`research_pressed(unit)`; `main.gd` starts the research through `PlacementController.research`
-or toasts why not, in `research_error_text` (**Messages**). There is nothing to cancel.
+**Making panel.** The Foundry's page: a strip of ability cards, one per ability in
+`catalog.ability_types()` order: the level chip "Lv N" (`ability_level`), the stock as the chip
+at the top right, "In stock N" (`stock`), the make cost at the ability's level and its make time
+(`ability_make_seconds`), and no last line. An ability the Foundry's finished level does not make
+yet (`ability_requires_foundry`) is locked, and disabled; `make_card_info(ability)` reads its
+stock chip, or its reason, "Needs Nanite Foundry L". Tapping a card emits `make_pressed(id,
+ability)`; `main.gd` queues one through `PlacementController.make` and toasts the error when it
+fails. Under the cards the training page's queue strip, its entries the queued abilities
+(`making_queue_of`) with their glyphs and names, the head's state from `making_status` and
+`making_seconds_left` ("Waiting for room": the stock is full), "Nothing being made" when empty;
+tapping an entry emits `cancel_making_pressed(id, ability)`, which cancels the newest of that
+ability (`PlacementController.cancel_making`) and toasts "Refunded".
 
-After the units' cards come the abilities', every ability in `catalog.ability_types()` order: the
-glyph, the name, "Level N", the next level's research cost and time, and "Needs Lab L", "Needs
-Nanite Foundry L" while no Foundry makes it yet (`is_ability_unlocked`), "Researching", or "Max
-level"; dimmed in the same cases. Tapping one emits `research_ability_pressed(ability)`, which
-`main.gd` sends through `PlacementController.research_ability`, toasting in `research_error_text`.
-The progress line names an ability's research too ("Researching Repair Swarm to Lv 2: …",
-`research_ability`); a unit's and an ability's share the one slot.
+**Research panel.** Beside the title, while a research runs, a line naming it, "Researching
+Ranger to Lv 2: 30s left" (`research_unit`, `research_seconds_left`; `InfoDetail`, 19 px), over a
+bar 420×20 (`RESEARCH_BAR_SIZE`): a meter's trough, the accent's progress fill of the share of the
+level's `research_seconds` gone, the ink border over it; with no research running both hide. Under
+the header a strip of cards, one per unit the base has unlocked (`is_unit_unlocked`), in
+`units.json` order: the level chip "Level N", then the next level's research cost and time, and
+the last line "Needs Lab L" (its `requires_lab`), "Researching" on the unit being researched, or,
+at the unit's top level, "Max level" with no cost or time. A card whose lab level the lab lacks is
+shown locked ("Lab L"), its last line in the warning colour, but still takes a tap; a card at the
+top level is shown as any other. Tapping a card emits `research_pressed(unit)`; `main.gd` starts
+the research through `PlacementController.research` or toasts why not, in `research_error_text`
+(**Messages**). There is nothing to cancel.
+
+After the units' cards come the abilities', every ability in `catalog.ability_types()` order, in
+the Foundry's green: the emblem, the name, "Level N", the next level's research cost and time,
+and "Needs Lab L", "Needs Foundry L" while no Foundry makes it yet (`is_ability_unlocked`; locked,
+"Foundry L"), "Researching", or "Max level"; locked in the same cases as the units'. Tapping one
+emits `research_ability_pressed(ability)`, which `main.gd` sends through
+`PlacementController.research_ability`, toasting in `research_error_text`. The progress line names
+an ability's research too ("Researching Repair Swarm to Lv 2: …", `research_ability`); a unit's
+and an ability's share the one slot.
 
 ## Sector map
 
@@ -777,26 +831,36 @@ Practice raid (null in a release build). `ui_theme()` and `preview()` hand the t
 pictures to the battle's HUD. `Hud.skin` is the skin the theme is built in and `set_skin(look)`
 restyles the HUD in another (**Skins**).
 The army: `housing_text()`, `housing_bar()` and `housing_fill()` are the training header's
-housing line, its bar (hidden with no Hangar) and the bar's fill, whose parent is the track it
-grows across; `action_button()` is the info panel's Train, Make or Research and `info_detail()` its
-lines; `army_panel()` the army panel, `is_training_open()`, `is_making_open()` and
+housing meter's text ("used / capacity", or the no-Hangar line), the meter (hidden with no Hangar)
+and its fill, whose parent is the track it grows across; `action_button()` is the info panel's
+Train, Make or Research and `info_detail()` its lines (a change written "600 → 800");
+`upgrade_button()` its upgrade button, `upgrade_progress()` the busy button's words ("" when not
+busy) and `upgrade_fill()` its fill, and `info_maxed()` whether the "MAX" chip shows; `army_panel()` the army panel, `is_training_open()`, `is_making_open()` and
 `is_research_open()` which page it shows (open or opening),
 `army_close_button()` its close button and `army_title()` its header; `train_card(unit)` and
-`train_card_info(unit)` a training card and its last line; `queue_shown()` the queued units the
+`train_card_info(unit)` a training card and its last line (or, locked, its reason in words), and
+`train_card_chip(unit)` its "Housed N" chip; `queue_shown()` the queued units the
 strip shows, `queue_entry(index)` an entry and `queue_head_status()` the head's state;
-`make_card(ability)` and `make_card_info(ability)` a making card and its last line;
+`make_card(ability)` and `make_card_info(ability)` a making card and its stock chip (or, locked,
+its reason);
 `research_card(unit)`, `research_card_lines(unit)` (its level line and its last line), the same for
 an ability (`research_ability_card(ability)`, `research_ability_card_lines(ability)`) and
-`research_line()` the research page's; `toast_text()` the toast's text while it shows.
+`research_line()` the research page's ("" while none runs) and `research_fill()` its bar's fill;
+`toast_text()` the toast's text while it shows and `toast_kind()` the kind of the last one.
 `expedition_button()` is the Expedition button and `expedition_badge()` its badge's count ("" while
 the badge is hidden). The sector map's own queries are under **Sector map**.
 `MENU_OPEN_SECONDS` and `MENU_CLOSE_SECONDS` say how long to wait for a slide.
 
 ## Messages
 
-`show_message(text)` shows the toast; `show_error(code)` shows `error_text(code)`, the
-player-facing text for a `BaseState` error code from `ERROR_TEXT`, or the code itself when there
-is none:
+`show_message(text, kind)` shows the toast, `kind` a `Hud.ToastKind` (`INFO` when none is
+given): its left edge, a 4 px band, is the defence red for a `REFUSAL`, the accent for `INFO` and
+gold for a `REWARD` (`TOAST_EDGES`). As the battle's toast does it, the band is the toast's own
+shape in the edge's colour (`ToastInfo`, `ToastRefusal`, `ToastReward`) showing past a body panel
+(`ToastBody`, the panel's fill) inset 4 px from its left, so it keeps the rounded corners and the
+ink border round both; the text is `ToastText`, 19 px. `show_error(code)` shows `error_text(code)`
+as a refusal, the player-facing text for a `BaseState` error code from `ERROR_TEXT`, or the code
+itself when there is none:
 
 | Code | Text |
 | --- | --- |
@@ -828,12 +892,14 @@ is none:
 slot is taken, "Research already running"; any other code is `error_text(code)`.
 
 `PlacementController.command_failed` is connected to `show_error`; the army's commands return
-their error to `main.gd`, which toasts it (**Army panel**) and "Refunded" on a cancel;
+their error to `main.gd`, which toasts it as a refusal (**Army panel**; a research's in
+`research_error_text`) and "Refunded" on a cancel, as information;
 `_reset_base` shows "Base reset" and `_template_base` "Template base"; a Practice raid with no
-units "Train some units first", and its end "Practice: nothing applied" (`battle-view.md`); an
-expedition's Attack with no units the same "Train some units first", and its end "Field cleared: N
-star(s)" or "Field still open", with a second line of what came home, "+N metal, +M crystal", when
-anything did (`battle-view.md`, **Expeditions**).
+units "Train some units first" (a refusal), and its end "Practice: nothing applied"
+(`battle-view.md`); an expedition's Attack with no units the same "Train some units first", and its
+end "Field cleared: N star(s)" or "Field still open", with a second line of what came home, "+N
+metal, +M crystal", when anything did (`battle-view.md`, **Expeditions**), a reward when the field
+was cleared or anything came home.
 Amounts, costs and durations are formatted by `Format` (`input-camera.md`): a duration in seconds
 under a minute ("45s"), minutes and seconds under an hour ("1m 15s"), hours and minutes under a
 day ("18h 30m"), then days and hours ("2d 18h").
