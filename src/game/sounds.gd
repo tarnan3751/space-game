@@ -385,6 +385,80 @@ const TABLE := {
 		{"wave": "noise", "at": 0.08, "a": 0.01, "d": 0.8, "filter": {"type": "bp", "hz": 2000, "q": 2.0},
 			"ring": {"hz": 17}, "db": -12}]},
 
+	# A shot arriving (BattleView._on_arrived): a building's dull knock, a unit's thump (a figure)
+	# or clank (a machine); soft and the least important.
+	"building_hit": {"category": "impact", "seconds": 0.12, "min": 0.06, "rms_db": -18.0, "priority": 0, "layers": [
+		{"wave": "sine", "hz": 180, "a": 0.002, "d": 0.09},
+		{"wave": "sine", "hz": 437, "a": 0.002, "d": 0.06, "db": -6},
+		{"wave": "noise", "a": 0.002, "d": 0.02, "filter": {"type": "lp", "hz": 1500}, "db": -8}]},
+	"unit_hit_figure": {"category": "impact", "seconds": 0.1, "min": 0.05, "rms_db": -19.0, "priority": 0, "layers": [
+		{"wave": "sine", "hz": [160, 90], "a": 0.002, "d": 0.08},
+		{"wave": "noise", "a": 0.002, "d": 0.03, "filter": {"type": "lp", "hz": 900}, "db": -8}]},
+	"unit_hit_machine": {"category": "impact", "seconds": 0.1, "min": 0.05, "rms_db": -19.0, "priority": 0, "layers": [
+		{"wave": "sine", "hz": 520, "a": 0.002, "d": 0.08, "ring": {"hz": 310}},
+		{"wave": "sine", "hz": 200, "a": 0.002, "d": 0.07, "db": -6},
+		{"wave": "noise", "a": 0.002, "d": 0.02, "filter": {"type": "hp", "hz": 2000}, "db": -10}]},
+
+	# The falls (BattleView._fall, _settle): a wall's gravel and thud; a building's groan as it
+	# sinks, its rubble and a last thud; the rubble settling; a hidden defence decloaking.
+	"wall_crumble": {"category": "impact", "seconds": 0.5, "max": 0.55, "layers": [
+		{"wave": "noise", "a": 0.003, "d": 0.42, "filter": {"type": "lp", "hz": [3000, 700]}, "ring": {"hz": 31}},
+		{"wave": "sine", "hz": [110, 50], "a": 0.002, "d": 0.2, "db": -2},
+		{"wave": "pink", "a": 0.005, "d": 0.4, "filter": {"type": "lp", "hz": 600}, "db": -6}]},
+	"building_collapse": {"category": "explosion", "seconds": 1.3, "drive": 0.2, "layers": [
+		{"wave": "sine", "hz": [95, 40], "glide": 1.0, "a": 0.08, "d": 0.1, "s": 0.7, "len": 0.9, "r": 0.3,
+			"vibrato": [5.0, 40.0]},
+		{"wave": "saw", "hz": [190, 80], "glide": 1.0, "a": 0.08, "d": 0.1, "s": 0.7, "len": 0.9, "r": 0.3,
+			"vibrato": [6.0, 50.0], "filter": {"type": "lp", "hz": 500}, "db": -10},
+		{"wave": "pink", "a": 0.03, "d": 1.2, "filter": {"type": "lp", "hz": [2200, 300]}, "ring": {"hz": 13}, "db": -3},
+		{"wave": "noise", "a": 0.002, "d": 0.08, "filter": {"type": "lp", "hz": 3000}, "db": -6},
+		{"wave": "sine", "at": 0.75, "hz": [80, 35], "a": 0.002, "d": 0.35},
+		{"wave": "noise", "at": 0.75, "a": 0.002, "d": 0.3, "filter": {"type": "lp", "hz": 1200}, "db": -4}]},
+	"rubble_settle": {"category": "impact", "seconds": 0.3, "layers": [
+		{"wave": "sine", "hz": [100, 45], "a": 0.002, "d": 0.25},
+		{"wave": "noise", "a": 0.002, "d": 0.2, "filter": {"type": "lp", "hz": [2500, 400]}, "ring": {"hz": 37}, "db": -4}]},
+	"reveal_shimmer": {"category": "chime", "seconds": 0.5, "min": 0.35, "rms_db": -16.0, "chorus": {"mix": 0.4}, "layers": [
+		{"wave": "sine", "hz": [500, 1500], "a": 0.15, "d": 0.3, "vibrato": [12.0, 40.0]},
+		{"wave": "triangle", "hz": 3000, "at": 0.18, "a": 0.003, "d": 0.18, "db": -8},
+		{"wave": "triangle", "hz": 4000, "at": 0.26, "a": 0.003, "d": 0.18, "db": -10}]},
+
+	# The deaths (Sounds.DEATH, DEATH_END, by Weapons.Death): a figure's comic "hup" and its fall;
+	# a machine's crunch (its fireball follows: explosion_small); an aircraft's falling whine (its
+	# crash: explosion_medium). Many die at once: a cooldown and three voices each.
+	"figure_down": {"category": "impact", "seconds": 0.3, "cooldown": 0.06, "voices": 3, "layers": [
+		{"wave": "saw", "hz": [170, 110], "a": 0.01, "d": 0.15, "filter": {"type": "bp", "hz": 700, "q": 3.0}, "db": -2},
+		{"wave": "sine", "hz": [220, 140], "a": 0.01, "d": 0.12, "db": -6},
+		{"wave": "sine", "at": 0.14, "hz": [120, 55], "a": 0.002, "d": 0.14},
+		{"wave": "noise", "at": 0.14, "a": 0.002, "d": 0.05, "filter": {"type": "lp", "hz": 900}, "db": -8}]},
+	"wreck_crunch": {"category": "impact", "seconds": 0.45, "max": 0.5, "cooldown": 0.06, "voices": 3, "layers": [
+		{"wave": "noise", "a": 0.002, "d": 0.35, "filter": {"type": "bp", "hz": 1200, "q": 2.0}, "ring": {"hz": 41}},
+		{"wave": "square", "pulse": 0.2, "hz": [300, 90], "a": 0.002, "d": 0.3, "filter": {"type": "lp", "hz": 1200}, "db": -8},
+		{"wave": "sine", "hz": [140, 60], "a": 0.002, "d": 0.25, "db": -4}]},
+	"crash_whine": {"category": "impact", "seconds": 0.62, "max": 0.7, "cooldown": 0.06, "voices": 3, "layers": [
+		{"wave": "sine", "hz": [1400, 300], "a": 0.02, "s": 0.8, "len": 0.5, "r": 0.1, "vibrato": [7.0, 30.0]},
+		{"wave": "saw", "hz": [1400, 300], "a": 0.02, "s": 0.8, "len": 0.5, "r": 0.1, "vibrato": [7.0, 30.0],
+			"filter": {"type": "lp", "hz": 2000}, "db": -12}]},
+	# A grav trap throwing a unit: a whoosh up.
+	"unit_thrown": {"category": "impact", "seconds": 0.32, "layers": [
+		{"wave": "pink", "a": 0.1, "d": 0.2, "filter": {"type": "bp", "hz": [400, 2500], "q": 1.3}},
+		{"wave": "sine", "hz": [250, 700], "a": 0.05, "d": 0.2, "db": -10}]},
+
+	# The traps (BattleView._spring): a click as one pops up; then, TRAP_POP on, a mine's blast
+	# (its landing), a flak mine's crack, a grav trap's pulling whoosh while its funnel spins.
+	"trap_click": {"category": "impact", "seconds": 0.1, "min": 0.06, "rms_db": -18.0, "priority": 3, "layers": [
+		{"wave": "triangle", "hz": 2000, "a": 0.001, "d": 0.015},
+		{"wave": "triangle", "hz": 1500, "at": 0.04, "a": 0.001, "d": 0.02},
+		{"wave": "sine", "hz": 400, "a": 0.002, "d": 0.08, "db": -4}]},
+	"flak_crack": {"category": "impact", "seconds": 0.25, "layers": [
+		{"wave": "noise", "a": 0.001, "d": 0.08, "filter": {"type": "lp", "hz": [9000, 2000]}},
+		{"wave": "noise", "a": 0.002, "d": 0.2, "filter": {"type": "hp", "hz": 3000}, "db": -6},
+		{"wave": "sine", "hz": [800, 200], "a": 0.001, "d": 0.08, "db": -4}]},
+	"grav_whoosh": {"category": "loop", "seconds": 1.0, "loop": true, "quiet": true, "layers": [
+		{"wave": "pink", "a": 0.0, "s": 1.0, "len": 1.1, "filter": {"type": "bp", "hz": 700, "q": 1.5}},
+		{"wave": "sine", "hz": 70, "a": 0.0, "s": 1.0, "len": 1.1, "vibrato": [2.0, 300.0], "db": -4},
+		{"wave": "saw", "hz": 140, "a": 0.0, "s": 1.0, "len": 1.1, "vibrato": [2.0, 300.0], "filter": {"type": "lp", "hz": 400},
+			"db": -12}]},
+
 	# The battle's end.
 	"victory": {"category": "sting", "seconds": 1.7, "chorus": {"mix": 0.3},
 		"echo": {"ms": 140, "feedback": 0.2, "mix": 0.15}, "layers": [
