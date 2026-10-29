@@ -40,7 +40,11 @@ the models' defects fixed and 9.5% of their triangles trimmed unseen. **The UI p
 phone's measure, the drone meter picked from rendered candidates, a theme foundation (type and touch
 floors, colour roles, pill-and-coin meters, card plinths and chips) in one look, skin A, chosen by
 the owner from three rendered, emblems on coins, the attack HUD's ceremony, the sector map's scan
-plates, the army and info panels. Sound is started: generated effects and the `Audio` node.
+plates, the army and info panels. **The sound pass is built** (2026-10-29; `docs/plans/sound-pass.md`):
+104 effects generated in code to one comic synth identity and checked by measurement, played by the
+`Audio` node over every hook of the base, the sector map and the battle, CC0 music for the base and the
+battle, generated stings and beds, the settings gear, and a silent harness that counts every play; the
+owner's audition is pending.
 `docs/project_overview.md` holds the roadmap (§2.2), the known limitations (§2.3) and the
 decisions (§3). The numbers in `data/` are the retune's real timers and economy
 (`docs/plans/retune.md`); a debug build's dev cheats make them free and one second at most.

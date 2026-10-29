@@ -115,7 +115,7 @@ in one second at most (`Catalog.apply_dev_cheats`; `-- --no-cheats` for the real
 | 6 | Expeditions: the sector map, the outpost generator (the player's roster with a faction tint, loot deposits, hazards), loot into `BaseState` through a new command, re-training; then the real-timer retune (6a). Milestone 2 complete: a game that plays end to end offline | Built. The retune (6a, `docs/plans/retune.md`): real build, training, research and making times, prices and production tuned to the pace of `docs/vision.md` §5, a 3 h scan, the units' battle stats set so a full army beats its level's fields, measured with `tools/sim_matrix.sh`. Core built (`docs/reference/expeditions.md`): the sector of six fields (two easy, two even, two hard) derived from a seed, the `scan` command on a cooldown, the outpost generator (walled compound, defences, collectors, deposits and hazards outside the walls, traps; loot sized to the player's capacity), `raid_result` clearing a field with a star, save version 5, the `expedition` harness scenario and `tools/gen_outposts.gd`. Built with the UI: the Expedition button and the sector map with its field cards, Scan and a field's detail with the outpost's minimap (`docs/reference/hud.md`, **Sector map**); the battle against the outpost drawn as a rival colony with the faction tint in its field's landscape, its result applied through the controller with toasts, the map reopened (`docs/reference/battle-view.md`, **Expeditions**, **The faction tint**); the `expedition_flow` harness scenario. |
 | 6b | The performance pass (`docs/plans/performance-pass.md`): the Mac measured fast (the `profile` and `model_audit` harness scenarios, a code inventory, the sim's slow ticks traced) with approximations for a mid-range phone, then eight series: the sim's search budget in cells, the battle view's buffers uploaded only on change, idle building parts folded into their meshes and moved in the vertex shader, the base's once-a-frame redraw with `buildings_revision` and the pictures built off the main thread, the models' defects fixed and their unseen triangles trimmed, the hold on per-building material copies | Built: the maxed base at the widest zoom from 1,198 to 615 draw calls, the once-a-second spike from 4.5 to 0.15 ms, the sim's slowest tick from 2.3–3.3 to 1.2–1.3 ms, body triangles down 9.5% with no visible change; the UI pass followed (6c) |
 | 6c | The UI pass (`docs/plans/ui-pass.md`): every surface shot and critiqued against the comic world with the phone's measure (1 vpx about 0.09 mm), the drone meter picked by the owner from five rendered candidates, the theme foundation (nothing under 17 px, controls 56 px and primaries 72, ink outlines only over bright fills or the world, gold spends and orange raids with cyan for selection only, pill-and-coin meters on one strip, card plinths, chips and coin cost rows, locked cards kept visible) with three skins rendered on the same screens, then the icons as emblems on coins, the drone pill, the attack HUD's visible stars and result ceremony, the sector map's scan plates, the army and info panels, the queue and the toasts | Built: nothing under 17 px or under 56 px in play, the attack HUD's own draws 69 → 54 mid-battle and 82 → 60 on the result, the sector map's opening frame 13.4 → 6.7 ms, the build panel's draws unchanged; skin A chosen by the owner on 2026-10-29 (B and C deleted); sound follows |
-| 6d | The sound pass: every sound effect generated in code at build time (`tools/gen_sounds.gd` from the recipes in `src/game/sounds.gd`, friendly comic synth, checked for peak, DC, clicks, silence, length and loudness), played by the `Audio` node (24 voices, buses, cooldowns, priority, loops, scheduled plays, music crossfades, stings, volume settings); free music chosen separately (`docs/reference/audio.md`) | Started: the audio foundation and the first sounds; the music (Gravity Turn, calm for the base and action for battle, crossfaded); the UI and base: every tap by its kind, the panels, the toasts and a refusal's buzz, placing and moving, a building tapped by its category, completions (construction, training, research, making), a meter filling, the boot's sting, the construction laser, the base's ambience, the sector map's sounds, and the settings gear (Music, Sound, Mute); the battle's sounds (every weapon's shot and landing, the hits, falls, deaths, traps, shields, EMP, gravity well, abilities and deploys, the attack HUD's, generated victory and defeat stings, the battle's bed and loops) |
+| 6d | The sound pass: every sound effect generated in code at build time (`tools/gen_sounds.gd` from the recipes in `src/game/sounds.gd`, friendly comic synth, checked for peak, DC, clicks, silence, length and loudness), played by the `Audio` node (24 voices, buses, cooldowns, priority, loops, scheduled plays, music crossfades, stings, volume settings); free music chosen separately (`docs/reference/audio.md`) | Built (2026-10-29; `docs/plans/sound-pass.md`): 104 generated effects over every hook of the base, the sector map and the battle (every weapon's shot and landing, hits, falls, deaths, traps, shields, abilities, deploys, the attack HUD), the stings and the beds; the Gravity Turn pair as the base's and the battle's music; the settings gear (Music, Sound, Mute); the harness silent and every play checked; the owner's audition on the sound board pending |
 | 7 | Milestone 3, the online game — the server: Nakama with accounts, base storage, migration of the local save and command validation; battles verified by replaying them in headless Godot running the same `src/core` | Planned |
 | 8 | Async PvP: matchmaking, attacking saved bases, a defence log with replays, shields, revenge, a league ladder | Planned |
 | 9 | Milestone 4, the social game — alliances through the Alliance Beacon: membership, donations, later wars; then a distinct PvE faction and the store release | Planned |
@@ -461,7 +461,7 @@ any of them can be reversed as a data or model change.
   ring reads worse than an emblem). The sector map's thumbnails are stylised scan plates (one
   polygon for the compound, a diamond, discs and squares, a ribbon and a chip); a rendered outpost
   picture is worth it only for the detail view's 480 px, later. The attack HUD keeps its own
-  variations as the dark in-field family under every skin. The debug row is demoted to grey chips
+  variations as the dark in-field family (skin A is the one look since 2026-10-29). The debug row is demoted to grey chips
   but stays one tap away. The difficulty words are the owner's.
 - **The drone meter** (the owner, 2026-10-27): from five candidates rendered in the real top bar (a
   bold ring with a count badge, dots around the icon, a pill with a slot per drone, an icon card with
@@ -478,6 +478,34 @@ any of them can be reversed as a data or model change.
   for battle, written by the composer to crossfade from the calm into the start of the action. Both
   ship as whole-file, bar-exact Ogg Vorbis loops, the base at -18 LUFS and the battle at -16, under
   the effects; the victory and defeat stings stay generated, no music asset for them.
+- **Hybrid sound** (the owner, 2026-10-29; `docs/reference/audio.md`, `docs/plans/sound-pass.md`): the
+  effects are generated in code at build time, the music is free under CC0 with its licence beside the
+  file; the victory and defeat stings and the ambience beds are generated too, so every short sound is
+  one voice in one identity. The owner asked for "specific and well made generated sounds" for the
+  defences, the army, the shooting and the explosions, effects "across the game", and free music "that
+  fits the style".
+- **One identity, written down first** (coordinator, 2026-10-29; `audio.md`, **The identity**): friendly
+  comic synth, toy-like rather than 8-bit harsh, short; every recipe is held to it, and nothing is harsh
+  for its own sake or realistic and gritty.
+- **No runtime synthesis** (coordinator, 2026-10-29): `tools/gen_sounds.gd` renders every recipe of
+  `Sounds.TABLE` to a WAV deterministically (a seed per key; a regeneration leaves the tree clean),
+  imported as PCM and loaded by path; phones decode nothing and compute nothing per play.
+- **Objective checks stand in for ears** (coordinator, 2026-10-29): nobody building can listen, so the
+  generator refuses a file outside its bounds (peak, DC, edge clicks, silence, duration, loudness, loop
+  seam), the reviews measure the files (spectra, envelopes, seams, periodicity, distinctness) and walk
+  the hook inventory, the harness counts every play, and the owner auditions at the end from a sound
+  board page.
+- **The harness is silent** (the owner, 2026-10-29): no test sound through the Mac's speakers; `run.sh`
+  runs on the Dummy audio driver and `--audible` is for a person listening.
+- **`main` owns quitting** (coordinator, 2026-10-29; `audio.md`, **Quitting**): a playing sound is
+  reported as leaked at exit, so `auto_accept_quit` is off, `_quit()` shuts the sounds down
+  (`Audio.shut_down()`, after which nothing starts) and waits 0.3 s before `quit()`; the gate's boot
+  quits through `--quit-frames`.
+- **A tap and its outcome layer** (coordinator, 2026-10-29): a button's click sounds under the panel's
+  whoosh or the place's thunk; a place is the thunk then the drone's whoosh 0.2 s later; the base's
+  hooks are silent while a battle runs, and a battle's scheduled plays are dropped when it ends.
+- **Settings outside the save** (coordinator, 2026-10-29): the Music and Sound volumes and Mute live in
+  a `ConfigFile` beside the save, never in it, so a server save carries no device preference.
 
 ### 3.2 Open
 
