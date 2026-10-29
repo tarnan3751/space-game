@@ -130,18 +130,21 @@ a missing file is an error, which the gate's boot catches), makes `VOICES` (24)
 | `play(key, pitch_jitter = 0.06, volume_db = 0.0) -> bool` | Plays `key` once on its bus, its pitch varied up to `pitch_jitter` either way; whether it played. Dropped while the key's cooldown runs (real time); a key already sounding on its `voices` takes its own oldest voice; else a free voice; else the least important, oldest one-shot no more important than it (loops are never taken); else dropped. Allocates nothing. |
 | `schedule(key, delay_seconds, pitch_jitter = 0.06, volume_db = 0.0)` | Plays `key` through `play()` `delay_seconds` from now (real time), so cooldowns, voices and the log apply then: a burst's later shots, a trap's pop. A ring of `SCHEDULED` (64) entries, filled at boot; when it is full the oldest is dropped with a warning (once a run). Each drain plays and retires every entry that is due, those still waiting closed up behind the head in their order; it turns `_process` on and the drain turns it off when nothing waits. `scheduled_count()` says how many wait. |
 | `loop(key, fade = 0.15) -> int`, `stop(id, fade = 0.15)` | A looping sound held on a voice of its own, faded in; stopped with a fade, freeing the voice. `loop` returns 0 when no voice could be had. A voice's fade is kept and ended when the voice is taken again or silenced, so it never runs on over the next sound there. |
+| `set_loop_volume(id, db, fade = 0.15)`, `loop_level(id)` | Fades loop `id` to `db` (0 its full level), its fade-in included: the base's ambience ducked under a panel and back. `loop_level` is its level now, 0 to 1, or -1 when it is not sounding. |
 | `music(key, fade = 1.0) -> bool`, `current_music()`, `music_playing()` | Crossfades to `assets/audio/music/<key>.ogg` (else `.mp3`), loaded by path, on the two music players, the new track from its start; `&""` fades the music out; the track already current is left playing. False, with a warning, when the track has no file. `music_playing()`: whether the current track's player is playing. |
 | `sting(key) -> bool` | Plays the fanfare `key` (a `sting` recipe) on Music, the music ducked 8 dB under it (down in 0.1 s, back over 0.5 s after it). |
-| `set_volume(bus, linear)`, `volume(bus)` | A bus's volume, 0 to 1 (0 mutes it), for `Master`, `SFX`, `UI` and `Music`; set is kept at once in `settings_path`. |
-| `tap_buttons(root)` | Every `BaseButton` under `root` plays `ui_tap` (pitch varied 3%) when pressed, connected once however often it is asked. |
+| `set_volume(bus, linear, keep = true)`, `volume(bus)` | A bus's volume, 0 to 1 (0 mutes it), for `Master`, `SFX`, `UI` and `Music`; with `keep` it is kept at once in `settings_path` (a slider being dragged sets it without, and keeps it when let go). |
+| `set_muted(on)`, `is_muted()` | Mutes every sound, Master to 0, keeping the volume Master had (section `mute` of the settings) to bring back on unmute; so a mute outlasts the run. |
+| `tap_buttons(root)` | Every `BaseButton` under `root` plays `ui_tap` (pitch varied 3%) when pressed, connected once however often it is asked: the attack HUD's buttons, until `BattleHud._button` plays the tap itself. |
 | `silence()` | Stops every sound (loops, music, stings), ends every fade and the duck, and drops the scheduled plays. |
 | `shut_down()` | `silence()` for good, before a quit: every later `play`, `schedule`, `loop`, `music` and `sting` returns at once (**Quitting**). |
 
 **Settings.** The volumes live in a `ConfigFile` at `settings_path`, section `volume`, one key a
-bus; read at boot, written on every `set_volume`; never in the save. It is `user://settings.cfg`,
+bus, and section `mute`, the Master volume a mute took away; read at boot, written on every kept
+`set_volume` and every mute; never in the save. It is `user://settings.cfg`,
 except when `main.gd` runs with `--save-path`: then `settings.cfg` beside that save, so the gate and
-the harness never read or write the owner's settings. There is no settings screen yet; it calls
-these setters.
+the harness never read or write the owner's settings. The HUD's settings panel (the gear at the
+top right, `hud.md`, **Settings**) calls these setters.
 
 **Phones.** On `NOTIFICATION_APPLICATION_PAUSED` the Master bus is muted, and unmuted on
 `RESUMED` (unless its volume is 0); a desktop window losing focus is not muted. `project.godot`
@@ -149,10 +152,13 @@ sets nothing for audio: the mix rate is the device's, the iOS session category t
 
 **Quitting.** When `Audio` leaves the tree it silences everything. The mixer lets go of a stopped
 sound a mix later, so a run that quits right after a sound played reports it as leaked resources at
-exit; the harness driver shuts the sounds down and waits `SILENCE_SECONDS` (0.1 s) before it
+exit; the harness driver shuts the sounds down and waits `SILENCE_SECONDS` (0.3 s) before it
 quits, and `main` owns every other quit (`auto_accept_quit` off): a window's close request (after
-the save) and the gate's boot (`--quit-frames`) shut down and wait `QUIT_SETTLE_SECONDS` (0.1 s)
+the save) and the gate's boot (`--quit-frames`) shut down and wait `QUIT_SETTLE_SECONDS` (0.3 s)
 before `quit()`: a count of frames is not enough, since headless they can all pass inside one mix.
+Both waits are 0.3 s, not 0.1: a stopped playback is released by the audio thread's next mix step
+(the Dummy driver mixes in large buffers, about 90 ms) and then collected by `AudioServer.update()` on
+a later frame, and 0.1 s leaked in rendered runs.
 `shut_down()` is `silence()` for good: after it `play`, `schedule`, `loop`, `music` and `sting`
 return at once, so a shot or a finished building in those frames starts nothing to leak. Phones
 mostly do not close through the window manager (the system ends the app, and nothing is reported),
@@ -166,12 +172,24 @@ one place.
 
 | Event | Sound | Where |
 | --- | --- | --- |
-| Any HUD button pressed (the base's HUD and the sector map, at setup; the attack HUD, when a battle opens) | `ui_tap` | `main._wire_audio`, `main.open_battle`: `Audio.tap_buttons` |
-| Build pressed, the panel opening or closing | `ui_open`, `ui_close` | `main._wire_audio`, reading `hud.is_menu_open()` after the HUD's own handler |
-| The build panel's Close | `ui_close` | `main._wire_audio` |
-| A building tapped that was not selected (a re-tap is quiet) | `select_building` | `PlacementController._on_tapped`, through its `sound` (`main._base_sound`) |
-| A place or an upgrade applied | `build_start` | `PlacementController.confirm_place`, `upgrade_selected`, through its `sound` |
+| A base HUD or sector map button pressed, by its kind | `ui_tap` (a primary), `ui_tap_soft` (a secondary or a close), `ui_tab` (a tab), `card_press` (a card), `cancel` (the place bar's Cancel), `map_close` (the map's close), none (a queue entry: its refund or refusal sounds) | `Hud._button`, `SectorMap._button` (their `tap` argument) |
+| Any attack HUD button pressed | `ui_tap` | `main.open_battle`: `Audio.tap_buttons` |
+| The build panel, the army panel or the settings panel opening, closing (every path: a button, a selection, placing), while the HUD shows (a battle opening hides it first, so a panel its deselection closes is not heard) | `ui_open`, `ui_close` | `Hud._slide_menu`, `_open_army`, `_close_army`, `_show_settings` |
+| A disabled card (locked, unaffordable, no drone) tapped: the finger lifted within 16 px of where it came down, so a scroll says nothing | `ui_denied`, once a frame with a refusal's toast | `Hud._on_card_input`, `Hud._deny` |
+| A toast, by kind | `toast_info`, `ui_denied` (a refusal, through `_deny`), `toast_reward`; a refund's `queue_refund` in its place | `Hud.show_message` (its `sound` argument) |
+| A resource's meter filling (not on the first refresh, and not while the HUD is hidden: the base ticks on behind a battle) | `meter_full` | `Hud._set_full` |
+| The ghost (or a dragged building) moving to another cell | `ghost_tick`, `ghost_tick_low` over a spot it cannot take; the wall brush's moves are quiet | `PlacementController._set_ghost_cell`, `_on_dragged` |
+| A place applied | `place_ok`, then `build_start` 0.2 s later (`PLACE_TO_BUILD`, scheduled): the confirm's thunk, then the drone's whoosh | `PlacementController.confirm_place`, through `main._base_sound`'s delay |
+| A wall placed (its 50 ms cooldown makes a fast stroke a ratchet; the brush's moves are quiet) | `wall_paint` | `PlacementController._paint` |
+| A selected building lifted, set down (moved or not; a refused move's toast buzzes instead) | `drag_pickup`, `drag_drop` | `PlacementController._on_drag_started`, `_on_drag_ended` |
+| A building tapped that was not selected (a re-tap is quiet), by its category | `select_building_<core, resources, army, defense, traps>` (`Sounds.SELECT`, `select_key`) | `PlacementController._on_tapped` |
+| An upgrade applied | `build_start` | `PlacementController.upgrade_selected` |
 | A construction finished (its view replaced with its drone) | `build_done`, unjittered | `BaseView.building_finished` → `main._base_sound` |
+| The construction drone starting to fire. The cap is the recipe's, `voices` 2 and a 0.2 s cooldown: the first drones to fire sound, a third firing within 0.2 s is dropped, and one firing later takes the oldest of the two voices (no ranking by distance to the camera) | `laser_work` | `ConstructionDrone.advance`, through the `sound` `BaseView` hands its views (none on a battle's field) |
+| A research done, a unit trained, an ability made, a trained head left waiting for room | `research_done`, `train_done`, `make_done`, `housing_full` | `main._hear_completions`, on `BaseState.changed`: counts compared, no event from core; a new base (boot, Reset, Template) counted quietly |
+| The boot, after the HUD is up | `offline_boot` when the save's offline catch-up finished anything (its `buildings_revision` moved), else `boot_sting` | `main._ready`, `Audio.sting` |
+| The base's ambience | `base_bed`, looping from the first frame, ducked 8 dB under the build, army or settings panel or the sector map, stopped while a battle runs, faded 0.6 s | `main._process` → `_set_bed` (`ambience()` is its loop's id, for the harness) |
+| The sector map opening; a field's detail opening; a scan applied | `map_open`, `field_open`, `scan`; Attack plays only its tap, and the map closing for the battle is quiet | `SectorMap.open`, `show_field`; `main._on_scan_pressed` |
 | A shot (`Sounds.FIRE`: laser_turret → `laser_fire`, plasma_mortar → `shell_fire`, missile_battery → `missile_fire`) | by type | `BattleEffects.fire`, a burst's later shots scheduled `burst_gap` apart |
 | A landing (`Sounds.LAND`: laser_turret → `impact_small`, plasma_mortar and missile_battery → `explosion_medium`) | by type | `BattleEffects.land` |
 | The battle's end | `victory` (a star or more), `defeat` | `BattleView.ended` → `main._on_battle_ended`, `Audio.sting` |
@@ -183,9 +201,9 @@ The base's sounds go through `main._base_sound`, which plays nothing while a bat
 base's place: the base view keeps syncing out of the tree, so a construction finishing then would
 otherwise chime over the battle. `shield_hum`, a loop, has no hook yet (the battle lane's).
 
-**Temporary:** `tap_buttons` walks the HUD once, so a button built after setup makes no tap and a
-disabled one (a locked card) makes no sound. Once the HUD's three button helpers (`Hud._button`,
-`BattleHud._button`, `SectorMap._button`) play the tap themselves, the walk goes.
+**Temporary:** `tap_buttons` walks the attack HUD once, so a button built after its setup makes no
+tap. Once `BattleHud._button` plays the tap itself, as `Hud._button` and `SectorMap._button` do, the
+walk goes.
 
 **`land()` at a later time.** `BattleEffects.land` plays at the call; a landing dated later (a
 trap's, after `TRAP_POP`) needs `schedule` with the delay instead.

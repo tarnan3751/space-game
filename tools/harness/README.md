@@ -88,8 +88,8 @@ Godot logs it as a `SCRIPT ERROR`, which fails the run in `run.sh`.
   `--save-path` save, `<out>/settings.cfg`, never in `user://settings.cfg`. Sounds play in every
   run, on the Dummy audio driver too, so the plays are recorded and checked the same either way;
   only a rendered run with `--audible` plays them aloud. When the scenario returns, the driver shuts
-  them down (`Audio.shut_down()`) and waits `SILENCE_SECONDS` before it quits: a sound still playing
-  at exit is reported as leaked resources.
+  them down (`Audio.shut_down()`) and waits `SILENCE_SECONDS` (0.3 s) before it quits: a sound still playing
+  at exit is reported as leaked resources, and 0.1 s was too short for a rendered run's mixer.
 - **The engine's own files.** Like any Godot run, a harness run writes the `.godot/` cache
   and any missing `*.uid` files in the tree it runs in. That is why the harness, like the
   gates, is run in a lane's own clone and never in the main tree by anyone but the
@@ -111,12 +111,16 @@ through the game layer as the player would, and read the state through `BaseStat
 | `main.state` | the `BaseState`: `buildings`, `resources`, `capacity()`, `builders_free()`, `seconds_left(id)`, `check_*` |
 | `main.camera`, `main.base_view` | `IsoCamera` and `BaseView`, for cell and screen mapping |
 | `main.sector_map` | the `SectorMap`: `open(state)`, `close()`, `show_field(index)`, `is_open()`, `is_detail_open()`, `detail_index()`, `detail_field()`, `card(index)`, `card_cleared(index)`, `card_lines(index)`, `scan_button()`, `close_button()`, `attack_button()`, `hint_shown()`, `minimap()` (`drawn()`, `walls_drawn()`), `card_thumbnail(index)`, `layouts_done()`, its signals `scan_pressed`, `attack_pressed`, `closed`; `main.open_sector_map()` (`docs/reference/hud.md`, **Sector map**) |
-| `main.audio` | the `Audio` node: `play(key)`, `schedule(key, delay)`, `loop(key)`, `stop(id)`, `music(key)`, `sting(key)`, `set_volume(bus, linear)`, `volume(bus)`, `silence()`, `shut_down()`; its queries `recent_plays()`, `recent_times()`, `play_count(key)`, `playing_count()`, `scheduled_count()`, `keys()`, `stream(key)`, `current_music()`, `music_playing()` (`docs/reference/audio.md`) |
+| `main.audio` | the `Audio` node: `play(key)`, `schedule(key, delay)`, `loop(key)`, `stop(id)`, `music(key)`, `sting(key)`, `set_volume(bus, linear, keep)`, `volume(bus)`, `set_muted(on)`, `is_muted()`, `set_loop_volume(id, db)`, `silence()`, `shut_down()`; its queries `recent_plays()`, `recent_times()`, `play_count(key)`, `playing_count()`, `scheduled_count()`, `keys()`, `stream(key)`, `loop_level(id)`, `current_music()`, `music_playing()`; `main.ambience()`, the base's ambience's loop id (0 off) (`docs/reference/audio.md`) |
 | `main.open_battle(setup, practice, expedition = {})`, `main.practice_setup()`, `main.battle`, `main.battle_hud` | a battle in the base's place and its `BattleView` while it runs: `sim` (read only), `script_commands(list)`, `deploy(unit, cell)`, `select_unit(unit)`, `surrender()`, `leave()`, `speed`, `deploy_unit`, `is_masked(cell)`, `input` (its own `WorldInput`), `field` (its `BaseView`, `deploy_strength()`), `units`, `step_ms()`, `slowest_tick()`, `clock()`, `finished` (`docs/reference/battle-view.md`); and its `BattleHud`'s queries (`docs/reference/hud.md`, **Battle HUD**) |
 
 Helpers on `HarnessScenario`:
 
 - `check(condition, message)` — records a failure and carries on, like the tests' asserts.
+- `heard_counts(main)`, `check_heard(main, before, key, times, what)` — how many times every sound
+  has played (`Audio.play_count`), and a check that `key` played `times` more since that mark. Two
+  plays of a key closer than its cooldown (40 ms for a tap; a headless frame is a few ms) sound
+  once, so a scenario spaces the steps it counts.
 - `say(text)` — a line in `log.txt` and on stdout.
 - `now()` — the harness clock in unix seconds.
 - `advance(seconds)` — moves the clock and calls `BaseState.advance_to`, as the game's tick
@@ -766,10 +770,21 @@ leaves the next sound on its voice at its own level; three plays scheduled 0.1, 
 ahead sound in order within 50 ms of their time, and the drain turns off after; a play due soon
 behind one due later is retired when it plays; the base's music plays from boot; a missing music
 track is refused and `music(&"base")` starts the base's track again; a volume is kept
-in the run's own `settings.cfg`; idle, no `_process` runs and no voice sounds. Then Build and
-Close tapped (`ui_tap`, `ui_open`, `ui_close`), a building tapped (`select_building`) and tapped
-again (nothing), one placed with the dev cheats and finished a second later (`build_start`,
-`build_done`), another finishing while a practice battle runs (nothing), and that battle at 2x
+in the run's own `settings.cfg`; idle, no `_process` runs and no voice sounds. Every one-shot is
+played in batches of eight with the pool gone quiet between, so a table of any size passes. Before those, the
+boot: its sting once, and the base's ambience looping, faded in, ducked 8 dB under the open build
+panel and back (it is then silenced, since the checks count voices). Then Build and Close tapped
+(`ui_tap`, `ui_open`, `ui_tap_soft`, `ui_close`); each toast kind's sound, and a disabled card's lift
+with a refusal's toast in one frame buzzing once, a drag off it not at all; the gear's settings
+panel: its sliders setting Music, SFX and UI as they move, kept in the settings file when let go
+(the Sound slider's tap), the mute and back, the panel opening again on what was set; the Command
+Center tapped (its category's voice) and tapped again (nothing); a metal extractor placed on the
+real numbers (`place_ok`), its drone firing within 8 s (`laser_work`), built and left to fill the
+metal meter (`meter_full`); with the dev cheats on, the Command Center's upgrade (`build_start`)
+finished (`build_done`); another construction finishing while a practice battle runs (nothing; its
+drone, released out of the tree, still over the site), the ambience off in the battle and back after
+it, a training panel open as the battle opens closing unheard, and the metal meter filling behind
+the battle unheard; and that battle at 2x
 against the template base's laser turrets, plasma mortars, missile batteries and Command Center alone, 40
 Rangers and 5 Hover Tanks deployed as near the turrets as the zone allows (in the whole template
 they sit deep inside and seldom fire): the turrets' shots and hits sound, a mortar's or missile's

@@ -109,7 +109,7 @@ bright fill (Build, Expedition, Place, the upgrade button, the selected tab) nee
 stroke reaches a quarter of `outline_size` out from each glyph.
 
 **Touch sizes.** The tabs are 160×56, the close buttons 56×56, Build 136×72 and Expedition 184×72,
-the info panel's Train, Make or Research 128×56 and its Close 112×56 (`ACTION_SIZE`,
+the settings gear 56×56 and its panel's sliders, Mute and close 56 tall, the info panel's Train, Make or Research 128×56 and its Close 112×56 (`ACTION_SIZE`,
 `INFO_CLOSE_SIZE`) and its upgrade button 64 tall, the place bar's Cancel and Place 170×72; the
 build cards 200×200, the army cards 200×184 and the queue's entries 220×56; the sector map's Scan
 190×56, its cards 360×200 at least, Back 140×72 and Attack 240×72. In battle (**Battle HUD**): speed
@@ -135,6 +135,7 @@ so its parts — the Build button above all — draw over the panel.
 | Info panel | bottom centre, at least 460 wide | The building's picture and its title `"Name   Lv N"` (a "MAX" chip at its top level) with Train, Make or Research (a finished producer, Foundry or research building only) and a `Close` button; stat rows (**Info panel**); the upgrade button, or its progress while busy; a note under it when the upgrade is refused. |
 | Army panel | bottom, the screen's full width | Slides up in the build panel's place: a producer's training or the lab's research (**Army panel**). |
 | Toast | top centre, 96 down | A small panel with a centred line, its left edge in its kind's colour (**Messages**), that fades out after 1.8 s over 0.6 s, then hides. |
+| Settings gear | top right, `MARGIN` from the safe area's corner, 56×56 | The gear (`HudIcon`'s `gear` mark, 36 px, in the text colour) on a card (`GearButton`); toggles the settings panel under it (**Settings**). |
 | Debug row | debug builds only (`OS.is_debug_build()`): under the top bar's strip, at the left | A "DEV" label (Lilita One 14, dim, outlined over the world) over three grey chips, 132×40 (`DEBUG_SIZE`; `CARD_DISABLED`, a 2 px ink border, dim Lilita One 16), 10 apart: Practice raid, which emits `practice_pressed`, Template base, which emits `template_pressed`, then Reset base, which emits `reset_pressed`. Demoted so a tester never takes them for the game's; the only text under 17 px. |
 
 The army panel is built after the build panel and before the root, outside it like the build
@@ -695,6 +696,45 @@ included.
 plate shows only the Command Center, the defences and the storages of them) and `walls_drawn()` the
 walls; `card_thumbnail(index)`, a card's plate (`Minimap` too); `layouts_done()`, whether all six fields are laid out.
 
+## Settings
+
+The gear at the top right opens a panel under it, 10 below, its right edge on the gear's: the HUD's
+panel shape (`PanelContainer`'s, with the cel edge), 360 wide (`SETTINGS_WIDTH`). A "Settings" title
+(`InfoTitle`) beside its close button "X" (`CloseButton`, 56×56); a row "Music" and a row "Sound",
+each its name (`SettingsLabel`, Lilita One 22, 90 wide) and an `HSlider` 0 to 100 in steps of 1,
+56 tall, filling the rest: a pill trough (`TROUGH`, a 3 px ink border, 20 tall) the accent's meter
+fill fills up to the grabber, a round knob 36 across in the text colour (cyan under the finger)
+inside an ink ring, both drawn into textures at setup (`_knob`); the wheel moves neither. Then
+"Mute", a `CheckButton` 56 tall at 22 px with no button shape round it and a switch at its right
+(72×40, `_switch`: a pill with an ink border, cyan with its knob at the right when on, the trough's
+dark with it at the left when off). All on `Audio` (`audio.md`): Music sets the `Music` bus, Sound
+the `SFX` and `UI` buses together, as they move (`set_volume(bus, v, false)`), kept in the settings
+file when let go (`drag_ended`) and when the panel closes; the Sound slider let go plays a tap at its
+new level. Mute is `Audio.set_muted`: Master to 0, its volume kept to bring back. The panel opens on
+what `Audio` has now. It stops touches on it as panels do, its rows IGNORE; the gear and the panel
+open and close with `ui_open` and `ui_close`, and the base's ambience ducks under the open panel. The base's HUD only: the HUD hides in a battle, and the
+sector map, added later under the root, covers it.
+
+## Sounds
+
+The HUD plays its own sounds on `audio` (main's `Audio`, `audio.md`, **Hooks**). `_button(text,
+size, variation, tap)` connects its `pressed` to the tap it names: `ui_tap` (the default: Build,
+Expedition, Place, Train, the upgrade), `ui_tap_soft` (the close buttons, Close, the debug chips,
+the gear), `ui_tab` (the tabs), `card_press` (the build and army cards), `cancel` (Cancel), or none
+(a queue entry, whose refund or refusal sounds). The build and army panels play `ui_open` and
+`ui_close` whenever they slide, by any path, while the HUD shows. A disabled card (locked, or refused for now) takes no
+press, so its `gui_input` is read: a finger lifted within 16 px of where it came down
+(`DENY_SLOP`) plays `ui_denied`, a drag that scrolls the strip nothing. `show_message(text, kind,
+sound)` plays the kind's sound (`TOAST_SOUNDS`: `toast_info`, `ui_denied`, `toast_reward`) unless
+`sound` names another (a refund's `queue_refund`); a refusal's buzz goes through `_deny`, once in a
+frame however many refusals ask for it (a disabled card's press and a refused command's toast
+together). A resource's meter filling plays `meter_full` (`_set_full`), not on the first refresh,
+which only records the amounts. The sounds a refresh makes rather than a tap (`meter_full`, the
+panels sliding) play only while the HUD shows: in a battle it is hidden, and the base still ticks
+behind it (`main.open_battle` hides it before deselecting, so a panel that closes then is not
+heard). `is_panel_open()` (the build, army or settings panel, open or opening) is what `main.gd`
+ducks the base's ambience under.
+
 ## Safe area
 
 The root holds every part but the build panel and the army panel, so their anchors and margins are relative to the
@@ -807,11 +847,15 @@ an ability (`research_ability_card(ability)`, `research_ability_card_lines(abili
 `expedition_button()` is the Expedition button and `expedition_badge()` its badge's count ("" while
 the badge is hidden). The sector map's own queries are under **Sector map**.
 `MENU_OPEN_SECONDS` and `MENU_CLOSE_SECONDS` say how long to wait for a slide.
+`is_panel_open()` whether the build, army or settings panel is open or opening. The settings:
+`gear_button()`, `settings_open()`, `settings_values()` (`{"music", "sound"}`, 0 to 100, and
+`"mute"`, as its controls show them), `music_slider()`, `sound_slider()`, `mute_button()` and
+`settings_close_button()`.
 
 ## Messages
 
-`show_message(text, kind)` shows the toast, `kind` a `Hud.ToastKind` (`INFO` when none is
-given): its left edge, a 4 px band, is the defence red for a `REFUSAL`, the accent for `INFO` and
+`show_message(text, kind, sound)` shows the toast, `kind` a `Hud.ToastKind` (`INFO` when none is
+given), with its sound (**Sounds**): its left edge, a 4 px band, is the defence red for a `REFUSAL`, the accent for `INFO` and
 gold for a `REWARD` (`TOAST_EDGES`). As the battle's toast does it, the band is the toast's own
 shape in the edge's colour (`ToastInfo`, `ToastRefusal`, `ToastReward`) showing past a body panel
 (`ToastBody`, the panel's fill) inset 4 px from its left, so it keeps the rounded corners and the

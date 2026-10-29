@@ -34,9 +34,16 @@ material kit, `LowPolyMesh`, the shaders, the outlines, the view states, the wal
    updates only the Place button), and `command_failed` shows a toast. Then the sounds
    (`_wire_audio`, `audio.md`, **Hooks**): the `Audio` node (`audio`, made before the base's view,
    its volumes kept beside the save when the run has its own) plays the base's sounds through
-   `_base_sound`, quiet while a battle runs, which the controller is given as its `sound` and the
-   view's `building_finished` plays `build_done` through; every HUD button plays `ui_tap`, and
-   Build and the panel's Close play `ui_open` and `ui_close`.
+   `_base_sound`, quiet while a battle runs, which the controller and the base's view are given as
+   their `sound` (the view hands it to each building view's construction drone, whose laser plays
+   `laser_work`) and the view's `building_finished` plays `build_done` through; the HUD and the
+   sector map are given the node as their `audio` and play their own (their buttons' taps by kind,
+   the panels, the toasts, the map). After the state is installed the boot plays its sting
+   (`offline_boot` when the save's catch-up finished anything, else `boot_sting`); every
+   `BaseState.changed` compares the base's counts for a research done, a unit trained, an ability
+   made or a head left waiting for room (`_hear_completions`); and `_process` keeps the base's
+   ambience (`base_bed`) looping, ducked under a panel (build, army, settings) or the sector map and stopped in a
+   battle (`_set_bed`).
 5. The state is loaded or created (`_load_or_create`) and installed (`_set_state`: disconnects
    the old state's `changed`, connects the new one, hands it to the controller, cancels any
    placement and selection, clears and syncs the view).
@@ -167,7 +174,7 @@ while a drag nears the screen's edge.
 
 | Member | What |
 | --- | --- |
-| `state`, `base_view`, `camera`, `sound` | Set by `main.gd`; `sound` plays a base sound by key (`main._base_sound`, quiet while a battle runs). A tap that selects a building not already selected plays `select_building`, and a place or an upgrade applied plays `build_start` (`audio.md`). |
+| `state`, `base_view`, `camera`, `sound` | Set by `main.gd`; `sound` plays a base sound by key (`main._base_sound`, quiet while a battle runs). A tap that selects a building not already selected plays its category's voice (`Sounds.select_key`); the ghost, or a dragged building, ticks on every move to another cell (`ghost_tick`, `ghost_tick_low` over a spot it cannot take; the wall brush's moves are quiet), starting quiet on its first cell; a place applied plays `place_ok` and, 0.2 s later (`PLACE_TO_BUILD`), `build_start`, every wall placed `wall_paint` (its cooldown spacing a fast stroke into a ratchet), a building lifted `drag_pickup` and set down `drag_drop` (not a refused move, whose toast buzzes), and an upgrade applied `build_start` (`audio.md`). |
 | `clock: Callable` | Returns the unix time in seconds for every command it applies; `main._now` in the game, the harness's clock under the harness. |
 | `selected_id` | The selected building, `0` for none. `select(id)` updates the view's selection tile and emits `selection_changed`; a change of selection ends a building drag in progress with no move (a second finger can press Close or Reset base). |
 | `placing_type` | The type being placed, `""` when not. `is_placing()`, `ghost_is_valid()`, `ghost_cell()` (the ghost's top-left cell, the brush's while painting). |

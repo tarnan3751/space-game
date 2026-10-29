@@ -75,7 +75,7 @@ non-zero on any failure:
    `SCRIPT ERROR`, `Parse Error` and `Failed to load script`.
 4. **boot** — `scenes/main.tscn` headless for 240 frames on an isolated save (`--save-path=`
    under a temp directory), quitting by `main`'s own quiet quit (`--quit-frames=240`: the sounds
-   shut down and 0.1 s waited, the path a window's close takes; it must log
+   shut down and 0.3 s waited (0.1 s leaked in rendered runs), the path a window's close takes; it must log
    `main: quitting after 240 frames`, and `--quit-after 960` is only a backstop against a hang),
    with no `SCRIPT ERROR` or `ERROR:` line. It
    passes no `--no-cheats` on purpose: it boots with the dev cheats on, as the owner's debug
@@ -115,9 +115,12 @@ render monitors and the CPU time a frame of each system `Profile` (`src/game/pro
 flag only that scenario sets) times, with the triangles and draws by source and the battle's
 alpha-blended fill; a table at the end of its log (`tools/harness/README.md`).
 `scenarios/sounds.gd` checks the sounds (`audio.md`): every key's file, the buses, the cooldown,
-the voice cap, a loop, scheduled plays, the settings file, and the hooks (the HUD's taps, a building
-tapped, placed and finished, a battle's shots, landings and sting, the base's and the battle's
-music), with no work a frame idle and
+the voice cap, a loop, scheduled plays, the settings file, and the hooks (the boot's sting and the
+ambience, the HUD's taps and panels, the toasts and the refusal's buzz, the settings panel, a
+building tapped, placed, fired at by its drone, upgraded and finished, a meter filling, a battle's
+shots, landings and sting, the base's and the battle's music); the HUD's scenarios (`hud_menu`, `place_and_build`, `train_units`,
+`make_abilities`, `expedition_flow`, `hud_layout`, `hud_directions`) check each step's sounds with
+`check_heard`, with no work a frame idle and
 `Audio`'s cost a frame in battle (`tools/harness/README.md`). `scenarios/expedition.gd` lays out the template base's six expedition fields, fights the even
 one with the same army and applies the result with the expedition key, then scans, headless
 (`expeditions.md`).
