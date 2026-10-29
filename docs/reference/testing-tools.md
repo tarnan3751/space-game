@@ -121,7 +121,9 @@ building tapped, placed, fired at by its drone, upgraded and finished, a meter f
 shots, landings and sting, the base's and the battle's music); the HUD's scenarios (`hud_menu`, `place_and_build`, `train_units`,
 `make_abilities`, `expedition_flow`, `hud_layout`, `hud_directions`) check each step's sounds with
 `check_heard`, with no work a frame idle and
-`Audio`'s cost a frame in battle (`tools/harness/README.md`). `scenarios/expedition.gd` lays out the template base's six expedition fields, fights the even
+`Audio`'s cost a frame in battle (`tools/harness/README.md`); `scenarios/sounds_battle.gd` the
+battle's: its maps' coverage and a battle with every defence, trap, unit and ability, each sound
+heard, every loop held and stopped. `scenarios/expedition.gd` lays out the template base's six expedition fields, fights the even
 one with the same army and applies the result with the expedition key, then scans, headless
 (`expeditions.md`).
 

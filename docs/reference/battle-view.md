@@ -23,8 +23,11 @@ battle and its `BattleHud` (`main.battle`, `main.battle_hud`) and bounds the cam
 When the battle ends the view emits `ended(result)` and the HUD shows its result panel; its Return
 calls `leave()`, which emits `finished(setup, result)` once, and the battle and its HUD are freed
 and the base's view, input and HUD come back. `main.gd` also hands the view its `Audio` (`audio`,
-passed on to `BattleEffects`), taps the attack HUD's buttons (`Audio.tap_buttons`) and plays
-`victory` (a star or more) or `defeat` on `ended` (`audio.md`, **Hooks**). The base keeps running meanwhile:
+passed on to `BattleEffects` and `BattleUnits`, and read by `BattleHud`), taps the attack HUD's
+buttons (`Audio.tap_buttons`) and plays `battle_start` as the battle opens; the view plays every
+event's sound and holds the battle's loops, from its bed at `setup` to `leave()`, drops the plays
+still scheduled when the battle ends (`audio.md`, **Battle**), and the result
+panel plays `victory` (a star or more) or `defeat` with its banner (`audio.md`, **Battle**). The base keeps running meanwhile:
 the game's tick advances it and saves it as ever.
 
 A battle is an expedition's (**Expeditions**, below) or the debug build's **Practice raid** (the
@@ -250,9 +253,10 @@ The events of each tick (`BattleEvents`, `battle.md`) become effects by the weap
 type that made them (**Weapons**), each primitive one MultiMesh of `BattleEffects`, fixed in size
 (`MAX_*`), an ended entry swapped with the last, an entry that starts later (a burst's later
 shots, a death's blast) drawn at no size until then; nothing is allocated a frame. Each `fire()` plays
-the type's shot sound (`Sounds.FIRE`; a burst's later shots scheduled `burst_gap` apart, in real
-seconds whatever the battle's speed) and each `land()` its landing's (`Sounds.LAND`), when the type
-has one (`audio.md`, **Hooks**). A list hands
+the type's shot sound (`Sounds.fire_key`; a burst's later shots on their `burst_gap` at the battle's
+speed) and each `land()` its landing's (`Sounds.land_key`), through `sound()`, which schedules a
+sound dated later on the battle's clock (a trap's blast) that far ahead in real time (`audio.md`,
+**Battle**). A list hands
 its buffer over only when what it draws changed: one empty since its last hand-over skips it; the
 lightning arcs, which stand still for their lives (their shader moves them), skip it until one is
 added or ends; the scorch marks, still for their first three quarters, until one is added or ends,

@@ -127,7 +127,7 @@ a missing file is an error, which the gate's boot catches), makes `VOICES` (24)
 
 | Call | What |
 | --- | --- |
-| `play(key, pitch_jitter = 0.06, volume_db = 0.0) -> bool` | Plays `key` once on its bus, its pitch varied up to `pitch_jitter` either way; whether it played. Dropped while the key's cooldown runs (real time); a key already sounding on its `voices` takes its own oldest voice; else a free voice; else the least important, oldest one-shot no more important than it (loops are never taken); else dropped. Allocates nothing. |
+| `play(key, pitch_jitter = 0.06, volume_db = 0.0) -> bool` | Plays `key` once on its bus, its pitch varied up to `pitch_jitter` either way; whether it played. `&""` (a silent entry of `Sounds`' maps) plays nothing. Dropped while the key's cooldown runs (real time); a key already sounding on its `voices` takes its own oldest voice; else a free voice; else the least important, oldest one-shot no more important than it (loops are never taken); else dropped. Allocates nothing. |
 | `schedule(key, delay_seconds, pitch_jitter = 0.06, volume_db = 0.0)` | Plays `key` through `play()` `delay_seconds` from now (real time), so cooldowns, voices and the log apply then: a burst's later shots, a trap's pop. A ring of `SCHEDULED` (64) entries, filled at boot; when it is full the oldest is dropped with a warning (once a run). Each drain plays and retires every entry that is due, those still waiting closed up behind the head in their order; it turns `_process` on and the drain turns it off when nothing waits. `scheduled_count()` says how many wait. |
 | `loop(key, fade = 0.15) -> int`, `stop(id, fade = 0.15)` | A looping sound held on a voice of its own, faded in; stopped with a fade, freeing the voice. `loop` returns 0 when no voice could be had. A voice's fade is kept and ended when the voice is taken again or silenced, so it never runs on over the next sound there. |
 | `set_loop_volume(id, db, fade = 0.15)`, `loop_level(id)` | Fades loop `id` to `db` (0 its full level), its fade-in included: the base's ambience ducked under a panel and back. `loop_level` is its level now, 0 to 1, or -1 when it is not sounding. |
@@ -136,6 +136,7 @@ a missing file is an error, which the gate's boot catches), makes `VOICES` (24)
 | `set_volume(bus, linear, keep = true)`, `volume(bus)` | A bus's volume, 0 to 1 (0 mutes it), for `Master`, `SFX`, `UI` and `Music`; with `keep` it is kept at once in `settings_path` (a slider being dragged sets it without, and keeps it when let go). |
 | `set_muted(on)`, `is_muted()` | Mutes every sound, Master to 0, keeping the volume Master had (section `mute` of the settings) to bring back on unmute; so a mute outlasts the run. |
 | `tap_buttons(root)` | Every `BaseButton` under `root` plays `ui_tap` (pitch varied 3%) when pressed, connected once however often it is asked: the attack HUD's buttons, until `BattleHud._button` plays the tap itself. |
+| `drop_scheduled()` | Drops every scheduled play still waiting; what sounds plays on. A battle's end calls it (**Battle**). |
 | `silence()` | Stops every sound (loops, music, stings), ends every fade and the duck, and drops the scheduled plays. |
 | `shut_down()` | `silence()` for good, before a quit: every later `play`, `schedule`, `loop`, `music` and `sting` returns at once (**Quitting**). |
 
@@ -190,25 +191,22 @@ one place.
 | The boot, after the HUD is up | `offline_boot` when the save's offline catch-up finished anything (its `buildings_revision` moved), else `boot_sting` | `main._ready`, `Audio.sting` |
 | The base's ambience | `base_bed`, looping from the first frame, ducked 8 dB under the build, army or settings panel or the sector map, stopped while a battle runs, faded 0.6 s | `main._process` → `_set_bed` (`ambience()` is its loop's id, for the harness) |
 | The sector map opening; a field's detail opening; a scan applied | `map_open`, `field_open`, `scan`; Attack plays only its tap, and the map closing for the battle is quiet | `SectorMap.open`, `show_field`; `main._on_scan_pressed` |
-| A shot (`Sounds.FIRE`: laser_turret → `laser_fire`, plasma_mortar → `shell_fire`, missile_battery → `missile_fire`) | by type | `BattleEffects.fire`, a burst's later shots scheduled `burst_gap` apart |
-| A landing (`Sounds.LAND`: laser_turret → `impact_small`, plasma_mortar and missile_battery → `explosion_medium`) | by type | `BattleEffects.land` |
-| The battle's end | `victory` (a star or more), `defeat` | `BattleView.ended` → `main._on_battle_ended`, `Audio.sting` |
+| A battle opening | `battle_start`, unjittered | `main.open_battle` |
+| Everything in a battle | **Battle**, below | `BattleEffects`, `BattleView`, `BattleUnits`, `BattleHud` |
 | Boot, once the save is loaded and the HUD up | music `base` | the end of `main._ready` |
 | A battle opened | music `combat`, crossfaded over 1.5 s | `main.open_battle`, once the battle is added |
 | A battle left (the result panel's Return) | music `base`, crossfaded over 2 s | `main._on_battle_finished` |
 
 The base's sounds go through `main._base_sound`, which plays nothing while a battle runs in the
 base's place: the base view keeps syncing out of the tree, so a construction finishing then would
-otherwise chime over the battle. `shield_hum`, a loop, has no hook yet (the battle lane's).
+otherwise chime over the battle.
 
 **Temporary:** `tap_buttons` walks the attack HUD once, so a button built after its setup makes no
 tap. Once `BattleHud._button` plays the tap itself, as `Hud._button` and `SectorMap._button` do, the
 walk goes.
 
-**`land()` at a later time.** `BattleEffects.land` plays at the call; a landing dated later (a
-trap's, after `TRAP_POP`) needs `schedule` with the delay instead.
-
-**Adding a sound:** a recipe line in `Sounds.TABLE` (and a `FIRE` or `LAND` entry for a weapon);
+**Adding a sound:** a recipe line in `Sounds.TABLE` (and an entry in the battle's maps for a
+weapon, a death or a trap: **Battle**);
 `$GODOT --headless --path . -s res://tools/gen_sounds.gd -- --only=<key>` until its row reads `ok`;
 one `audio.play(&"<key>")` at the event; commit the WAV and its `.import`.
 
@@ -239,6 +237,76 @@ adds no encoder delay (the decoded files match the sources sample for sample in 
 alignment), so no loop offset is needed, which MP3 would have. Replacing a track: the same
 processing, the file as `<key>.ogg`, its `.import` with `loop=true`, and a line in `LICENSES.md`.
 
+## Battle
+
+Every event of a battle sounds, and every one is specific: by the weapon, the impact, the death, the
+trap or the ability. The recipes are the table's battle section; the maps that pick them are beside
+it in `Sounds`, every key of an enum present, a silence an explicit `&""` with its reason beside it:
+
+| Map | Keyed by | What |
+| --- | --- | --- |
+| `FIRE_KIND`, `FIRE` | `Weapons.Kind`; a type id over it | a shot (`fire_key(type)`): `laser_fire`, `sentry_fire`, `missile_fire`, `shell_fire` (the plasma mortar's), `flak_fire`, `tracer_fire` (the dune runner's and the gunship's), `arc_zap`, `emp_pulse`, `railgun_fire`, `beam_fire`, `skimmer_beam`, `orbital_fire`, `bolt_fire` (the ranger's, the jet trooper's), `walker_fire`, `tank_fire`, `titan_fire`, `bomb_whistle`, `melee_swing`; silent: the gravity well (its hum is a loop), the breacher's charge (its blast is its sound), the traps, the shield, none |
+| `LAND_IMPACT`, `LAND` | `Weapons.Impact`; a type id over it | a landing (`land_key(type)`): sparks and a ring `impact_small`, the blasts `explosion_small`, `_medium`, `_large`, `air_burst`, `plasma_splash`, `beam_burn`, `emp_zap`; the brawler's punch `punch_land`, the mega mine's `mega_blast`; none silent |
+| `TWIN` | type id | a second play of the shot that many seconds on (the cloaked sentry's twin barrels, 40 ms) |
+| `DEATH`, `DEATH_END` | `Weapons.Death` | a unit's death (`figure_down` for a figure and a jet trooper, `wreck_crunch`, `crash_whine`), and its effect's when it comes (a wreck's fireball `explosion_small` `WRECK_BLAST` of the way through, a crash's `explosion_medium` where it comes to rest, a jet trooper's `explosion_small`) |
+| `TRAP_SPRING`, `TRAP` | `Weapons.Kind` of a trap | `trap_click` as any trap pops up, then `TRAP_POP` later by its kind: a mine's blast is its landing, the flak mine's `flak_crack`, the grav trap's `grav_whoosh` loop while its funnel spins |
+| `EVENTS` | `BattleEvents` kind | the keys each arm of `BattleView._read_events` plays itself, past the maps above, for the `sounds_battle` scenario's coverage |
+
+**Dated sounds.** Every sound of the field goes through `BattleEffects.sound(key, at, ...)`, `at` on
+the battle's clock (seconds of battle, which 2x runs twice as fast): due now it plays, dated later it
+is scheduled `(at - clock) / speed` real seconds ahead, the view handing the effects its clock and
+speed each frame. So a burst's later shots keep their `burst_gap` at the battle's speed, the
+cloaked sentry's twin its 40 ms, a trap's blast lands `TRAP_POP` after its click, and the strike's
+bolt whine (`strike_bolt`) starts `STRIKE_WHINE` (0.5 s) of real time before it lands, peaking as it
+does. A play is dated in real time at the speed when it is scheduled: toggling the speed before it
+sounds leaves it as it was (a leftover, accepted). The battle ending (in the steps that end it,
+before the attack HUD refreshes and schedules its stars' chimes, or at once on a surrender, which
+ends it outside the steps), `leave()` and the view leaving the tree each call
+`Audio.drop_scheduled()`, so nothing the field dated later (a strike's whine, a trap's blast, a
+burst's later shots) sounds over the result or the base after Return.
+
+| Event | Sound | Where |
+| --- | --- | --- |
+| A shot, its landing (a burst's later shots on their gap; a shell's launch and landing; a punch's swing and its landing) | by `FIRE`/`LAND` | `BattleEffects.fire`, `land`; `BattleView._unit_hit`, `_land_blows` |
+| A shot arriving at a building; at a unit (a machine dies by wreck or crash) | `building_hit`; `unit_hit_figure`, `unit_hit_machine` | `BattleView._on_arrived` |
+| A wall falling; a building falling, its rubble popping up; a trap's fall is silent | `wall_crumble`; `building_collapse`, `rubble_settle` | `BattleView._fall`, `_settle` |
+| A cloaked sentry revealed | `reveal_shimmer` | `BattleView._decloak` |
+| A unit dying, its death's effect | by `DEATH`, `DEATH_END` | `BattleView._death`, `_finish_deaths` |
+| A trap springing; a unit thrown | by `TRAP_SPRING`, `TRAP`; `unit_thrown` | `BattleView._spring`; the `THROW` arm |
+| A shield up (from none: at setup, and when its pool comes back), a shot absorbed, the dome gone | `shield_up`, `shield_hit`, `shield_down` | `BattleEffects.set_shield` |
+| The EMP burst; each defence waking | `emp_burst`; `emp_wake` (cooldown 80 ms) | `BattleView._ability_used`, `_woke` |
+| The repair swarm cast; the strike landing | `swarm_cast`; `strike_land` (with `strike_bolt` before it) | `BattleView._ability_used`, the `STRIKE_LAND` arm |
+| A unit deployed (a tap, a smear, a script), by its class | `deploy_ground`, `deploy_air`, pitch varied 10% | `BattleUnits.after_step` |
+| A star won (several at once 0.15 s apart); the loot rising; each of the last ten seconds; the speed toggled; End asking; a refused deploy's or cast's toast | `star_earned`, `loot_tick` (cooldown 120 ms), `timer_warning`, `speed_toggle`, `confirm_open`, `ui_denied` | `BattleHud._refresh`, `_on_speed`, `_on_end`, `_show_toast` |
+| The battle over: the result's banner | `victory` (a star or more), `defeat`, as `Audio.sting` | `BattleHud._show_result` |
+
+**Loops.** The view holds the sustained sounds as loops, one voice a key however many things keep it
+on (`_hold_loop(key, on)`, started and stopped only on a change; `_loop_for(key, until)` for one
+timed on the clock, stopped when it is up):
+
+| Loop | Held |
+| --- | --- |
+| `battle_bed` | from `setup` to `leave()` (a low wind with gusts and a distant hum, -26 dBFS) |
+| `air_bed` | while any air unit lives (`BattleUnits.air_alive()`) |
+| `shield_hum` | while any shield generator's pool is up |
+| `vortex_hum` | while a gravity well holds a unit, for its `hold_ms` from each pull |
+| `emp_hold` | while any defence an EMP burst disabled is still out |
+| `swarm_hum` | for a repair swarm's seconds |
+| `strike_marker` | from a strike's cast until it lands |
+| `grav_whoosh` | from a grav trap's spring until its funnel stops (`TRAP_POP` + `FUNNEL_SECONDS`) |
+
+The battle's end stops every loop but the bed; `leave()` and the view leaving the tree stop that,
+so no voice sounds after Return.
+
+**Throttles.** A full army fires hundreds of shots a second; the categories' cooldowns and each
+key's `voices` hold it to a sound a key every few frames, and the recipes' `priority` decides what a
+full pool lets go first: the hits and a spark's `impact_small` (six voices) lowest (0), the shots
+(1, the heavy ones 2), the impacts and the deploys (2), the blasts and the trap's click (3), the
+mega mine's and the strike's landings highest (4, with the stings). The deaths have a 60 ms
+cooldown and three voices each, a missile salvo 60 ms and three, the flak's pok 25 ms, the
+tracers' tat 30 ms. A shot's
+cooldown sits under its burst's gap at 2x, so a burst's shots all sound.
+
 ## The harness
 
 Plays are recorded whatever the device: `run.sh` runs every scenario on Godot's Dummy audio driver,
@@ -247,8 +315,10 @@ speakers; a rendered run with `--audible` plays aloud, for a person listening.
 The queries: `recent_plays()` (the last `RECENT`, 32, keys, oldest first) and `recent_times()`
 beside it (`Time.get_ticks_msec()`), `play_count(key)` since boot, `playing_count()` (the pool's
 voices sounding), `scheduled_count()`, `keys()`, `stream(key)`, `current_music()`, `music_playing()`. The `sounds` scenario checks the files, the buses, the
-cooldown, the cap, a loop, scheduled plays, the music, the settings and every hook
-(`tools/harness/README.md`).
+cooldown, the cap, a loop, scheduled plays, the music, the settings and every hook; `sounds_battle` the
+battle's: the maps' coverage and a battle with every defence, trap, unit and ability, each of their
+sounds heard, every loop held and none after Return (`tools/harness/README.md`). A loop is not a
+play, so `BattleView.loop_starts(key)` and `loops_held()` say which the view held.
 
 ## Cost
 

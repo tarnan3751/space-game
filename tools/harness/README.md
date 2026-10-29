@@ -791,6 +791,31 @@ they sit deep inside and seldom fire): the turrets' shots and hits sound, a mort
 landing does, Audio's cost a frame is logged, and the surrender plays one sting. The battle opens
 on the combat track, and once it is left the base's track plays again.
 
+`scenarios/sounds_battle.gd` checks the battle's sounds (`docs/reference/audio.md`, **Battle**),
+headless or rendered. First the coverage from the tables: every `Weapons` type's shot and landing a
+key or `&""`, every `Weapons.Kind`, `Impact`, `Death` and trap kind and every `BattleEvents` kind in
+`Sounds`' maps, every key they name in the table. Then a practice battle against the template base
+trimmed to one of each defence and trap, the Command Center, the buildings under the shield
+generator's bubble and the walls within two cells of them, the traps moved beside the railgun (the
+ground ones) and the missile battery (the flak mine), raided by every unit type with two of each
+ability; it checks the opening's `battle_start`, the bed and the shield's hum held from the start,
+the speed toggled to 2x (`speed_toggle`), End asked and kept (`confirm_open`), a deploy refused on a
+defence's cell (`ui_denied`), the deploys of both classes, the strike, EMP and swarm cast (a
+second strike on the shield generator and EMP on the orbital cannon after tick 300); then runs until
+every wanted key has played (each kept defence's shot and landing, each unit's shot or, silent, its
+landing, every death and its blast, each trap's, the hits, falls, shield, EMP, ability and loot
+sounds) and every loop was held (`BattleView.loop_starts`), with a star won, or `BATTLE_WAIT`; that
+every trap sprang; the mega mine's blast `TRAP_POP` (at 2x) after it sprang, which happened between
+the frame it is seen gone and the one before (from `recent_times()`, within 40 ms; a long frame, as
+a rendered run's first battle frames are, widens that span); surrenders; one sting with the result,
+a chime for each star won (counted once the last has had its 0.15 s), only the bed held; and after
+Return no voice sounding but the base's own ambience (`main.ambience()`) and nothing scheduled.
+Then a second practice battle: a strike cast and, once the step that takes it has scheduled its
+whine (more than nothing waiting), a surrender; on the result panel nothing waits and no
+`strike_bolt` two seconds on, past its time, nor after Return (the surrender drops it). Audio's
+cost a frame over the battle is logged; the rendered run shoots the battle at tick 200 and the
+result.
+
 `scenarios/profile.gd` is the performance profile, to re-run after every change made for cost: the
 Template base idle at camera sizes 44, 24 and 10, again at 44 with the sun's shadow off, the
 sector map open, the training panel open, and the Practice raid on it with the battle scenario's
