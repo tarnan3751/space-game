@@ -227,9 +227,20 @@ func set_site_top(site_top: float) -> void:
 
 
 ## Moves it under `parent`, where it stays put in the world and drives itself: its view is about
-## to be freed. Whoever releases it then tells it to leave.
+## to be freed. Whoever releases it then tells it to leave. Out of the tree (the base's view, while
+## a battle runs in its place) there is no global transform to keep, so its place in `parent`'s
+## frame is made from its own through every node between them.
 func release(parent: Node) -> void:
-	reparent(parent)
+	if is_inside_tree():
+		reparent(parent)
+	else:
+		var moved := transform
+		var node := get_parent()
+		while node != parent and node is Node3D:
+			moved = (node as Node3D).transform * moved
+			node = node.get_parent()
+		reparent(parent, false)
+		transform = moved
 	set_process(true)
 
 
