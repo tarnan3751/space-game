@@ -31,7 +31,8 @@ extends Node3D
 ## The sounds (Audio, main.audio) are wired in _wire_audio: the base's events through their
 ## signals, the HUD and the sector map by handing them the node, which their buttons play their
 ## taps on; the attack HUD's buttons through Audio.tap_buttons, and the battle's shots and
-## landings by handing the node to the battle view.
+## landings by handing the node to the battle view. main plays the boot's sting and hears the
+## base's completions by counting (_hear_completions).
 
 const DEFAULT_SAVE_PATH := "user://base.json"
 const SAVE_PATH_ARG := "--save-path="
@@ -80,6 +81,15 @@ var _quitting: bool = false
 ## Where the camera looked at the base, and its zoom, when a battle opened: put back after it.
 var _base_focus: Vector3 = Vector3.ZERO
 var _base_zoom: float = IsoCamera.START_ZOOM_SIZE
+## Whether loading the save's offline catch-up finished anything (the boot's welcome).
+var _caught_up: bool = false
+## What the base held at the last change, counted for the completions it hears
+## (_hear_completions): units in the army, abilities in stock, research levels, and the producers
+## whose trained head waits for room.
+var _trained: int = 0
+var _made: int = 0
+var _researched: int = 0
+var _waiting: int = 0
 
 
 func _ready() -> void:
@@ -153,6 +163,7 @@ func _ready() -> void:
 	_wire_audio()
 
 	_set_state(_load_or_create())
+	audio.sting(&"offline_boot" if _caught_up else &"boot_sting")
 
 	var tick := Timer.new()
 	tick.wait_time = 1.0
@@ -254,6 +265,40 @@ func _on_tick() -> void:
 func _on_state_changed() -> void:
 	_dirty = true
 	_sector_dirty = true
+	_hear_completions(false)
+
+
+## What the base finished since the last change, heard (unless `quiet`): a research done, a unit
+## trained, an ability made, a trained head left waiting for room in the Hangars. Core emits no
+## event for them, so they are counted and compared, which allocates nothing; _set_state counts a
+## new base quietly (the boot, Reset base, Template base).
+func _hear_completions(quiet: bool) -> void:
+	var trained := 0
+	for unit: String in state.army:
+		trained += state.army[unit]
+	var researched := 0
+	for unit: String in state.unit_levels:
+		researched += state.unit_levels[unit]
+	for ability: String in state.ability_levels:
+		researched += state.ability_levels[ability]
+	var waiting := 0
+	for id: int in state.training:
+		if state.training_status(id) == BaseState.TRAINING_WAITING:
+			waiting += 1
+	var made := state.stock_total()
+	if not quiet:
+		if researched > _researched:
+			_base_sound(&"research_done", 0.0)
+		if trained > _trained:
+			_base_sound(&"train_done", 0.03)
+		if made > _made:
+			_base_sound(&"make_done", 0.04)
+		if waiting > _waiting:
+			_base_sound(&"housing_full", 0.0)
+	_trained = trained
+	_made = made
+	_researched = researched
+	_waiting = waiting
 
 
 func _refresh_hud() -> void:
@@ -280,7 +325,7 @@ func _on_train_pressed(id: int, unit: String) -> void:
 func _on_cancel_training_pressed(id: int, unit: String) -> void:
 	var error := placement.cancel_training(id, unit)
 	if error == "":
-		hud.show_message("Refunded")
+		hud.show_message("Refunded", Hud.ToastKind.INFO, &"queue_refund")
 	else:
 		hud.show_error(error)
 
@@ -303,7 +348,7 @@ func _on_make_pressed(id: int, ability: String) -> void:
 func _on_cancel_making_pressed(id: int, ability: String) -> void:
 	var error := placement.cancel_making(id, ability)
 	if error == "":
-		hud.show_message("Refunded")
+		hud.show_message("Refunded", Hud.ToastKind.INFO, &"queue_refund")
 	else:
 		hud.show_error(error)
 
@@ -320,6 +365,7 @@ func _set_state(new_state: BaseState) -> void:
 		state.changed.disconnect(_on_state_changed)
 	state = new_state
 	state.changed.connect(_on_state_changed)
+	_hear_completions(true)
 	placement.state = state
 	placement.cancel_place()
 	placement.select(0)
@@ -522,8 +568,11 @@ func _load_or_create() -> BaseState:
 		var data: Variant = JSON.parse_string(FileAccess.get_file_as_string(save_path))
 		if typeof(data) == TYPE_DICTIONARY:
 			var loaded := BaseState.from_dict(catalog, data)
-			# Offline progress: finish timers and pay out production since the last save.
+			# Offline progress: finish timers and pay out production since the last save. Each
+			# completion moves the revision, so the boot knows whether any came.
+			var revision := loaded.buildings_revision
 			loaded.advance_to(_now())
+			_caught_up = loaded.buildings_revision != revision
 			return loaded
 		push_warning("Save file unreadable, starting a new base")
 	return BaseState.create_new(catalog, _now())

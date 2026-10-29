@@ -205,6 +205,8 @@ const TOAST_EDGES := {
 	&"ToastRefusal": MaterialKit.DEFENCE,
 	&"ToastReward": GOLD,
 }
+## Each toast kind's sound, in ToastKind's order; a refusal's plays through _deny, once a frame.
+const TOAST_SOUNDS: Array[StringName] = [&"toast_info", &"ui_denied", &"toast_reward"]
 ## Each ability effect's colour (HudIcon kinds "swarm", "emp", "strike"): its glyph's, and its
 ## coin's, which HudIcon holds to its coin value.
 const ABILITY_COLORS := {
@@ -733,8 +735,15 @@ func fit_safe_area() -> void:
 	apply_safe_area(area)
 
 
-## Shows the toast: `text`, its left edge in `kind`'s colour (TOAST_EDGES).
-func show_message(text: String, kind: ToastKind = ToastKind.INFO) -> void:
+## Shows the toast: `text`, its left edge in `kind`'s colour (TOAST_EDGES), with `kind`'s sound
+## (TOAST_SOUNDS; a refusal's is ui_denied, once a frame) unless `sound` names another.
+func show_message(text: String, kind: ToastKind = ToastKind.INFO, sound: StringName = &"") -> void:
+	if sound != &"":
+		audio.play(sound, Audio.TAP_JITTER)
+	elif kind == ToastKind.REFUSAL:
+		_deny()
+	else:
+		audio.play(TOAST_SOUNDS[kind], Audio.TAP_JITTER)
 	_toast_kind = kind
 	_toast.theme_type_variation = TOAST_EDGES.keys()[kind]
 	_toast_label.text = text
@@ -1938,12 +1947,16 @@ static func _tint_meter(shader: ShaderMaterial, color: Color) -> void:
 
 
 ## The full state, when a meter's amount reaches its cap: a gold line inside the pill and the
-## digits in gold. Set only when it changes.
+## digits in gold, and a resource's meter dings (meter_full). Set only when it changes.
 func _set_full(key: String, full: bool) -> void:
 	if _meter_full.get(key, false) == full:
 		return
 	_meter_full[key] = full
 	_meter_shaders[key].set_shader_parameter(&"full", full)
+	# A resource's meter filling dings, but not on the first refresh, which only records it, nor
+	# while the HUD is hidden (a battle runs in the base's place and the base still ticks).
+	if full and _meter_amounts.has(key) and visible:
+		audio.play(&"meter_full", 0.0)
 	if full:
 		_meter_labels[key].add_theme_color_override("font_color", GOLD)
 	else:

@@ -132,6 +132,68 @@ const TABLE := {
 		{"wave": "sine", "hz": G6, "at": 0.22, "a": 0.003, "d": 0.6, "fm": {"ratio": 2.0, "index": [0.8, 0.0]}},
 		{"wave": "triangle", "hz": C5, "at": 0.22, "a": 0.01, "d": 0.6, "db": -12}]},
 
+	# The base's other events: a unit trained, a research done, an ability made, a queue entry
+	# refunded, a head left waiting for room in the Hangars, a meter full; the toasts by kind (a
+	# refusal's is ui_denied); the boot, a short rising logo, or a welcome when the offline catch-up
+	# finished anything.
+	"train_done": {"category": "chime", "seconds": 0.5, "min": 0.3, "rms_db": -17.5, "chorus": {"mix": 0.3}, "layers": [
+		{"wave": "triangle", "hz": 2093.0, "a": 0.001, "d": 0.02, "db": -10},
+		{"wave": "sine", "hz": G5, "a": 0.003, "d": 0.22, "fm": {"ratio": 2.0, "index": [0.7, 0.0]}},
+		{"wave": "sine", "hz": C6, "at": 0.09, "a": 0.003, "d": 0.36, "fm": {"ratio": 2.0, "index": [0.7, 0.0]}},
+		{"wave": "triangle", "hz": 261.63, "at": 0.09, "a": 0.01, "d": 0.3, "db": -14}]},
+	"research_done": {"category": "chime", "seconds": 1.1, "chorus": {"mix": 0.35},
+		"echo": {"ms": 140, "feedback": 0.3, "mix": 0.25}, "layers": [
+		{"wave": "sine", "hz": C6, "a": 0.002, "d": 0.3, "fm": {"ratio": 3.0, "index": [0.6, 0.0]}},
+		{"wave": "sine", "hz": E6, "at": 0.06, "a": 0.002, "d": 0.3, "fm": {"ratio": 3.0, "index": [0.6, 0.0]}},
+		{"wave": "sine", "hz": G6, "at": 0.12, "a": 0.002, "d": 0.35, "fm": {"ratio": 3.0, "index": [0.6, 0.0]}},
+		{"wave": "sine", "hz": 2093.0, "at": 0.18, "a": 0.002, "d": 0.6, "fm": {"ratio": 3.0, "index": [0.6, 0.0]}},
+		{"wave": "noise", "at": 0.18, "a": 0.05, "d": 0.5, "filter": {"type": "hp", "hz": 7000}, "db": -22},
+		{"wave": "triangle", "hz": C5, "at": 0.18, "a": 0.01, "d": 0.6, "db": -14}]},
+	"make_done": {"category": "chime", "seconds": 0.3, "min": 0.2, "rms_db": -19.0, "layers": [
+		{"wave": "sine", "hz": [320, 900], "glide": 0.05, "a": 0.002, "d": 0.08},
+		{"wave": "sine", "hz": [420, 1200], "glide": 0.05, "at": 0.07, "a": 0.002, "d": 0.08, "db": -2},
+		{"wave": "sine", "hz": [560, 1600], "glide": 0.05, "at": 0.14, "a": 0.002, "d": 0.12, "db": -4},
+		{"wave": "triangle", "hz": 180, "a": 0.003, "d": 0.12, "db": -12}]},
+	"queue_refund": {"category": "ui", "seconds": 0.15, "rms_db": -18.0, "layers": [
+		{"wave": "sine", "hz": E6, "a": 0.1, "d": 0.03, "fm": {"ratio": 3.0, "index": [0.2, 1.2]}},
+		{"wave": "sine", "hz": 987.77, "a": 0.08, "d": 0.04, "db": -6}]},
+	"housing_full": {"category": "ui", "seconds": 0.12, "rms_db": -22.0, "layers": [
+		{"wave": "sine", "hz": 880, "a": 0.002, "d": 0.035},
+		{"wave": "triangle", "hz": 440, "a": 0.002, "d": 0.03, "db": -10},
+		{"wave": "sine", "hz": 880, "at": 0.06, "a": 0.002, "d": 0.045},
+		{"wave": "triangle", "hz": 440, "at": 0.06, "a": 0.002, "d": 0.035, "db": -10}]},
+	"meter_full": {"category": "chime", "seconds": 0.8, "echo": {"ms": 130, "feedback": 0.25, "mix": 0.2}, "layers": [
+		{"wave": "sine", "hz": 1760.0, "a": 0.002, "d": 0.6, "fm": {"ratio": 3.5, "index": [1.2, 0.0]}},
+		{"wave": "sine", "hz": 880.0, "a": 0.003, "d": 0.5, "db": -8},
+		{"wave": "triangle", "hz": 3520.0, "a": 0.001, "d": 0.05, "db": -18}]},
+	"toast_info": {"category": "ui", "seconds": 0.12, "rms_db": -22.0, "layers": [
+		{"wave": "sine", "hz": 988, "a": 0.004, "d": 0.06},
+		{"wave": "sine", "hz": 1480, "at": 0.035, "a": 0.004, "d": 0.08, "db": -4}]},
+	"toast_reward": {"category": "chime", "seconds": 0.65, "chorus": {"mix": 0.3},
+		"echo": {"ms": 110, "feedback": 0.25, "mix": 0.2}, "layers": [
+		{"wave": "triangle", "hz": 987.77, "a": 0.002, "d": 0.08, "s": 0.5, "len": 0.07, "r": 0.03},
+		{"wave": "sine", "hz": E6, "at": 0.07, "a": 0.002, "d": 0.5, "fm": {"ratio": 3.0, "index": [1.0, 0.0]}},
+		{"wave": "triangle", "hz": 2637, "at": 0.07, "a": 0.002, "d": 0.12, "db": -16}]},
+	"boot_sting": {"category": "sting", "seconds": 1.1, "chorus": {"mix": 0.3},
+		"echo": {"ms": 140, "feedback": 0.2, "mix": 0.15}, "layers": [
+		{"wave": "triangle", "hz": [220, 440], "sweep": "lin", "glide": 0.25, "a": 0.08, "d": 0.2, "s": 0.4, "len": 0.25,
+			"r": 0.1, "filter": {"type": "lp", "hz": [800, 3000]}, "db": -6},
+		{"wave": "triangle", "hz": G5, "at": 0.2, "a": 0.004, "d": 0.2},
+		{"wave": "triangle", "hz": C6, "at": 0.3, "a": 0.004, "d": 0.2},
+		{"wave": "sine", "hz": E6, "at": 0.4, "a": 0.004, "d": 0.6, "fm": {"ratio": 2.0, "index": [0.6, 0.0]}},
+		{"wave": "triangle", "hz": C5, "at": 0.4, "a": 0.02, "d": 0.3, "s": 0.5, "len": 0.35, "r": 0.3,
+			"vibrato": [5.0, 10.0], "db": -6}]},
+	"offline_boot": {"category": "sting", "seconds": 1.5, "chorus": {"mix": 0.35},
+		"echo": {"ms": 150, "feedback": 0.25, "mix": 0.2}, "layers": [
+		{"wave": "sine", "hz": E6, "a": 0.004, "d": 0.25, "fm": {"ratio": 2.0, "index": [0.6, 0.0]}},
+		{"wave": "sine", "hz": C6, "at": 0.12, "a": 0.004, "d": 0.25, "fm": {"ratio": 2.0, "index": [0.6, 0.0]}},
+		{"wave": "sine", "hz": G5, "at": 0.24, "a": 0.004, "d": 0.25, "fm": {"ratio": 2.0, "index": [0.6, 0.0]}},
+		{"wave": "triangle", "hz": C5, "at": 0.42, "a": 0.02, "d": 0.3, "s": 0.5, "len": 0.5, "r": 0.4,
+			"vibrato": [5.0, 10.0], "db": -4},
+		{"wave": "triangle", "hz": E5, "at": 0.42, "a": 0.02, "d": 0.3, "s": 0.5, "len": 0.5, "r": 0.4,
+			"vibrato": [5.0, 10.0], "db": -5},
+		{"wave": "sine", "hz": C6, "at": 0.42, "a": 0.004, "d": 0.8, "fm": {"ratio": 2.0, "index": [0.6, 0.0]}, "db": -2}]},
+
 	# The battle: shots, impacts and blasts.
 	"laser_fire": {"category": "shot", "seconds": 0.2, "layers": [
 		{"wave": "triangle", "hz": [2200, 380], "glide": 0.14, "a": 0.002, "d": 0.15, "fm": {"ratio": 2.0, "index": [1.0, 0.0]}},
