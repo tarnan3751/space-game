@@ -534,29 +534,105 @@ const TABLE := {
 		{"wave": "noise", "at": 0.06, "a": 0.01, "d": 0.9, "filter": {"type": "bp", "hz": 2500, "q": 2.0},
 			"ring": {"hz": 19}, "db": -11}]},
 
-	# The battle's end.
-	"victory": {"category": "sting", "seconds": 1.7, "chorus": {"mix": 0.3},
-		"echo": {"ms": 140, "feedback": 0.2, "mix": 0.15}, "layers": [
-		{"wave": "triangle", "hz": G5, "a": 0.004, "d": 0.25},
-		{"wave": "triangle", "hz": C6, "at": 0.12, "a": 0.004, "d": 0.25},
-		{"wave": "triangle", "hz": E6, "at": 0.24, "a": 0.004, "d": 0.25},
-		{"wave": "sine", "hz": G6, "at": 0.36, "a": 0.004, "d": 0.4},
-		{"wave": "triangle", "hz": C5, "at": 0.48, "a": 0.02, "d": 0.3, "s": 0.5, "len": 0.6, "r": 0.5,
-			"vibrato": [5.0, 12.0], "db": -3},
-		{"wave": "triangle", "hz": E5, "at": 0.48, "a": 0.02, "d": 0.3, "s": 0.5, "len": 0.6, "r": 0.5,
-			"vibrato": [5.0, 12.0], "db": -4},
-		{"wave": "sine", "hz": G5, "at": 0.48, "a": 0.02, "d": 0.3, "s": 0.5, "len": 0.6, "r": 0.5,
-			"vibrato": [5.0, 12.0], "db": -4}]},
-	"defeat": {"category": "sting", "seconds": 1.5, "chorus": {"mix": 0.25}, "layers": [
-		{"wave": "triangle", "hz": [392, 370], "a": 0.02, "d": 0.2, "s": 0.6, "len": 0.25, "r": 0.08,
-			"filter": {"type": "lp", "hz": 1800}},
-		{"wave": "triangle", "hz": [349, 330], "at": 0.3, "a": 0.02, "d": 0.2, "s": 0.6, "len": 0.25, "r": 0.08,
-			"filter": {"type": "lp", "hz": 1800}},
-		{"wave": "triangle", "hz": [330, 247], "sweep": "lin", "glide": 0.7, "at": 0.6, "a": 0.02, "d": 0.3, "s": 0.6,
-			"len": 0.6, "r": 0.25, "vibrato": [6.0, 30.0], "filter": {"type": "lp", "hz": [1800, 700]}},
-		{"wave": "sine", "hz": [165, 124], "sweep": "lin", "glide": 0.7, "at": 0.6, "a": 0.02, "d": 0.3, "s": 0.6,
-			"len": 0.6, "r": 0.25, "db": -8}]},
+	# Deploying (BattleUnits.after_step): a ground unit's soft drop and step, an air unit's jet
+	# whoosh, each varied in pitch so a smear walks. A deploy or a cast refused buzzes the HUD's
+	# ui_denied (BattleHud's toast).
+	"deploy_ground": {"category": "impact", "seconds": 0.16, "min": 0.08, "rms_db": -19.0, "cooldown": 0.07, "layers": [
+		{"wave": "sine", "hz": [500, 180], "glide": 0.06, "a": 0.002, "d": 0.08},
+		{"wave": "sine", "hz": [140, 70], "at": 0.05, "a": 0.002, "d": 0.09, "db": -3},
+		{"wave": "noise", "at": 0.05, "a": 0.002, "d": 0.02, "filter": {"type": "lp", "hz": 2000}, "db": -10}]},
+	"deploy_air": {"category": "impact", "seconds": 0.25, "rms_db": -19.0, "cooldown": 0.07, "layers": [
+		{"wave": "pink", "a": 0.04, "d": 0.18, "filter": {"type": "bp", "hz": [800, 3000], "q": 1.5}},
+		{"wave": "sine", "hz": [400, 900], "a": 0.03, "d": 0.15, "db": -10}]},
 
+	# The attack HUD (BattleHud): a star won, the loot ticking up, the last ten seconds, the battle
+	# opening (main.open_battle), the speed toggled, End asking.
+	"star_earned": {"category": "chime", "seconds": 0.75, "chorus": {"mix": 0.35},
+		"echo": {"ms": 110, "feedback": 0.25, "mix": 0.2}, "layers": [
+		{"wave": "sine", "hz": E6, "a": 0.003, "d": 0.3, "fm": {"ratio": 2.0, "index": [1.0, 0.0]}},
+		{"wave": "sine", "hz": G6, "at": 0.07, "a": 0.003, "d": 0.3, "fm": {"ratio": 2.0, "index": [1.0, 0.0]}},
+		{"wave": "sine", "hz": 2093.0, "at": 0.14, "a": 0.003, "d": 0.45, "fm": {"ratio": 2.0, "index": [1.0, 0.0]}},
+		{"wave": "triangle", "hz": 4186.0, "at": 0.14, "a": 0.003, "d": 0.3, "db": -14}]},
+	"loot_tick": {"category": "ui", "seconds": 0.14, "rms_db": -21.0, "cooldown": 0.12, "layers": [
+		{"wave": "sine", "hz": 1976.0, "a": 0.002, "d": 0.05},
+		{"wave": "sine", "hz": 2637.0, "at": 0.035, "a": 0.002, "d": 0.1}]},
+	"timer_warning": {"category": "ui", "seconds": 0.08, "min": 0.04, "layers": [
+		{"wave": "triangle", "hz": 1000, "a": 0.001, "d": 0.03},
+		{"wave": "sine", "hz": 500, "a": 0.002, "d": 0.05, "db": -6}]},
+	# A brass-like stab (a saw chord opening under a rising low-pass) and a whoosh.
+	"battle_start": {"category": "chime", "seconds": 0.85, "rms_db": -16.0, "layers": [
+		{"wave": "saw", "hz": 261.63, "a": 0.02, "d": 0.4, "s": 0.4, "len": 0.5, "r": 0.3, "filter": {"type": "lp", "hz": [500, 2600]}},
+		{"wave": "saw", "hz": 329.63, "a": 0.02, "d": 0.4, "s": 0.4, "len": 0.5, "r": 0.3, "filter": {"type": "lp", "hz": [500, 2600]},
+			"db": -2},
+		{"wave": "saw", "hz": 392.0, "a": 0.02, "d": 0.4, "s": 0.4, "len": 0.5, "r": 0.3, "filter": {"type": "lp", "hz": [500, 2600]},
+			"db": -2},
+		{"wave": "sine", "hz": 130.81, "a": 0.02, "d": 0.4, "s": 0.4, "len": 0.5, "r": 0.3, "db": -4},
+		{"wave": "pink", "a": 0.15, "d": 0.25, "filter": {"type": "bp", "hz": [400, 3000], "q": 1.3}, "db": -8}]},
+	"speed_toggle": {"category": "ui", "seconds": 0.09, "layers": [
+		{"wave": "triangle", "hz": [800, 1600], "a": 0.002, "d": 0.05},
+		{"wave": "sine", "hz": 1200, "at": 0.03, "a": 0.002, "d": 0.04, "db": -6}]},
+	"confirm_open": {"category": "ui", "seconds": 0.13, "layers": [
+		{"wave": "sine", "hz": [600, 900], "a": 0.003, "d": 0.08},
+		{"wave": "triangle", "hz": 1350, "at": 0.04, "a": 0.002, "d": 0.07, "db": -8}]},
+
+	# The battle's end (BattleHud, with the result's banner): a victory's bright major arpeggio, its
+	# chord held with a chorus and a sparkle over its tail; a defeat's slow minor fall over a soft
+	# sub.
+	"victory": {"category": "sting", "seconds": 1.85, "chorus": {"mix": 0.35},
+		"echo": {"ms": 140, "feedback": 0.25, "mix": 0.18}, "layers": [
+		{"wave": "triangle", "hz": C5, "a": 0.004, "d": 0.22},
+		{"wave": "triangle", "hz": E5, "at": 0.09, "a": 0.004, "d": 0.22},
+		{"wave": "triangle", "hz": G5, "at": 0.18, "a": 0.004, "d": 0.22},
+		{"wave": "sine", "hz": C6, "at": 0.27, "a": 0.004, "d": 0.3, "fm": {"ratio": 2.0, "index": [0.8, 0.0]}},
+		{"wave": "triangle", "hz": C5, "at": 0.4, "a": 0.02, "d": 0.3, "s": 0.55, "len": 0.75, "r": 0.5,
+			"vibrato": [5.0, 12.0], "db": -3},
+		{"wave": "triangle", "hz": E5, "at": 0.4, "a": 0.02, "d": 0.3, "s": 0.55, "len": 0.75, "r": 0.5,
+			"vibrato": [5.0, 12.0], "db": -4},
+		{"wave": "sine", "hz": G5, "at": 0.4, "a": 0.02, "d": 0.3, "s": 0.55, "len": 0.75, "r": 0.5,
+			"vibrato": [5.0, 12.0], "db": -4},
+		{"wave": "sine", "hz": C6, "at": 0.4, "a": 0.02, "d": 0.3, "s": 0.55, "len": 0.75, "r": 0.5,
+			"vibrato": [5.0, 12.0], "db": -6},
+		{"wave": "sine", "hz": 261.63, "at": 0.4, "a": 0.02, "d": 0.3, "s": 0.5, "len": 0.75, "r": 0.4, "db": -8},
+		{"wave": "triangle", "hz": E6 * 2.0, "at": 0.5, "a": 0.002, "d": 0.2, "db": -12},
+		{"wave": "triangle", "hz": G6 * 2.0, "at": 0.62, "a": 0.002, "d": 0.2, "db": -12},
+		{"wave": "triangle", "hz": C6 * 4.0, "at": 0.74, "a": 0.002, "d": 0.25, "db": -13},
+		{"wave": "triangle", "hz": G6 * 2.0, "at": 0.9, "a": 0.002, "d": 0.3, "db": -14}]},
+	"defeat": {"category": "sting", "seconds": 1.65, "chorus": {"mix": 0.3}, "layers": [
+		{"wave": "triangle", "hz": E5, "a": 0.03, "d": 0.2, "s": 0.6, "len": 0.28, "r": 0.1, "filter": {"type": "lp", "hz": 1800}},
+		{"wave": "triangle", "hz": C5, "at": 0.32, "a": 0.03, "d": 0.2, "s": 0.6, "len": 0.28, "r": 0.1,
+			"filter": {"type": "lp", "hz": 1600}},
+		{"wave": "triangle", "hz": [440.0, 330.0], "sweep": "lin", "glide": 0.8, "at": 0.64, "a": 0.03, "d": 0.3, "s": 0.6,
+			"len": 0.6, "r": 0.3, "vibrato": [5.0, 25.0], "filter": {"type": "lp", "hz": [1500, 600]}},
+		{"wave": "sine", "hz": [220.0, 165.0], "sweep": "lin", "glide": 0.8, "at": 0.64, "a": 0.03, "d": 0.3, "s": 0.6,
+			"len": 0.6, "r": 0.3, "db": -8},
+		{"wave": "sine", "hz": [110.0, 82.4], "sweep": "lin", "glide": 0.8, "at": 0.64, "a": 0.08, "d": 0.3, "s": 0.7,
+			"len": 0.6, "r": 0.3, "db": -10}]},
+
+	# Beds under a battle (BattleView): a low wind with gusts and a distant hum from setup to the
+	# return, and the aircraft's engines while any is up. The wind's gusts come at uneven times and
+	# strengths, each over within the loop, so it never repeats inside its 20 s and its seam joins
+	# the steady layers alone.
+	"battle_bed": {"category": "loop", "seconds": 20.0, "max": 20.0, "loop": true, "quiet": true, "rms_db": -26.0, "layers": [
+		{"wave": "pink", "a": 0.0, "s": 1.0, "len": 20.1, "filter": {"type": "lp", "hz": 350}},
+		{"wave": "pink", "a": 0.0, "s": 1.0, "len": 20.1, "filter": {"type": "bp", "hz": 700, "q": 1.0}, "db": -14},
+		{"wave": "pink", "at": 0.4, "a": 1.6, "d": 3.0, "s": 0.7, "len": 2.2, "r": 1.5, "filter": {"type": "bp", "hz": 650, "q": 1.0},
+			"db": -6},
+		{"wave": "pink", "at": 3.9, "a": 1.0, "d": 3.0, "s": 0.7, "len": 1.6, "r": 1.2, "filter": {"type": "bp", "hz": 820, "q": 1.0},
+			"db": -9},
+		{"wave": "pink", "at": 6.3, "a": 2.2, "d": 3.0, "s": 0.7, "len": 3.0, "r": 2.0, "filter": {"type": "bp", "hz": 560, "q": 1.0},
+			"db": -5},
+		{"wave": "pink", "at": 11.7, "a": 0.8, "d": 3.0, "s": 0.7, "len": 1.2, "r": 1.0, "filter": {"type": "bp", "hz": 900, "q": 1.0},
+			"db": -10},
+		{"wave": "pink", "at": 13.6, "a": 1.5, "d": 3.0, "s": 0.7, "len": 2.4, "r": 1.6, "filter": {"type": "bp", "hz": 700, "q": 1.0},
+			"db": -7},
+		{"wave": "pink", "at": 17.0, "a": 0.9, "d": 3.0, "s": 0.7, "len": 1.0, "r": 0.8, "filter": {"type": "bp", "hz": 760, "q": 1.0},
+			"db": -11},
+		{"wave": "sine", "hz": 55, "a": 0.0, "s": 1.0, "len": 20.1, "db": -12},
+		{"wave": "sine", "hz": 82.5, "a": 0.0, "s": 1.0, "len": 20.1, "vibrato": [0.2, 10.0], "db": -16}]},
+	"air_bed": {"category": "loop", "seconds": 3.0, "loop": true, "quiet": true, "rms_db": -26.0, "layers": [
+		{"wave": "saw", "hz": 98, "a": 0.0, "s": 1.0, "len": 3.1, "vibrato": [0.33, 15.0], "filter": {"type": "lp", "hz": 500}},
+		{"wave": "saw", "hz": 147.5, "a": 0.0, "s": 1.0, "len": 3.1, "filter": {"type": "lp", "hz": 500}, "db": -6},
+		{"wave": "pink", "a": 0.0, "s": 1.0, "len": 3.1, "filter": {"type": "bp", "hz": 1200, "q": 1.0}, "db": -10}]},
 }
 
 ## The sound a weapon's shot makes (fire_key()), by its kind (Weapons.Kind), or by its type id where
