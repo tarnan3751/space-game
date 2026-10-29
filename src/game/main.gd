@@ -40,8 +40,10 @@ const NO_CHEATS_ARG := "--no-cheats"
 const QUIT_FRAMES_ARG := "--quit-frames="
 ## How long a quit waits after silencing the sounds, frames running: the mixer, on its own thread,
 ## lets go of a stopped sound after its next mix, and a frame after that frees it, so a count of
-## frames is not enough (they can all pass inside one mix headless). As the harness driver waits.
-const QUIT_SETTLE_SECONDS := 0.1
+## frames is not enough (they can all pass inside one mix headless). 0.3 s, not 0.1: the Dummy
+## driver mixes in large buffers (about 90 ms) and AudioServer.update() collects the released
+## playback on a later frame, so 0.1 s leaked in rendered runs. As the harness driver waits.
+const QUIT_SETTLE_SECONDS := 0.3
 const SAVE_EVERY_TICKS := 10
 ## The base's ambience (base_bed): how far a panel or the sector map ducks it (dB), and how long its
 ## fades take (seconds).

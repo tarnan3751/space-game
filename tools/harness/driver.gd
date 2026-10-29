@@ -28,8 +28,10 @@ const SCENARIO_DIR := "res://tools/harness/scenarios"
 const MAIN_SCENE := "res://scenes/main.tscn"
 const CLOCK_LEAD := 1_000_000
 const HARNESS_TIMEOUT_SECONDS := 300
-## How long the driver waits after silencing the sounds before it quits.
-const SILENCE_SECONDS := 0.1
+## How long the driver waits after shutting the sounds down before it quits: the mixer releases a
+## stopped playback at its next mix step (the Dummy driver mixes in large buffers, about 90 ms) and
+## AudioServer.update() collects it on a later frame; 0.1 s leaked in rendered runs.
+const SILENCE_SECONDS := 0.3
 ## A strip's frames: each downscaled to STRIP_FRAME, laid left to right STRIP_COLUMNS to a row.
 const STRIP_FRAME := Vector2i(640, 360)
 const STRIP_COLUMNS := 4
