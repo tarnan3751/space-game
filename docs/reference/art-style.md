@@ -1800,8 +1800,7 @@ are vector shapes drawn in code, flat fills with a lighter facet and an ink outl
 asset file, the meters' on coins. The meters' stripes drift, a soft glint crosses each fill in
 turn every 8 s and a change flashes it, all from `anim_time` (`meter.gdshader`, `hud.md`, **Top
 bar**). The build cards carry their category's accent from **Colour** as a stripe and as the
-plinth their picture stands on. Two other skins of the menu family, a halftone console and a
-cream pulp page, wait on the owner's pick (`hud.md`, **Skins**).
+plinth their picture stands on.
 
 ## Cost
 

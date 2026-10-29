@@ -36,11 +36,11 @@ panel's unit cards and queue entries are the same: `PASS` buttons whose content 
 ## Theme
 
 One `Theme`, built in `_make_theme`, styles every part: its fonts, sizes, colours and
-`StyleBoxFlat`s, in the skin `Hud.skin` names (**Skins**). Controls take their style from it by
+`StyleBoxFlat`s. Controls take their style from it by
 type variation (`theme_type_variation`: `BuildButton`, `TabButton`, `MeterText` and so on), not by
 overrides of their own; only a cost amount takes its resource's colour as an override, since that
 colour is data, and a full meter its digits' gold. The buttons take no focus. The build and army
-cards take `CardButton`, a button's shape in skin A, so a skin can give them one of their own.
+cards take `CardButton`, a button's shape.
 
 **Fonts** (`assets/fonts/`, Google Fonts under the SIL Open Font License, each with its
 `OFL.txt`, imported with Godot's default dynamic font settings): **Bangers** for the Build
@@ -116,47 +116,8 @@ build cards 200×200, the army cards 200×184 and the queue's entries 220×56; t
 96×64 and End 140×64, Keep fighting 200×72 and End battle 180×72, Return 240×72, the deploy and
 ability cards 124×136.
 
-## Skins
-
-The UI pass's three directions for the menu family (the top bar, the build panel and its cards,
-the tabs and buttons, the army panel's frame), for the owner to pick from (`Hud.Look`; the
-engine's own `Skin` class takes that name). `Hud.skin`, static, names the one `_make_theme` builds
-and the parts that draw themselves read: set it before `setup`, or call `set_skin(look)` on a HUD
-already built, which builds the theme again, hands it to the root and the two bottom panels, and
-redraws what the cards, the panels and the meters draw themselves. The `hud_directions` scenario
-shoots each (`tools/harness/README.md`). The battle's HUD is the dark family over the field under
-every skin: its variations are its own, built after the skin's in a Battle HUD block at the end of
-`_make_theme` (**Battle HUD**), so no skin reaches them.
-
-- **A, the comic console** (the default): everything above.
-- **B, the halftone console**: the bottom panels, the cards and the buttons drawn from 9-slice
-  `StyleBoxTexture`s that `tools/gen_textures.gd` draws into `assets/textures/kit/hud_*.png`
-  (panel, card, card-disabled, button, button-bright): two bands meeting in a hard edge at 40 %
-  of the height, the lower one with a dot screen at an 8 px pitch darkening it by 10 %, a 3 px ink
-  border, a 1 px light line and the flat shadow outside the shape (`SLICE_SHADOW`). Each 9-slice's
-  middle is tile-fitted on both axes (`TILE_FIT`: a whole number of tiles scaled to fit), so where
-  a control's middle is not a whole number of tiles the dots are scaled a little. The dark shapes are drawn in their
-  own fills; the bright buttons share one near-white texture with its top right corner cut,
-  tinted to their role (`modulate_color`); anything disabled takes the flat card-disabled shape.
-  Pressed, a shape is 15 % lighter and squashes 4 % about its centre (`SQUASH`, `_squash`)
-  instead of sinking; a toggle (a tab) never squashes. The panels' and cards' light line and band
-  are the textures'. The info panel, the place bar, the toast and the sector map keep A's shapes, but for the sector
-  map's cards, which take B's card as `CardButton`.
-- **C, the pulp page**: the menu family in the buildings' cream (`CREAM`, `MaterialKit.HULL_LIGHT`)
-  with ink text and no outlines, a 4 px ink border, a disabled shape a darker cream, dim text and
-  warnings in inks that read on cream; the bright buttons in their roles' colours with ink. The
-  bottom panels are a cream tray the panel draws itself (`_draw_tray`, one triangle array): its
-  top edge stepped every 168 px and torn every 42, inked. A build card is a trading card: its
-  category's colour across its top third under an ink dot screen and an ink line, the picture
-  standing on it with no plinth, the name on an ink ribbon (`CardName`'s `normal` style), the
-  costs in ink (`_cost_color`, which a card's amounts take when built and on `set_skin`). The
-  meters, the drone meter among them, are cream troughs with saturated fills and ink digits on an ink strip; a full meter keeps
-  its gold line, its digits ink. The info panel and the sector map go cream
-  too, as they share the titles' and the lines' variations; the toast stays dark. The army and
-  info panels' own variations follow: the queue's head in ink with no outline (`QueueHeadName`,
-  `QueueHeadTime`, dim ink), a next level's value in ink (`InfoNext`), a busy upgrade button the
-  darker cream with its words in ink over the gold fill (`ProgressButton`, `ProgressText`); the
-  "MAX" chip, gold with an ink ring and ink text, is unchanged.
+The `hud_directions` scenario is the HUD's gallery: the top bar, the build panel, the training
+page, a held card and the locked cards in five shots (`tools/harness/README.md`).
 
 ## Layout
 
@@ -305,20 +266,18 @@ along every stroke and shadow. Fills are left hard, since their outlines cover t
 
 **Drone meter.** `DroneRing`, 200×44, at the strip's right end, shows how many of the base's drones
 (`state.builders_total()`, kept with the capacities, **Refresh**) are free
-(`state.builders_free()`). It is a resource meter's twin, built from the same parts, so a skin
+(`state.builders_free()`). It is a resource meter's twin, built from the same parts, so the theme
 styles it as it styles the meters: the pill-shaped trough (`MeterTrough`), the drone icon in the
 accent cyan on its coin in the trough's colour over the left end, the trough's ink border again
 over what is inside it (`MeterFrame`), and "free / all" right-aligned 12 px in from the end in
 `MeterText`. Inside the border, from the coin's edge to 52 px short of the text's end, a slot per
 drone split by 3 px ink lines, with one at either end, the first on the coin's ink ring and the pill's round end inked up to it behind the coin: free slots
-in the accent as a meter's fill takes a colour (`Hud.meter_fill`: 85 % of its value, or under skin
-C saturated), with the meters' gloss (white at 10 %) over their top third; busy slots the trough's
-own fill crossed by the meters' 45-degree stripes (16 px apart, 6 wide, static), 14 % lighter on a
-dark trough or darker on a light one (skin C's cream): at work. Like a resource meter it costs six
+in the accent as a meter's fill takes a colour (`Hud.meter_fill`: 85 % of its value), with the meters' gloss (white at 10 %) over their top third; busy slots the trough's
+own fill crossed by the meters' 45-degree stripes (16 px apart, 6 wide, static), 14 % lighter than the
+trough: at work. Like a resource meter it costs six
 draws: the trough, the slots, the frame, the text and its outline, and the coin; only the slots are
-one triangle array (**One draw call each**). The slots read the theme's `MeterTrough` when drawn
-(skin A's trough colour and border if a skin's is not a flat shape) and are redrawn only when
-`refresh` changes a count (`set_counts`) or the theme changes (`set_skin`), never per frame. The
+one triangle array (**One draw call each**). The slots take the trough's colour and border (`TROUGH`, `BORDER`)
+and are redrawn only when `refresh` changes a count (`set_counts`), never per frame. The
 "All drones are busy" toast and the cards' "No free drone" also name the drones.
 
 ## Refresh
@@ -565,8 +524,8 @@ a trough coin 36 across over the left end of a pill trough (`MeterTrough`), the 
 `housing_capacity()`, the ink border again over it (`MeterFrame`), and "12 / 280"
 (`Format.amount`) right-aligned on it in `HousingText` (19 px, white with 2.5 px of ink); when the
 Hangars are full, the meters' full state, a gold line inside the pill and the digits in gold (its
-shader and digits are kept with the meters' under `HOUSING_KEY`, so `set_skin` tints it and
-`_set_full` sets it as theirs). With no Hangar (capacity 0) the meter hides and the line reads
+shader and digits are kept with the meters' under `HOUSING_KEY`, so `_set_full` sets it as
+theirs). With no Hangar (capacity 0) the meter hides and the line reads
 "No Hangar: build one to house units" (`NO_HANGAR`) in the dim style (`CardCount`). On the
 research page it is the research's progress (**Research panel**); the making page shows nothing
 there.
@@ -617,7 +576,7 @@ busy upgrade button share one piece, `Hud.Fill`: a clip `Control` over a `Textur
 meters' stripe tile drawn through `meter.gdshader` (the drift, the glint, the round ends of a pill
 track; **Top bar**), tinted by `Hud.meter_fill` of its colour. Setting its fraction sizes the clip
 and sets the shader's `fill_width`, and only when the width in pixels changed; nothing is built.
-Its shader is kept with the meters' (`_meter_shaders`, `_meter_colors`), so a skin tints it.
+Its shader is kept with the meters' (`_meter_shaders`).
 
 **Making panel.** The Foundry's page: a strip of ability cards, one per ability in
 `catalog.ability_types()` order: the level chip "Lv N" (`ability_level`), the stock as the chip
@@ -687,7 +646,7 @@ buildings cream (`HULL_LIGHT`), walls a plain grey fill. Over either, once the b
 corner, reaching 6 px out past the left edge and folded round it, notched at its right end, with a
 skull (20 px, `HudIcon`'s mark in the text colour) per step of difficulty, the band's place in
 the catalog's order of bands (easy one, even two, hard three); and "CC N" in `CardChip` on a pill
-(`CARD_DISABLED`, skin C's darker cream, a 2 px ink ring) over the top-right corner. Its drawing is
+(`CARD_DISABLED`, a 2 px ink ring) over the top-right corner. Its drawing is
 kept (**Known cost**).
 
 **Layouts.** The fields are laid out (`OutpostGenerator.generate_field`, up to 25 ms for a hard
@@ -705,7 +664,7 @@ every one, so quitting with tasks in flight is safe. Once all six are in, proces
 nothing is laid out or drawn per frame.
 
 **Known cost.** Every drawing the map holds is kept: a plate or the minimap keeps its `HudIcon.Pen`
-and builds it again only when its field, its band, its size or the skin changes (showing the field
+and builds it again only when its field, its band or its size changes (showing the field
 already shown changes nothing); the stamps and the swatches when their size does, and the loot icons
 (`LootIcon`, a `HudIcon` that keeps its drawing) when their size, kind, colour, wing or coin does. Showing a control draws it again, so without this every
 open rebuilt them all, the 21 loot icons alone about 8 ms. The cards and the detail are built once in
@@ -771,7 +730,7 @@ and when the timer's second changes); its panels and buttons take theirs.
 | Status panel | top left | the time left as `m:ss` (`seconds_left`, Bangers 28), the destruction as "41%" (`destruction_pct`, Bangers 28) with "destruction" dim beside it at 17, and the three stars, `HudIcon`'s `star` at 36 px: the buildings' dark hull grey (`MaterialKit.HULL_DARK`, `BattleHud.UNEARNED`) with the ink outline until won, gold once won |
 | Loot | top centre, one pill in the status panel's shape | per resource its icon in its colour on a trough coin (40 px, the silhouette 28) and the amount taken so far (`loot()`, `Format.short`) at 20 px in the text colour |
 | Speed and End | top right, 24 apart | speed 96×64 (`1x`/`2x`, toggling `BattleView.speed` through `SPEEDS`), End 140×64 in the defence red with ink text (`EndButton`), which opens the confirmation; both disabled once the battle ends |
-| Deploy bar | along the bottom from the left margin, as wide as its cards (and scrolling when they would reach the Build button's column, which stays clear), the rest of the bottom edge left to the field | a panel (`BattleBar`, skin A's bottom panel) with a strip of cards (124×136), one per unit type brought in sorted order: the unit's picture (64×64, its attacker's level's tier), its name (17) and "xN" left (22, `left_to_deploy`). A press selects the type (`BattleCardSelected`: the cyan fill, a 3 px ink ring 5 px inside its edge framing the picture, its text in ink) or, on the selected card, lets it go; the first card starts selected. A type run out is let go and its card shown at 55 %. Cards PASS, so a drag on one scrolls the strip |
+| Deploy bar | along the bottom from the left margin, as wide as its cards (and scrolling when they would reach the Build button's column, which stays clear), the rest of the bottom edge left to the field | a panel (`BattleBar`, the bottom panel's shape) with a strip of cards (124×136), one per unit type brought in sorted order: the unit's picture (64×64, its attacker's level's tier), its name (17) and "xN" left (22, `left_to_deploy`). A press selects the type (`BattleCardSelected`: the cyan fill, a 3 px ink ring 5 px inside its edge framing the picture, its text in ink) or, on the selected card, lets it go; the first card starts selected. A type run out is let go and its card shown at 55 %. Cards PASS, so a drag on one scrolls the strip |
 | Abilities bar | along the bottom, right of the deploy bar after a 16-unit gap, as wide as its cards; the deploy bar scrolls in what is left, the Build column still clear; hidden when no ability is brought | the same panel with a card per ability brought (above 0) in the catalog's order: its emblem on its coin (**Ability glyphs**, 64 px), its name and "xN" left (`left_to_use`) as the deploy cards'. A press selects the ability and lets the unit type go, so the red zone hides (a unit card's press does the reverse); on the selected card it lets it go. A tap on the field then casts it at the cell, anywhere on the field (`BattleView.cast`); a drag pans. An ability run out is let go and its card shown at 55 % |
 | Confirmation | centred, over the ink at 55 % across the whole screen that takes every touch while it is open, so no tap or drag beside the panel reaches the field | "End the battle?" (Bangers 30), Keep fighting (cyan, the safe choice, 200×72) and End battle (the card's fill, 180×72), which surrenders (`BattleView.surrender`) |
 | Result panel | top centre, 12 under the loot pill, on `ended`, 720 wide, its height capped so Return ends `MARGIN` above the safe area's bottom, the panel's shape with the light inner line the base's panels have (`_draw_edge`) | the title on a rounded banner across the top, gold with "Victory!" when a star was won, else red with "Defeat", in Bangers 48 in ink; the stars at 80 px (won gold, the rest the dark hull grey) over the destruction as "41%" (Bangers 40) with "destruction" dim, beside the loot as three rows of a coin and "+amount" at 24 px; "Units deployed" (or "No units deployed") over a strip of each type's picture (64 px, the deploy cards') with its count "xN" on a chip at its lower right corner (17 px, the disabled card's fill, an ink ring) and its name under it at 17 (the result's `deployed`); "Abilities used", when any was, the same with each ability's emblem at 48 px (the result's `abilities_used`); a strip too wide for the panel wraps. All between the banner and Return sits in a vertical scroll that scrolls only when it would not fit (`_fit_result`, again on a resize and once a wrapped strip knows its height), so the banner and Return stay in place. Return, gold, 240×72, leaves the battle (`BattleView.leave`). The deploy and abilities bars hide and Speed and End are disabled |
@@ -779,8 +738,7 @@ and when the timer's second changes); its panels and buttons take theirs.
 
 Every part takes a variation of its own (`BattlePanel`, `BattleBar`, `BattleCard`, `BattleBarButton`,
 `EndButton`, `BattleConfirmButton`, `BattleCommitButton`, the `Battle*` labels, the banners, the
-chip, the result's scroll bar and the toast's, its text `BattleToastText` included), made in the Battle HUD block at the end of `_make_theme` after the skin's,
-so the attack HUD is the same under every skin (**Skins**). Every control tapped mid-battle is at
+chip, the result's scroll bar and the toast's, its text `BattleToastText` included), made in the Battle HUD block at the end of `_make_theme`. Every control tapped mid-battle is at
 least 64 tall; no text is under 17 px.
 
 The top bar's text is set on the view's `stepped`, only where what it shows changed: the time,
@@ -828,8 +786,7 @@ is the top bar's meter for a resource and `resource_fill(res)` its fill, whose p
 whose `free_count()` and `total_count()` are the counts it shows; `reset_button()` and
 `template_button()` are the debug row's Reset base and Template base, and `practice_button()` its
 Practice raid (null in a release build). `ui_theme()` and `preview()` hand the theme and the
-pictures to the battle's HUD. `Hud.skin` is the skin the theme is built in and `set_skin(look)`
-restyles the HUD in another (**Skins**).
+pictures to the battle's HUD.
 The army: `housing_text()`, `housing_bar()` and `housing_fill()` are the training header's
 housing meter's text ("used / capacity", or the no-Hangar line), the meter (hidden with no Hangar)
 and its fill, whose parent is the track it grows across; `action_button()` is the info panel's

@@ -113,9 +113,7 @@ tap away; the difficulty words unchanged.
 - **The skin pick**: the owner has not chosen between A, B and C; A is landed as the default and the
   roll-out is on it. B and C stay behind `Hud.Look` until the pick; the pick's follow-up is either
   deleting B and C (two small commits and the `hud_*.png` textures) or a cream pass over the army
-  panel, queue, info panel and sector map for C.
-- **Skin C's seams** in the rolled-out surfaces (the queue head's outlined text, the housing meter's
-  dark trough) are known and not fixed.
+  panel, queue, info panel and sector map for C. On 2026-10-29 the owner chose A; B and C were deleted.
 - **The info panel's picture** is blank for the first frames after selecting a building whose picture
   is not made yet, then fills on its own; and it is the level-1 picture of the type.
 - **The result panel**: a fade at the scroll's bottom edge would say "more below" better than the bar.
@@ -129,7 +127,7 @@ tap away; the difficulty words unchanged.
 
 ## 6. Seeing it again
 
-`tools/harness/run.sh hud_directions --rendered` (the three skins on five screens), `drone_meter
+`tools/harness/run.sh hud_directions --rendered` (the HUD's gallery: five screens), `drone_meter
 --rendered`, `icon_sheet --rendered`, and the surfaces' own scenarios: `hud_menu`, `hud_layout`,
 `place_and_build`, `train_units`, `make_abilities`, `expedition_flow`, `battle_view`. Rendered runs
 take the machine-wide lock and want `caffeinate -d -i -u`, with the window visible.
