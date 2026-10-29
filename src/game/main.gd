@@ -475,11 +475,13 @@ func _on_sector_map_closed() -> void:
 		add_child(world_input)
 
 
-## The map's Scan: the next epoch, or why not as a toast.
+## The map's Scan: the next epoch with its sweep, or why not as a toast.
 func _on_scan_pressed() -> void:
 	var error := placement.scan()
 	if error != "":
 		hud.show_error(error)
+	else:
+		audio.play(&"scan", 0.0)
 
 
 ## The detail's Attack on field `index` (laid out as `field`): the army in the Hangars and the

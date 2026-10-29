@@ -219,6 +219,24 @@ const TABLE := {
 		{"wave": "sine", "hz": 110, "a": 0.0, "s": 1.0, "len": 20.1, "vibrato": [0.1, 6.0], "db": -16},
 		{"wave": "sine", "hz": 165, "a": 0.0, "s": 1.0, "len": 20.1, "vibrato": [0.15, 5.0], "db": -22}]},
 
+	# The sector map: open and closed, a scan's radar sweep and ping, a field's detail opened.
+	"map_open": {"category": "ui", "seconds": 0.42, "max": 0.45, "rms_db": -18.0, "layers": [
+		{"wave": "pink", "a": 0.12, "d": 0.25, "filter": {"type": "bp", "hz": [300, 3000], "q": 2.0}},
+		{"wave": "sine", "hz": [400, 1200], "a": 0.05, "d": 0.3, "db": -8},
+		{"wave": "sine", "hz": 1600, "at": 0.3, "a": 0.002, "d": 0.1, "db": -6}]},
+	"map_close": {"category": "ui", "seconds": 0.3, "max": 0.32, "rms_db": -18.0, "layers": [
+		{"wave": "pink", "a": 0.04, "d": 0.22, "filter": {"type": "bp", "hz": [2500, 350], "q": 1.6}},
+		{"wave": "sine", "hz": [1000, 350], "a": 0.02, "d": 0.22, "db": -8}]},
+	"scan": {"category": "chime", "seconds": 1.3, "rms_db": -16.0, "echo": {"ms": 180, "feedback": 0.35, "mix": 0.3}, "layers": [
+		{"wave": "noise", "a": 0.3, "d": 0.3, "s": 0.5, "len": 0.6, "r": 0.3, "filter": {"type": "bp", "hz": [400, 3200], "q": 3.0},
+			"db": -4},
+		{"wave": "sine", "hz": [300, 900], "sweep": "lin", "a": 0.2, "d": 0.7, "db": -10},
+		{"wave": "sine", "hz": E6, "at": 0.75, "a": 0.002, "d": 0.45, "fm": {"ratio": 2.0, "index": [0.5, 0.0]}}]},
+	"field_open": {"category": "ui", "seconds": 0.3, "max": 0.32, "rms_db": -19.0, "layers": [
+		{"wave": "triangle", "hz": [1800, 1200], "glide": 0.02, "a": 0.001, "d": 0.03, "db": -2},
+		{"wave": "sine", "hz": 110, "a": 0.03, "d": 0.25, "vibrato": [6.0, 15.0]},
+		{"wave": "sine", "hz": 220, "a": 0.03, "d": 0.2, "db": -8}]},
+
 	# The battle: shots, impacts and blasts.
 	"laser_fire": {"category": "shot", "seconds": 0.2, "layers": [
 		{"wave": "triangle", "hz": [2200, 380], "glide": 0.14, "a": 0.002, "d": 0.15, "fm": {"ratio": 2.0, "index": [1.0, 0.0]}},

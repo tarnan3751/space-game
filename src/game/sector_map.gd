@@ -70,7 +70,8 @@ const GROUND_COLOR := MaterialKit.FIELD_DARK
 const LEGEND := [["Command Center", HQ_COLOR], ["Defences", DEFENCE_COLOR], ["Storages and deposits", STORAGE_COLOR],
 	["Walls", WALL_COLOR], ["Other buildings", OTHER_COLOR]]
 
-## Plays the map's sounds (main.gd sets it): each button's tap by its kind (_button).
+## Plays the map's sounds (main.gd sets it): each button's tap by its kind (_button), the map
+## opening and its close button, a field's detail opening.
 var audio: Audio
 var _catalog: Catalog
 ## The state of the last refresh.
@@ -171,7 +172,8 @@ func setup(catalog: Catalog) -> void:
 	_scan_button = _button("SCAN", SCAN_SIZE, &"ConfirmButton")
 	_scan_button.pressed.connect(func() -> void: scan_pressed.emit())
 	header.add_child(_scan_button)
-	_close_button = _button("X", Hud.CLOSE_SIZE, &"CloseButton", &"ui_tap_soft")
+	# Its tap is the map closing; close() itself is quiet, since Attack closes the map for its battle.
+	_close_button = _button("X", Hud.CLOSE_SIZE, &"CloseButton", &"map_close")
 	_close_button.pressed.connect(close)
 	header.add_child(_close_button)
 	_hint = Label.new()
@@ -215,6 +217,7 @@ func setup(catalog: Catalog) -> void:
 
 ## Shows the map on the fields' page.
 func open(state: BaseState) -> void:
+	audio.play(&"map_open")
 	_show_fields()
 	_fit()
 	visible = true
@@ -312,6 +315,7 @@ func show_field(index: int) -> bool:
 	_fields.visible = false
 	_scan_button.visible = false
 	_detail.visible = true
+	audio.play(&"field_open")
 	return true
 
 
