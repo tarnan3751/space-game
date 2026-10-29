@@ -70,6 +70,8 @@ const GROUND_COLOR := MaterialKit.FIELD_DARK
 const LEGEND := [["Command Center", HQ_COLOR], ["Defences", DEFENCE_COLOR], ["Storages and deposits", STORAGE_COLOR],
 	["Walls", WALL_COLOR], ["Other buildings", OTHER_COLOR]]
 
+## Plays the map's sounds (main.gd sets it): each button's tap by its kind (_button).
+var audio: Audio
 var _catalog: Catalog
 ## The state of the last refresh.
 var _state: BaseState
@@ -169,7 +171,7 @@ func setup(catalog: Catalog) -> void:
 	_scan_button = _button("SCAN", SCAN_SIZE, &"ConfirmButton")
 	_scan_button.pressed.connect(func() -> void: scan_pressed.emit())
 	header.add_child(_scan_button)
-	_close_button = _button("X", Hud.CLOSE_SIZE, &"CloseButton")
+	_close_button = _button("X", Hud.CLOSE_SIZE, &"CloseButton", &"ui_tap_soft")
 	_close_button.pressed.connect(close)
 	header.add_child(_close_button)
 	_hint = Label.new()
@@ -490,7 +492,7 @@ func _show_fields() -> void:
 ## with the card while it is pressed, as a build card's does (Hud._sink).
 func _build_card() -> FieldCard:
 	var field_card := FieldCard.new()
-	field_card.button = _button("", CARD_SIZE, &"CardButton")
+	field_card.button = _button("", CARD_SIZE, &"CardButton", &"card_press")
 	# PASS, so a drag that starts on a card scrolls the fields where they do not fit (two columns,
 	# when a safe-area inset narrows the map); the panel still stops the touch from reaching the
 	# world.
@@ -639,7 +641,7 @@ func _build_detail(parent: Control) -> void:
 	buttons.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	buttons.add_theme_constant_override("separation", 16)
 	side.add_child(buttons)
-	_back_button = _button("Back", BACK_SIZE, &"BarButton")
+	_back_button = _button("Back", BACK_SIZE, &"BarButton", &"ui_tap_soft")
 	_back_button.pressed.connect(_show_fields)
 	buttons.add_child(_back_button)
 	_attack_button = _button("ATTACK", ATTACK_SIZE, &"CommitButton")
@@ -668,13 +670,20 @@ func _fill(field_card: FieldCard, field: Dictionary) -> void:
 	field_card.no_loot.visible = not any
 
 
-func _button(text: String, min_size: Vector2, variation: StringName = &"") -> Button:
+## A button of `variation` that plays `tap` when pressed, as the HUD's do (Hud._button).
+func _button(text: String, min_size: Vector2, variation: StringName = &"", tap: StringName = &"ui_tap") -> Button:
 	var button := Button.new()
 	button.text = text
 	button.theme_type_variation = variation
 	button.custom_minimum_size = min_size
 	button.focus_mode = Control.FOCUS_NONE
+	if tap != &"":
+		button.pressed.connect(_tap.bind(tap))
 	return button
+
+
+func _tap(key: StringName) -> void:
+	audio.play(key, Audio.TAP_JITTER)
 
 
 func _resource_color(res: String) -> Color:

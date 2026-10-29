@@ -36,10 +36,30 @@ const E6 := 1318.51
 const G6 := 1567.98
 
 const TABLE := {
-	# The menus.
+	# UI and base: the taps by the kind of button (Hud._button, SectorMap._button), soft attacks,
+	# sine and triangle blips, and a refusal's low buzz; the build and army panels sliding.
 	"ui_tap": {"category": "ui", "seconds": 0.09, "layers": [
 		{"wave": "sine", "hz": [1250, 880], "glide": 0.04, "a": 0.002, "d": 0.07},
 		{"wave": "triangle", "hz": 2500, "a": 0.001, "d": 0.02, "db": -12}]},
+	"ui_tap_soft": {"category": "ui", "seconds": 0.09, "rms_db": -22.0, "layers": [
+		{"wave": "sine", "hz": [820, 600], "glide": 0.04, "a": 0.003, "d": 0.07},
+		{"wave": "triangle", "hz": 1640, "a": 0.002, "d": 0.02, "db": -16}]},
+	"ui_tab": {"category": "ui", "seconds": 0.12, "layers": [
+		{"wave": "sine", "hz": 740, "a": 0.002, "d": 0.05},
+		{"wave": "triangle", "hz": 1480, "a": 0.001, "d": 0.015, "db": -14},
+		{"wave": "sine", "hz": 1110, "at": 0.045, "a": 0.002, "d": 0.065},
+		{"wave": "triangle", "hz": 2220, "at": 0.045, "a": 0.001, "d": 0.015, "db": -14}]},
+	"ui_denied": {"category": "ui", "seconds": 0.18, "max": 0.18, "rms_db": -17.0, "layers": [
+		{"wave": "square", "pulse": 0.4, "hz": 155, "a": 0.004, "d": 0.03, "s": 0.6, "len": 0.05, "r": 0.025,
+			"filter": {"type": "lp", "hz": 1100}},
+		{"wave": "triangle", "hz": 77.5, "a": 0.004, "d": 0.03, "s": 0.6, "len": 0.05, "r": 0.025, "db": -6},
+		{"wave": "square", "pulse": 0.4, "hz": 130, "at": 0.08, "a": 0.004, "d": 0.03, "s": 0.6, "len": 0.05, "r": 0.03,
+			"filter": {"type": "lp", "hz": 1000}},
+		{"wave": "triangle", "hz": 65, "at": 0.08, "a": 0.004, "d": 0.03, "s": 0.6, "len": 0.05, "r": 0.03, "db": -6}]},
+	"card_press": {"category": "ui", "seconds": 0.08, "min": 0.04, "layers": [
+		{"wave": "triangle", "hz": [2000, 1300], "glide": 0.02, "a": 0.001, "d": 0.03},
+		{"wave": "sine", "hz": [520, 380], "glide": 0.05, "a": 0.001, "d": 0.065, "db": -3},
+		{"wave": "noise", "a": 0.0005, "d": 0.008, "filter": {"type": "hp", "hz": 4000}, "db": -12}]},
 	"ui_open": {"category": "ui", "seconds": 0.22, "max": 0.25, "rms_db": -18.0, "layers": [
 		{"wave": "pink", "a": 0.07, "d": 0.12, "filter": {"type": "bp", "hz": [400, 2600], "q": 1.4}},
 		{"wave": "sine", "hz": [320, 760], "a": 0.03, "d": 0.16, "db": -4}]},
@@ -47,7 +67,7 @@ const TABLE := {
 		{"wave": "pink", "a": 0.05, "d": 0.14, "filter": {"type": "bp", "hz": [2600, 450], "q": 1.4}},
 		{"wave": "sine", "hz": [760, 300], "a": 0.02, "d": 0.16, "db": -8}]},
 
-	# The base.
+	# The base: a building tapped, a construction started (an upgrade's too) and finished.
 	"select_building": {"category": "ui", "seconds": 0.14, "layers": [
 		{"wave": "triangle", "hz": 660, "a": 0.002, "d": 0.06},
 		{"wave": "sine", "hz": 990, "at": 0.045, "a": 0.002, "d": 0.08}]},

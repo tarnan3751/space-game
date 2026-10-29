@@ -29,8 +29,9 @@ extends Node3D
 ## untouched by it.
 ##
 ## The sounds (Audio, main.audio) are wired in _wire_audio: the base's events through their
-## signals, the HUD's buttons through Audio.tap_buttons, and the battle's shots and landings by
-## handing the node to the battle view.
+## signals, the HUD and the sector map by handing them the node, which their buttons play their
+## taps on; the attack HUD's buttons through Audio.tap_buttons, and the battle's shots and
+## landings by handing the node to the battle view.
 
 const DEFAULT_SAVE_PATH := "user://base.json"
 const SAVE_PATH_ARG := "--save-path="
@@ -162,15 +163,13 @@ func _ready() -> void:
 
 
 ## The sounds of the base and its HUD (docs/reference/audio.md, **Hooks**): a building tapped and
-## a construction started (PlacementController), finished (BaseView), every HUD button's tap, and
-## the build panel opening and closing.
+## a construction started (PlacementController), finished (BaseView); the HUD and the sector map
+## play their own (their buttons' taps, the panels).
 func _wire_audio() -> void:
+	hud.audio = audio
+	sector_map.audio = audio
 	placement.sound = _base_sound
 	base_view.building_finished.connect(func(_id: int) -> void: _base_sound(&"build_done", 0.0))
-	audio.tap_buttons(hud)
-	# The HUD's own handler ran first, so the panel is already open or closed.
-	hud.build_button().pressed.connect(func() -> void: audio.play(&"ui_open" if hud.is_menu_open() else &"ui_close"))
-	hud.close_button().pressed.connect(func() -> void: audio.play(&"ui_close"))
 
 
 ## Plays the base's sound `key` (its pitch varied up to `pitch_jitter`), unless a battle runs in the
@@ -437,11 +436,12 @@ func open_battle(setup: Dictionary, practice: bool, expedition: Dictionary = {})
 	if error != "":
 		view.free()
 		return error
+	# The HUD hides first, so the panels the deselection closes slide away unheard.
+	hud.visible = false
 	placement.cancel_place()
 	placement.select(0)
 	remove_child(base_view)
 	remove_child(world_input)
-	hud.visible = false
 	battle = view
 	add_child(battle)
 	audio.music(&"combat", 1.5)

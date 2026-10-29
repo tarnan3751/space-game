@@ -32,7 +32,7 @@ const LIMIT_DB := -0.3
 const DUCK_DB := -8.0
 const DUCK_DOWN := 0.1
 const DUCK_UP := 0.5
-## A button tap's pitch variation.
+## A button tap's pitch variation (Hud._button, SectorMap._button, tap_buttons).
 const TAP_JITTER := 0.03
 
 ## Where the volumes are kept; main points it beside the save when the run has its own.
@@ -263,8 +263,9 @@ func volume(bus: StringName) -> float:
 	return AudioServer.get_bus_volume_linear(AudioServer.get_bus_index(bus))
 
 
-## Every button under `root` plays ui_tap when pressed, once however often it is asked. A stopgap
-## until the HUD's button helpers play it themselves (audio.md, **Hooks**).
+## Every button under `root` plays ui_tap when pressed, once however often it is asked: the attack
+## HUD's, a stopgap until its button helper plays the tap itself as the base HUD's and the sector
+## map's do (audio.md, **Hooks**).
 func tap_buttons(root: Node) -> void:
 	for node: Node in root.find_children("*", "BaseButton", true, false):
 		var button := node as BaseButton

@@ -255,9 +255,14 @@ const HOUSING_COIN := 36.0
 const HOUSING_KEY := "housing"
 ## The training header's and a producer's info panel's line while the base has no Hangar.
 const NO_HANGAR := "No Hangar: build one to house units"
+## How far a finger may move between down and up on a disabled card for its lift to buzz (px).
+const DENY_SLOP := 16.0
 
 ## The dev cheats are on (main.gd): every meter shows, full, reading "∞" instead of amount / cap.
 var cheats: bool = false
+## Plays the HUD's sounds (main.gd sets it): each button's tap by its kind (_button), the panels
+## sliding, a refused press.
+var audio: Audio
 var _catalog: Catalog
 var _theme: Theme
 ## Holds every part but the build panel; positioned on the safe area.
@@ -418,6 +423,10 @@ var _research_cards: Dictionary[String, ArmyCard] = {}
 ## last showed, so a tick sets its text only when they changed.
 var _research_prefix: String = ""
 var _research_seconds: int = -1
+## The frame ui_denied last played in (_deny), and where the last press on a disabled card came
+## down (_on_card_input).
+var _denied_frame: int = -1
+var _press_at: Vector2 = Vector2.ZERO
 
 
 ## A build card's parts that a refresh sets, and what it last showed.
@@ -1031,17 +1040,41 @@ func _on_build_button() -> void:
 	_slide_menu(not _menu_open)
 
 
+## A press on a card that cannot be pressed now (disabled: locked, unaffordable, no drone) buzzes
+## when the finger lifts where it came down, so a drag that scrolls the strip says nothing; an
+## enabled card plays its tap (_button).
+func _on_card_input(event: InputEvent, button: Button) -> void:
+	var press := event as InputEventMouseButton
+	if press == null or press.button_index != MOUSE_BUTTON_LEFT or not button.disabled:
+		return
+	if press.pressed:
+		_press_at = press.global_position
+	elif press.global_position.distance_to(_press_at) < DENY_SLOP:
+		_deny()
+
+
+## ui_denied, once in a frame however many refusals ask for it: a disabled card's press and a
+## refusal's toast in the same frame sound once.
+func _deny() -> void:
+	var frame := Engine.get_process_frames()
+	if frame != _denied_frame:
+		_denied_frame = frame
+		audio.play(&"ui_denied", Audio.TAP_JITTER)
+
+
 func _on_card_pressed(type: String) -> void:
 	_slide_menu(false)
 	build_pressed.emit(type)
 
 
 ## Slides the panel up from below the screen's bottom edge, or back down and out of the
-## way (_slide).
+## way (_slide), with ui_open or ui_close while the HUD shows.
 func _slide_menu(open: bool) -> void:
 	if open == _menu_open:
 		return
 	_menu_open = open
+	if visible:
+		audio.play(&"ui_open" if open else &"ui_close")
 	if open and _state != null:
 		_refresh_entries(_state)
 	# The cards' pictures render while the panel is open, the selected tab's first.
@@ -1125,6 +1158,8 @@ func _page_for(type: String) -> ArmyPage:
 func _open_army(page: ArmyPage) -> void:
 	if page == ArmyPage.NONE:
 		return
+	if visible:
+		audio.play(&"ui_open")
 	_army_page = page
 	_army_id = _selected_id
 	_queue_id = 0
@@ -1149,6 +1184,8 @@ func _open_army(page: ArmyPage) -> void:
 func _close_army() -> void:
 	if _army_page == ArmyPage.NONE:
 		return
+	if visible:
+		audio.play(&"ui_close")
 	_army_page = ArmyPage.NONE
 	_run_preview()
 	_army_tween = _slide(_army, false, _army_tween)
@@ -1993,7 +2030,7 @@ func _build_menu() -> void:
 	column.add_child(tabs)
 	var group := ButtonGroup.new()
 	for category: String in _catalog.categories:
-		var tab := _button(_catalog.category_name(category), TAB_SIZE, &"TabButton")
+		var tab := _button(_catalog.category_name(category), TAB_SIZE, &"TabButton", &"ui_tab")
 		tab.toggle_mode = true
 		tab.button_group = group
 		tab.pressed.connect(_on_tab_pressed.bind(category))
@@ -2003,7 +2040,7 @@ func _build_menu() -> void:
 	gap.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	gap.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	tabs.add_child(gap)
-	_close_button = _button("X", CLOSE_SIZE, &"CloseButton")
+	_close_button = _button("X", CLOSE_SIZE, &"CloseButton", &"ui_tap_soft")
 	_close_button.pressed.connect(func() -> void: _slide_menu(false))
 	tabs.add_child(_close_button)
 
@@ -2052,11 +2089,12 @@ func _build_menu() -> void:
 ## `_refresh_entries` fills them. The card's drawn parts (CardArt) are one triangle array under the
 ## picture; its content sinks with it when pressed.
 func _build_entry(type: String) -> Button:
-	var button := _button("", CARD_SIZE, &"CardButton")
+	var button := _button("", CARD_SIZE, &"CardButton", &"card_press")
 	# PASS, so a drag that starts on a card reaches the ScrollContainer and scrolls the
 	# strip; the panel behind still stops the touch from reaching the world.
 	button.mouse_filter = Control.MOUSE_FILTER_PASS
 	button.pressed.connect(_on_card_pressed.bind(type))
+	button.gui_input.connect(_on_card_input.bind(button))
 	var card := BuildCard.new()
 	var body := _card_body(button)
 	card.art = CardArt.new()
@@ -2281,7 +2319,7 @@ func _build_army_panel() -> void:
 	gap.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	gap.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	header.add_child(gap)
-	_army_close = _button("X", CLOSE_SIZE, &"CloseButton")
+	_army_close = _button("X", CLOSE_SIZE, &"CloseButton", &"ui_tap_soft")
 	_army_close.pressed.connect(_on_army_close)
 	header.add_child(_army_close)
 
@@ -2497,8 +2535,9 @@ func _strip(parent: Control, height: float) -> HBoxContainer:
 ## its content takes no touch and sinks with it when pressed.
 func _build_army_card(id: String, ability: bool, tint: Color, right_chip: bool) -> ArmyCard:
 	var card := ArmyCard.new()
-	card.button = _button("", ARMY_CARD_SIZE, &"CardButton")
+	card.button = _button("", ARMY_CARD_SIZE, &"CardButton", &"card_press")
 	card.button.mouse_filter = Control.MOUSE_FILTER_PASS
+	card.button.gui_input.connect(_on_card_input.bind(card.button))
 	var body := _card_body(card.button)
 	card.art = CardArt.new()
 	card.art.mouse_filter = Control.MOUSE_FILTER_IGNORE
@@ -2580,7 +2619,8 @@ func _build_army_card(id: String, ability: bool, tint: Color, right_chip: bool) 
 ## so a drag on it scrolls the strip.
 func _build_queue_entry(index: int) -> ArmyCard:
 	var entry := ArmyCard.new()
-	entry.button = _button("", QUEUE_ENTRY_SIZE)
+	# Silent itself: the refund, or its refusal, is what it sounds of.
+	entry.button = _button("", QUEUE_ENTRY_SIZE, &"", &"")
 	entry.button.mouse_filter = Control.MOUSE_FILTER_PASS
 	entry.button.pressed.connect(_on_queue_entry.bind(index))
 	if index == 0:
@@ -2662,7 +2702,7 @@ func _build_place_bar() -> void:
 	row.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	row.add_theme_constant_override("separation", 16)
 	panel.add_child(row)
-	var cancel := _button("Cancel", Vector2(170, 72), &"BarButton")
+	var cancel := _button("Cancel", Vector2(170, 72), &"BarButton", &"ui_tap_soft")
 	cancel.pressed.connect(func() -> void: cancel_pressed.emit())
 	row.add_child(cancel)
 	_place_button = _button("Place", Vector2(170, 72), &"CommitButton")
@@ -2715,7 +2755,7 @@ func _build_info_panel() -> void:
 	_action_button.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 	_action_button.pressed.connect(_on_action_pressed)
 	header.add_child(_action_button)
-	var close := _button("Close", INFO_CLOSE_SIZE)
+	var close := _button("Close", INFO_CLOSE_SIZE, &"", &"ui_tap_soft")
 	close.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 	close.pressed.connect(func() -> void: close_pressed.emit())
 	header.add_child(close)
@@ -2791,15 +2831,15 @@ func _build_debug_buttons() -> void:
 	row.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	row.add_theme_constant_override("separation", 10)
 	column.add_child(row)
-	var practice := _button("Practice raid", DEBUG_SIZE, &"DebugButton")
+	var practice := _button("Practice raid", DEBUG_SIZE, &"DebugButton", &"ui_tap_soft")
 	practice.pressed.connect(func() -> void: practice_pressed.emit())
 	row.add_child(practice)
 	_practice_button = practice
-	var template := _button("Template base", DEBUG_SIZE, &"DebugButton")
+	var template := _button("Template base", DEBUG_SIZE, &"DebugButton", &"ui_tap_soft")
 	template.pressed.connect(func() -> void: template_pressed.emit())
 	row.add_child(template)
 	_template_button = template
-	var reset := _button("Reset base", DEBUG_SIZE, &"DebugButton")
+	var reset := _button("Reset base", DEBUG_SIZE, &"DebugButton", &"ui_tap_soft")
 	reset.pressed.connect(func() -> void: reset_pressed.emit())
 	row.add_child(reset)
 	_reset_button = reset
@@ -2814,13 +2854,22 @@ func _card_label(parent: Control, text: String, variation: StringName) -> Label:
 	return label
 
 
-func _button(text: String, min_size: Vector2, variation: StringName = &"") -> Button:
+## A button of `variation` that plays `tap` when pressed: ui_tap for a primary, ui_tap_soft for a
+## secondary or a close, ui_tab for a tab, card_press for a card; &"" for none, when what the press
+## does makes the sound.
+func _button(text: String, min_size: Vector2, variation: StringName = &"", tap: StringName = &"ui_tap") -> Button:
 	var button := Button.new()
 	button.text = text
 	button.theme_type_variation = variation
 	button.custom_minimum_size = min_size
 	button.focus_mode = Control.FOCUS_NONE
+	if tap != &"":
+		button.pressed.connect(_tap.bind(tap))
 	return button
+
+
+func _tap(key: StringName) -> void:
+	audio.play(key, Audio.TAP_JITTER)
 
 
 ## Pins a control to the bottom centre; it grows upward to fit its content.
