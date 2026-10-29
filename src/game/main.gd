@@ -172,11 +172,15 @@ func _wire_audio() -> void:
 	base_view.building_finished.connect(func(_id: int) -> void: _base_sound(&"build_done", 0.0))
 
 
-## Plays the base's sound `key` (its pitch varied up to `pitch_jitter`), unless a battle runs in the
-## base's place (its view keeps syncing out of the tree, and a construction finishing then is not
-## heard).
-func _base_sound(key: StringName, pitch_jitter: float = 0.06) -> void:
-	if battle == null:
+## Plays the base's sound `key` (its pitch varied up to `pitch_jitter`), `delay` seconds from now
+## when it is given (Audio.schedule), unless a battle runs in the base's place (its view keeps
+## syncing out of the tree, and a construction finishing then is not heard).
+func _base_sound(key: StringName, pitch_jitter: float = 0.06, delay: float = 0.0) -> void:
+	if battle != null:
+		return
+	if delay > 0.0:
+		audio.schedule(key, delay, pitch_jitter)
+	else:
 		audio.play(key, pitch_jitter)
 
 

@@ -30,12 +30,16 @@ const EDGE_MARGIN := 0.08
 ## The scroll speed at the very edge, in viewport widths per second; it falls off linearly
 ## to nothing at the margin's inner side. One viewport width is the visible world width.
 const EDGE_SCROLL_SPEED := 0.6
+## A place's build_start follows its place_ok this long after (seconds).
+const PLACE_TO_BUILD := 0.2
 
 var state: BaseState
 var base_view: BaseView
 var camera: IsoCamera
-## Plays a sound of the base by its key (a building tapped, a construction started); main's
-## _base_sound, which stays quiet while a battle runs.
+## Plays a sound of the base by its key, a pitch jitter and a delay (a building tapped by its
+## category, the ghost or a dragged building ticking from cell to cell, a place and its
+## construction starting after it, a wall placed, a building lifted and set down, an upgrade
+## started); main's _base_sound, which stays quiet while a battle runs.
 var sound: Callable
 ## Returns the current unix time in seconds. Injected so a server clock can replace it.
 var clock: Callable
@@ -119,7 +123,9 @@ func begin_place(type: String) -> void:
 	var centre: Variant = camera.ground_point(camera.get_viewport().get_visible_rect().size * 0.5)
 	if typeof(centre) == TYPE_VECTOR3:
 		start = base_view.footprint_cell_at(centre, size)
-	_set_ghost_cell(_find_free_cell(start, size))
+	# Already on its first cell, so it starts without a tick.
+	_ghost_cell = _clamp_cell(_find_free_cell(start, size), size)
+	_set_ghost_cell(_ghost_cell)
 
 
 ## Places the ghost's building and selects it; while painting, only ends the mode (Done).
@@ -135,7 +141,9 @@ func confirm_place() -> void:
 		command_failed.emit(error)
 		return
 	var new_id := state.last_added_id
-	sound.call(&"build_start")
+	# The confirm's thunk, then the drone's whoosh as the construction starts.
+	sound.call(&"place_ok", 0.03)
+	sound.call(&"build_start", 0.06, PLACE_TO_BUILD)
 	cancel_place()
 	select(new_id)
 
@@ -192,10 +200,13 @@ func _paint_to(cell: Vector2i) -> void:
 
 
 ## One cell of a stroke. A taken cell is skipped quietly; any other failure (resources,
-## the count limit) is shown once a stroke, and the next stroke tries again.
+## the count limit) is shown once a stroke, and the next stroke tries again. Every wall placed
+## plays wall_paint, which its cooldown spaces into a ratchet on a fast stroke.
 func _paint(cell: Vector2i) -> void:
 	var command := {"op": "place", "type": placing_type, "cell": [cell.x, cell.y]}
 	var error := state.apply(command, clock.call())
+	if error == "":
+		sound.call(&"wall_paint", 0.08)
 	if error == "" or error == BaseState.ERR_BLOCKED or _paint_failed:
 		return
 	_paint_failed = true
@@ -301,7 +312,7 @@ func _on_tapped(screen_pos: Vector2) -> void:
 	var id := building.id if building != null else 0
 	# A tap on the building already selected selects nothing new: no sound.
 	if id != 0 and id != selected_id:
-		sound.call(&"select_building")
+		sound.call(Sounds.select_key(state.catalog.category_of(building.type)), 0.03)
 	select(id)
 
 
@@ -332,6 +343,7 @@ func _on_drag_started(screen_pos: Vector2) -> void:
 		_drag_cell = building.cell
 		_grab_offset = building.cell - cell
 		base_view.dragging_id = building.id
+		sound.call(&"drag_pickup", 0.04)
 		# A lifted wall leaves the merged wall mesh at once, and its own post shows.
 		base_view.sync(state)
 
@@ -352,10 +364,13 @@ func _on_dragged(screen_pos: Vector2, screen_delta: Vector2) -> void:
 		_paint_to(cell)
 	elif _drag == Drag.BUILDING and base_view.views.has(_drag_id):
 		var view: BuildingView = base_view.views[_drag_id]
-		_drag_cell = _clamp_cell(cell + _grab_offset, view.footprint_size)
+		var moved := _clamp_cell(cell + _grab_offset, view.footprint_size)
+		var ok := state.check_move(_drag_id, moved) == ""
+		if moved != _drag_cell:
+			sound.call(&"ghost_tick" if ok else &"ghost_tick_low", 0.02)
+		_drag_cell = moved
 		view.position = base_view.cell_to_world(_drag_cell, view.footprint_size)
 		view.set_lifted(true)
-		var ok := state.check_move(_drag_id, _drag_cell) == ""
 		view.set_footprint(BuildingView.Footprint.VALID if ok else BuildingView.Footprint.INVALID)
 
 
@@ -363,11 +378,15 @@ func _on_drag_ended(_screen_pos: Vector2) -> void:
 	if _drag == Drag.BUILDING:
 		base_view.dragging_id = 0
 		var building: BuildingState = state.buildings.get(_drag_id)
+		# Set down where it was or moved, it lands; a refused move's toast buzzes instead.
+		var error := ""
 		if building != null and building.cell != _drag_cell:
 			var command := {"op": "move", "id": _drag_id, "cell": [_drag_cell.x, _drag_cell.y]}
-			var error := state.apply(command, clock.call())
+			error = state.apply(command, clock.call())
 			if error != "":
 				command_failed.emit(error)
+		if building != null and error == "":
+			sound.call(&"drag_drop", 0.04)
 		base_view.sync(state)
 	_set_drag(Drag.NONE)
 
@@ -432,10 +451,17 @@ func _show_grid() -> void:
 	base_view.set_grid_highlight(is_placing() or _drag == Drag.BUILDING)
 
 
+## Moves the ghost (the wall brush while painting) to `cell`, clamped to the grid. A move to
+## another cell ticks, lower over a spot it cannot take; the brush's moves are quiet, its stroke
+## sounds (_paint).
 func _set_ghost_cell(cell: Vector2i) -> void:
-	_ghost_cell = _clamp_cell(cell, _ghost.footprint_size)
+	var clamped := _clamp_cell(cell, _ghost.footprint_size)
+	var moved := clamped != _ghost_cell
+	_ghost_cell = clamped
 	_ghost.position = base_view.cell_to_world(_ghost_cell, _ghost.footprint_size)
 	var valid := ghost_is_valid()
+	if moved and not _painting:
+		sound.call(&"ghost_tick" if valid else &"ghost_tick_low", 0.02)
 	_ghost.set_footprint(BuildingView.Footprint.VALID if valid else BuildingView.Footprint.INVALID)
 	_ghost.set_ghost(valid)
 	placing_changed.emit()

@@ -67,10 +67,59 @@ const TABLE := {
 		{"wave": "pink", "a": 0.05, "d": 0.14, "filter": {"type": "bp", "hz": [2600, 450], "q": 1.4}},
 		{"wave": "sine", "hz": [760, 300], "a": 0.02, "d": 0.16, "db": -8}]},
 
-	# The base: a building tapped, a construction started (an upgrade's too) and finished.
-	"select_building": {"category": "ui", "seconds": 0.14, "layers": [
-		{"wave": "triangle", "hz": 660, "a": 0.002, "d": 0.06},
-		{"wave": "sine", "hz": 990, "at": 0.045, "a": 0.002, "d": 0.08}]},
+	# Placing: the ghost's ticks as it moves (lower over a spot it cannot take), the place's clunk
+	# and chime, Cancel's fall, a wall placed (a ratchet along a stroke), a building lifted and set down.
+	"ghost_tick": {"category": "ui", "seconds": 0.05, "min": 0.02, "max": 0.06, "rms_db": -24.0,
+		"cooldown": 0.05, "voices": 2, "layers": [
+		{"wave": "sine", "hz": 1500, "a": 0.001, "d": 0.03},
+		{"wave": "triangle", "hz": 3000, "a": 0.001, "d": 0.01, "db": -14}]},
+	"ghost_tick_low": {"category": "ui", "seconds": 0.05, "min": 0.02, "max": 0.06, "rms_db": -24.0,
+		"cooldown": 0.05, "voices": 2, "layers": [
+		{"wave": "sine", "hz": 620, "a": 0.001, "d": 0.035},
+		{"wave": "triangle", "hz": 1240, "a": 0.001, "d": 0.012, "db": -14}]},
+	"place_ok": {"category": "ui", "seconds": 0.38, "max": 0.4, "rms_db": -18.0, "chorus": {"mix": 0.25}, "layers": [
+		{"wave": "sine", "hz": [190, 90], "glide": 0.06, "a": 0.001, "d": 0.12},
+		{"wave": "noise", "a": 0.001, "d": 0.03, "filter": {"type": "lp", "hz": [3000, 500]}, "db": -8},
+		{"wave": "triangle", "hz": 330, "a": 0.001, "d": 0.06, "filter": {"type": "lp", "hz": 1200}, "db": -6},
+		{"wave": "sine", "hz": G5, "at": 0.07, "a": 0.003, "d": 0.2, "fm": {"ratio": 2.0, "index": [0.6, 0.0]}, "db": -6},
+		{"wave": "sine", "hz": C6, "at": 0.13, "a": 0.003, "d": 0.22, "fm": {"ratio": 2.0, "index": [0.6, 0.0]}, "db": -6}]},
+	"cancel": {"category": "ui", "seconds": 0.12, "rms_db": -21.0, "layers": [
+		{"wave": "sine", "hz": [900, 380], "glide": 0.08, "a": 0.002, "d": 0.1},
+		{"wave": "triangle", "hz": [1800, 760], "glide": 0.08, "a": 0.002, "d": 0.03, "db": -14}]},
+	"wall_paint": {"category": "ui", "seconds": 0.1, "cooldown": 0.05, "layers": [
+		{"wave": "sine", "hz": [260, 140], "glide": 0.04, "a": 0.001, "d": 0.08},
+		{"wave": "triangle", "hz": 1200, "a": 0.001, "d": 0.02, "db": -10},
+		{"wave": "noise", "a": 0.0005, "d": 0.01, "filter": {"type": "bp", "hz": 2500, "q": 1.5}, "db": -10}]},
+	"drag_pickup": {"category": "ui", "seconds": 0.14, "rms_db": -19.0, "layers": [
+		{"wave": "sine", "hz": [300, 720], "glide": 0.1, "a": 0.02, "d": 0.11},
+		{"wave": "pink", "a": 0.03, "d": 0.08, "filter": {"type": "bp", "hz": [600, 2000], "q": 1.2}, "db": -10}]},
+	"drag_drop": {"category": "ui", "seconds": 0.14, "layers": [
+		{"wave": "sine", "hz": [200, 85], "glide": 0.05, "a": 0.001, "d": 0.12},
+		{"wave": "noise", "a": 0.001, "d": 0.025, "filter": {"type": "lp", "hz": [2500, 400]}, "db": -6},
+		{"wave": "triangle", "hz": 420, "a": 0.001, "d": 0.03, "db": -10}]},
+
+	# A building tapped, a voice per category (SELECT): the core a warm two-note, resources a bright
+	# ping, the army a snare-ish tap, defences a metallic click, traps a low blip.
+	"select_building_core": {"category": "ui", "seconds": 0.15, "chorus": {"mix": 0.3}, "layers": [
+		{"wave": "triangle", "hz": 392, "a": 0.003, "d": 0.07, "filter": {"type": "lp", "hz": 1800}},
+		{"wave": "sine", "hz": 196, "a": 0.003, "d": 0.06, "db": -8},
+		{"wave": "triangle", "hz": 587.33, "at": 0.05, "a": 0.003, "d": 0.09, "filter": {"type": "lp", "hz": 2200}}]},
+	"select_building_resources": {"category": "ui", "seconds": 0.14, "layers": [
+		{"wave": "sine", "hz": G6, "a": 0.001, "d": 0.12, "fm": {"ratio": 3.0, "index": [0.8, 0.0]}},
+		{"wave": "triangle", "hz": 3136, "a": 0.001, "d": 0.02, "db": -16}]},
+	"select_building_army": {"category": "ui", "seconds": 0.1, "layers": [
+		{"wave": "noise", "a": 0.001, "d": 0.075, "filter": {"type": "bp", "hz": 1800, "q": 0.8}},
+		{"wave": "triangle", "hz": [330, 180], "glide": 0.04, "a": 0.001, "d": 0.07, "db": -4},
+		{"wave": "sine", "hz": 200, "a": 0.001, "d": 0.04, "db": -6}]},
+	"select_building_defense": {"category": "ui", "seconds": 0.1, "layers": [
+		{"wave": "sine", "hz": 1200, "a": 0.001, "d": 0.07, "ring": {"hz": 1730}},
+		{"wave": "triangle", "hz": 600, "a": 0.001, "d": 0.03, "db": -8},
+		{"wave": "noise", "a": 0.0005, "d": 0.008, "filter": {"type": "hp", "hz": 5000}, "db": -10}]},
+	"select_building_traps": {"category": "ui", "seconds": 0.12, "rms_db": -21.0, "layers": [
+		{"wave": "sine", "hz": [300, 220], "glide": 0.05, "a": 0.002, "d": 0.1},
+		{"wave": "triangle", "hz": 150, "a": 0.002, "d": 0.06, "db": -10}]},
+
+	# The base: a construction started (an upgrade's too) and finished.
 	"build_start": {"category": "ui", "seconds": 0.38, "max": 0.4, "layers": [
 		{"wave": "sine", "hz": [150, 85], "glide": 0.08, "a": 0.002, "d": 0.14},
 		{"wave": "square", "pulse": 0.3, "hz": [220, 660], "sweep": "lin", "glide": 0.26, "a": 0.01, "d": 0.3,
@@ -150,6 +199,17 @@ const LAND := {
 }
 
 
+## The sound a building tapped makes, by its category (PlacementController); one not listed takes
+## the core's.
+const SELECT := {
+	"core": &"select_building_core",
+	"resources": &"select_building_resources",
+	"army": &"select_building_army",
+	"defense": &"select_building_defense",
+	"traps": &"select_building_traps",
+}
+
+
 ## The key `type`'s shot plays, &"" for none.
 static func fire_key(type: String) -> StringName:
 	var key: StringName = FIRE.get(type, &"")
@@ -159,6 +219,12 @@ static func fire_key(type: String) -> StringName:
 ## The key `type`'s landing plays, &"" for none.
 static func land_key(type: String) -> StringName:
 	var key: StringName = LAND.get(type, &"")
+	return key
+
+
+## The key a building of `category` plays when tapped.
+static func select_key(category: String) -> StringName:
+	var key: StringName = SELECT.get(category, &"select_building_core")
 	return key
 
 

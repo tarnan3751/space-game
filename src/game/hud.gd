@@ -2702,7 +2702,7 @@ func _build_place_bar() -> void:
 	row.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	row.add_theme_constant_override("separation", 16)
 	panel.add_child(row)
-	var cancel := _button("Cancel", Vector2(170, 72), &"BarButton", &"ui_tap_soft")
+	var cancel := _button("Cancel", Vector2(170, 72), &"BarButton", &"cancel")
 	cancel.pressed.connect(func() -> void: cancel_pressed.emit())
 	row.add_child(cancel)
 	_place_button = _button("Place", Vector2(170, 72), &"CommitButton")
