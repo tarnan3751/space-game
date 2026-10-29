@@ -176,8 +176,8 @@ tools/harness/   driver.gd, scenario.gd, scenarios/, run.sh, README.md (output i
 .claude/agents/  scout, researcher, developer, reviewer
 assets/          textures/kit/ (the material kit, generated); textures/field.png and
                  terrain_rock.png (the ground's and the terrain's, generated); fonts/ (the HUD's two
-                 fonts, each with its OFL.txt); audio/sfx/ (the sound effects, generated); real
-                 models and music later
+                 fonts, each with its OFL.txt); audio/sfx/ (the sound effects, generated);
+                 audio/music/ (the two music tracks, with LICENSES.md); real models later
 server/          Nakama TypeScript runtime later (.gdignore keeps Godot out)
 ```
 
@@ -319,9 +319,10 @@ Constraints:
 - The HUD's fonts under `assets/fonts/` are imported resources (each `.ttf` with its `.import`),
   preloaded by `hud.gd`, so they export with it; the `OFL.txt` beside each is not a resource and
   needs the preset's include filter to ship.
-- The sound effects under `assets/audio/sfx/` (each `.wav` with its `.import`, PCM) are loaded by
-  path (`Audio`), and so will the music under `assets/audio/music/` be, so a preset that exports
-  selected resources only must include `assets/audio/`.
+- The sound effects under `assets/audio/sfx/` (each `.wav` with its `.import`, PCM) and the music
+  under `assets/audio/music/` (each `.ogg` with its `.import`) are loaded by path (`Audio`), so a
+  preset that exports selected resources only must include `assets/audio/`; the music's
+  `LICENSES.md` is not a resource and, like the fonts' `OFL.txt`, needs the include filter to ship.
 - Commit the `*.uid` files Godot generates next to scripts.
 - A debug export (a debug APK, for example) is a debug build, so it runs with the dev cheats on;
   check balance on a release export or with `--no-cheats`.

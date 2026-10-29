@@ -111,7 +111,7 @@ through the game layer as the player would, and read the state through `BaseStat
 | `main.state` | the `BaseState`: `buildings`, `resources`, `capacity()`, `builders_free()`, `seconds_left(id)`, `check_*` |
 | `main.camera`, `main.base_view` | `IsoCamera` and `BaseView`, for cell and screen mapping |
 | `main.sector_map` | the `SectorMap`: `open(state)`, `close()`, `show_field(index)`, `is_open()`, `is_detail_open()`, `detail_index()`, `detail_field()`, `card(index)`, `card_cleared(index)`, `card_lines(index)`, `scan_button()`, `close_button()`, `attack_button()`, `hint_shown()`, `minimap()` (`drawn()`, `walls_drawn()`), `card_thumbnail(index)`, `layouts_done()`, its signals `scan_pressed`, `attack_pressed`, `closed`; `main.open_sector_map()` (`docs/reference/hud.md`, **Sector map**) |
-| `main.audio` | the `Audio` node: `play(key)`, `schedule(key, delay)`, `loop(key)`, `stop(id)`, `music(key)`, `sting(key)`, `set_volume(bus, linear)`, `volume(bus)`, `silence()`, `shut_down()`; its queries `recent_plays()`, `recent_times()`, `play_count(key)`, `playing_count()`, `scheduled_count()`, `keys()`, `stream(key)`, `current_music()` (`docs/reference/audio.md`) |
+| `main.audio` | the `Audio` node: `play(key)`, `schedule(key, delay)`, `loop(key)`, `stop(id)`, `music(key)`, `sting(key)`, `set_volume(bus, linear)`, `volume(bus)`, `silence()`, `shut_down()`; its queries `recent_plays()`, `recent_times()`, `play_count(key)`, `playing_count()`, `scheduled_count()`, `keys()`, `stream(key)`, `current_music()`, `music_playing()` (`docs/reference/audio.md`) |
 | `main.open_battle(setup, practice, expedition = {})`, `main.practice_setup()`, `main.battle`, `main.battle_hud` | a battle in the base's place and its `BattleView` while it runs: `sim` (read only), `script_commands(list)`, `deploy(unit, cell)`, `select_unit(unit)`, `surrender()`, `leave()`, `speed`, `deploy_unit`, `is_masked(cell)`, `input` (its own `WorldInput`), `field` (its `BaseView`, `deploy_strength()`), `units`, `step_ms()`, `slowest_tick()`, `clock()`, `finished` (`docs/reference/battle-view.md`); and its `BattleHud`'s queries (`docs/reference/hud.md`, **Battle HUD**) |
 
 Helpers on `HarnessScenario`:
@@ -764,7 +764,8 @@ flood of every one-shot, 50 ms apart, fills the 24 voices and no more, and a sti
 a loop sounds past its file's length and `stop()` frees its voice; a loop fading in, silenced,
 leaves the next sound on its voice at its own level; three plays scheduled 0.1, 0.2 and 0.3 s
 ahead sound in order within 50 ms of their time, and the drain turns off after; a play due soon
-behind one due later is retired when it plays; a missing music track is refused; a volume is kept
+behind one due later is retired when it plays; the base's music plays from boot; a missing music
+track is refused and `music(&"base")` starts the base's track again; a volume is kept
 in the run's own `settings.cfg`; idle, no `_process` runs and no voice sounds. Then Build and
 Close tapped (`ui_tap`, `ui_open`, `ui_close`), a building tapped (`select_building`) and tapped
 again (nothing), one placed with the dev cheats and finished a second later (`build_start`,
@@ -772,7 +773,8 @@ again (nothing), one placed with the dev cheats and finished a second later (`bu
 against the template base's laser turrets, plasma mortars, missile batteries and Command Center alone, 40
 Rangers and 5 Hover Tanks deployed as near the turrets as the zone allows (in the whole template
 they sit deep inside and seldom fire): the turrets' shots and hits sound, a mortar's or missile's
-landing does, Audio's cost a frame is logged, and the surrender plays one sting.
+landing does, Audio's cost a frame is logged, and the surrender plays one sting. The battle opens
+on the combat track, and once it is left the base's track plays again.
 
 `scenarios/profile.gd` is the performance profile, to re-run after every change made for cost: the
 Template base idle at camera sizes 44, 24 and 10, again at 44 with the sun's shadow off, the

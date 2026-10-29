@@ -116,7 +116,8 @@ flag only that scenario sets) times, with the triangles and draws by source and 
 alpha-blended fill; a table at the end of its log (`tools/harness/README.md`).
 `scenarios/sounds.gd` checks the sounds (`audio.md`): every key's file, the buses, the cooldown,
 the voice cap, a loop, scheduled plays, the settings file, and the hooks (the HUD's taps, a building
-tapped, placed and finished, a battle's shots, landings and sting), with no work a frame idle and
+tapped, placed and finished, a battle's shots, landings and sting, the base's and the battle's
+music), with no work a frame idle and
 `Audio`'s cost a frame in battle (`tools/harness/README.md`). `scenarios/expedition.gd` lays out the template base's six expedition fields, fights the even
 one with the same army and applies the result with the expedition key, then scans, headless
 (`expeditions.md`).

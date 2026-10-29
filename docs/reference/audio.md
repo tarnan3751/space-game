@@ -1,10 +1,10 @@
 # Audio
 
-The game's sound: effects generated in code at build time and the node that plays them. Music is
-free tracks chosen separately (none are in yet; the API takes them by key). Files:
+The game's sound: effects generated in code at build time, two free music tracks (**Music**) and
+the node that plays them. Files:
 `tools/gen_sounds.gd` (the generator), `src/game/sounds.gd` (`Sounds`, the recipes and the
 weapons' sounds), `src/game/audio.gd` (`Audio`, the player), `assets/audio/sfx/` (the rendered
-WAVs, each with its `.import`, committed), `assets/audio/music/` (the tracks, later).
+WAVs, each with its `.import`, committed), `assets/audio/music/` (the tracks, each with its `.import`, and `LICENSES.md`).
 
 ## The identity
 
@@ -130,7 +130,7 @@ a missing file is an error, which the gate's boot catches), makes `VOICES` (24)
 | `play(key, pitch_jitter = 0.06, volume_db = 0.0) -> bool` | Plays `key` once on its bus, its pitch varied up to `pitch_jitter` either way; whether it played. Dropped while the key's cooldown runs (real time); a key already sounding on its `voices` takes its own oldest voice; else a free voice; else the least important, oldest one-shot no more important than it (loops are never taken); else dropped. Allocates nothing. |
 | `schedule(key, delay_seconds, pitch_jitter = 0.06, volume_db = 0.0)` | Plays `key` through `play()` `delay_seconds` from now (real time), so cooldowns, voices and the log apply then: a burst's later shots, a trap's pop. A ring of `SCHEDULED` (64) entries, filled at boot; when it is full the oldest is dropped with a warning (once a run). Each drain plays and retires every entry that is due, those still waiting closed up behind the head in their order; it turns `_process` on and the drain turns it off when nothing waits. `scheduled_count()` says how many wait. |
 | `loop(key, fade = 0.15) -> int`, `stop(id, fade = 0.15)` | A looping sound held on a voice of its own, faded in; stopped with a fade, freeing the voice. `loop` returns 0 when no voice could be had. A voice's fade is kept and ended when the voice is taken again or silenced, so it never runs on over the next sound there. |
-| `music(key, fade = 1.0) -> bool`, `current_music()` | Crossfades to `assets/audio/music/<key>.ogg` (else `.mp3`), loaded by path, on the two music players; `&""` fades the music out. False, with a warning, when the track has no file. |
+| `music(key, fade = 1.0) -> bool`, `current_music()`, `music_playing()` | Crossfades to `assets/audio/music/<key>.ogg` (else `.mp3`), loaded by path, on the two music players, the new track from its start; `&""` fades the music out; the track already current is left playing. False, with a warning, when the track has no file. `music_playing()`: whether the current track's player is playing. |
 | `sting(key) -> bool` | Plays the fanfare `key` (a `sting` recipe) on Music, the music ducked 8 dB under it (down in 0.1 s, back over 0.5 s after it). |
 | `set_volume(bus, linear)`, `volume(bus)` | A bus's volume, 0 to 1 (0 mutes it), for `Master`, `SFX`, `UI` and `Music`; set is kept at once in `settings_path`. |
 | `tap_buttons(root)` | Every `BaseButton` under `root` plays `ui_tap` (pitch varied 3%) when pressed, connected once however often it is asked. |
@@ -175,6 +175,9 @@ one place.
 | A shot (`Sounds.FIRE`: laser_turret → `laser_fire`, plasma_mortar → `shell_fire`, missile_battery → `missile_fire`) | by type | `BattleEffects.fire`, a burst's later shots scheduled `burst_gap` apart |
 | A landing (`Sounds.LAND`: laser_turret → `impact_small`, plasma_mortar and missile_battery → `explosion_medium`) | by type | `BattleEffects.land` |
 | The battle's end | `victory` (a star or more), `defeat` | `BattleView.ended` → `main._on_battle_ended`, `Audio.sting` |
+| Boot, once the save is loaded and the HUD up | music `base` | the end of `main._ready` |
+| A battle opened | music `combat`, crossfaded over 1.5 s | `main.open_battle`, once the battle is added |
+| A battle left (the result panel's Return) | music `base`, crossfaded over 2 s | `main._on_battle_finished` |
 
 The base's sounds go through `main._base_sound`, which plays nothing while a battle runs in the
 base's place: the base view keeps syncing out of the tree, so a construction finishing then would
@@ -191,6 +194,33 @@ trap's, after `TRAP_POP`) needs `schedule` with the delay instead.
 `$GODOT --headless --path . -s res://tools/gen_sounds.gd -- --only=<key>` until its row reads `ok`;
 one `audio.play(&"<key>")` at the event; commit the WAV and its `.import`.
 
+## Music
+
+Two tracks by vitalezzz, CC0 1.0 from OpenGameArt (https://opengameart.org/content/gravity-turn),
+picked by the owner: written as a pair, the calm version for the base and the action version for
+battle, "to crossfade from any point of calm version to the beginning of the action version",
+which is why a battle's music starts from its beginning. Their source, licence and processing
+are recorded in `assets/audio/music/LICENSES.md`, which ships beside them.
+
+| Key | Track | Length | Loudness | True peak | Size |
+| --- | --- | --- | --- | --- | --- |
+| `base` | Gravity Turn (calm) | 177.231 s, 96 bars at 130 BPM | -18 LUFS integrated | -6.2 dBTP | 2.5 MB |
+| `combat` | Gravity Turn (action) | 324.923 s, 176 bars at 130 BPM | -16 LUFS integrated | -2.6 dBTP | 5.7 MB |
+
+**Loop points.** Each file is the composer's lossless loop file kept whole, an exact number of
+bars, so the loop is the whole file (imported with `loop` on, `loop_offset` 0). The source files
+start from silence and end mid-waveform, a step of up to 0.15 at the seam; a 10 ms raised-cosine
+fade-out on the last 441 samples meets the silent start instead, keeping the bar-exact length a
+crossfade would have shortened. Decoded, the seam's step is under 0.009, inside the waveform's
+ordinary sample-to-sample motion.
+
+**Loudness and encoding.** A plain gain to the targets (-0.5 dB and -3.0 dB, no limiter, so the
+dynamics are the composer's), base below combat so the effects sit over both. Ogg Vorbis from the
+FLACs with `oggenc` (vorbis-tools 1.4.3, `-q 4`, about 115 and 139 kb/s), 44.1 kHz stereo; Vorbis
+adds no encoder delay (the decoded files match the sources sample for sample in length and
+alignment), so no loop offset is needed, which MP3 would have. Replacing a track: the same
+processing, the file as `<key>.ogg`, its `.import` with `loop=true`, and a line in `LICENSES.md`.
+
 ## The harness
 
 Plays are recorded whatever the device: `run.sh` runs every scenario on Godot's Dummy audio driver,
@@ -198,8 +228,8 @@ on which players play and finish as on a real one, so the checks hold and nothin
 speakers; a rendered run with `--audible` plays aloud, for a person listening.
 The queries: `recent_plays()` (the last `RECENT`, 32, keys, oldest first) and `recent_times()`
 beside it (`Time.get_ticks_msec()`), `play_count(key)` since boot, `playing_count()` (the pool's
-voices sounding), `scheduled_count()`, `keys()`, `stream(key)`. The `sounds` scenario checks the files, the buses, the
-cooldown, the cap, a loop, scheduled plays, the settings and every hook
+voices sounding), `scheduled_count()`, `keys()`, `stream(key)`, `current_music()`, `music_playing()`. The `sounds` scenario checks the files, the buses, the
+cooldown, the cap, a loop, scheduled plays, the music, the settings and every hook
 (`tools/harness/README.md`).
 
 ## Cost
@@ -207,4 +237,5 @@ cooldown, the cap, a loop, scheduled plays, the settings and every hook
 `Audio` does no per-frame work while idle: no `_process` runs unless a play is scheduled (the
 `sounds` scenario checks that the drain is off and no voice sounds); fades are Tweens. `play()` is timed under `Profile`'s
 `audio` key, a column of the `profile` scenario's table. Mixing runs on the engine's audio thread,
-which GDScript does not time. The files are PCM, about 88 KB a second of sound.
+which GDScript does not time. The effects' files are PCM, about 88 KB a second of sound; the music
+is streamed Ogg Vorbis, decoded on the audio thread, loaded when `music()` first asks for a track.
