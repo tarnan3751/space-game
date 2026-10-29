@@ -158,6 +158,7 @@ func _ready() -> void:
 	tick.autostart = true
 	tick.timeout.connect(_on_tick)
 	add_child(tick)
+	audio.music(&"base")
 
 
 ## The sounds of the base and its HUD (docs/reference/audio.md, **Hooks**): a building tapped and
@@ -443,6 +444,7 @@ func open_battle(setup: Dictionary, practice: bool, expedition: Dictionary = {})
 	hud.visible = false
 	battle = view
 	add_child(battle)
+	audio.music(&"combat", 1.5)
 	# The base is no longer idle: the prerender stops before the battle's HUD runs the preview for
 	# its deploy cards, so the next frame's idle check leaves that run alone.
 	if _prerendering:
@@ -478,6 +480,7 @@ func _on_battle_finished(setup: Dictionary, result: Dictionary, practice: bool, 
 	camera.size = _base_zoom
 	camera.nudge(_base_focus - camera.focus)
 	hud.visible = true
+	audio.music(&"base", 2.0)
 	_refresh_hud()
 	if practice:
 		hud.show_message("Practice: nothing applied")

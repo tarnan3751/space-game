@@ -220,6 +220,11 @@ func current_music() -> StringName:
 	return _music_key
 
 
+## Whether the current track's player is playing (for the harness).
+func music_playing() -> bool:
+	return _music_key != &"" and _music[_music_current].playing
+
+
 ## Plays the fanfare `key` on Music, the music ducked under it: whether it played.
 func sting(key: StringName) -> bool:
 	if _shut:

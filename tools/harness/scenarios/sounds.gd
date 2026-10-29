@@ -9,9 +9,10 @@ extends HarnessScenario
 ## building tapped (select_building) and tapped again (nothing), a building placed and finished
 ## (build_start, build_done), another finishing during a practice battle (nothing), and the battle
 ## against the template base's mapped defences (laser_fire and impact_small, the shells and missiles
-## when they come, and a sting at the end), with Audio's cost a frame from Profile. Plays are
-## recorded whatever the device, so the checks hold on run.sh's Dummy audio driver; a rendered run
-## with --audible plays them aloud.
+## when they come, and a sting at the end), with Audio's cost a frame from Profile. The music: the
+## base's track playing from boot, crossfaded to the combat track as the battle opens and back to
+## the base's as it is left. Plays are recorded whatever the device, so the checks hold on run.sh's
+## Dummy audio driver; a rendered run with --audible plays them aloud.
 
 const ARMY := {"ranger": 40, "hover_tank": 5}
 ## The defences whose shots and landings have sounds (Sounds.FIRE).
@@ -24,6 +25,7 @@ const SCHEDULE: Array[StringName] = [&"select_building", &"ui_tap", &"impact_sma
 func run(main: MainScript) -> void:
 	var audio: Audio = main.audio
 	await frames(2)
+	check(audio.current_music() == &"base" and audio.music_playing(), "the base's music plays from boot")
 	_check_table(audio)
 	_check_buses()
 	await _play_every_key(audio)
@@ -160,6 +162,8 @@ func _check_schedule(main: MainScript, audio: Audio) -> void:
 
 func _check_music_and_settings(main: MainScript, audio: Audio) -> void:
 	check(not audio.music(&"no_such_track") and audio.current_music() == &"", "a missing track is refused")
+	check(audio.music(&"base") and audio.current_music() == &"base" and audio.music_playing(),
+		"music(&\"base\") starts the base's track")
 	check(audio.settings_path == main.save_path.get_base_dir().path_join("settings.cfg"),
 		"the settings sit beside the run's own save: %s" % audio.settings_path)
 	audio.set_volume(&"Music", 0.5)
@@ -266,6 +270,7 @@ func _check_battle(main: MainScript, audio: Audio) -> void:
 		return
 	var view: BattleView = main.battle
 	view.speed = 2
+	check(audio.current_music() == &"combat" and audio.music_playing(), "the battle opens on the combat track")
 	var dones := audio.play_count(&"build_done")
 	advance(1)
 	await frames(3)
@@ -333,6 +338,7 @@ func _check_battle(main: MainScript, audio: Audio) -> void:
 	view.leave()
 	while not finished[0]:
 		await frames(1)
+	check(audio.current_music() == &"base" and audio.music_playing(), "back on the base, the base's track again")
 
 
 ## Waits until no voice sounds (every key here is shorter than two seconds).
