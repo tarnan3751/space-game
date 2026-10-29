@@ -17,7 +17,10 @@ extends HarnessScenario
 ## ("Needs Cadet Academy 2", disabled; a real touch on it queues nothing and reaches nothing
 ## behind it), a Ranger refused for want of room; the panel's close button back to the info panel
 ## with the academy still selected; and Build over the open panel closing it and opening the build
-## panel. Checks go through BaseState; the screenshots show the look.
+## panel. Checks go through BaseState; the screenshots show the look. Each step's sound is checked
+## as it plays (Audio.play_count): the academy's and the lab's voices, Train's tap and the panel's
+## whoosh, a card's press, the refund, a unit trained, a research's press, refusal and finish, the
+## locked card's buzz, the close.
 ## Touches are real input events (Input.parse_input_event), so they take a finger's path.
 
 const PRODUCER := "cadet_academy"
@@ -41,18 +44,23 @@ func run(main: MainScript) -> void:
 	var academy := _first(state, PRODUCER)
 	_focus(main, academy)
 	await frames(4)
+	var heard := heard_counts(main)
 	tap_cell(main, academy.cell + Vector2i.ONE)
 	await frames(2)
 	check(main.placement.selected_id == academy.id, "a tap selected the Cadet Academy (id %d)" % academy.id)
+	check_heard(main, heard, Sounds.select_key(catalog.category_of(PRODUCER)), 1, "the academy tapped")
 	_world_taps = 0
 	check(hud.action_button().is_visible_in_tree() and hud.action_button().text == "Train",
 		"its info panel offers Train")
 	var housing_line := "Housing %s / %s" % [Format.amount(state.housing_used()), Format.amount(capacity)]
 	check(housing_line in hud.info_detail().split("\n"), "its info panel reads %s" % housing_line)
 	await screenshot("info-train")
+	heard = heard_counts(main)
 	hud.action_button().pressed.emit()
 	await wait_seconds(main, Hud.MENU_OPEN_SECONDS)
 	check(hud.is_training_open(), "Train opened the training panel")
+	check_heard(main, heard, &"ui_tap", 1, "Train pressed")
+	check_heard(main, heard, &"ui_open", 1, "Train pressed")
 	check(hud.army_title() == "%s   Lv %d" % [catalog.display_name(PRODUCER), academy.level],
 		"the panel's title: %s" % hud.army_title())
 	var panel := hud.army_panel().get_global_rect()
@@ -68,7 +76,9 @@ func run(main: MainScript) -> void:
 
 	# Two Rangers and a Breacher; the first Ranger by a real touch on its card.
 	var crystal_before: int = state.resources["crystal"]
+	heard = heard_counts(main)
 	await tap_screen(main, hud.train_card("ranger").get_global_rect().get_center())
+	check_heard(main, heard, &"card_press", 1, "the Ranger card touched")
 	hud.train_card("ranger").pressed.emit()
 	hud.train_card("breacher").pressed.emit()
 	await frames(2)
@@ -85,8 +95,11 @@ func run(main: MainScript) -> void:
 
 	# The second entry, a Ranger: the newest Ranger goes, refunded.
 	var crystal_queued: int = state.resources["crystal"]
+	heard = heard_counts(main)
 	hud.queue_entry(1).pressed.emit()
 	await frames(2)
+	check_heard(main, heard, &"queue_refund", 1, "a queued Ranger cancelled")
+	check_heard(main, heard, &"toast_info", 0, "a queued Ranger cancelled")
 	queued = PackedStringArray(["ranger", "breacher"])
 	check(state.queue_of(academy.id) == queued and hud.queue_shown() == queued,
 		"cancelling a Ranger leaves %s" % ", ".join(state.queue_of(academy.id)))
@@ -102,8 +115,10 @@ func run(main: MainScript) -> void:
 		% [hud.queue_head_status(), head_left])
 
 	# The head trains and is housed.
+	heard = heard_counts(main)
 	advance(state.training_seconds_left(academy.id))
 	await frames(2)
+	check_heard(main, heard, &"train_done", 1, "the head trained")
 	check(state.army_count("ranger") == 1 and state.queue_of(academy.id) == PackedStringArray(["breacher"]),
 		"the first Ranger is housed, the Breacher next")
 	check(hud.train_card_chip("ranger") == "Housed 1"
@@ -139,8 +154,10 @@ func run(main: MainScript) -> void:
 		% int(catalog.unit_level_stats("ranger", 2)["requires_lab"])]), "the Ranger card: %s"
 		% " / ".join(hud.research_card_lines("ranger")))
 	var crystal_research: int = state.resources["crystal"]
+	heard = heard_counts(main)
 	hud.research_card("ranger").pressed.emit()
 	await frames(2)
+	check_heard(main, heard, &"card_press", 1, "the Ranger's research card pressed")
 	var research_cost: Dictionary = catalog.unit_level_stats("ranger", 2)["research_cost"]
 	check(state.research_unit == "ranger" and crystal_research - state.resources["crystal"] == int(research_cost["crystal"]),
 		"the Ranger's level 2 is being researched, paid %d crystal" % (crystal_research - state.resources["crystal"]))
@@ -148,8 +165,10 @@ func run(main: MainScript) -> void:
 	check(hud.research_line() == line, "the progress line: %s (expected %s)" % [hud.research_line(), line])
 	check(hud.research_card_lines("ranger")[1] == "Researching", "the Ranger card says it is researching")
 	crystal_research = state.resources["crystal"]
+	heard = heard_counts(main)
 	hud.research_card("breacher").pressed.emit()
 	await frames(2)
+	check_heard(main, heard, &"ui_denied", 1, "a second research refused")
 	check(state.research_unit == "ranger" and state.resources["crystal"] == crystal_research
 		and hud.toast_text() == "Research already running" and hud.toast_kind() == Hud.ToastKind.REFUSAL,
 		"a second research is refused while one runs: %s" % hud.toast_text())
@@ -162,8 +181,10 @@ func run(main: MainScript) -> void:
 	check(hud.research_fill().size.x == half, "half way the research bar is filled %d of %d px (expected %d)"
 		% [hud.research_fill().size.x, bar, half])
 	await screenshot("research")
+	heard = heard_counts(main)
 	advance(state.research_seconds_left())
 	await frames(2)
+	check_heard(main, heard, &"research_done", 1, "the research finished")
 	check(state.unit_level("ranger") == 2 and hud.research_line() == ""
 		and hud.research_card_lines("ranger")[0] == "Level 2", "the Ranger reached level 2: %s"
 		% " / ".join(hud.research_card_lines("ranger")))
@@ -231,7 +252,9 @@ func _fresh_academy(main: MainScript) -> void:
 		"the Breacher card is locked: %s" % hud.train_card_info("breacher"))
 	check(not hud.train_card("ranger").disabled, "the Ranger card is not")
 	_world_taps = 0
+	var heard := heard_counts(main)
 	await tap_screen(main, hud.train_card("breacher").get_global_rect().get_center())
+	check_heard(main, heard, &"ui_denied", 1, "the locked Breacher card touched")
 	check(_world_taps == 0 and state.queue_of(academy.id).is_empty(),
 		"a touch on the locked card queued nothing and reached nothing behind it")
 	hud.train_card("ranger").pressed.emit()
@@ -241,8 +264,12 @@ func _fresh_academy(main: MainScript) -> void:
 	await screenshot("locked")
 
 	# The close button goes back to the info panel, the academy still selected.
+	await wait_seconds(main, 0.1)
+	heard = heard_counts(main)
 	hud.army_close_button().pressed.emit()
 	await wait_seconds(main, Hud.MENU_CLOSE_SECONDS)
+	check_heard(main, heard, &"ui_tap_soft", 1, "the panel's close pressed")
+	check_heard(main, heard, &"ui_close", 1, "the panel's close pressed")
 	check(not hud.is_training_open() and not hud.army_panel().visible and hud.action_button().is_visible_in_tree()
 		and main.placement.selected_id == academy.id, "the close button showed the info panel, the academy still selected")
 

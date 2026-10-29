@@ -2,7 +2,8 @@ extends HarnessScenario
 ## The HUD's layout on a fresh base: the top bar's row holds the resource meters and then the
 ## drone meter, nothing else; under a notch-like safe-area inset the top bar, the Build
 ## button and the open build panel's content keep inside the inset while the panel reaches the
-## screen's edges; a drag across the card strip scrolls it and presses nothing; and a window
+## screen's edges, and the settings gear inside it at the top right; a drag across the card strip
+## scrolls it and presses nothing, silently (no card's press, no refusal's buzz); and a window
 ## resized while the panel slides open leaves it open on the new bottom edge.
 
 ## A phone's safe area at 1280x720: its top, bottom and sides, in the HUD's coordinates.
@@ -33,6 +34,7 @@ func run(main: MainScript) -> void:
 	var turret := hud.entry_button("laser_turret")
 	check(inner.encloses(hud.resource_panel("metal").get_global_rect()), "the top bar keeps inside the inset")
 	check(inner.encloses(hud.build_button().get_global_rect()), "the Build button keeps inside the inset")
+	check(inner.encloses(hud.gear_button().get_global_rect()), "the settings gear keeps inside the inset")
 	check(inner.encloses(hud.tab_button(catalog.categories[0]).get_global_rect()) and inner.encloses(turret.get_global_rect()),
 		"the tabs and the first card keep inside the inset")
 	var panel := hud.build_panel().get_global_rect()
@@ -42,9 +44,12 @@ func run(main: MainScript) -> void:
 	hud.apply_safe_area(full)
 	await frames(2)
 	var x_before := turret.global_position.x
+	var heard := heard_counts(main)
 	await _drag(main, turret.get_global_rect().get_center(), Vector2(-400, 0))
 	check(turret.global_position.x < x_before - 100 and not main.placement.is_placing(),
 		"a drag scrolled the strip (%d -> %d) and pressed nothing" % [x_before, turret.global_position.x])
+	check_heard(main, heard, &"card_press", 0, "a drag across the strip")
+	check_heard(main, heard, &"ui_denied", 0, "a drag across the strip")
 	hud.close_button().pressed.emit()
 	await main.get_tree().create_timer(Hud.MENU_CLOSE_SECONDS + 0.05).timeout
 

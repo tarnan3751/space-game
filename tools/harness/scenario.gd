@@ -129,6 +129,21 @@ func wait_seconds(main: MainScript, seconds: float) -> void:
 	await frames(2)
 
 
+## How many times each sound has played since boot (Audio.play_count), a key each: the mark
+## check_heard() counts from.
+func heard_counts(main: MainScript) -> Dictionary:
+	var counts := {}
+	for key: StringName in main.audio.keys():
+		counts[key] = main.audio.play_count(key)
+	return counts
+
+
+## Checks that sound `key` played `times` times since `before` (heard_counts), saying so after `what`.
+func check_heard(main: MainScript, before: Dictionary, key: StringName, times: int, what: String) -> void:
+	var played := main.audio.play_count(key) - int(before.get(key, 0))
+	check(played == times, "%s: %s x%d (played %d)" % [what, key, times, played])
+
+
 ## Opens the build panel the way the player does: presses the Build button (unless the panel
 ## is already open), waits for the panel to slide up, and checks that it is open.
 func open_build_menu(main: MainScript) -> void:

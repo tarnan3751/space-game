@@ -3,7 +3,9 @@ extends HarnessScenario
 ## up (tabs, cards and their pictures, the selected tab pressed again, close button), a card
 ## picked into the place bar, a purchase and its flash on the metal meter, the crystal meter
 ## still through the new harvester's trickle and flashing on a catch-up, a wide window; the
-## meters' glint crossing the metal fill.
+## meters' glint crossing the metal fill; the settings panel the gear opens. Each step's sounds are
+## checked as it plays them (Audio.play_count): Build's tap and the panel's whoosh, each tab's
+## ui_tab, a disabled card's buzz, the close button's soft tap, a card's press, the place.
 ## Touches are real input events (Input.parse_input_event), so they take a finger's path.
 
 ## The meters' glint (meter.gdshader): its period and how long it takes to cross a fill.
@@ -29,10 +31,18 @@ func run(main: MainScript) -> void:
 	main.placement.select(0)
 
 	# Build opens the panel on the first tab; a tap on each tab shows its cards.
+	var before := heard_counts(main)
+	await tap_screen(main, hud.build_button().get_global_rect().get_center())
 	await open_build_menu(main)
+	check_heard(main, before, &"ui_tap", 1, "Build tapped")
+	check_heard(main, before, &"ui_open", 1, "Build tapped")
 	check(hud.tab_button(catalog.categories[0]).button_pressed, "the first tab is selected")
 	for category: String in catalog.categories:
+		# Apart by more than a tap's cooldown: headless, frames come fast.
+		await wait_seconds(main, 0.05)
+		before = heard_counts(main)
 		await tap_screen(main, hud.tab_button(category).get_global_rect().get_center())
+		check_heard(main, before, &"ui_tab", 1, "the %s tab tapped" % category)
 		var shown := PackedStringArray()
 		var expected := PackedStringArray()
 		for type: String in catalog.menu_order:
@@ -84,12 +94,20 @@ func run(main: MainScript) -> void:
 	await tap_screen(main, hud.tab_button(catalog.category_of(locked)).get_global_rect().get_center())
 	check(hud.entry_button(locked).disabled and hud.entry_status(locked).begins_with("Needs Command Center"),
 		"%s is disabled: %s" % [locked, hud.entry_status(locked)])
+	await wait_seconds(main, 0.1)
+	before = heard_counts(main)
+	await tap_screen(main, hud.entry_button(locked).get_global_rect().get_center())
+	check_heard(main, before, &"ui_denied", 1, "the disabled %s card tapped" % locked)
+	check_heard(main, before, &"card_press", 0, "the disabled %s card tapped" % locked)
 	for at: Vector2 in [hud.close_button().get_global_rect().get_center() - Vector2(120, 0),
 			hud.resource_panel("metal").get_global_rect().get_center(), hud.drones_panel().get_global_rect().get_center()]:
 		await tap_screen(main, at)
+	before = heard_counts(main)
 	await tap_screen(main, hud.close_button().get_global_rect().get_center())
 	await wait_seconds(main, Hud.MENU_CLOSE_SECONDS)
 	check(not hud.is_menu_open() and not hud.close_button().is_visible_in_tree(), "the close button closed the panel")
+	check_heard(main, before, &"ui_tap_soft", 1, "the close button tapped")
+	check_heard(main, before, &"ui_close", 1, "the close button tapped")
 	check(_world_taps == 1, "no touch on the panel, a meter or the drone meter reached the world (%d did)" % (_world_taps - 1))
 
 	# Picking a card closes the panel and begins placing; the place bar takes Build's place.
@@ -98,15 +116,21 @@ func run(main: MainScript) -> void:
 	check(hud.entry_status("metal_extractor") == "0 / %d" % catalog.max_count("metal_extractor", state.cc_level()),
 		"Metal Extractor reads %s" % hud.entry_status("metal_extractor"))
 	var card_at := hud.entry_button("metal_extractor").get_global_rect().get_center()
+	before = heard_counts(main)
 	touch_screen(main, card_at, true)
 	await frames(2)
 	await screenshot("card-pressed")
 	touch_screen(main, card_at, false)
 	await wait_seconds(main, Hud.MENU_CLOSE_SECONDS)
 	check(main.placement.placing_type == "metal_extractor" and not hud.is_menu_open(), "the card closed the panel, placing")
+	check_heard(main, before, &"card_press", 1, "the card pressed")
+	check_heard(main, before, &"ui_close", 1, "the card pressed")
 	check(hud.place_button().is_visible_in_tree() and not hud.build_button().is_visible_in_tree(), "the place bar hid Build")
 	await screenshot("place-bar")
-	main.placement.cancel_place()
+	before = heard_counts(main)
+	await tap_screen(main, hud.place_button().get_parent().get_child(0).get_global_rect().get_center())
+	check(not main.placement.is_placing(), "Cancel ended the placing")
+	check_heard(main, before, &"cancel", 1, "Cancel tapped")
 	await frames(2)
 	check(hud.build_button().is_visible_in_tree(), "Build is back after cancelling")
 
@@ -114,7 +138,10 @@ func run(main: MainScript) -> void:
 	var metal_before := hud.resource_fill("metal").size.x
 	await open_build_menu(main)
 	hud.entry_button("crystal_harvester").pressed.emit()
-	main.placement.confirm_place()
+	before = heard_counts(main)
+	await tap_screen(main, hud.place_button().get_global_rect().get_center())
+	check_heard(main, before, &"ui_tap", 1, "Place tapped")
+	check_heard(main, before, &"place_ok", 1, "Place tapped")
 	var flash_at: float = _meter_shader(hud, "metal").get_shader_parameter(&"flash_time")
 	check(absf(Motion.clock() - flash_at) < 0.05, "the purchase flashed the metal meter at %.2f s (now %.2f s)" % [flash_at, Motion.clock()])
 	await screenshot("purchase-flash")
@@ -131,6 +158,37 @@ func run(main: MainScript) -> void:
 	await frames(4)
 	check(hud.close_button().get_global_rect().end.x <= 1560 - Hud.MARGIN, "the close button fits a 1560x720 window")
 	await screenshot("wide-open")
+	hud.close_button().pressed.emit()
+	await _check_settings(main, hud)
+
+
+## The gear at the top right opens the settings panel under it, in the HUD's shape: Music and Sound
+## sliders and the mute, every control a touch high, the panel inside the window; a tap on it
+## reaches nothing behind it.
+func _check_settings(main: MainScript, hud: Hud) -> void:
+	await wait_seconds(main, Hud.MENU_CLOSE_SECONDS)
+	var window := main.get_viewport().get_visible_rect()
+	var gear := hud.gear_button().get_global_rect()
+	check(gear.size.x >= 56 and gear.size.y >= 56 and gear.end.x <= window.end.x - Hud.MARGIN + 1 and gear.position.y >= Hud.MARGIN - 1,
+		"the gear is %s, at the top right" % gear)
+	var before := heard_counts(main)
+	await tap_screen(main, gear.get_center())
+	await frames(2)
+	check(hud.settings_open(), "the gear opened the settings panel")
+	check_heard(main, before, &"ui_open", 1, "the gear tapped")
+	for control: Control in [hud.music_slider(), hud.sound_slider(), hud.mute_button(), hud.settings_close_button()]:
+		check(control.size.y >= 56, "%s is %d tall" % [control.get_class(), control.size.y])
+	var panel := hud.music_slider().get_parent().get_parent().get_parent() as Control
+	check(window.encloses(panel.get_global_rect()), "the panel %s lies in the window" % panel.get_global_rect())
+	var taps := _world_taps
+	await tap_screen(main, hud.mute_button().get_global_rect().get_center())
+	check(hud.settings_values()["mute"] == true and main.audio.is_muted() and _world_taps == taps,
+		"a tap on Mute muted, and reached nothing behind it")
+	await screenshot("settings-open")
+	await tap_screen(main, hud.mute_button().get_global_rect().get_center())
+	check(not main.audio.is_muted(), "a second tap unmuted")
+	await tap_screen(main, hud.settings_close_button().get_global_rect().get_center())
+	check(not hud.settings_open(), "the close button closed it")
 
 
 ## Each meter's fill spans its track by amount over capacity, to a pixel; the drone meter counts drones.

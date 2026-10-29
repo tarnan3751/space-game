@@ -1,4 +1,7 @@
 extends HarnessScenario
+## (The sounds of the map are checked as they play, Audio.play_count: the Expedition tap and the
+## map's sweep open, a scan's radar, a refused scan's buzz, a card's press and the detail's hum,
+## Attack's tap alone, the map's close, the toast of a field's end.)
 ## The expedition flow in the game (docs/reference/hud.md, **Sector map**; battle-view.md,
 ## **Expeditions**) on the debug build's Template base (Command Center 10), pressed through its
 ## button. The Expedition button opens the sector map over the base (the world's input out of the
@@ -76,7 +79,10 @@ func run(main: MainScript) -> void:
 	var count := catalog.expedition_field_count()
 	check(hud.expedition_button().is_visible_in_tree() and hud.expedition_badge() == str(count),
 		"the Expedition button shows with %d open fields on its badge ('%s')" % [count, hud.expedition_badge()])
+	var heard := heard_counts(main)
 	hud.expedition_button().pressed.emit()
+	check_heard(main, heard, &"ui_tap", 1, "Expedition pressed")
+	check_heard(main, heard, &"map_open", 1, "Expedition pressed")
 	await frames(3)
 	_touch(main, 1, world_point, false)
 	await frames(2)
@@ -95,12 +101,17 @@ func run(main: MainScript) -> void:
 	await screenshot("map")
 	var epoch := state.sector.epoch
 	check(not map.scan_button().disabled and map.scan_button().text == "SCAN", "the first scan is free")
+	heard = heard_counts(main)
 	map.scan_button().pressed.emit()
 	await frames(2)
 	check(state.sector.epoch == epoch + 1, "Scan started epoch %d" % state.sector.epoch)
+	check_heard(main, heard, &"scan", 1, "Scan pressed")
 	check(map.scan_button().disabled and map.scan_button().text == "SCAN  %s" % Format.duration(state.scan_seconds_left()),
 		"Scan counts down: '%s'" % map.scan_button().text)
+	heard = heard_counts(main)
 	map.scan_pressed.emit()
+	check_heard(main, heard, &"ui_denied", 1, "a scan refused")
+	check_heard(main, heard, &"scan", 0, "a scan refused")
 	check(state.sector.epoch == epoch + 1 and hud.toast_text() == "The scanner is still cooling down",
 		"a scan while it recharges is refused: '%s'" % hud.toast_text())
 	advance(state.scan_seconds_left())
@@ -115,8 +126,11 @@ func run(main: MainScript) -> void:
 			and not map.card_cleared(i) and not map.card(i).disabled,
 			"card %d shows its %s field, open" % [i, fields[i]["band"]])
 
+	heard = heard_counts(main)
 	map.card(FIELD).pressed.emit()
 	await frames(3)
+	check_heard(main, heard, &"card_press", 1, "the easy card pressed")
+	check_heard(main, heard, &"field_open", 1, "the easy card pressed")
 	var field := map.detail_field()
 	check(map.is_detail_open() and map.detail_index() == FIELD and not map.scan_button().visible,
 		"the easy card opened its detail")
@@ -154,8 +168,13 @@ func run(main: MainScript) -> void:
 		state.resources[res] = state.capacity(res) / 2
 	var before := state.resources.duplicate()
 	var raids := state.raids.size()
+	# Past the tap's cooldown, which the refused Attack started.
+	await main.get_tree().create_timer(0.1).timeout
+	heard = heard_counts(main)
 	map.attack_button().pressed.emit()
 	await frames(2)
+	check_heard(main, heard, &"ui_tap", 1, "Attack pressed")
+	check_heard(main, heard, &"map_close", 0, "Attack pressed")
 	var view: BattleView = main.battle
 	check(view != null, "Attack opened the battle")
 	if view == null:
@@ -238,6 +257,9 @@ func run(main: MainScript) -> void:
 	check(hud.toast_text() == toast, "the toast: '%s'" % hud.toast_text().replace("\n", " / "))
 	var kind := Hud.ToastKind.REWARD if starred or not gains.is_empty() else Hud.ToastKind.INFO
 	check(hud.toast_kind() == kind, "the toast's edge is a %s's" % Hud.ToastKind.keys()[hud.toast_kind()].to_lower())
+	var recent := main.audio.recent_plays()
+	check(recent.has(Hud.TOAST_SOUNDS[kind]) and recent.has(&"map_open"),
+		"back, the toast sounded (%s) and the map opened again (map_open): %s" % [Hud.TOAST_SOUNDS[kind], recent.slice(-6)])
 	check(main.battle == null and hud.visible and map.is_open() and not map.is_detail_open()
 		and not main.world_input.is_inside_tree(), "the map opened again over the base")
 	check(map.card_cleared(FIELD) == starred and map.card(FIELD).disabled == starred,
@@ -251,9 +273,11 @@ func run(main: MainScript) -> void:
 			"the cleared field's result again is refused: '%s'" % Hud.error_text(again))
 	else:
 		say("expedition_flow: no star, so the field stays open and its second attack is not tried")
+	heard = heard_counts(main)
 	map.close_button().pressed.emit()
 	await frames(2)
 	check(not map.is_open() and main.world_input.is_inside_tree(), "Close gave the world its input back")
+	check_heard(main, heard, &"map_close", 1, "the map's close pressed")
 	taps[0] = 0
 	_touch(main, 0, world_point, true)
 	await frames(2)

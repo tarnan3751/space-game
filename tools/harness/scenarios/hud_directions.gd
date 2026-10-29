@@ -5,7 +5,9 @@ extends HarnessScenario
 ## base), the Hangar's card held down on the Army tab (on the template every card is maxed), and the
 ## Resources tab with its locked cards. Checks: the meters' full state on the template, the held
 ## card's content sunk in a rendered run, the locked cards. Rendered, for its five shots; headless it
-## checks the wiring.
+## checks the wiring. The sounds: Template base's soft tap and its toast, the base swapped with no
+## completion heard (its army, research and stock are counted quietly); the held card pressed when
+## let go; the locked card's buzz.
 
 const PRODUCER := "cadet_academy"
 
@@ -13,8 +15,13 @@ const PRODUCER := "cadet_academy"
 func run(main: MainScript) -> void:
 	var hud: Hud = main.hud
 	var catalog: Catalog = main.state.catalog
+	var heard := heard_counts(main)
 	main.hud.template_button().pressed.emit()
 	await frames(4)
+	check_heard(main, heard, &"ui_tap_soft", 1, "Template base pressed")
+	check_heard(main, heard, &"toast_info", 1, "Template base pressed")
+	for key: StringName in [&"train_done", &"research_done", &"make_done", &"build_done", &"housing_full"]:
+		check_heard(main, heard, key, 0, "the base swapped for the template")
 	var state: BaseState = main.state
 	for res: String in catalog.resources:
 		var shader := (hud.resource_fill(res).get_child(0) as CanvasItem).material as ShaderMaterial
@@ -66,8 +73,10 @@ func run(main: MainScript) -> void:
 			"the held card's content sank to %s" % body.position)
 	await screenshot("pressed")
 	# Let go: the card is picked, and its placing cancelled.
+	heard = heard_counts(main)
 	touch_screen(main, at, false)
 	await frames(2)
+	check_heard(main, heard, &"card_press", 1, "the held card let go")
 	if main.placement.is_placing():
 		main.placement.cancel_place()
 	await open_build_menu(main)
@@ -78,6 +87,10 @@ func run(main: MainScript) -> void:
 		if catalog.category_of(type) == "resources" and hud.entry_status(type).begins_with("Needs Command Center"):
 			locked.append(type)
 	check(not locked.is_empty() and hud.entry_button(locked[0]).disabled, "locked cards %s" % ", ".join(locked))
+	if not locked.is_empty():
+		heard = heard_counts(main)
+		await tap_screen(main, hud.entry_button(locked[0]).get_global_rect().get_center())
+		check_heard(main, heard, &"ui_denied", 1, "the locked %s tapped" % locked[0])
 	await screenshot("locked")
 	hud.close_button().pressed.emit()
 	await wait_seconds(main, Hud.MENU_CLOSE_SECONDS)
