@@ -5,6 +5,10 @@
 #   tools/harness/run.sh <scenario> --out <dir>     output directory (default tools/harness/out/<scenario>)
 #   tools/harness/run.sh <scenario> --timeout <s>   fail a run still going after <s> seconds
 #                                                   (default: the driver's, 300)
+#   tools/harness/run.sh <scenario> --audible       let a rendered run play its sounds; without it
+#                                                   every run uses the engine's Dummy audio driver,
+#                                                   so nothing reaches the speakers (the harness
+#                                                   observes plays through main.audio, not the device)
 # The save file is <out>/base.json, never user://base.json, and --no-cheats keeps a debug
 # build's dev cheats off (main.gd), so every scenario runs on the real numbers. The output
 # directory is emptied first, so every run starts from a new base. Exits non-zero when a
@@ -37,6 +41,8 @@ fi
 
 scenario=""
 mode="--headless"
+audio="--audio-driver"
+audio_driver="Dummy"
 out=""
 timeout=()
 while [ $# -gt 0 ]; do
@@ -45,13 +51,14 @@ while [ $# -gt 0 ]; do
     --headless) mode="--headless" ;;
     --out) out="$2"; shift ;;
     --timeout) timeout=("--timeout=$2"); shift ;;
+    --audible) audio_driver="" ;;
     -*) echo "unknown option $1" >&2; exit 2 ;;
     *) scenario="$1" ;;
   esac
   shift
 done
 if [ -z "$scenario" ]; then
-  echo "usage: tools/harness/run.sh <scenario> [--rendered] [--out <dir>] [--timeout <s>]" >&2
+  echo "usage: tools/harness/run.sh <scenario> [--rendered] [--audible] [--out <dir>] [--timeout <s>]" >&2
   echo "scenarios:" >&2
   ls tools/harness/scenarios/*.gd 2>/dev/null | sed 's#.*/##; s#\.gd$##; s#^#  #' >&2
   exit 2
@@ -101,7 +108,8 @@ if [ -z "$mode" ]; then
   trap 'exit 143' TERM
 fi
 
-output="$("$GODOT" $mode $window --path . -s res://tools/harness/driver.gd -- \
+if [ -n "$audio_driver" ]; then audio_args=("$audio" "$audio_driver"); else audio_args=(); fi
+output="$("$GODOT" $mode $window ${audio_args[@]+"${audio_args[@]}"} --path . -s res://tools/harness/driver.gd -- \
   "--scenario=$scenario" "--out=$out" "--save-path=$out/base.json" --no-cheats ${timeout[@]+"${timeout[@]}"} 2>&1)"
 status=$?
 echo "$output"

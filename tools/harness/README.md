@@ -22,6 +22,7 @@ between `src/core`, `src/game` and the scene.
 ```
 tools/harness/run.sh place_and_build                 # headless: logic checks only
 tools/harness/run.sh place_and_build --rendered      # a window; screenshots are saved
+tools/harness/run.sh sounds --rendered --audible      # a rendered run that plays its sounds
 tools/harness/run.sh place_and_build --out <dir>     # output elsewhere
 tools/harness/run.sh place_and_build --timeout 60    # fail if still running after 60 s
 tools/harness/run.sh                                 # lists the scenarios
@@ -35,7 +36,9 @@ laid out from `data/rules.json`.
 
 **Headless** (`--headless`, the default) renders nothing: `screenshot()` logs that it was
 skipped and the run checks logic only. It is the mode for a gate-style check, and any number
-of headless runs may go at once. **Rendered** (`--rendered`) opens the game window at the
+of headless runs may go at once. Every run uses the engine's Dummy audio driver, so nothing
+reaches the speakers while agents test (the harness observes plays through `main.audio`); pass
+`--audible` to a rendered run to hear it. **Rendered** (`--rendered`) opens the game window at the
 project's 1280x720 and saves each screenshot from the window's viewport texture.
 
 Godot stops drawing a window that is fully covered, and a window that is not drawn leaves every
