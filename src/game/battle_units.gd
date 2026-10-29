@@ -115,7 +115,11 @@ const AIM_EASE := 10.0
 ## How near to vertical (radians) an aimed muzzle's direction gives its type no turn as it aims.
 const AIM_YAW_VERTICAL := 0.5236
 const AIM_READY := 0.9
+## A deploy's sound (deploy_ground, deploy_air) varies its pitch this much, so a smear walks.
+const DEPLOY_JITTER := 0.1
 
+## Plays a deploy's sound; BattleView gives it before setup().
+var audio: Audio
 var _sim: BattleSim
 var _grid: Vector2i
 ## Each building's centre on the ground (world x and z), for a unit facing its target.
@@ -153,6 +157,9 @@ var _sockets: Array[Dictionary] = []
 var _muzzles: Array[LowPolyMesh.Socket] = []
 var _aim_yaw := PackedFloat32Array()
 var _weapons: Array[Weapons.Weapon] = []
+## Per type, 1 for an air unit (catalog.unit_class); the air units deployed and alive.
+var _air := PackedByteArray()
+var _air_count := 0
 ## Per type: how it dies (Fall), how long that takes, how far a machine rolls, its model's bounds
 ## (the lowest point, over which an aircraft and a hovering machine come down) and its extreme
 ## points (_extremes), which a falling model is kept above the ground by.
@@ -238,6 +245,7 @@ func setup(sim: BattleSim, catalog: Catalog, army: Dictionary, levels: Dictionar
 		_aim_yaw.append(_muzzle_yaw(muzzle))
 		_weapons.append(Weapons.of(unit))
 		var ground := catalog.unit_class(unit) == "ground"
+		_air.append(0 if ground else 1)
 		_bank_max.append(BANK_MAX_GROUND if ground else BANK_MAX)
 		_hop.append(0.0 if hovers or not ground else float(WHEELED.get(unit, 1.0)))
 		var altitude := 0.0
@@ -320,8 +328,9 @@ func shoot(id: int, to: Vector3, building: int, impact: float, now: float) -> vo
 	_held_impact[u] = impact
 
 
-## Reads the units after a sim step: those deployed in it start where they stand, the rest move
-## their last tick's place to the one before; each unit that struck a blow in it is marked.
+## Reads the units after a sim step: those deployed in it start where they stand, each with its
+## class's deploy sound, the rest move their last tick's place to the one before; each unit that
+## struck a blow in it is marked.
 func after_step() -> void:
 	var events := _sim.events
 	for i: int in events.count:
@@ -354,6 +363,10 @@ func after_step() -> void:
 		_drawn_as[u] = Transform3D(Basis.IDENTITY, Vector3(at.x, 0.0, at.y))
 		_held_at[u] = -1.0
 		_blow[u] = 0
+		var air := _air[_type[u]] == 1
+		if air:
+			_air_count += 1
+		audio.play(&"deploy_air" if air else &"deploy_ground", DEPLOY_JITTER)
 
 
 ## Unit `id` was hit: it flashes from `now`.
@@ -373,6 +386,13 @@ func death_seconds(id: int) -> float:
 func die(id: int, now: float) -> void:
 	if id >= 1 and id <= _count and _death_at[id - 1] < 0.0:
 		_death_at[id - 1] = now
+		if _air[_type[id - 1]] == 1:
+			_air_count -= 1
+
+
+## How many air units are deployed and alive (BattleView holds the engines' loop while any is).
+func air_alive() -> int:
+	return _air_count
 
 
 ## Unit `id` was thrown from the field point `from`: it flies from there to its new place from `now`.

@@ -357,6 +357,13 @@ func stream(key: StringName) -> AudioStreamWAV:
 	return _streams.get(key, null)
 
 
+## Drops every scheduled play still waiting (a battle over: nothing it dated later may sound after
+## it); what is sounding plays on.
+func drop_scheduled() -> void:
+	_due_count = 0
+	set_process(false)
+
+
 ## Stops every sound at once (loops, music and stings too) and drops the scheduled plays. The
 ## mixer lets go of what was playing a mix later, so a run that quits waits a moment after this
 ## (the harness driver does), or the engine reports the playing sounds as leaked.

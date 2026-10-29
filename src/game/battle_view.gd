@@ -46,6 +46,15 @@ extends Node3D
 ## swarm's dome, an EMP's ring and the defences it disabled dimmed until they wake, a strike's
 ## marker until it lands and its blast and smoke.
 ##
+## Every event sounds (docs/reference/audio.md, **Battle**): the shots and landings through the
+## effects (BattleEffects.fire, land, sound()), the hits, falls, deaths, traps and abilities from
+## the arms of _read_events, and the held sounds as loops (_hold_loop, _loop_for): the battle's bed
+## from setup to leave(), the aircraft's engines while any flies, a shield's hum while any dome is
+## up, the gravity well's while it pulls, the EMP's crackle while it holds a defence, the swarm's
+## buzz, the strike's marker and a grav trap's whoosh for their seconds; the battle's end stops all
+## but the bed and drops the plays still scheduled, and leave() and leaving the tree stop the bed
+## and drop the plays the result scheduled.
+##
 ## main.gd makes it, adds it in place of the base's view with its BattleHud, and frees both on
 ## `finished`, which leave() emits (the result panel's Return) with the setup and the sim's result;
 ## `ended` tells the HUD the battle is over.
@@ -171,6 +180,9 @@ const STRIKE_BLAST := Color("ff6a3d")
 const STRIKE_CORE := Color("fff6e0")
 ## A strike's blast lasts this long (the other impacts IMPACT_SECONDS).
 const STRIKE_BLAST_SECONDS := 0.6
+## How long before a strike lands its bolt's whine starts (seconds of real time: its sound's
+## rise, peaking as it lands).
+const STRIKE_WHINE := 0.5
 
 ## The battle being run; read only.
 var sim: BattleSim
@@ -192,7 +204,7 @@ var field: BaseView
 var input: WorldInput
 var units: BattleUnits
 var effects: BattleEffects
-## Plays the shots and landings (BattleEffects); main gives it before setup().
+## Plays the battle's sounds (BattleEffects.sound, the loops); main gives it before setup().
 var audio: Audio
 
 ## Seconds of battle shown so far, `speed` times as fast as real time, run on after the end.
@@ -300,6 +312,13 @@ var _steps: int = 0
 ## Commands to send at their ticks (script_commands), in tick order, and the next one.
 var _script: Array[Dictionary] = []
 var _next_script: int = 0
+## The loops held (Audio.loop's ids by key), until when on the clock the timed ones run, and the
+## keys done this frame, reused.
+var _loops: Dictionary[StringName, int] = {}
+var _loop_until: Dictionary[StringName, float] = {}
+var _loops_done: Array[StringName] = []
+## Harness hook, read by no game code: how often each loop was started.
+var _loop_starts: Dictionary[StringName, int] = {}
 
 
 ## Makes the battle from `setup` on `battle_catalog`, its field and its scene; "" or why the setup
@@ -376,6 +395,7 @@ func setup(battle_catalog: Catalog, setup_data: Dictionary, iso_camera: IsoCamer
 
 	effects = BattleEffects.new()
 	effects.audio = audio
+	_hold_loop(&"battle_bed", true)
 	effects.setup(walls, area)
 	effects.arrived = _on_arrived
 	add_child(effects)
@@ -383,11 +403,13 @@ func setup(battle_catalog: Catalog, setup_data: Dictionary, iso_camera: IsoCamer
 		var range_cells := _stat(id, "range_cells")
 		effects.add_shield(id, Vector3(_centres[id].x, 0.0, _centres[id].y), float(range_cells))
 		effects.set_shield(id, sim.shield_hp(id), 0.0)
+	_hum_shields()
 
 	var attacker: Dictionary = setup_data.get("attacker", {})
 	for unit: String in units_brought():
 		_splash[unit] = catalog.unit_splash(unit) / 1000.0
 	units = BattleUnits.new()
+	units.audio = audio
 	units.setup(sim, catalog, attacker.get("army", {}), attacker.get("unit_levels", {}), grid, _centres, area)
 	add_child(units)
 
@@ -422,9 +444,13 @@ func deploy(unit: String, cell: Vector2i) -> String:
 	return command({"op": "deploy", "unit": unit, "cell": [cell.x, cell.y]})
 
 
-## Ends the battle on this tick.
+## Ends the battle on this tick. The sim is over at once, outside the steps, so the plays still
+## scheduled are dropped here (no step follows to drop them, and none refreshes the HUD's stars).
 func surrender() -> String:
-	return command({"op": "surrender"})
+	var refused := command({"op": "surrender"})
+	if refused == "":
+		audio.drop_scheduled()
+	return refused
 
 
 ## Commands to send each at its own tick, as a player would at that moment (the harness's
@@ -458,6 +484,8 @@ func _process(delta: float) -> void:
 	var started := began
 	var shown := delta * speed
 	_clock += shown
+	effects.clock = _clock
+	effects.speed = speed
 	if not sim.is_over():
 		_accumulator += shown
 		var steps := 0
@@ -467,6 +495,11 @@ func _process(delta: float) -> void:
 			steps += 1
 		if steps == MAX_STEPS_PER_FRAME:
 			_accumulator = minf(_accumulator, TICK_SECONDS)
+		if sim.is_over():
+			# Over in these steps: nothing the field dated later (a strike's whine, a trap's blast, a
+			# burst's later shots) sounds over the result, and the HUD's refresh after this schedules
+			# its own stars' chimes.
+			audio.drop_scheduled()
 		if steps > 0:
 			stepped.emit()
 	if sim.is_over() and _ended_at < 0.0:
@@ -475,7 +508,9 @@ func _process(delta: float) -> void:
 		_smear.clear()
 		select_unit("")
 		select_ability("")
+		_stop_loops(true)
 		ended.emit(sim.result())
+	_time_loops()
 	if profiled:
 		started = Profile.since(&"battle_steps", started)
 	var alpha := clampf(_accumulator / TICK_SECONDS, 0.0, 1.0)
@@ -521,8 +556,12 @@ func _process(delta: float) -> void:
 		Profile.since(&"battle_view", began)
 
 
-## The camera is the base's: a shake still on leaves no offset behind.
+## The camera is the base's: a shake still on leaves no offset behind. No loop sounds on (Audio
+## silences itself when it goes first, as the game quits).
 func _exit_tree() -> void:
+	if audio.is_inside_tree():
+		_stop_loops(false)
+		audio.drop_scheduled()
 	if camera != null:
 		camera.h_offset = 0.0
 		camera.v_offset = 0.0
@@ -554,6 +593,18 @@ func cast(ability: String, cell: Vector2i) -> String:
 	return command({"op": "ability", "ability": ability, "cell": [cell.x, cell.y]})
 
 
+## Harness hooks, read by no game code: the loops held now, and how often `key` was started.
+func loops_held() -> Array[StringName]:
+	var held: Array[StringName] = []
+	held.assign(_loops.keys())
+	return held
+
+
+func loop_starts(key: StringName) -> int:
+	var count: int = _loop_starts.get(key, 0)
+	return count
+
+
 ## Buildings fallen so far, walls included; it moves only when the loot can have.
 func falls() -> int:
 	return _falls
@@ -569,6 +620,8 @@ func leave() -> void:
 	if _finished or not sim.is_over():
 		return
 	_finished = true
+	_stop_loops(false)
+	audio.drop_scheduled()
 	finished.emit(battle_setup, sim.result())
 
 
@@ -593,7 +646,61 @@ func _step() -> void:
 	_read_events()
 	for id: int in _shields:
 		effects.set_shield(id, sim.shield_hp(id), _clock)
+	_hum_shields()
+	_hold_loop(&"air_bed", units.air_alive() > 0)
 	_wake_defences()
+
+
+## Holds the loop `key` while `on`: one voice however many things keep it on, started and stopped
+## only when that changes.
+func _hold_loop(key: StringName, on: bool) -> void:
+	if on == _loops.has(key):
+		return
+	if on:
+		_loops[key] = audio.loop(key)
+		_loop_starts[key] = loop_starts(key) + 1
+	else:
+		audio.stop(_loops[key])
+		_loops.erase(key)
+		_loop_until.erase(key)
+
+
+## Holds the loop `key` until `until` on the clock, or later if it is held longer already.
+func _loop_for(key: StringName, until: float) -> void:
+	_hold_loop(key, true)
+	var held: float = _loop_until.get(key, 0.0)
+	_loop_until[key] = maxf(until, held)
+
+
+## The timed loops whose time is up stop.
+func _time_loops() -> void:
+	if _loop_until.is_empty():
+		return
+	_loops_done.clear()
+	for key: StringName in _loop_until:
+		if _clock >= _loop_until[key]:
+			_loops_done.append(key)
+	for key: StringName in _loops_done:
+		_hold_loop(key, false)
+
+
+## Stops every loop held, but the battle's bed when `keep_bed` (the battle is over and its result
+## shows).
+func _stop_loops(keep_bed: bool) -> void:
+	_loops_done.clear()
+	for key: StringName in _loops:
+		if not (keep_bed and key == &"battle_bed"):
+			_loops_done.append(key)
+	for key: StringName in _loops_done:
+		_hold_loop(key, false)
+
+
+## A shield's hum, held while any shield generator's dome is up.
+func _hum_shields() -> void:
+	var up := false
+	for id: int in _shields:
+		up = up or sim.shield_hp(id) > 0
+	_hold_loop(&"shield_hum", up)
 
 
 ## The defences an EMP burst disabled whose time is up wake (_woke).
@@ -608,6 +715,8 @@ func _wake_defences() -> void:
 		_disabled.erase(id)
 		if _views.has(id):
 			_woke(id)
+	if _disabled.is_empty():
+		_hold_loop(&"emp_hold", false)
 
 
 ## Drawn defence `id` wakes from an EMP burst: it loses its grey and its moving parts snap back to
@@ -620,6 +729,7 @@ func _woke(id: int) -> void:
 	effects.flash(top, size, MaterialKit.ENERGY, _clock)
 	effects.ring_flash(top, size * 1.4, MaterialKit.ENERGY, _clock, 0.3)
 	effects.glow(Vector3(centre.x, 0.0, centre.y), size * 1.5, MaterialKit.ENERGY, _clock, 0.4)
+	effects.sound(&"emp_wake", _clock)
 
 
 ## The last tick's events (BattleEvents) turned into effects, flashes, falls and deaths.
@@ -653,6 +763,7 @@ func _read_events() -> void:
 				_spring(source, _point(events.from_x[i], events.from_y[i]))
 			BattleEvents.THROW:
 				units.throw_unit(target, Vector2i(events.from_x[i], events.from_y[i]), _clock)
+				effects.sound(&"unit_thrown", _clock)
 			BattleEvents.REVEAL:
 				if _views.has(source):
 					_views[source].visible = true
@@ -672,6 +783,7 @@ func _read_events() -> void:
 				var radius := _ability_radius(source)
 				effects.strike_landed(at, radius, _under_strike(at, radius, true).x, _clock, STRIKE_BLAST_SECONDS, STRIKE_CORE,
 					STRIKE_BLAST)
+				effects.sound(&"strike_land", _clock, 0.03)
 
 
 ## An ability (its place in catalog.ability_types() plus one, `index`) used at the field point
@@ -685,15 +797,21 @@ func _ability_used(index: int, x: int, y: int, until: int) -> void:
 	match catalog.ability_effect(ability):
 		"swarm":
 			effects.swarm(at, radius, _clock, seconds, SWARM_GLOW)
+			effects.sound(&"swarm_cast", _clock)
+			_loop_for(&"swarm_hum", _clock + seconds)
 		"emp":
 			effects.impact(at, radius, EMP_RING, _clock)
+			effects.sound(&"emp_burst", _clock, 0.03)
 			for id: int in _views:
 				if not _disabled.has(id) and sim.building_disabled(id):
 					_disabled[id] = true
 					_views[id].set_disabled(true)
+			_hold_loop(&"emp_hold", not _disabled.is_empty())
 		_:
 			var under := _under_strike(at, radius)
 			effects.strike_marker(at, radius, maxf(radius, under.y), under.x, _clock, seconds, STRIKE_MARKER)
+			_loop_for(&"strike_marker", _clock + seconds)
+			effects.sound(&"strike_bolt", _clock + seconds - STRIKE_WHINE * maxi(speed, 1), 0.0)
 
 
 ## Under a strike at `at`, `radius` across: (the top of the tallest drawn standing building it
@@ -735,6 +853,7 @@ func _unit_hit(unit: int, building: int, x: int, y: int) -> void:
 	match weapon.kind:
 		Weapons.Kind.MELEE:
 			# Drawn at the fist as the punch lands (_land_blows), a moment after the blow.
+			effects.sound(Sounds.fire_key(type), _clock)
 			_blows[unit] = building
 			_blow_at[unit] = _clock + PUNCH_DELAY
 		Weapons.Kind.CHARGE:
@@ -765,6 +884,7 @@ func _land_blows() -> void:
 		effects.sparks(fist, weapon.impact_size * PUNCH_RING, weapon.color.lerp(Color.WHITE, 0.5), _clock)
 		effects.flash(fist, PUNCH_FLASH, Color.WHITE, _clock)
 		effects.puff(Vector3(fist.x, 0.1, fist.z), 0.2, Weapons.DUST, _clock, 0.6, 0.3)
+		effects.sound(Sounds.land_key(weapon.type), _clock)
 		_on_arrived(_blows[unit], 0)
 	for unit: int in _done:
 		_blow_at.erase(unit)
@@ -777,6 +897,7 @@ func _land_blows() -> void:
 ## small blast at the end; a figure nothing more.
 func _death(unit: int) -> void:
 	var weapon := Weapons.of(sim.unit_type(unit))
+	effects.sound(Sounds.DEATH[weapon.death], _clock)
 	if weapon.death == Weapons.Death.NONE:
 		return
 	_dying[unit] = _clock
@@ -807,10 +928,13 @@ func _finish_deaths() -> void:
 		if weapon.death == Weapons.Death.WRECK and since >= seconds * WRECK_BLAST and not _wrecked.has(unit):
 			_wrecked[unit] = true
 			effects.blast(at, size, 0, _clock)
+			effects.sound(Sounds.DEATH_END[weapon.death], _clock)
 			effects.glow(ground, size * 1.2, Weapons.BLAST_RIM, _clock, 0.4)
 		if since < seconds:
 			continue
 		_done.append(unit)
+		if weapon.death != Weapons.Death.WRECK:
+			effects.sound(Sounds.DEATH_END[weapon.death], _clock)
 		match weapon.death:
 			Weapons.Death.WRECK:
 				effects.scorch(ground, size * 0.5)
@@ -859,7 +983,11 @@ func _crash_socket(unit: int) -> String:
 func _on_arrived(building: int, unit: int) -> void:
 	if unit != 0:
 		units.hit(unit, _clock)
+		var death := Weapons.of(sim.unit_type(unit)).death
+		var machine := death == Weapons.Death.WRECK or death == Weapons.Death.CRASH
+		effects.sound(&"unit_hit_machine" if machine else &"unit_hit_figure", _clock)
 	if building != 0 and _views.has(building):
+		effects.sound(&"building_hit", _clock)
 		_flash_until[building] = _clock + FLASH_SECONDS
 		_shake_until[building] = _clock + SHAKE_SECONDS
 		_bar_until[building] = _clock + BAR_SECONDS
@@ -882,13 +1010,16 @@ func _fall(id: int) -> void:
 			_walls.erase(cell)
 			_walls_changed = true
 			effects.wall_rubble(at)
+			effects.sound(&"wall_crumble", _clock)
 			effects.impact(at + Vector3(0, 0.2, 0), 0.5, FALL_DUST, _clock)
 			effects.debris(at + Vector3(0, 0.3, 0), 3, 0.3, 0.1, _clock, MaterialKit.WALL, MaterialKit.HULL_DARK)
 			for k: int in 2:
 				effects.puff(at + Parts.around(0.25, 180.0 * k + 45.0, 0.1), 0.25, Weapons.DUST, _clock, 0.8, 0.4)
 			return
 		Catalog.CLASS_TRAP:
+			# Silent: its spring sounded (_spring).
 			return
+	effects.sound(&"building_collapse", _clock)
 	if _held_shots.has(id):
 		_release_shot(id)
 	if _views.has(id):
@@ -958,6 +1089,7 @@ func _settle(id: int) -> void:
 	add_child(rubble)
 	_rubble_pop[id] = rubble
 	_rubble_at[id] = _clock
+	effects.sound(&"rubble_settle", _clock)
 	effects.debris(at + Vector3.UP * 0.3, mini(4 + size, 6), 0.35 * size, 0.1 + 0.03 * size, _clock,
 		MaterialKit.HULL_DARK, MaterialKit.ARMY)
 	effects.impact(at + Vector3(0, 0.1, 0), size * 0.6, FALL_DUST, _clock)
@@ -977,6 +1109,12 @@ func _spring(id: int, at: Vector3) -> void:
 		_traps[id].scale = Vector3.ONE * 0.01
 		_sprung[id] = _clock
 	effects.glow(at, maxf(weapon.light, reach * 0.6), weapon.color, goes, 0.4)
+	effects.sound(Sounds.TRAP_SPRING, _clock)
+	var key: StringName = Sounds.TRAP.get(weapon.kind, &"")
+	if weapon.kind == Weapons.Kind.GRAV_TRAP:
+		_loop_for(key, goes + FUNNEL_SECONDS)
+	else:
+		effects.sound(key, goes)
 	match weapon.kind:
 		Weapons.Kind.MINE:
 			effects.impact(at, maxf(1.0, reach), MINE_BLAST, goes)
@@ -1136,6 +1274,8 @@ func _hold(id: int, at: Vector3) -> void:
 	var rim := _sizes[id] * WELL_RIM
 	for unit: int in _in_reach(id, range_cells):
 		effects.vortex(_weapons[id], id, unit, from, units.aim_point(unit), rim, _clock, hold)
+	if not _found.is_empty():
+		_loop_for(&"vortex_hum", _clock + hold)
 
 
 ## The cloaked sentry `id` shown: a shimmer round it as it decloaks, rings of energy and pale wisps.
@@ -1143,6 +1283,7 @@ func _decloak(id: int) -> void:
 	var centre := _centres[id]
 	var top := _muzzles[id] / MUZZLE_SHARE
 	var at := Vector3(centre.x, top * 0.5, centre.y)
+	effects.sound(&"reveal_shimmer", _clock)
 	effects.ring_flash(at, 0.9, MaterialKit.ENERGY, _clock, 0.3)
 	effects.impact(Vector3(centre.x, 0.05, centre.y), 0.9, MaterialKit.ENERGY, _clock, 0.4)
 	effects.impact(Vector3(centre.x, top * 0.6, centre.y), 0.6, MaterialKit.CORE_GLASS, _clock + 0.08, 0.35)

@@ -694,6 +694,61 @@ const LAND := {
 	"mega_mine": &"mega_blast",
 }
 
+## Types whose every shot sounds twice, the second this many seconds after (real time): the cloaked
+## sentry's twin barrels.
+const TWIN := {"cloaked_sentry": 0.04}
+## A unit's death (BattleView._death), by its record's death (Weapons.Death): what it makes as it
+## dies, and what its death's effect makes when it comes (BattleView._finish_deaths): a wreck's
+## fireball WRECK_BLAST of the way through, a crash's blast where it comes to rest, a jet trooper's
+## small blast at the end.
+const DEATH := {
+	Weapons.Death.NONE: &"figure_down",
+	Weapons.Death.WRECK: &"wreck_crunch",
+	Weapons.Death.CRASH: &"crash_whine",
+	Weapons.Death.BLAST: &"figure_down",
+}
+const DEATH_END := {
+	# A figure's fall is its whole death.
+	Weapons.Death.NONE: &"",
+	Weapons.Death.WRECK: &"explosion_small",
+	Weapons.Death.CRASH: &"explosion_medium",
+	Weapons.Death.BLAST: &"explosion_small",
+}
+## A trap springing (BattleView._spring): TRAP_SPRING as it pops up, then by its kind when it goes
+## off, TRAP_POP later: a loop (grav_whoosh) held while its funnel spins, or a one-shot.
+const TRAP_SPRING := &"trap_click"
+const TRAP := {
+	# A mine's blast is its landing (LAND_IMPACT, LAND), dated when it goes off.
+	Weapons.Kind.MINE: &"",
+	Weapons.Kind.MEGA_MINE: &"",
+	Weapons.Kind.FLAK_MINE: &"flak_crack",
+	Weapons.Kind.GRAV_TRAP: &"grav_whoosh",
+}
+## What each of the sim's event kinds (BattleEvents) sounds through, for the coverage the
+## sounds_battle scenario checks: the keys its arm in BattleView._read_events plays itself, past
+## the weapons' shots and landings (FIRE_KIND, LAND_IMPACT), the deaths' (DEATH, DEATH_END) and the
+## traps' (TRAP), which their own maps cover.
+const EVENTS := {
+	# A unit's shot or blow (its FIRE and LAND), and the building it hits.
+	BattleEvents.UNIT_HIT: [&"building_hit"],
+	# A defence's shot (its FIRE and LAND), and the unit it hits.
+	BattleEvents.SHOT: [&"unit_hit_figure", &"unit_hit_machine"],
+	# A shell's launch and its landing: the defence's FIRE and LAND.
+	BattleEvents.SHELL: [],
+	BattleEvents.SHELL_LAND: [],
+	BattleEvents.HOLD: [&"vortex_hum"],
+	BattleEvents.DETONATE: [TRAP_SPRING],
+	BattleEvents.THROW: [&"unit_thrown"],
+	BattleEvents.REVEAL: [&"reveal_shimmer"],
+	# A trap's fall is silent: its spring sounded.
+	BattleEvents.FALL: [&"wall_crumble", &"building_collapse", &"rubble_settle"],
+	# A unit's death: DEATH and DEATH_END.
+	BattleEvents.DEATH: [],
+	BattleEvents.ABILITY: [&"swarm_cast", &"swarm_hum", &"emp_burst", &"emp_hold", &"emp_wake", &"strike_marker",
+		&"strike_bolt"],
+	BattleEvents.STRIKE_LAND: [&"strike_land"],
+}
+
 
 ## The sound a building tapped makes, by its category (PlacementController); one not listed takes
 ## the core's.

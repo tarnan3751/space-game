@@ -30,9 +30,10 @@ extends Node3D
 ##
 ## The sounds (Audio, main.audio) are wired in _wire_audio: the base's events through their
 ## signals, the HUD and the sector map by handing them the node, which their buttons play their
-## taps on; the attack HUD's buttons through Audio.tap_buttons, and the battle's shots and
-## landings by handing the node to the battle view. main plays the boot's sting, hears the base's
-## completions by counting (_hear_completions) and keeps the base's ambience (_set_bed).
+## taps on; the attack HUD's buttons through Audio.tap_buttons, and the battle's sounds by
+## handing the node to the battle view (its opening's stab in open_battle). main plays the boot's
+## sting, hears the base's completions by counting (_hear_completions) and keeps the base's
+## ambience (_set_bed).
 
 const DEFAULT_SAVE_PATH := "user://base.json"
 const SAVE_PATH_ARG := "--save-path="
@@ -532,6 +533,7 @@ func open_battle(setup: Dictionary, practice: bool, expedition: Dictionary = {})
 	battle = view
 	add_child(battle)
 	audio.music(&"combat", 1.5)
+	audio.play(&"battle_start", 0.0)
 	# The base is no longer idle: the prerender stops before the battle's HUD runs the preview for
 	# its deploy cards, so the next frame's idle check leaves that run alone.
 	if _prerendering:
@@ -545,13 +547,7 @@ func open_battle(setup: Dictionary, practice: bool, expedition: Dictionary = {})
 	_base_zoom = camera.size
 	camera.setup(battle.area())
 	battle.finished.connect(_on_battle_finished.bind(practice, expedition))
-	battle.ended.connect(_on_battle_ended)
 	return ""
-
-
-## The battle is over: a fanfare for a victory (a star or more), a fall for a defeat.
-func _on_battle_ended(result: Dictionary) -> void:
-	audio.sting(&"victory" if int(result.get("stars", 0)) > 0 else &"defeat")
 
 
 ## The battle ended and was left: the base comes back. A practice applies nothing; an expedition's

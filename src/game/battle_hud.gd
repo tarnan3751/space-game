@@ -21,6 +21,10 @@ extends CanvasLayer
 ##   Return scrolls when it would not fit.
 ## - A toast for a refused deploy or cast, its left edge red for a refusal (ToastKind).
 ##
+## Its sounds (docs/reference/audio.md, **Battle**), through the view's Audio: a star won, the loot
+## rising, each of the last ten seconds, the speed toggled, End asking, a refusal's toast, and the
+## result's sting with its banner.
+##
 ## Everything sits inside the device's safe area (Hud.safe_area), the deploy bar with a column kept
 ## clear at its right where the base's Build button stands. Layout containers take no touch, so
 ## the field under them gets it; the panels and buttons take theirs. Text is set only when what it
@@ -65,6 +69,9 @@ const SPEED_SIZE := Vector2(96, 64)
 const END_SIZE := Vector2(140, 64)
 ## Between speed and End, so a miss on the toggle does not land on End.
 const END_GAP := 24
+## The time left from which each second ticks (timer_warning), and between two stars won at once.
+const WARNING_SECONDS := 10
+const STAR_GAP := 0.15
 ## The refused deploys' toasts. A card run out is let go on the next refresh, so a tap never meets
 ## `none_left`; a smear can, when a frame steps several ticks and the type runs out between two
 ## of them, before the refresh: that is the toast it keeps.
@@ -536,6 +543,8 @@ func _refresh() -> void:
 	var sim := _view.sim
 	var seconds := sim.seconds_left()
 	if seconds != _shown_seconds:
+		if seconds > 0 and seconds <= WARNING_SECONDS and not sim.is_over():
+			_view.audio.play(&"timer_warning", 0.0)
 		_shown_seconds = seconds
 		_timer.text = "%d:%02d" % [seconds / 60, seconds % 60]
 		_fit()
@@ -545,6 +554,8 @@ func _refresh() -> void:
 		_destruction.text = "%d%%" % pct
 	var stars := sim.stars()
 	if stars != _shown_stars:
+		for k: int in range(maxi(_shown_stars, 0), stars):
+			_view.audio.schedule(&"star_earned", STAR_GAP * (k - maxi(_shown_stars, 0)), 0.0)
 		_shown_stars = stars
 		for k: int in _stars.size():
 			_light(_stars[k], k < stars)
@@ -556,6 +567,8 @@ func _refresh() -> void:
 		for res: String in _catalog.resources:
 			var amount: int = loot.get(res, 0)
 			if amount != _shown_loot[res]:
+				if amount > _shown_loot[res]:
+					_view.audio.play(&"loot_tick", 0.04)
 				_shown_loot[res] = amount
 				_loot[res].text = Format.short(amount)
 	for unit: String in _cards:
@@ -585,6 +598,7 @@ func _show_result(result: Dictionary) -> void:
 	_speed_button.disabled = true
 	var stars := int(result.get("stars", 0))
 	_result_title.text = "Victory!" if stars > 0 else "Defeat"
+	_view.audio.sting(&"victory" if stars > 0 else &"defeat")
 	_result_banner.theme_type_variation = &"BattleBannerVictory" if stars > 0 else &"BattleBannerDefeat"
 	# The stars over the destruction, beside the loot.
 	var top := HBoxContainer.new()
@@ -747,11 +761,13 @@ func _on_speed() -> void:
 	var at := BattleView.SPEEDS.find(_view.speed)
 	_view.speed = BattleView.SPEEDS[(at + 1) % BattleView.SPEEDS.size()]
 	_speed_button.text = "%dx" % _view.speed
+	_view.audio.play(&"speed_toggle", 0.0)
 
 
 func _on_end() -> void:
 	if not _view.sim.is_over():
 		_confirm_backdrop.show()
+		_view.audio.play(&"confirm_open", 0.0)
 
 
 func _on_confirm_end() -> void:
@@ -770,6 +786,8 @@ func _on_cast_failed(error: String) -> void:
 
 
 func _show_toast(text: String, kind: ToastKind = ToastKind.INFO) -> void:
+	if kind == ToastKind.REFUSAL:
+		_view.audio.play(&"ui_denied", 0.0)
 	_toast.theme_type_variation = &"BattleToastRefusal" if kind == ToastKind.REFUSAL else &"BattleToastInfo"
 	_toast_label.text = text
 	_toast.modulate.a = 1.0

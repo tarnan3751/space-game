@@ -24,7 +24,8 @@ extends Node3D
 ## frame allocates nothing, and an entry may start later than it is added (a burst's later bolts,
 ## a death's blast), drawn at no size until then. A projectile that arrives calls `arrived` with
 ## the building and the unit it was aimed at (0 for none), for BattleView's hit flashes; an
-## instant one (a streak, a beam, lightning) calls it at once.
+## instant one (a streak, a beam, lightning) calls it at once. Its sounds and BattleView's go
+## through sound(), dated on the battle's clock (docs/reference/audio.md, **Battle**).
 
 ## Floats per instance in a buffer: a 3D transform (three rows of four), a colour and custom data.
 const FLOATS := 20
@@ -167,12 +168,20 @@ const SHIELD_FLICKER_BRIGHT := 1.6
 const SHIELD_DROP_SECONDS := 0.4
 const SHIELD_DROP_SWELL := 0.08
 const MAX_SHIELDS := 16
+## A sound dated less than this far ahead (seconds of real time) plays at once rather than
+## scheduled: under a frame.
+const SOUND_LATE := 0.01
 
 ## Called with (building id, unit id) when a bolt aimed at either arrives.
 var arrived: Callable
-## Plays a weapon's shot and its landing (Sounds.FIRE and LAND, by its type): one play in fire(),
-## a burst's later shots scheduled its burst_gap apart, one in land().
+## Plays the battle's sounds (sound()): a weapon's shot and its landing (Sounds.fire_key and
+## land_key, by its type) in fire() and land(), a shield's in set_shield(), and BattleView's
+## through it.
 var audio: Audio
+## The view's clock (seconds of battle) and speed, set each frame before anything is added, so a
+## sound dated later on the clock is scheduled that far ahead in real time.
+var clock: float = 0.0
+var speed: int = 1
 ## Harness hooks, read by no game code: projectiles started so far, and where the last one started
 ## and its colour (the rig scenario's checks).
 var bolts_fired: int = 0
@@ -1030,15 +1039,16 @@ func setup(walls: int, area: AABB) -> void:
 ## landing by its impact (land()) of `impact` radius at least (none at 0) and calling `arrived`
 ## with `building` and `unit`, with its muzzle flash at `from` when `flash_on`. `seconds` is a
 ## flight the sim timed (a shell's, landing then); 0 flies at the record's speed. A burst draws
-## its later shots `burst_gap` apart, each with its flash; only the first calls `arrived`.
+## its later shots `burst_gap` apart, each with its flash and its sound; only the first calls
+## `arrived`.
 func fire(weapon: Weapons.Weapon, from: Vector3, to: Vector3, building: int, unit: int, impact: float, now: float,
 		flash_on: bool = true, seconds: float = 0.0) -> void:
 	_count_shot(from, weapon.color)
-	var sound := Sounds.fire_key(weapon.type)
-	if sound != &"":
-		audio.play(sound)
-		for k: int in range(1, weapon.burst):
-			audio.schedule(sound, k * weapon.burst_gap)
+	var key := Sounds.fire_key(weapon.type)
+	for k: int in weapon.burst:
+		sound(key, now + k * weapon.burst_gap)
+	if Sounds.TWIN.has(weapon.type):
+		sound(key, now + float(Sounds.TWIN[weapon.type]))
 	var distance := from.distance_to(to)
 	match weapon.kind:
 		Weapons.Kind.BOLT, Weapons.Kind.LASER, Weapons.Kind.TRACER, Weapons.Kind.PLASMA, Weapons.Kind.BALL, Weapons.Kind.SHELL:
@@ -1078,11 +1088,10 @@ func fire(weapon: Weapons.Weapon, from: Vector3, to: Vector3, building: int, uni
 
 
 ## Where `weapon` lands at `at`, `size` across at least, from `now`: its record's impact and the
-## glow decal of its light on the ground under it.
+## glow decal of its light on the ground under it, and its sound (a landing dated later, a trap's,
+## scheduled).
 func land(weapon: Weapons.Weapon, at: Vector3, size: float, now: float) -> void:
-	var sound := Sounds.land_key(weapon.type)
-	if sound != &"":
-		audio.play(sound)
+	sound(Sounds.land_key(weapon.type), now)
 	var r := maxf(size, weapon.impact_size)
 	var c := weapon.color
 	var ground := Vector3(at.x, 0.0, at.z)
@@ -1366,9 +1375,27 @@ func set_shield(id: int, pool: int, now: float) -> void:
 		if pool <= 0:
 			_shield_drop[id] = now
 			impact(_shield_at[id], _shield_radius[id], MaterialKit.ENERGY, now, SHIELD_DROP_SECONDS)
+		sound(&"shield_down" if pool <= 0 else &"shield_hit", now)
 	elif pool > 0:
 		_shield_drop[id] = -1.0
+		if _shield_pool[id] <= 0:
+			sound(&"shield_up", now)
 	_shield_pool[id] = pool
+
+
+## Plays `key` (&"" plays nothing) at `at` on the battle's clock: now when that is now or past,
+## else scheduled as far ahead as the view's speed makes it in real time (a burst's later shots, a
+## trap going off after it pops up).
+func sound(key: StringName, at: float, pitch_jitter: float = 0.06, volume_db: float = 0.0) -> void:
+	if key == &"":
+		return
+	var delay := (at - clock) / maxi(speed, 1)
+	if delay > SOUND_LATE:
+		# Dated in real time at the speed now: a speed toggled before it plays leaves it as it was
+		# (a leftover, accepted).
+		audio.schedule(key, delay, pitch_jitter, volume_db)
+	else:
+		audio.play(key, pitch_jitter, volume_db)
 
 
 # --- Drawing ---------------------------------------------------------------------
