@@ -2,19 +2,13 @@ extends HarnessScenario
 ## The top bar's drone meter (docs/reference/hud.md, **Drone meter**), rendered. On a fresh base
 ## the real meter is set to each of COUNTS in turn, free then all, and shot beside the resource
 ## meters (01-0of1 .. 07-5of5), each checked for its counts, its text and its place at the end of
-## the top bar's row; then every count again at 2x on the panel colour, in two columns (08-2x); then
-## the top bar at 2 / 5 in each skin (Hud.set_skin), A, B and C (09-skin-a .. 11-skin-c), a busy
-## slot's pixels checked, rendered, to read as the skin's trough (its stripes shift it a little).
+## the top bar's row; then every count again at 2x on the panel colour, in two columns (08-2x).
 ## The game's tick is held while the meter shows counts the base does not have, so the HUD's
 ## refresh does not put the real ones back; the animation clock is fixed so the resource meters'
 ## glint stands still.
 
 const COUNTS: Array[Vector2i] = [Vector2i(0, 1), Vector2i(1, 1), Vector2i(1, 3), Vector2i(3, 3), Vector2i(2, 5),
 	Vector2i(0, 5), Vector2i(5, 5)]
-const SHOWN := Vector2i(2, 5)
-const SKINS: Array[Hud.Look] = [Hud.Look.A, Hud.Look.B, Hud.Look.C]
-## How far in luminance a busy slot's average on screen may lie from the skin's trough fill.
-const BUSY_TOLERANCE := 0.08
 const ZOOMED_ROWS := 4
 const ZOOMED_GAP := Vector2(40, 20)
 
@@ -57,41 +51,8 @@ func run(main: MainScript) -> void:
 	await screenshot("2x")
 	backdrop.queue_free()
 
-	meter.set_counts(SHOWN.x, SHOWN.y)
-	for look: Hud.Look in SKINS:
-		hud.set_skin(look)
-		await frames(3)
-		if DisplayServer.get_name() != "headless":
-			var trough := (hud.ui_theme().get_stylebox(&"panel", &"MeterTrough") as StyleBoxFlat).bg_color
-			var busy := _busy_slot_colour(main, meter)
-			check(absf(busy.get_luminance() - trough.get_luminance()) < BUSY_TOLERANCE,
-				"skin %s: a busy slot reads %s on screen, the skin's trough %s" % [_name(look), busy.to_html(false),
-				trough.to_html(false)])
-		# Skin A at 2 / 5 is 05-2of5 again, which the guard against repeated frames would refuse.
-		await screenshot("skin-" + _name(look), look == Hud.Look.A)
-	hud.set_skin(Hud.Look.A)
-	meter.set_counts(real.x, real.y)
 	main.process_mode = Node.PROCESS_MODE_INHERIT
 	release_clock()
-
-
-## The average colour on screen of the last slot (busy at 2 / 5), inside its ink lines.
-func _busy_slot_colour(main: MainScript, meter: DroneRing) -> Color:
-	var right := DroneRing.SIZE.x - Hud.METER_TEXT_RIGHT - DroneRing.TEXT_WIDTH
-	var width := (right - DroneRing.SLOTS_LEFT) / SHOWN.y
-	var inside := Rect2(right - width + 3.0, 10.0, width - 6.0, DroneRing.SIZE.y - 20.0)
-	var to_window := main.get_viewport().get_final_transform() * meter.get_global_transform_with_canvas()
-	var area := Rect2i((to_window * inside).abs())
-	var image := main.get_viewport().get_texture().get_image()
-	var sum := Color(0, 0, 0, 0)
-	for y: int in range(area.position.y, area.end.y):
-		for x: int in range(area.position.x, area.end.x):
-			sum += image.get_pixel(x, y)
-	return sum / float(area.get_area())
-
-
-func _name(look: Hud.Look) -> String:
-	return (Hud.Look.keys()[look] as String).to_lower()
 
 
 ## The meter's text: its one Label's.

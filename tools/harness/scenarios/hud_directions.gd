@@ -1,33 +1,18 @@
 extends HarnessScenario
-## The UI pass's three skins (docs/reference/hud.md, **Skins**) side by side, for the owner to pick
-## from: for each of A, B and C, set through Hud.set_skin, the debug build's Template base with the
-## build panel closed (the top bar, its meters full); the build panel open on the Army tab with its
-## pictures made; the Cadet Academy's training page with two Rangers queued; then, on a fresh base
-## (Reset base), the Hangar's card held down on the Army tab (on the template every card is maxed),
-## and the Resources tab with its locked cards. Each shot is named
-## after its skin. Checks: the theme each skin builds, the meters' full state on the template, the
-## held card's content sunk (A and C) or the card squashed (B) in a rendered run, the locked cards. Rendered, for
-## its fifteen shots; headless it checks the wiring.
+## The HUD's gallery (docs/reference/hud.md): the debug build's Template base with the build panel
+## closed (the top bar, its meters full); the build panel open on the Army tab with its pictures
+## made; the Cadet Academy's training page with two Rangers queued; then, on a fresh base (Reset
+## base), the Hangar's card held down on the Army tab (on the template every card is maxed), and the
+## Resources tab with its locked cards. Checks: the meters' full state on the template, the held
+## card's content sunk in a rendered run, the locked cards. Rendered, for its five shots; headless it
+## checks the wiring.
 
 const PRODUCER := "cadet_academy"
-const SKINS: Array[Hud.Look] = [Hud.Look.A, Hud.Look.B, Hud.Look.C]
 
 
 func run(main: MainScript) -> void:
 	var hud: Hud = main.hud
-	for look: Hud.Look in SKINS:
-		var label: String = Hud.Look.keys()[look]
-		hud.set_skin(look)
-		await _shoot(main, label.to_lower())
-	hud.set_skin(Hud.Look.A)
-
-
-func _shoot(main: MainScript, label: String) -> void:
-	var hud: Hud = main.hud
 	var catalog: Catalog = main.state.catalog
-	var card_box := hud.ui_theme().get_stylebox("normal", "CardButton")
-	check((card_box is StyleBoxTexture) == (Hud.skin == Hud.Look.B),
-		"%s: the cards' shape is a %s" % [label, card_box.get_class()])
 	main.hud.template_button().pressed.emit()
 	await frames(4)
 	var state: BaseState = main.state
@@ -35,14 +20,14 @@ func _shoot(main: MainScript, label: String) -> void:
 		var shader := (hud.resource_fill(res).get_child(0) as CanvasItem).material as ShaderMaterial
 		var full: bool = shader.get_shader_parameter(&"full")
 		check(full == (state.resources[res] >= state.capacity(res)),
-			"%s: the %s meter's full state is %s at %d / %d" % [label, res, full, state.resources[res], state.capacity(res)])
+			"the %s meter's full state is %s at %d / %d" % [res, full, state.resources[res], state.capacity(res)])
 	await wait_seconds(main, 0.5)
-	await screenshot("%s-01-top" % label)
+	await screenshot("top")
 
 	await open_build_menu(main)
 	hud.tab_button("army").pressed.emit()
 	await _pictures(main)
-	await screenshot("%s-02-build-army" % label)
+	await screenshot("build-army")
 	hud.close_button().pressed.emit()
 	await wait_seconds(main, Hud.MENU_CLOSE_SECONDS)
 
@@ -51,14 +36,14 @@ func _shoot(main: MainScript, label: String) -> void:
 	await frames(2)
 	hud.action_button().pressed.emit()
 	await wait_seconds(main, Hud.MENU_OPEN_SECONDS)
-	check(hud.is_training_open(), "%s: Train opened the training page" % label)
+	check(hud.is_training_open(), "Train opened the training page")
 	hud.train_card("ranger").pressed.emit()
 	hud.train_card("ranger").pressed.emit()
 	await frames(2)
-	check(hud.queue_shown().size() == 2, "%s: two Rangers queued" % label)
+	check(hud.queue_shown().size() == 2, "two Rangers queued")
 	await _pictures(main)
 	await wait_seconds(main, 0.3)
-	await screenshot("%s-04-training" % label)
+	await screenshot("training")
 	hud.army_close_button().pressed.emit()
 	main.placement.select(0)
 	await wait_seconds(main, Hud.MENU_CLOSE_SECONDS)
@@ -76,15 +61,10 @@ func _shoot(main: MainScript, label: String) -> void:
 	await frames(3)
 	# The press shows on the card's next draw, which a headless run never makes.
 	var body := card.get_child(0) as Control
-	if DisplayServer.get_name() == "headless":
-		pass
-	elif Hud.skin == Hud.Look.B:
-		check(card.scale != Vector2.ONE and body.position == Vector2.ZERO,
-			"%s: the held card squashes (%s)" % [label, card.scale])
-	else:
+	if DisplayServer.get_name() != "headless":
 		check(body.position == Vector2.ONE * Hud.PRESSED_SINK,
-			"%s: the held card's content sank to %s" % [label, body.position])
-	await screenshot("%s-03-pressed" % label)
+			"the held card's content sank to %s" % body.position)
+	await screenshot("pressed")
 	# Let go: the card is picked, and its placing cancelled.
 	touch_screen(main, at, false)
 	await frames(2)
@@ -97,8 +77,8 @@ func _shoot(main: MainScript, label: String) -> void:
 	for type: String in catalog.menu_order:
 		if catalog.category_of(type) == "resources" and hud.entry_status(type).begins_with("Needs Command Center"):
 			locked.append(type)
-	check(not locked.is_empty() and hud.entry_button(locked[0]).disabled, "%s: locked cards %s" % [label, ", ".join(locked)])
-	await screenshot("%s-05-locked" % label)
+	check(not locked.is_empty() and hud.entry_button(locked[0]).disabled, "locked cards %s" % ", ".join(locked))
+	await screenshot("locked")
 	hud.close_button().pressed.emit()
 	await wait_seconds(main, Hud.MENU_CLOSE_SECONDS)
 
