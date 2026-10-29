@@ -128,9 +128,10 @@ func _ready() -> void:
 
 
 ## Plays `key` once, its pitch varied up to `pitch_jitter` either way, `volume_db` louder or
-## softer: whether it played (not dropped by its cooldown or a full pool).
+## softer: whether it played (not dropped by its cooldown or a full pool). &"" (a silent entry of
+## Sounds' maps) plays nothing.
 func play(key: StringName, pitch_jitter: float = 0.06, volume_db: float = 0.0) -> bool:
-	if _shut:
+	if _shut or key == &"":
 		return false
 	var started := Time.get_ticks_usec() if Profile.enabled else 0
 	var played := _play(key, pitch_jitter, volume_db)

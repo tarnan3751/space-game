@@ -237,28 +237,153 @@ const TABLE := {
 		{"wave": "sine", "hz": 110, "a": 0.03, "d": 0.25, "vibrato": [6.0, 15.0]},
 		{"wave": "sine", "hz": 220, "a": 0.03, "d": 0.2, "db": -8}]},
 
-	# The battle: shots, impacts and blasts.
+	# The battle: the shots (Sounds.FIRE_KIND, FIRE), by the weapon's kind and per type where its
+	# character differs. Short and bright for the light guns, a sub under the heavy ones.
 	"laser_fire": {"category": "shot", "seconds": 0.2, "layers": [
 		{"wave": "triangle", "hz": [2200, 380], "glide": 0.14, "a": 0.002, "d": 0.15, "fm": {"ratio": 2.0, "index": [1.0, 0.0]}},
 		{"wave": "sine", "hz": [1100, 250], "glide": 0.14, "a": 0.002, "d": 0.14, "db": -6},
 		{"wave": "noise", "a": 0.001, "d": 0.02, "filter": {"type": "hp", "hz": 5000}, "db": -14}]},
+	# The laser a fifth higher and thinner; its twin barrel's shot follows 40 ms on (TWIN).
+	"sentry_fire": {"category": "shot", "seconds": 0.18, "layers": [
+		{"wave": "triangle", "hz": [3300, 570], "glide": 0.12, "a": 0.002, "d": 0.12, "fm": {"ratio": 2.0, "index": [0.8, 0.0]}},
+		{"wave": "sine", "hz": [1650, 375], "glide": 0.12, "a": 0.002, "d": 0.11, "db": -9},
+		{"wave": "noise", "a": 0.001, "d": 0.015, "filter": {"type": "hp", "hz": 6000}, "db": -14}]},
+	# The plasma mortar's hollow thoomp.
 	"shell_fire": {"category": "shot", "seconds": 0.28, "layers": [
 		{"wave": "sine", "hz": [180, 60], "glide": 0.12, "a": 0.002, "d": 0.2},
 		{"wave": "noise", "a": 0.002, "d": 0.12, "filter": {"type": "lp", "hz": [3000, 400]}, "db": -6},
 		{"wave": "triangle", "hz": 90, "a": 0.004, "d": 0.2, "db": -6}]},
-	"missile_fire": {"category": "shot", "seconds": 0.3, "layers": [
+	# Up to twenty tubes in a salvo: a short cooldown and three voices.
+	"missile_fire": {"category": "shot", "seconds": 0.3, "cooldown": 0.06, "voices": 3, "layers": [
 		{"wave": "noise", "a": 0.015, "d": 0.26, "filter": {"type": "bp", "hz": [500, 2200], "q": 2.0}},
 		{"wave": "saw", "hz": [200, 520], "a": 0.01, "d": 0.2, "filter": {"type": "lp", "hz": 1200}, "db": -14},
 		{"wave": "sine", "hz": [120, 70], "a": 0.002, "d": 0.08, "db": -6}]},
-	"impact_small": {"category": "impact", "seconds": 0.3, "layers": [
-		{"wave": "noise", "a": 0.001, "d": 0.04, "filter": {"type": "hp", "hz": 2500}, "db": -3},
-		{"wave": "triangle", "hz": [1600, 600], "glide": 0.06, "a": 0.001, "d": 0.12, "db": -4},
-		{"wave": "sine", "hz": [300, 170], "glide": 0.15, "a": 0.002, "d": 0.28}]},
+	# The flak's crisp pok, one a barrel of its burst (its cooldown under the burst's gap at 2x).
+	"flak_fire": {"category": "shot", "seconds": 0.16, "cooldown": 0.025, "layers": [
+		{"wave": "sine", "hz": [700, 160], "glide": 0.04, "a": 0.001, "d": 0.11},
+		{"wave": "noise", "a": 0.001, "d": 0.045, "filter": {"type": "bp", "hz": 1800, "q": 1.2}, "db": -3},
+		{"wave": "triangle", "hz": [320, 140], "a": 0.001, "d": 0.09, "db": -6}]},
+	# The dune runner's and the gunship's lighter tat, three a burst.
+	"tracer_fire": {"category": "shot", "seconds": 0.1, "min": 0.05, "rms_db": -19.0, "cooldown": 0.03, "layers": [
+		{"wave": "sine", "hz": [1250, 420], "glide": 0.03, "a": 0.001, "d": 0.06},
+		{"wave": "noise", "a": 0.001, "d": 0.025, "filter": {"type": "hp", "hz": 3000}, "db": -6},
+		{"wave": "triangle", "hz": [600, 300], "a": 0.001, "d": 0.05, "db": -8}]},
+	# The arc tower's crackle: noise through a resonant band falling, chopped by a ring.
+	"arc_zap": {"category": "shot", "seconds": 0.26, "layers": [
+		{"wave": "noise", "a": 0.002, "d": 0.24, "filter": {"type": "bp", "hz": [3200, 800], "q": 4.0}, "ring": {"hz": 60}},
+		{"wave": "square", "pulse": 0.2, "hz": [220, 110], "a": 0.002, "d": 0.2, "filter": {"type": "lp", "hz": 2500}, "db": -12},
+		{"wave": "sine", "hz": [1500, 600], "a": 0.001, "d": 0.08, "db": -8}]},
+	# The EMP tower's pulse: a soft square falling, a sine under it.
+	"emp_pulse": {"category": "shot", "seconds": 0.32, "layers": [
+		{"wave": "square", "pulse": 0.25, "hz": [1600, 200], "glide": 0.25, "a": 0.003, "d": 0.28,
+			"filter": {"type": "lp", "hz": 2400}, "db": -4},
+		{"wave": "sine", "hz": [800, 100], "glide": 0.25, "a": 0.003, "d": 0.3}]},
+	# The railgun: a charge rising, then the snap of the slug.
+	"railgun_fire": {"category": "shot", "seconds": 0.3, "layers": [
+		{"wave": "sine", "hz": [200, 1800], "glide": 0.11, "a": 0.1, "d": 0.04, "db": -6},
+		{"wave": "noise", "at": 0.1, "a": 0.001, "d": 0.12, "filter": {"type": "hp", "hz": 2500}, "db": -2},
+		{"wave": "triangle", "at": 0.1, "hz": [2400, 300], "glide": 0.12, "a": 0.001, "d": 0.15, "db": -4},
+		{"wave": "sine", "at": 0.1, "hz": [180, 60], "a": 0.001, "d": 0.15, "db": -4}]},
+	# The ion beam's held drone, a zing at its start.
+	"beam_fire": {"category": "shot", "seconds": 0.3, "chorus": {"mix": 0.4}, "layers": [
+		{"wave": "saw", "hz": 220, "a": 0.01, "d": 0.05, "s": 0.7, "len": 0.2, "r": 0.06, "filter": {"type": "lp", "hz": 1800}, "db": -4},
+		{"wave": "sine", "hz": 440, "a": 0.01, "d": 0.05, "s": 0.7, "len": 0.2, "r": 0.06, "vibrato": [14.0, 20.0]},
+		{"wave": "sine", "hz": [1400, 900], "a": 0.002, "d": 0.06, "db": -8}]},
+	# The skimmer's thinner beam.
+	"skimmer_beam": {"category": "shot", "seconds": 0.22, "chorus": {"mix": 0.35}, "layers": [
+		{"wave": "saw", "hz": 330, "a": 0.008, "d": 0.04, "s": 0.6, "len": 0.15, "r": 0.05, "filter": {"type": "lp", "hz": 2500}, "db": -6},
+		{"wave": "sine", "hz": 990, "a": 0.008, "d": 0.04, "s": 0.6, "len": 0.15, "r": 0.05, "vibrato": [16.0, 25.0]}]},
+	# The orbital cannon's deep launch: a sub falling and a long exhale.
+	"orbital_fire": {"category": "shot", "seconds": 0.55, "max": 0.6, "priority": 2, "layers": [
+		{"wave": "sine", "hz": [95, 40], "glide": 0.35, "a": 0.003, "d": 0.45},
+		{"wave": "pink", "a": 0.01, "d": 0.5, "filter": {"type": "lp", "hz": [2500, 300]}, "db": -4},
+		{"wave": "triangle", "hz": [600, 150], "a": 0.002, "d": 0.12, "db": -8}]},
+	# The ranger's soft pew (the jet trooper's too, two a burst).
+	"bolt_fire": {"category": "shot", "seconds": 0.13, "layers": [
+		{"wave": "triangle", "hz": [1400, 500], "glide": 0.1, "a": 0.002, "d": 0.11},
+		{"wave": "sine", "hz": [700, 250], "glide": 0.1, "a": 0.002, "d": 0.1, "db": -8}]},
+	# The siege walker's fatter bolt.
+	"walker_fire": {"category": "shot", "seconds": 0.2, "layers": [
+		{"wave": "triangle", "hz": [900, 300], "glide": 0.14, "a": 0.002, "d": 0.16},
+		{"wave": "square", "pulse": 0.3, "hz": [450, 150], "glide": 0.14, "a": 0.002, "d": 0.14,
+			"filter": {"type": "lp", "hz": 1500}, "db": -12},
+		{"wave": "sine", "hz": [200, 80], "a": 0.002, "d": 0.1, "db": -4}]},
+	# The hover tank's cannon: a thump and a crack.
+	"tank_fire": {"category": "shot", "seconds": 0.26, "layers": [
+		{"wave": "sine", "hz": [140, 50], "glide": 0.15, "a": 0.002, "d": 0.22},
+		{"wave": "noise", "a": 0.001, "d": 0.1, "filter": {"type": "lp", "hz": [4000, 500]}, "db": -4},
+		{"wave": "triangle", "hz": 70, "a": 0.003, "d": 0.2, "db": -6}]},
+	# The titan's: bigger, its sub down to 35 Hz.
+	"titan_fire": {"category": "shot", "seconds": 0.38, "max": 0.4, "drive": 0.2, "priority": 2, "layers": [
+		{"wave": "sine", "hz": [120, 35], "glide": 0.25, "a": 0.002, "d": 0.32},
+		{"wave": "noise", "a": 0.001, "d": 0.16, "filter": {"type": "lp", "hz": [3000, 300]}, "db": -3},
+		{"wave": "pink", "a": 0.003, "d": 0.3, "filter": {"type": "lp", "hz": 800}, "db": -6}]},
+	# The bomber's bomb whistling down from its bay.
+	"bomb_whistle": {"category": "shot", "seconds": 0.42, "max": 0.45, "layers": [
+		{"wave": "sine", "hz": [1300, 450], "a": 0.05, "s": 0.8, "len": 0.32, "r": 0.06, "vibrato": [8.0, 15.0]},
+		{"wave": "pink", "a": 0.1, "s": 0.6, "len": 0.3, "r": 0.06, "filter": {"type": "bp", "hz": [2500, 900], "q": 2.0}, "db": -12}]},
+	# The brawler's swing; its punch lands as punch_land.
+	"melee_swing": {"category": "shot", "seconds": 0.14, "min": 0.08, "layers": [
+		{"wave": "pink", "a": 0.03, "d": 0.1, "filter": {"type": "bp", "hz": [600, 2000], "q": 1.2}},
+		{"wave": "sine", "hz": [250, 400], "a": 0.02, "d": 0.08, "db": -10}]},
+
+	# The landings (Sounds.LAND_IMPACT, LAND), by the weapon's impact and per type. A spark and a
+	# hit are the least important sounds of a battle, a blast more, the biggest the most.
+	"impact_small": {"category": "impact", "seconds": 0.3, "min": 0.08, "rms_db": -18.0, "priority": 0, "cooldown": 0.03, "voices": 6,
+		"layers": [
+		{"wave": "noise", "a": 0.001, "d": 0.04, "filter": {"type": "hp", "hz": 4000}, "db": -3},
+		{"wave": "sine", "hz": 2400, "a": 0.001, "d": 0.16, "ring": {"hz": 1730}, "db": -2},
+		{"wave": "triangle", "hz": [1600, 900], "glide": 0.05, "a": 0.001, "d": 0.07, "db": -6},
+		{"wave": "sine", "hz": [300, 170], "a": 0.002, "d": 0.3, "db": -6}]},
+	"explosion_small": {"category": "explosion", "seconds": 0.55, "min": 0.35, "drive": 0.25, "layers": [
+		{"wave": "noise", "a": 0.001, "d": 0.35, "filter": {"type": "lp", "hz": [5000, 400]}},
+		{"wave": "pink", "a": 0.003, "d": 0.45, "filter": {"type": "lp", "hz": [1500, 250]}, "db": -4},
+		{"wave": "sine", "hz": [110, 45], "glide": 0.2, "a": 0.002, "d": 0.3, "db": -2}]},
 	"explosion_medium": {"category": "explosion", "seconds": 1.2, "drive": 0.3,
 		"echo": {"ms": 90, "feedback": 0.2, "mix": 0.15}, "layers": [
 		{"wave": "noise", "a": 0.002, "d": 0.7, "filter": {"type": "lp", "hz": [5000, 300]}},
 		{"wave": "pink", "a": 0.004, "d": 0.9, "filter": {"type": "lp", "hz": [1200, 200]}, "db": -4},
 		{"wave": "sine", "hz": [90, 40], "glide": 0.3, "a": 0.002, "d": 0.45, "db": -2}]},
+	# A sub thump, noise under a falling low-pass, a crackle and a little room.
+	"explosion_large": {"category": "explosion", "seconds": 1.45, "drive": 0.35,
+		"echo": {"ms": 110, "feedback": 0.25, "mix": 0.18}, "layers": [
+		{"wave": "sine", "hz": [70, 30], "glide": 0.5, "a": 0.002, "d": 0.8},
+		{"wave": "noise", "a": 0.002, "d": 0.9, "filter": {"type": "lp", "hz": [6000, 200]}, "db": -1},
+		{"wave": "pink", "a": 0.005, "d": 1.25, "filter": {"type": "lp", "hz": [1500, 150]}, "db": -3},
+		{"wave": "noise", "at": 0.05, "a": 0.01, "d": 0.6, "filter": {"type": "bp", "hz": 2500, "q": 2.0},
+			"ring": {"hz": 23}, "db": -12}]},
+	"air_burst": {"category": "impact", "seconds": 0.32, "rms_db": -17.0, "layers": [
+		{"wave": "noise", "a": 0.001, "d": 0.09, "filter": {"type": "lp", "hz": [8000, 1500]}},
+		{"wave": "noise", "a": 0.002, "d": 0.28, "filter": {"type": "hp", "hz": 3500}, "db": -8},
+		{"wave": "sine", "hz": [500, 150], "a": 0.001, "d": 0.15, "db": -3}]},
+	# The plasma's wet splat: a bubbling sine and a falling hiss.
+	"plasma_splash": {"category": "impact", "seconds": 0.38, "layers": [
+		{"wave": "noise", "a": 0.003, "d": 0.3, "filter": {"type": "bp", "hz": [2500, 600], "q": 1.5}},
+		{"wave": "sine", "hz": [420, 160], "glide": 0.2, "a": 0.002, "d": 0.26, "fm": {"ratio": 3.1, "index": [3.0, 0.0]}, "db": -3},
+		{"wave": "triangle", "hz": [900, 300], "a": 0.001, "d": 0.1, "db": -8}]},
+	# A beam's burn: a buzzing sizzle round 2 kHz.
+	"beam_burn": {"category": "impact", "seconds": 0.26, "layers": [
+		{"wave": "noise", "a": 0.005, "d": 0.24, "filter": {"type": "bp", "hz": 2200, "q": 3.0}, "ring": {"hz": 47}},
+		{"wave": "sine", "hz": 180, "a": 0.005, "d": 0.2, "db": -10}]},
+	# EMP arcs on a unit: a square falling and a crackle.
+	"emp_zap": {"category": "impact", "seconds": 0.5, "max": 0.55, "layers": [
+		{"wave": "square", "pulse": 0.3, "hz": [2000, 100], "glide": 0.4, "a": 0.002, "d": 0.45,
+			"filter": {"type": "lp", "hz": 3000}, "db": -5},
+		{"wave": "noise", "a": 0.002, "d": 0.4, "filter": {"type": "bp", "hz": 2000, "q": 3.0}, "ring": {"hz": 30}, "db": -6},
+		{"wave": "sine", "hz": [600, 120], "a": 0.002, "d": 0.3}]},
+	# The brawler's punch landing: a comic bop.
+	"punch_land": {"category": "impact", "seconds": 0.16, "min": 0.1, "layers": [
+		{"wave": "sine", "hz": [320, 80], "glide": 0.1, "a": 0.003, "d": 0.14},
+		{"wave": "noise", "a": 0.003, "d": 0.02, "filter": {"type": "lp", "hz": 3000}, "db": -6},
+		{"wave": "triangle", "hz": [600, 200], "a": 0.003, "d": 0.04, "db": -8}]},
+	# The mega mine: deeper and longer than the big blast, a sub rumbling after it.
+	"mega_blast": {"category": "explosion", "seconds": 1.65, "max": 1.7, "drive": 0.4, "priority": 4, "voices": 2,
+		"echo": {"ms": 130, "feedback": 0.3, "mix": 0.2}, "layers": [
+		{"wave": "sine", "hz": [60, 28], "glide": 0.6, "a": 0.002, "d": 1.0},
+		{"wave": "noise", "a": 0.002, "d": 1.1, "filter": {"type": "lp", "hz": [5000, 150]}, "db": -1},
+		{"wave": "pink", "a": 0.05, "d": 1.6, "filter": {"type": "lp", "hz": [700, 80]}, "db": -2},
+		{"wave": "noise", "at": 0.08, "a": 0.01, "d": 0.8, "filter": {"type": "bp", "hz": 2000, "q": 2.0},
+			"ring": {"hz": 17}, "db": -12}]},
 
 	# The battle's end.
 	"victory": {"category": "sting", "seconds": 1.7, "chorus": {"mix": 0.3},
@@ -290,17 +415,63 @@ const TABLE := {
 		{"wave": "pink", "a": 0.0, "s": 1.0, "len": 2.1, "filter": {"type": "lp", "hz": 500}, "db": -14}]},
 }
 
-## The sound a weapon's shot and its landing make, by its type id (Weapons.Weapon.type): read by
-## BattleEffects.fire() and land(). A type with none is silent.
+## The sound a weapon's shot makes (fire_key()), by its kind (Weapons.Kind), or by its type id where
+## FIRE has it. Every kind has an entry: &"" is silent, and says why. Read by BattleEffects.fire()
+## and, for a melee blow, BattleView._unit_hit().
+const FIRE_KIND := {
+	Weapons.Kind.NONE: &"",
+	Weapons.Kind.BOLT: &"bolt_fire",
+	Weapons.Kind.LASER: &"laser_fire",
+	Weapons.Kind.TRACER: &"flak_fire",
+	Weapons.Kind.PLASMA: &"shell_fire",
+	Weapons.Kind.BALL: &"orbital_fire",
+	Weapons.Kind.SHELL: &"tank_fire",
+	Weapons.Kind.MISSILE: &"missile_fire",
+	Weapons.Kind.BOMB: &"bomb_whistle",
+	Weapons.Kind.STREAK: &"railgun_fire",
+	Weapons.Kind.BEAM: &"beam_fire",
+	Weapons.Kind.LIGHTNING: &"arc_zap",
+	Weapons.Kind.PULSE: &"emp_pulse",
+	# The gravity well's hold is its hum, a loop BattleView holds while it pulls (vortex_hum).
+	Weapons.Kind.VORTEX: &"",
+	Weapons.Kind.MELEE: &"melee_swing",
+	# The breacher's charge goes off where it stands at once: its blast (LAND_IMPACT) is its sound.
+	Weapons.Kind.CHARGE: &"",
+	# The traps fire nothing: their sounds are their spring's (TRAP) and their blast's (LAND).
+	Weapons.Kind.MINE: &"",
+	Weapons.Kind.FLAK_MINE: &"",
+	Weapons.Kind.MEGA_MINE: &"",
+	Weapons.Kind.GRAV_TRAP: &"",
+	# A shield generator's dome sounds as it rises, absorbs and falls (BattleEffects.set_shield).
+	Weapons.Kind.SHIELD: &"",
+}
 const FIRE := {
-	"laser_turret": &"laser_fire",
-	"plasma_mortar": &"shell_fire",
-	"missile_battery": &"missile_fire",
+	"cloaked_sentry": &"sentry_fire",
+	"dune_runner": &"tracer_fire",
+	"gunship": &"tracer_fire",
+	"skimmer": &"skimmer_beam",
+	"siege_walker": &"walker_fire",
+	"titan": &"titan_fire",
+}
+## The sound where a weapon lands (land_key()), by its impact (Weapons.Impact), or by its type id
+## where LAND has it; every impact has an entry. Read by BattleEffects.land() and, for a punch,
+## BattleView._land_blows().
+const LAND_IMPACT := {
+	# A weapon that lands nothing (the gravity well, the grav trap, the shield, the brawler: LAND).
+	Weapons.Impact.NONE: &"",
+	Weapons.Impact.SPARKS: &"impact_small",
+	Weapons.Impact.RING: &"impact_small",
+	Weapons.Impact.BLAST_S: &"explosion_small",
+	Weapons.Impact.BLAST_M: &"explosion_medium",
+	Weapons.Impact.BLAST_L: &"explosion_large",
+	Weapons.Impact.AIR_BURST: &"air_burst",
+	Weapons.Impact.SPLASH: &"plasma_splash",
+	Weapons.Impact.BURN: &"beam_burn",
+	Weapons.Impact.EMP: &"emp_zap",
 }
 const LAND := {
-	"laser_turret": &"impact_small",
-	"plasma_mortar": &"explosion_medium",
-	"missile_battery": &"explosion_medium",
+	"brawler": &"punch_land",
+	"mega_mine": &"mega_blast",
 }
 
 
@@ -317,13 +488,13 @@ const SELECT := {
 
 ## The key `type`'s shot plays, &"" for none.
 static func fire_key(type: String) -> StringName:
-	var key: StringName = FIRE.get(type, &"")
+	var key: StringName = FIRE.get(type, FIRE_KIND[Weapons.of(type).kind])
 	return key
 
 
 ## The key `type`'s landing plays, &"" for none.
 static func land_key(type: String) -> StringName:
-	var key: StringName = LAND.get(type, &"")
+	var key: StringName = LAND.get(type, LAND_IMPACT[Weapons.of(type).impact])
 	return key
 
 
