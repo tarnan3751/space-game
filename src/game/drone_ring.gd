@@ -2,15 +2,14 @@ class_name DroneRing
 extends Control
 ## The top bar's drones (docs/reference/hud.md, **Drone meter**): how many of the base's drones
 ## are free, as a resource meter's twin at the strip's right end, built from the same parts as
-## Hud._build_meter so every skin styles it as it styles them: the pill-shaped trough
+## Hud._build_meter so the theme styles it as it styles them: the pill-shaped trough
 ## (`MeterTrough`), its ink border again over what is inside it (`MeterFrame`), the drone icon on
 ## its coin in the trough's colour over the left end, and "free / all" right-aligned in
 ## `MeterText`. Inside the trough, a slot per drone split by ink lines: free ones in the accent
 ## cyan as a meter's fill takes it (Hud.meter_fill) with the meters' gloss over their top third,
 ## busy ones the trough's own fill crossed by the meters' 45-degree stripes (at work). The slots
-## are one triangle array (`HudIcon.Pen`), redrawn only when set_counts changes a count or the
-## theme changes (a skin), never per frame. It stops a touch on it, as any opaque part of the HUD
-## does; its parts take none.
+## are one triangle array (`HudIcon.Pen`), redrawn only when set_counts changes a count, never per
+## frame. It stops a touch on it, as any opaque part of the HUD does; its parts take none.
 
 const SIZE := Vector2(200, Hud.METER_SIZE.y)
 ## The slots start at the coin's edge, their first ink line on the coin's ink ring, and end where
@@ -18,8 +17,8 @@ const SIZE := Vector2(200, Hud.METER_SIZE.y)
 ## METER_TROUGH_LEFT in).
 const SLOTS_LEFT := Hud.METER_COIN - 0.5
 const TEXT_WIDTH := 52.0
-## The meters' stripes (Hud.STRIPE_TILE, Hud.STRIPE_BAND), static, this much off the trough's fill:
-## lighter on a dark trough, darker on a light one.
+## The meters' stripes (Hud.STRIPE_TILE, Hud.STRIPE_BAND), static, this much lighter than the
+## trough's fill.
 const STRIPE_SHIFT := 0.14
 ## Steps round the circle the pill's round end is cut from.
 const END_STEPS := 32
@@ -90,12 +89,6 @@ func total_count() -> int:
 	return _total
 
 
-## A skin's theme changes the trough's fill and border, which the slots follow.
-func _notification(what: int) -> void:
-	if what == NOTIFICATION_THEME_CHANGED and _slots != null:
-		_slots.queue_redraw()
-
-
 ## Between the trough's border, from just past the coin to the text: a slot per drone, free
 ## ones the accent's fill with the gloss, busy ones the trough's fill striped, an ink line
 ## between neighbours and one at either end, the pill's round end inked up to the first, so no
@@ -103,12 +96,8 @@ func _notification(what: int) -> void:
 func _draw_slots() -> void:
 	if _total == 0:
 		return
-	# A skin whose trough is not a flat shape (a texture) gets skin A's trough colour and border.
-	var box := get_theme_stylebox(&"panel", &"MeterTrough") as StyleBoxFlat
-	var trough_fill := box.bg_color if box != null else Hud.TROUGH
-	var border := float(box.border_width_top) if box != null else float(Hud.BORDER)
-	var stripe := trough_fill.darkened(STRIPE_SHIFT) if trough_fill.get_luminance() > 0.5 \
-		else trough_fill.lightened(STRIPE_SHIFT)
+	var border := float(Hud.BORDER)
+	var stripe := Hud.TROUGH.lightened(STRIPE_SHIFT)
 	var free_fill := Hud.meter_fill(Hud.ACCENT)
 	var pen := HudIcon.Pen.new()
 	var left := SLOTS_LEFT - Hud.METER_TROUGH_LEFT
@@ -131,7 +120,7 @@ func _draw_slots() -> void:
 			pen.add_fill(slot, free_fill, false)
 			pen.add_fill(_box(Rect2(x0, top, x1 - x0, (bottom - top) / 3.0)), GLOSS, false)
 		else:
-			_striped(pen, slot, trough_fill, stripe)
+			_striped(pen, slot, Hud.TROUGH, stripe)
 	for i: int in _total + 1:
 		var x := left + (right - left) * i / _total
 		pen.add_stroke(PackedVector2Array([Vector2(x, top), Vector2(x, bottom)]), Hud.BORDER, Hud.INK, false)

@@ -748,10 +748,9 @@ class Minimap:
 	var _ribbon: Label
 	var _chip: Label
 	## The drawing, kept: drawn again as it is when the map opens, built again only once the field,
-	## the band, the size or the skin has changed (_rebuild).
+	## the band or the size has changed (_rebuild).
 	var _pen: HudIcon.Pen
 	var _pen_size: Vector2 = Vector2.ZERO
-	var _pen_skin: Hud.Look = Hud.Look.A
 
 	func _init() -> void:
 		_ribbon = Label.new()
@@ -840,10 +839,9 @@ class Minimap:
 		return _walls.size()
 
 	func _draw() -> void:
-		if _pen == null or _pen_size != size or _pen_skin != Hud.skin:
+		if _pen == null or _pen_size != size:
 			_pen = HudIcon.Pen.new()
 			_pen_size = size
-			_pen_skin = Hud.skin
 			if size.x / (maxf(_grid.x, _grid.y) + 2.0 * PAD) < BOLD_CELL:
 				_draw_plate(_pen)
 			else:
@@ -951,7 +949,7 @@ class Minimap:
 			var rect := Rect2(_chip.position, _chip.size).grow_individual(Hud.CHIP_PAD.x, Hud.CHIP_PAD.y,
 				Hud.CHIP_PAD.x, Hud.CHIP_PAD.y)
 			var radius := Vector2.ONE * rect.size.y / 2.0
-			var fill := Hud.CREAM_DISABLED if Hud.skin == Hud.Look.C else Hud.CARD_DISABLED
+			var fill := Hud.CARD_DISABLED
 			var pill := Hud._round_rect(rect, radius, false)
 			pen.add_fill(_moved(pill, PLATE_SHADOW / 2.0), Hud.SHADOW, true)
 			pen.add_fill(pill, fill, false)

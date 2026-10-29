@@ -46,9 +46,6 @@ signal expedition_pressed
 enum ArmyPage { NONE, TRAIN, RESEARCH, MAKE }
 ## A toast's kind, which colours its left edge (TOAST_EDGES): information, a refusal, or a reward.
 enum ToastKind { INFO, REFUSAL, REWARD }
-## The menu family's look (docs/reference/hud.md, **Skins**): A, the comic console (the default);
-## B, the halftone console, its shapes drawn from textures; C, the pulp page, cream and ink.
-enum Look { A, B, C }
 
 const ERROR_TEXT := {
 	BaseState.ERR_BLOCKED: "That spot is taken",
@@ -124,28 +121,6 @@ const PRESSED_LIGHTEN := 0.15
 const PRESSED_SINK := 4.0
 ## A panel's inner edge: a line this light just inside its ink border.
 const EDGE_LIGHT := Color("f4f2ff", 0.12)
-## Skin B: a pressed button's squash, and its shapes' textures (tools/gen_textures.gd), their
-## corners and edges kept whole in a 9-slice SLICE wide, plus the shadow drawn outside the shape.
-const SQUASH := Vector2(1.04, 0.96)
-const SKIN_B_TEXTURES := "res://assets/textures/kit/hud_%s.png"
-const SLICE := 20.0
-const SLICE_SHADOW := 4.0
-## Skin C, the pulp page: the menu family in the buildings' cream with ink text and no outlines,
-## a thicker ink border, the bottom panels a cream tray with a stepped, torn top edge; a disabled
-## shape a darker cream; dim text and warnings in inks that read on cream; a full meter's digits
-## stay ink, which reads on the saturated fills where gold does not (its gold line stays).
-const CREAM := MaterialKit.HULL_LIGHT
-const CREAM_DISABLED := Color("c4bdae")
-const CREAM_BORDER := 4
-const INK_DIM := Color("5d5875")
-const WARNING_INK := Color("b4470c")
-## The tray's top edge: a step up or down every TRAY_STEP px, TRAY_RISE high, with a small tear
-## every TRAY_TEAR px; the band across the cards' top third carries an ink dot screen, TRAY_DOTS apart.
-const TRAY_STEP := 168.0
-const TRAY_RISE := 5.0
-const TRAY_TEAR := 42.0
-const BAND_DOT_PITCH := 8.0
-const BAND_DOT_RADIUS := 1.4
 ## The bottom panels' top band, a shade lighter than the rest, down to the gap under the tabs.
 const MENU_BAND := 74.0
 const MENU_BAND_LIGHTEN := 0.06
@@ -275,17 +250,14 @@ const RESEARCH_KEY := "research"
 ## HOUSING_COIN across, over the trough's left end.
 const HOUSING_SIZE := Vector2(220, 32)
 const HOUSING_COIN := 36.0
-## The housing meter's key among the meters' shaders and labels, so a skin tints it and its full
-## state shows as theirs does.
+## The housing meter's key among the meters' shaders and labels, so its full state shows as theirs
+## does.
 const HOUSING_KEY := "housing"
 ## The training header's and a producer's info panel's line while the base has no Hangar.
 const NO_HANGAR := "No Hangar: build one to house units"
 
 ## The dev cheats are on (main.gd): every meter shows, full, reading "∞" instead of amount / cap.
 var cheats: bool = false
-## The skin the theme is built in: set before setup, or through set_skin, which restyles a HUD
-## already built.
-static var skin: Look = Look.A
 var _catalog: Catalog
 var _theme: Theme
 ## Holds every part but the build panel; positioned on the safe area.
@@ -302,10 +274,6 @@ var _meter_labels: Dictionary[String, Label] = {}
 var _meter_shaders: Dictionary[String, ShaderMaterial] = {}
 ## Whether each meter shows its full state (its amount at its cap).
 var _meter_full: Dictionary[String, bool] = {}
-## Each meter's fill's colour, which skin C saturates.
-var _meter_colors: Dictionary[String, Color] = {}
-## Every cost amount on a card and its resource's colour, which skin C swaps for ink.
-var _cost_labels: Dictionary[Label, Color] = {}
 var _meter_amounts: Dictionary[String, int] = {}
 ## The capacity each meter's text last showed (-1 before the first), so a refresh sets the text
 ## only when its amount or its capacity changed.
@@ -504,45 +472,22 @@ class CardArt:
 	func _draw() -> void:
 		var pen := HudIcon.Pen.new()
 		var inside := Rect2(Vector2.ZERO, size).grow(-Hud.BORDER)
-		if Hud.skin == Hud.Look.C:
-			_draw_band(pen, inside)
-		# Skin B's card texture has its own; skin C's cream needs none.
-		elif Hud.skin != Hud.Look.B:
-			pen.add_stroke(Hud._round_rect(inside.grow(-0.5), Vector2.ONE * (12 - Hud.BORDER - 0.5), false), 1.0,
-				Hud.EDGE_LIGHT, true)
-		if Hud.skin != Hud.Look.C:
-			var stripe := Rect2(inside.position, Vector2(inside.size.x, Hud.STRIPE_HEIGHT))
-			pen.add_fill(Hud._round_rect(stripe, Vector2(12 - Hud.BORDER, Hud.STRIPE_HEIGHT), true), tint, false)
-			var radius := plinth / 2.0
-			pen.add_fill(Hud._circle(plinth_centre, radius, SIDES), Color(tint, Hud.PLINTH_ALPHA), false)
-			pen.add_stroke(Hud._circle(plinth_centre, radius - Hud.PLINTH_RING / 2.0, SIDES), Hud.PLINTH_RING, Hud.INK,
-				true)
+		pen.add_stroke(Hud._round_rect(inside.grow(-0.5), Vector2.ONE * (12 - Hud.BORDER - 0.5), false), 1.0,
+			Hud.EDGE_LIGHT, true)
+		var stripe := Rect2(inside.position, Vector2(inside.size.x, Hud.STRIPE_HEIGHT))
+		pen.add_fill(Hud._round_rect(stripe, Vector2(12 - Hud.BORDER, Hud.STRIPE_HEIGHT), true), tint, false)
+		var radius := plinth / 2.0
+		pen.add_fill(Hud._circle(plinth_centre, radius, SIDES), Color(tint, Hud.PLINTH_ALPHA), false)
+		pen.add_stroke(Hud._circle(plinth_centre, radius - Hud.PLINTH_RING / 2.0, SIDES), Hud.PLINTH_RING, Hud.INK,
+			true)
 		for chip: Label in chips:
 			if chip.visible:
 				_chip(pen, _rect_of(chip).grow_individual(Hud.CHIP_PAD.x, Hud.CHIP_PAD.y, Hud.CHIP_PAD.x,
-					Hud.CHIP_PAD.y), Hud.CREAM_DISABLED if Hud.skin == Hud.Look.C else Hud.CARD_DISABLED)
+					Hud.CHIP_PAD.y), Hud.CARD_DISABLED)
 		for i: int in icons.size():
 			if icons[i].is_visible_in_tree():
 				HudIcon.paint(pen, kinds[i], _rect_of(icons[i]), colors[i], false, coins[i])
 		pen.draw(self)
-
-	## Skin C's trading-card band: the category's colour across the card's top third, inside its
-	## border, with an ink dot screen over it and an ink line under it.
-	func _draw_band(pen: HudIcon.Pen, inside: Rect2) -> void:
-		var inner := inside.grow(-(Hud.CREAM_BORDER - Hud.BORDER))
-		var band := Rect2(inner.position, Vector2(inner.size.x, roundf(size.y / 3.0) - inner.position.y))
-		pen.add_fill(Hud._round_rect(band, Vector2.ONE * (12 - Hud.CREAM_BORDER), true), tint, false)
-		var dot := Color(Hud.INK, 0.22)
-		var row := 0
-		var y := band.position.y + Hud.BAND_DOT_PITCH / 4.0
-		while y < band.end.y - 1.0:
-			var x := band.position.x + Hud.BAND_DOT_PITCH / 2.0 + (Hud.BAND_DOT_PITCH / 2.0 if row % 2 == 1 else 0.0)
-			while x < band.end.x - 1.0:
-				pen.add_fill(Hud._circle(Vector2(x, y), Hud.BAND_DOT_RADIUS, 6), dot, false)
-				x += Hud.BAND_DOT_PITCH
-			y += Hud.BAND_DOT_PITCH / 2.0
-			row += 1
-		pen.add_stroke(PackedVector2Array([Vector2(band.position.x, band.end.y), band.end]), 2.0, Hud.INK, false)
 
 	## A pill round `rect`: `fill`, an ink ring.
 	func _chip(pen: HudIcon.Pen, rect: Rect2, fill: Color) -> void:
@@ -1371,8 +1316,7 @@ func _refresh_queue(state: BaseState) -> void:
 		_queue_entries.append(_build_queue_entry(_queue_entries.size()))
 	# The head's fill: the army's for a unit, the Foundry's green for an ability.
 	if _queue_fill != null:
-		_meter_colors[QUEUE_KEY] = MaterialKit.NANITE_GREEN if making else MaterialKit.ARMY
-		_tint_meter(_queue_fill.shader, _meter_colors[QUEUE_KEY])
+		_tint_meter(_queue_fill.shader, MaterialKit.NANITE_GREEN if making else MaterialKit.ARMY)
 	for i: int in _queue_entries.size():
 		var entry := _queue_entries[i]
 		entry.button.visible = i < _queue_units.size()
@@ -1908,7 +1852,6 @@ func _build_meter(parent: Control, key: String, icon_kind: String, color: Color,
 	stripes.texture_repeat = CanvasItem.TEXTURE_REPEAT_ENABLED
 	var shader := ShaderMaterial.new()
 	shader.shader = METER_SHADER
-	_meter_colors[key] = color
 	_tint_meter(shader, color)
 	shader.set_shader_parameter(&"phase", phase)
 	shader.set_shader_parameter(&"track_height", METER_TRACK.y)
@@ -1946,16 +1889,8 @@ func _build_meter(parent: Control, key: String, icon_kind: String, color: Color,
 	_meter_shaders[key] = shader
 
 
-## A cost amount's colour: its resource's (`color`), or ink under skin C, whose cards are cream.
-static func _cost_color(color: Color) -> Color:
-	return INK if skin == Look.C else color
-
-
-## A meter's fill colour for `color`: at METER_VALUE, or under skin C saturated at full value. The
-## drone meter's free slots take it too.
+## A meter's fill colour for `color`: at METER_VALUE. The drone meter's free slots take it too.
 static func meter_fill(color: Color) -> Color:
-	if skin == Look.C:
-		return Color.from_hsv(color.h, minf(color.s * 1.6, 1.0), 1.0)
 	return Color.from_hsv(color.h, color.s, color.v * METER_VALUE)
 
 
@@ -1973,7 +1908,7 @@ func _set_full(key: String, full: bool) -> void:
 	_meter_full[key] = full
 	_meter_shaders[key].set_shader_parameter(&"full", full)
 	if full:
-		_meter_labels[key].add_theme_color_override("font_color", INK if skin == Look.C else GOLD)
+		_meter_labels[key].add_theme_color_override("font_color", GOLD)
 	else:
 		_meter_labels[key].remove_theme_color_override("font_color")
 
@@ -2169,8 +2104,7 @@ func _build_entry(type: String) -> Button:
 			_spacer(cost_row, Vector2(8, 0))
 		card.art.add_icon(_spacer(cost_row, COST_ICON), str(res), _resource_color(str(res)), _resource_color(str(res)))
 		var amount := _card_label(cost_row, Format.amount(int(cost[res])), &"CardCost")
-		_cost_labels[amount] = _resource_color(str(res))
-		amount.add_theme_color_override("font_color", _cost_color(_cost_labels[amount]))
+		amount.add_theme_color_override("font_color", _resource_color(str(res)))
 	cost_row.sort_children.connect(card.art.queue_redraw)
 	var last_row := HBoxContainer.new()
 	last_row.mouse_filter = Control.MOUSE_FILTER_IGNORE
@@ -2252,8 +2186,7 @@ func _card_body(button: Button) -> Control:
 ## button redraws whenever its state changes, so its draw signal says when.
 static func _sink(button: Button, body: Control) -> void:
 	var mode := button.get_draw_mode()
-	# Skin B squashes instead (_squash).
-	var pressed := skin != Look.B and (mode == BaseButton.DRAW_PRESSED or mode == BaseButton.DRAW_HOVER_PRESSED)
+	var pressed := mode == BaseButton.DRAW_PRESSED or mode == BaseButton.DRAW_HOVER_PRESSED
 	body.position = Vector2.ONE * PRESSED_SINK if pressed else Vector2.ZERO
 
 
@@ -2501,8 +2434,7 @@ func _build_research_bar(parent: Control) -> void:
 
 ## A progress fill across `track` (a Control `size` big) in `color`'s meter fill (meter_fill): the
 ## meters' stripes, drifting and glinting at `phase` of the glint's period (meter.gdshader), clipped
-## to the fill's width. Its shader is kept with the meters' under `key`, so a skin tints it as it
-## tints them. Empty until set.
+## to the fill's width. Its shader is kept with the meters' under `key`. Empty until set.
 func _build_fill(track: Control, key: String, size: Vector2, color: Color, phase: float) -> Fill:
 	if _fill_stripe == null:
 		_fill_stripe = _make_stripe()
@@ -2522,7 +2454,6 @@ func _build_fill(track: Control, key: String, size: Vector2, color: Color, phase
 	stripes.size = size
 	fill.shader = ShaderMaterial.new()
 	fill.shader.shader = METER_SHADER
-	_meter_colors[key] = color
 	_tint_meter(fill.shader, color)
 	fill.shader.set_shader_parameter(&"phase", phase)
 	fill.shader.set_shader_parameter(&"track_height", size.y)
@@ -2621,8 +2552,7 @@ func _build_army_card(id: String, ability: bool, tint: Color, right_chip: bool) 
 		cost_row.add_child(amount_row)
 		card.art.add_icon(_spacer(amount_row, ARMY_COST_ICON), res, _resource_color(res), _resource_color(res))
 		var amount := _card_label(amount_row, "", &"CardCost")
-		_cost_labels[amount] = _resource_color(res)
-		amount.add_theme_color_override("font_color", _cost_color(_cost_labels[amount]))
+		amount.add_theme_color_override("font_color", _resource_color(res))
 		card.costs[res] = amount
 	card.free = _card_label(cost_row, "Free", &"CardCost")
 	cost_row.sort_children.connect(card.art.queue_redraw)
@@ -2890,17 +2820,7 @@ func _button(text: String, min_size: Vector2, variation: StringName = &"") -> Bu
 	button.theme_type_variation = variation
 	button.custom_minimum_size = min_size
 	button.focus_mode = Control.FOCUS_NONE
-	button.draw.connect(_squash.bind(button))
 	return button
-
-
-## Skin B's press: a button squashes SQUASH about its centre while it is pressed (a toggle, a tab,
-## never does). The button redraws whenever its state changes, so its draw signal says when.
-static func _squash(button: Button) -> void:
-	var mode := button.get_draw_mode()
-	var pressed := mode == BaseButton.DRAW_PRESSED or mode == BaseButton.DRAW_HOVER_PRESSED
-	button.pivot_offset = button.size / 2.0
-	button.scale = SQUASH if skin == Look.B and pressed and not button.toggle_mode else Vector2.ONE
 
 
 ## Pins a control to the bottom centre; it grows upward to fit its content.
@@ -3041,7 +2961,7 @@ func _make_theme() -> Theme:
 	_button_variation(ui, &"TabSelected", ACCENT, 10, DISPLAY_FONT, 24, 0, INK)
 	for item: String in ["normal", "hover", "pressed", "hover_pressed"]:
 		ui.set_stylebox(item, &"TabSelected", _shape(ACCENT, 10, BUTTON_MARGIN))
-	# The build and army cards: a button's shape, which a skin may change.
+	# The build and army cards: a button's shape.
 	ui.set_type_variation(&"CardButton", &"Button")
 
 	_label_variation(ui, &"CardName", 22, TEXT, 0)
@@ -3100,19 +3020,14 @@ func _make_theme() -> Theme:
 	ui.set_type_variation(&"ProgressButton", &"Button")
 	ui.set_stylebox("disabled", &"ProgressButton", _shape(TROUGH, 12, BUTTON_MARGIN))
 	_label_variation(ui, &"ProgressText", 20, TEXT, 2.5)
-	if skin == Look.B:
-		_skin_b(ui)
-	elif skin == Look.C:
-		_skin_c(ui)
 
 	# Sector map: the band's word in ink on its ribbon (SectorMap.Minimap); the detail's loot
-	# amounts and its lines of what a field holds, in ink on skin C's cream.
+	# amounts and its lines of what a field holds.
 	_label_variation(ui, &"SectorRibbon", 20, INK, 0, DISPLAY_FONT)
-	_label_variation(ui, &"SectorLoot", 22, INK if skin == Look.C else TEXT, 0)
-	_label_variation(ui, &"SectorRow", 20, INK if skin == Look.C else TEXT, 0)
+	_label_variation(ui, &"SectorLoot", 22, TEXT, 0)
+	_label_variation(ui, &"SectorRow", 20, TEXT, 0)
 
 	# Battle HUD: the attack HUD's own variations (battle_hud.gd), the dark family over the field.
-	# Built after the skins, so the attack HUD is the same under every one.
 	ui.set_type_variation(&"BattlePanel", &"PanelContainer")
 	ui.set_stylebox("panel", &"BattlePanel", _shape(PANEL, 12))
 	_label_variation(ui, &"BattleFigure", 28, TEXT, 0, DISPLAY_FONT)
@@ -3121,10 +3036,10 @@ func _make_theme() -> Theme:
 	_button_variation(ui, &"BattleBarButton", CARD, 12, DISPLAY_FONT, 24, 0)
 	# End stops the battle: the defence's red, ink text.
 	_button_variation(ui, &"EndButton", MaterialKit.DEFENCE, 12, DISPLAY_FONT, 24, 0, INK)
-	# Both disabled once the battle is over: the dark family's dim text, whatever a skin gave Button.
+	# Both disabled once the battle is over: the dark family's dim text.
 	for type: StringName in [&"BattleBarButton", &"EndButton"]:
 		ui.set_color("font_disabled_color", type, Color(TEXT, DISABLED_ALPHA))
-	# The deploy and abilities bars: skin A's bottom panel. Their cards: a button's shape, and the
+	# The deploy and abilities bars: the bottom panel. Their cards: a button's shape, and the
 	# selected one cyan in every state with an ink ring inside its border (BattleCardRing).
 	ui.set_type_variation(&"BattleBar", &"PanelContainer")
 	ui.set_stylebox("panel", &"BattleBar", menu)
@@ -3197,160 +3112,6 @@ func _make_theme() -> Theme:
 	ui.set_stylebox("panel", &"BattleToastBody", body)
 	_label_variation(ui, &"BattleToastText", 19, TEXT, 0)
 	return ui
-
-
-## Restyles the HUD in `new_skin`: the theme built again and given to every part that holds it, and
-## what the parts draw themselves drawn again. The harness shoots the skins this way.
-func set_skin(new_skin: Look) -> void:
-	skin = new_skin
-	_theme = _make_theme()
-	for holder: Control in [_root, _menu, _army]:
-		holder.theme = _theme
-	for type: String in _cards:
-		_cards[type].art.queue_redraw()
-	for panel: Control in [_menu, _army, _info_panel, _place_bar]:
-		panel.queue_redraw()
-	for key: String in _meter_shaders:
-		_tint_meter(_meter_shaders[key], _meter_colors[key])
-		if _meter_full.get(key, false):
-			_meter_labels[key].add_theme_color_override("font_color", INK if skin == Look.C else GOLD)
-	for label: Label in _cost_labels:
-		label.add_theme_color_override("font_color", _cost_color(_cost_labels[label]))
-
-
-## Skin B, the halftone console: the menu family's shapes from the textures tools/gen_textures.gd
-## draws, two bands and a dot screen in an ink border with a light line and a shadow. The bottom
-## panels, the cards and the dark buttons in their own fills; the bright buttons from one white
-## texture tinted to their role, with a corner cut; anything disabled flat. Pressed, a shape is 15 %
-## lighter (and squashes, _squash).
-static func _skin_b(ui: Theme) -> void:
-	var menu := _texture_box("panel", Color.WHITE, 0.0)
-	menu.content_margin_left = MARGIN
-	menu.content_margin_right = MARGIN
-	menu.content_margin_top = 12
-	menu.content_margin_bottom = MARGIN
-	# Its sides, bottom and shadow lie off the screen: only its top edge shows, as skin A's.
-	menu.expand_margin_left = SLICE
-	menu.expand_margin_right = SLICE
-	menu.expand_margin_bottom = SLICE
-	ui.set_stylebox("panel", &"MenuPanel", menu)
-	var dark: Array[StringName] = [&"Button", &"CardButton", &"TabButton", &"CloseButton", &"BarButton"]
-	var bright := {&"BuildButton": GOLD, &"ExpeditionButton": MaterialKit.ARMY, &"UpgradeButton": GOLD,
-		&"CommitButton": GOLD, &"ConfirmButton": ACCENT, &"TabSelected": ACCENT}
-	for type: StringName in dark:
-		var texture := "card" if type == &"CardButton" else "button"
-		ui.set_stylebox("normal", type, _texture_box(texture, Color.WHITE, BUTTON_MARGIN))
-		ui.set_stylebox("hover", type, _texture_box(texture, Color.WHITE.lightened(0.08), BUTTON_MARGIN))
-		for item: String in ["pressed", "hover_pressed"]:
-			ui.set_stylebox(item, type, _texture_box(texture, _brighter(PRESSED_LIGHTEN), BUTTON_MARGIN))
-		ui.set_stylebox("disabled", type, _texture_box("card_disabled", Color.WHITE, BUTTON_MARGIN))
-	for type: StringName in bright:
-		var fill: Color = bright[type]
-		ui.set_stylebox("normal", type, _texture_box("button_bright", fill, BUTTON_MARGIN))
-		ui.set_stylebox("hover", type, _texture_box("button_bright", fill.lightened(0.08), BUTTON_MARGIN))
-		var pressed := fill if type == &"TabSelected" else fill.lightened(PRESSED_LIGHTEN)
-		for item: String in ["pressed", "hover_pressed"]:
-			ui.set_stylebox(item, type, _texture_box("button_bright", pressed, BUTTON_MARGIN))
-		ui.set_stylebox("disabled", type, _texture_box("card_disabled", Color.WHITE, BUTTON_MARGIN))
-
-
-## Skin C, the pulp page: the menu family cream with ink text and no outlines, a 4 px ink border,
-## the bright buttons in their roles' colours with ink; the bottom panels a cream tray drawn by the
-## panel itself (_draw_edge); a card's name on an ink ribbon. The toast, over the field, stays dark.
-static func _skin_c(ui: Theme) -> void:
-	for type: StringName in [&"PanelContainer", &"ScreenPanel"]:
-		ui.set_stylebox("panel", type, _shape_c(CREAM, 12, 12.0))
-	var tray := StyleBoxEmpty.new()
-	tray.content_margin_left = MARGIN
-	tray.content_margin_right = MARGIN
-	tray.content_margin_top = 12 + TRAY_RISE
-	tray.content_margin_bottom = MARGIN
-	ui.set_stylebox("panel", &"MenuPanel", tray)
-	ui.set_stylebox("panel", &"MeterStrip", _flat(Color(INK, 0.5), STRIP_RADIUS))
-	ui.get_stylebox("panel", &"MeterStrip").set_content_margin_all(STRIP_PADDING)
-	ui.set_stylebox("panel", &"MeterTrough", _shape_c(CREAM, roundi(METER_SIZE.y / 2.0), 0.0))
-	var dark := {&"Button": 12, &"CardButton": 12, &"TabButton": 10, &"CloseButton": 12, &"BarButton": 12}
-	var bright := {&"BuildButton": GOLD, &"ExpeditionButton": MaterialKit.ARMY, &"UpgradeButton": GOLD,
-		&"CommitButton": GOLD, &"ConfirmButton": ACCENT, &"TabSelected": ACCENT}
-	for type: StringName in dark:
-		_buttons_c(ui, type, CREAM, dark[type])
-	for type: StringName in bright:
-		_buttons_c(ui, type, bright[type], 10 if type == &"TabSelected" else 12)
-	for item: String in ["normal", "hover", "pressed", "hover_pressed"]:
-		ui.set_stylebox(item, &"TabSelected", _shape_c(ACCENT, 10, BUTTON_MARGIN))
-	for type: StringName in [&"Button"] + dark.keys() + bright.keys():
-		for item: String in BUTTON_TEXT_COLORS:
-			ui.set_color(item, type, INK)
-		ui.set_color("font_disabled_color", type, Color(INK, DISABLED_ALPHA))
-		ui.set_constant("outline_size", type, 0)
-	var ribbon := _flat(INK, 4)
-	ribbon.content_margin_left = 6
-	ribbon.content_margin_right = 6
-	ribbon.content_margin_top = 0
-	ribbon.content_margin_bottom = 1
-	ui.set_stylebox("normal", &"CardName", ribbon)
-	ui.set_color("font_color", &"CardName", CREAM)
-	for type: StringName in [&"CardCost", &"CardChip", &"QueueName", &"HousingText", &"InfoTitle", &"InfoDetail",
-			&"MeterText"]:
-		ui.set_color("font_color", type, INK)
-		ui.set_constant("outline_size", type, 0)
-	# The queue's head, its text over its fill: ink, no outline, as the other entries'.
-	ui.set_color("font_color", &"QueueHeadName", INK)
-	ui.set_constant("outline_size", &"QueueHeadName", 0)
-	ui.set_constant("outline_size", &"QueueHeadTime", 0)
-	for type: StringName in [&"CardCount", &"CardReason", &"CardTime", &"QueueHeadTime"]:
-		ui.set_color("font_color", type, INK_DIM)
-	# The info panel: the next level's value in ink (the chevron marks it), and a busy building's
-	# upgrade button a disabled cream with its words in ink over the gold fill. The "MAX" chip, gold
-	# with an ink ring and ink text, is the lock chip's family and reads on cream as it is.
-	ui.set_color("font_color", &"InfoNext", INK)
-	ui.set_stylebox("disabled", &"ProgressButton", _shape_c(CREAM_DISABLED, 12, BUTTON_MARGIN))
-	ui.set_color("font_color", &"ProgressText", INK)
-	ui.set_constant("outline_size", &"ProgressText", 0)
-	for type: StringName in [&"CardWarning", &"InfoNote"]:
-		ui.set_color("font_color", type, WARNING_INK)
-
-
-## Skin C's states of a button filled `fill`: hover a shade lighter, pressed lighter still and
-## sunk, disabled the darker cream.
-static func _buttons_c(ui: Theme, type: StringName, fill: Color, radius: int) -> void:
-	ui.set_stylebox("normal", type, _shape_c(fill, radius, BUTTON_MARGIN))
-	ui.set_stylebox("hover", type, _shape_c(fill.lightened(0.08), radius, BUTTON_MARGIN))
-	for item: String in ["pressed", "hover_pressed"]:
-		ui.set_stylebox(item, type, _shape_c(fill.lightened(PRESSED_LIGHTEN), radius, BUTTON_MARGIN, true))
-	ui.set_stylebox("disabled", type, _shape_c(CREAM_DISABLED, radius, BUTTON_MARGIN))
-
-
-## Skin C's shape: skin A's with the thicker ink border.
-static func _shape_c(fill: Color, radius: int, margin: float, sunk: bool = false) -> StyleBoxFlat:
-	var box := _shape(fill, radius, margin, sunk)
-	box.set_border_width_all(CREAM_BORDER)
-	return box
-
-
-## A skin B shape: the texture `shape`, tinted `tint`, its 9-slice's middle tile-fitted on both
-## axes (a whole number of tiles scaled to fit, so the dots rescale a little where the middle is
-## not a whole number of tiles), its shadow drawn outside the control's rect, `margin` round its
-## content.
-static func _texture_box(shape: String, tint: Color, margin: float) -> StyleBoxTexture:
-	var box := StyleBoxTexture.new()
-	box.texture = load(SKIN_B_TEXTURES % shape)
-	box.modulate_color = tint
-	box.texture_margin_left = SLICE
-	box.texture_margin_top = SLICE
-	box.texture_margin_right = SLICE + SLICE_SHADOW
-	box.texture_margin_bottom = SLICE + SLICE_SHADOW
-	box.expand_margin_right = SLICE_SHADOW
-	box.expand_margin_bottom = SLICE_SHADOW
-	box.axis_stretch_horizontal = StyleBoxTexture.AXIS_STRETCH_MODE_TILE_FIT
-	box.axis_stretch_vertical = StyleBoxTexture.AXIS_STRETCH_MODE_TILE_FIT
-	box.set_content_margin_all(margin)
-	return box
-
-
-## White made `amount` lighter than itself, for a texture's tint: a modulate past 1 brightens it.
-static func _brighter(amount: float) -> Color:
-	return Color(1.0 + amount, 1.0 + amount, 1.0 + amount)
 
 
 ## `outline`: the ink round the text, in pixels; 0 for none.
@@ -3429,13 +3190,6 @@ static func _shape(fill: Color, radius: int, margin: float = 12.0, sunk: bool = 
 ## inside its ink border, and on a bottom panel (`menu`: the build panel's and the army panel's
 ## shape, its border along the top only) a band a shade lighter across its top, down to MENU_BAND.
 func _draw_edge(panel: Control, menu: bool) -> void:
-	# Skin B's bottom panels carry their band and line in their texture.
-	if skin == Look.B and menu:
-		return
-	if skin == Look.C:
-		if menu:
-			_draw_tray(panel)
-		return
 	var pen := HudIcon.Pen.new()
 	var inside := Rect2(Vector2.ZERO, panel.size).grow(-BORDER)
 	if menu:
@@ -3448,35 +3202,6 @@ func _draw_edge(panel: Control, menu: bool) -> void:
 		pen.add_stroke(_round_rect(line, Vector2(16, 16 - BORDER - 0.5), true), 1.0, EDGE_LIGHT, false)
 	else:
 		pen.add_stroke(_round_rect(inside.grow(-0.5), Vector2.ONE * (12 - BORDER - 0.5), false), 1.0, EDGE_LIGHT, true)
-	pen.draw(panel)
-
-
-## Skin C's bottom panel: a cream tray from a stepped, slightly torn top edge down to the panel's
-## bottom, its edge inked; one triangle array, drawn when the panel is.
-func _draw_tray(panel: Control) -> void:
-	var edge := PackedVector2Array()
-	var x := 0.0
-	var step := 0
-	while x < panel.size.x:
-		var y := TRAY_RISE if step % 2 == 1 else 0.0
-		edge.append(Vector2(x, y))
-		var end := minf(x + TRAY_STEP, panel.size.x)
-		# The tears: a small notch every TRAY_TEAR along the step.
-		var tear := x + TRAY_TEAR
-		while tear < end - 8.0:
-			edge.append(Vector2(tear - 3.0, y))
-			edge.append(Vector2(tear, y + 2.5))
-			edge.append(Vector2(tear + 4.0, y))
-			tear += TRAY_TEAR
-		edge.append(Vector2(end, y))
-		x = end
-		step += 1
-	var fill := edge.duplicate()
-	fill.append(Vector2(panel.size.x, panel.size.y))
-	fill.append(Vector2(0, panel.size.y))
-	var pen := HudIcon.Pen.new()
-	pen.add_fill(fill, CREAM, false)
-	pen.add_stroke(edge, CREAM_BORDER, INK, false)
 	pen.draw(panel)
 
 
