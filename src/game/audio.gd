@@ -10,7 +10,8 @@ extends Node
 ## important than itself, or is dropped. schedule() plays a key later (a burst's later shots, a
 ## trap's pop), loop() holds a looping sound until stop(), music() crossfades between two tracks
 ## on Music and sting() plays a fanfare there, ducking the music under it. The volumes of the
-## buses are the player's settings, kept in a ConfigFile at settings_path (not in the save).
+## buses and the mute are the player's settings (the HUD's settings panel), kept in a ConfigFile
+## at settings_path (not in the save).
 ##
 ## A play allocates nothing: the players are made at boot and the tables filled then. Plays are
 ## recorded whatever the device (a headless run's dummy driver plays too), for the harness:
@@ -25,6 +26,8 @@ const SFX_DIR := "res://assets/audio/sfx"
 const MUSIC_DIR := "res://assets/audio/music"
 const DEFAULT_SETTINGS_PATH := "user://settings.cfg"
 const SETTINGS_SECTION := "volume"
+## Where the Master volume a mute took away is kept, to bring back on unmute.
+const MUTE_SECTION := "mute"
 ## The buses added under Master, and the limiter's ceiling on Master (dBFS).
 const BUSES: Array[StringName] = [&"SFX", &"UI", &"Music"]
 const LIMIT_DB := -0.3
@@ -37,6 +40,8 @@ const TAP_JITTER := 0.03
 
 ## Where the volumes are kept; main points it beside the save when the run has its own.
 var settings_path := DEFAULT_SETTINGS_PATH
+## The Master volume an unmute brings back (set_muted).
+var _unmuted := 1.0
 
 var _streams: Dictionary[StringName, AudioStreamWAV] = {}
 var _bus: Dictionary[StringName, StringName] = {}
@@ -258,20 +263,32 @@ func sting(key: StringName) -> bool:
 	return true
 
 
-## Sets bus `bus`'s volume (0 to 1; 0 mutes it) and keeps it in the settings.
-func set_volume(bus: StringName, linear: float) -> void:
+## Sets bus `bus`'s volume (0 to 1; 0 mutes it) and, with `keep`, keeps it in the settings: a
+## slider being dragged sets it without, and keeps it when let go.
+func set_volume(bus: StringName, linear: float, keep: bool = true) -> void:
 	_apply_volume(bus, linear)
-	var config := ConfigFile.new()
-	config.load(settings_path)
-	config.set_value(SETTINGS_SECTION, String(bus), linear)
-	var error := config.save(settings_path)
-	if error != OK:
-		push_warning("Audio: could not save %s: %s" % [settings_path, error_string(error)])
+	if keep:
+		_keep(SETTINGS_SECTION, String(bus), linear)
 
 
 ## Bus `bus`'s volume, 0 to 1.
 func volume(bus: StringName) -> float:
 	return AudioServer.get_bus_volume_linear(AudioServer.get_bus_index(bus))
+
+
+## Mutes every sound (Master to 0), keeping the volume Master had to bring back on unmute; both
+## kept in the settings, so a mute outlasts the run.
+func set_muted(on: bool) -> void:
+	if on == is_muted():
+		return
+	if on:
+		_unmuted = volume(&"Master")
+		_keep(MUTE_SECTION, "Master", _unmuted)
+	set_volume(&"Master", 0.0 if on else _unmuted)
+
+
+func is_muted() -> bool:
+	return volume(&"Master") <= 0.0
 
 
 ## Every button under `root` plays ui_tap when pressed, once however often it is asked: the attack
@@ -518,9 +535,21 @@ func _apply_volume(bus: StringName, linear: float) -> void:
 	AudioServer.set_bus_mute(index, linear <= 0.0)
 
 
+func _keep(section: String, key: String, value: float) -> void:
+	var config := ConfigFile.new()
+	config.load(settings_path)
+	config.set_value(section, key, value)
+	var error := config.save(settings_path)
+	if error != OK:
+		push_warning("Audio: could not save %s: %s" % [settings_path, error_string(error)])
+
+
 func _load_settings() -> void:
 	var config := ConfigFile.new()
-	if config.load(settings_path) != OK or not config.has_section(SETTINGS_SECTION):
+	if config.load(settings_path) != OK:
+		return
+	_unmuted = config.get_value(MUTE_SECTION, "Master", 1.0)
+	if not config.has_section(SETTINGS_SECTION):
 		return
 	for bus: String in config.get_section_keys(SETTINGS_SECTION):
 		var linear: float = config.get_value(SETTINGS_SECTION, bus, 1.0)

@@ -259,6 +259,14 @@ const HOUSING_KEY := "housing"
 const NO_HANGAR := "No Hangar: build one to house units"
 ## How far a finger may move between down and up on a disabled card for its lift to buzz (px).
 const DENY_SLOP := 16.0
+## The settings panel: its width, the gear on its button, the volume sliders' row label width,
+## height and track, the grabber, and the mute switch.
+const SETTINGS_WIDTH := 360.0
+const GEAR_ICON := Vector2(36, 36)
+const SETTINGS_LABEL := 90.0
+const SLIDER_TRACK := 20
+const KNOB := 36
+const SWITCH := Vector2i(72, 40)
 
 ## The dev cheats are on (main.gd): every meter shows, full, reading "∞" instead of amount / cap.
 var cheats: bool = false
@@ -429,6 +437,13 @@ var _research_seconds: int = -1
 ## down (_on_card_input).
 var _denied_frame: int = -1
 var _press_at: Vector2 = Vector2.ZERO
+## The gear at the top right and the settings panel it opens: Music and Sound, the mute, the close.
+var _gear_button: Button
+var _settings: PanelContainer
+var _settings_close: Button
+var _music_slider: HSlider
+var _sound_slider: HSlider
+var _mute_button: CheckButton
 
 
 ## A build card's parts that a refresh sets, and what it last showed.
@@ -587,6 +602,7 @@ func setup(catalog: Catalog) -> void:
 	_build_top_bar()
 	_build_build_button()
 	_build_expedition_button()
+	_build_settings()
 	_build_place_bar()
 	_build_info_panel()
 	_build_toast()
@@ -797,10 +813,40 @@ func is_menu_open() -> bool:
 	return _menu_open
 
 
-## Whether a bottom panel is open or sliding open: the build panel or the army panel (main.gd ducks
-## the base's ambience under it).
+## Whether a panel is open or sliding open: the build panel, the army panel or the settings panel
+## (main.gd ducks the base's ambience under it).
 func is_panel_open() -> bool:
-	return _menu_open or _army_page != ArmyPage.NONE
+	return _menu_open or _army_page != ArmyPage.NONE or _settings.visible
+
+
+## The gear, the settings panel's close button, and the panel's controls.
+func gear_button() -> Button:
+	return _gear_button
+
+
+func settings_close_button() -> Button:
+	return _settings_close
+
+
+func music_slider() -> HSlider:
+	return _music_slider
+
+
+func sound_slider() -> HSlider:
+	return _sound_slider
+
+
+func mute_button() -> CheckButton:
+	return _mute_button
+
+
+## Whether the settings panel shows, and what it shows: {"music", "sound"} (0 to 100) and "mute".
+func settings_open() -> bool:
+	return _settings.visible
+
+
+func settings_values() -> Dictionary:
+	return {"music": roundi(_music_slider.value), "sound": roundi(_sound_slider.value), "mute": _mute_button.button_pressed}
 
 
 ## The build panel itself; hidden while closed.
@@ -2257,6 +2303,122 @@ static func _spacer(parent: Control, size: Vector2) -> Control:
 	return spacer
 
 
+## Top right: the gear, which opens the settings panel under it, the HUD's panel shape at
+## SETTINGS_WIDTH: its title and close button, a slider for the music and one for every other
+## sound (0 to 100, the SFX and UI buses together), and the mute switch, all on Audio. A slider
+## sets its bus as it moves and keeps it in the settings when let go (and when the panel closes);
+## the Sound slider let go plays a tap at its new level. The panel stops touches, as panels do.
+func _build_settings() -> void:
+	_gear_button = _button("", CLOSE_SIZE, &"GearButton", &"ui_tap_soft")
+	_gear_button.pressed.connect(func() -> void: _show_settings(not _settings.visible))
+	_root.add_child(_gear_button)
+	_gear_button.set_anchors_preset(Control.PRESET_TOP_RIGHT)
+	_gear_button.grow_horizontal = Control.GROW_DIRECTION_BEGIN
+	_gear_button.offset_left = -MARGIN - CLOSE_SIZE.x
+	_gear_button.offset_right = -MARGIN
+	_gear_button.offset_top = MARGIN
+	_gear_button.offset_bottom = MARGIN + CLOSE_SIZE.y
+	var gear := HudIcon.new()
+	gear.kind = "gear"
+	gear.color = TEXT
+	gear.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	gear.position = (CLOSE_SIZE - GEAR_ICON) / 2.0
+	gear.size = GEAR_ICON
+	_card_body(_gear_button).add_child(gear)
+
+	_settings = PanelContainer.new()
+	_settings.custom_minimum_size = Vector2(SETTINGS_WIDTH, 0)
+	_settings.visible = false
+	_settings.draw.connect(_draw_edge.bind(_settings, false))
+	_root.add_child(_settings)
+	_settings.set_anchors_preset(Control.PRESET_TOP_RIGHT)
+	_settings.grow_horizontal = Control.GROW_DIRECTION_BEGIN
+	_settings.offset_left = -MARGIN - SETTINGS_WIDTH
+	_settings.offset_right = -MARGIN
+	_settings.offset_top = MARGIN + CLOSE_SIZE.y + 10
+	_settings.offset_bottom = _settings.offset_top
+	var column := VBoxContainer.new()
+	column.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	column.add_theme_constant_override("separation", 8)
+	_settings.add_child(column)
+	var header := HBoxContainer.new()
+	header.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	column.add_child(header)
+	var title := Label.new()
+	title.theme_type_variation = &"InfoTitle"
+	title.text = "Settings"
+	title.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	title.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	header.add_child(title)
+	_settings_close = _button("X", CLOSE_SIZE, &"CloseButton", &"ui_tap_soft")
+	_settings_close.pressed.connect(_show_settings.bind(false))
+	header.add_child(_settings_close)
+	_music_slider = _volume_row(column, "Music")
+	_music_slider.value_changed.connect(func(value: float) -> void: audio.set_volume(&"Music", value / 100.0, false))
+	_music_slider.drag_ended.connect(func(_changed: bool) -> void: _keep_volumes())
+	_sound_slider = _volume_row(column, "Sound")
+	_sound_slider.value_changed.connect(_set_sound)
+	_sound_slider.drag_ended.connect(func(_changed: bool) -> void:
+		_keep_volumes()
+		audio.play(&"ui_tap", Audio.TAP_JITTER))
+	_mute_button = CheckButton.new()
+	_mute_button.text = "Mute"
+	_mute_button.focus_mode = Control.FOCUS_NONE
+	_mute_button.custom_minimum_size = Vector2(0, CLOSE_SIZE.y)
+	_mute_button.toggled.connect(func(on: bool) -> void: audio.set_muted(on))
+	column.add_child(_mute_button)
+
+
+## A row of `parent`: the bus's name over SETTINGS_LABEL and its slider, 0 to 100, filling the rest,
+## a touch's height tall.
+func _volume_row(parent: Control, text: String) -> HSlider:
+	var row := HBoxContainer.new()
+	row.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	row.add_theme_constant_override("separation", 12)
+	parent.add_child(row)
+	var label := Label.new()
+	label.theme_type_variation = &"SettingsLabel"
+	label.text = text
+	label.custom_minimum_size = Vector2(SETTINGS_LABEL, 0)
+	label.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	row.add_child(label)
+	var slider := HSlider.new()
+	slider.max_value = 100.0
+	slider.step = 1.0
+	slider.scrollable = false
+	slider.focus_mode = Control.FOCUS_NONE
+	slider.custom_minimum_size = Vector2(0, CLOSE_SIZE.y)
+	slider.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	row.add_child(slider)
+	return slider
+
+
+## Opens the settings panel on what Audio has now, or closes it, keeping the volumes.
+func _show_settings(open: bool) -> void:
+	if open == _settings.visible:
+		return
+	audio.play(&"ui_open" if open else &"ui_close")
+	if open:
+		_music_slider.set_value_no_signal(roundf(audio.volume(&"Music") * 100.0))
+		_sound_slider.set_value_no_signal(roundf(audio.volume(&"SFX") * 100.0))
+		_mute_button.set_pressed_no_signal(audio.is_muted())
+	else:
+		_keep_volumes()
+	_settings.visible = open
+
+
+## The Sound slider moved: every sound but the music, the SFX and UI buses together.
+func _set_sound(value: float) -> void:
+	audio.set_volume(&"SFX", value / 100.0, false)
+	audio.set_volume(&"UI", value / 100.0, false)
+
+
+func _keep_volumes() -> void:
+	audio.set_volume(&"Music", _music_slider.value / 100.0)
+	audio.set_volume(&"SFX", _sound_slider.value / 100.0)
+	audio.set_volume(&"UI", _sound_slider.value / 100.0)
+
+
 ## Bottom left, opposite Build: opens the sector map, with a badge of the open fields on its top
 ## right corner. The badge takes no touch.
 func _build_expedition_button() -> void:
@@ -3089,6 +3251,29 @@ func _make_theme() -> Theme:
 	ui.set_stylebox("disabled", &"ProgressButton", _shape(TROUGH, 12, BUTTON_MARGIN))
 	_label_variation(ui, &"ProgressText", 20, TEXT, 2.5)
 
+	# Settings: the gear's button, a card; the rows' names; the volume sliders, a pill trough with
+	# the ink border the accent fills up to a round knob; the mute, a plain row of its word and a
+	# switch (no button shape round it).
+	_button_variation(ui, &"GearButton", CARD, 12, DISPLAY_FONT, 28, 0)
+	_label_variation(ui, &"SettingsLabel", 22, TEXT, 0)
+	var trough := _flat(TROUGH, SLIDER_TRACK / 2)
+	trough.border_color = INK
+	trough.set_border_width_all(BORDER)
+	trough.content_margin_top = SLIDER_TRACK / 2.0
+	trough.content_margin_bottom = SLIDER_TRACK / 2.0
+	ui.set_stylebox("slider", "HSlider", trough)
+	var filled := trough.duplicate() as StyleBoxFlat
+	filled.bg_color = meter_fill(ACCENT)
+	ui.set_stylebox("grabber_area", "HSlider", filled)
+	ui.set_stylebox("grabber_area_highlight", "HSlider", filled)
+	ui.set_icon("grabber", "HSlider", _knob(KNOB, TEXT))
+	ui.set_icon("grabber_highlight", "HSlider", _knob(KNOB, ACCENT))
+	for item: String in ["normal", "hover", "pressed", "hover_pressed", "disabled", "focus"]:
+		ui.set_stylebox(item, "CheckButton", StyleBoxEmpty.new())
+	ui.set_font_size("font_size", "CheckButton", 22)
+	ui.set_icon("checked", "CheckButton", _switch(true))
+	ui.set_icon("unchecked", "CheckButton", _switch(false))
+
 	# Sector map: the band's word in ink on its ribbon (SectorMap.Minimap); the detail's loot
 	# amounts and its lines of what a field holds.
 	_label_variation(ui, &"SectorRibbon", 20, INK, 0, DISPLAY_FONT)
@@ -3311,6 +3496,42 @@ static func _circle(centre: Vector2, radius: float, sides: int) -> PackedVector2
 		var angle := TAU * i / sides
 		points.append(centre + Vector2(cos(angle), sin(angle)) * radius)
 	return points
+
+
+## A round knob `diameter` across, its fill inside an ink ring BORDER wide, antialiased: the
+## volume sliders' grabber.
+static func _knob(diameter: int, fill: Color) -> ImageTexture:
+	var image := Image.create_empty(diameter, diameter, false, Image.FORMAT_RGBA8)
+	var centre := Vector2.ONE * diameter / 2.0
+	for y: int in diameter:
+		for x: int in diameter:
+			var edge := diameter / 2.0 - Vector2(x + 0.5, y + 0.5).distance_to(centre)
+			var color := INK.lerp(fill, clampf(edge - BORDER + 0.5, 0.0, 1.0))
+			color.a = clampf(edge + 0.5, 0.0, 1.0)
+			image.set_pixel(x, y, color)
+	return ImageTexture.create_from_image(image)
+
+
+## The mute's switch, SWITCH big, antialiased: a pill with an ink border, cyan when `on` and the
+## trough's dark when off, its knob (the text colour in an ink ring) at the end it is switched to.
+static func _switch(on: bool) -> ImageTexture:
+	var image := Image.create_empty(SWITCH.x, SWITCH.y, false, Image.FORMAT_RGBA8)
+	var radius := SWITCH.y / 2.0
+	var left := Vector2(radius, radius)
+	var right := Vector2(SWITCH.x - radius, radius)
+	var knob := right if on else left
+	var knob_radius := radius - 6.0
+	for y: int in SWITCH.y:
+		for x: int in SWITCH.x:
+			var point := Vector2(x + 0.5, y + 0.5)
+			var along := clampf(point.x, left.x, right.x)
+			var edge := radius - point.distance_to(Vector2(along, radius))
+			var color := INK.lerp(ACCENT if on else TROUGH, clampf(edge - BORDER + 0.5, 0.0, 1.0))
+			var knob_edge := knob_radius - point.distance_to(knob)
+			color = color.lerp(INK.lerp(TEXT, clampf(knob_edge - BORDER + 0.5, 0.0, 1.0)), clampf(knob_edge + 0.5, 0.0, 1.0))
+			color.a = clampf(edge + 0.5, 0.0, 1.0)
+			image.set_pixel(x, y, color)
+	return ImageTexture.create_from_image(image)
 
 
 ## A plain rounded fill, for the scroll bar.

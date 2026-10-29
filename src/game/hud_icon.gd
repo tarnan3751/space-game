@@ -31,8 +31,8 @@ const STEEL := Color("7fa6cc")
 
 ## "metal", "crystal", "antimatter", "drones", "army" (the army's figure, on the training panel's
 ## housing line), or a unit's crew, "human", "piloted" or "autonomous", or an ability's effect,
-## "swarm", "emp" or "strike", or a mark, "lock", "clock", "chevron", "star", "skull" or "cross"; anything
-## else draws a plain gem.
+## "swarm", "emp" or "strike", or a mark, "lock", "clock", "chevron", "star", "skull", "cross" or "gear";
+## anything else draws a plain gem.
 var kind: String = ""
 var color: Color = Color.WHITE
 ## A wing mark at the lower right: an air unit.
@@ -104,6 +104,8 @@ static func paint(pen: Pen, icon: String, rect: Rect2, tint: Color, wing: bool =
 				_skull(pen, tint)
 			"cross":
 				_cross(pen, tint)
+			"gear":
+				_gear(pen, tint)
 			_:
 				_gem(pen, tint)
 		if wing:
@@ -472,6 +474,23 @@ static func _cross(pen: Pen, tint: Color) -> void:
 	pen.shape(outline, tint)
 	pen.facet(PackedVector2Array([outline[9], outline[10], outline[11], centre]), tint.lightened(0.4))
 	pen.outline(outline)
+
+
+## A cog: eight square teeth round a body with a lighter cel band across its top, and its hole, an
+## ink ring round the card's fill (it sits on the settings button).
+static func _gear(pen: Pen, tint: Color) -> void:
+	var centre := Vector2(20, 20)
+	var outline := PackedVector2Array()
+	for k: int in 8:
+		var angle := TAU * k / 8.0
+		for step: Vector2 in [Vector2(-0.3, 13.0), Vector2(-0.18, 18.0), Vector2(0.18, 18.0), Vector2(0.3, 13.0),
+				Vector2(TAU / 16.0, 13.0)]:
+			outline.append(centre + Vector2.from_angle(angle + step.x) * step.y)
+	pen.shape(outline, tint)
+	pen.facet(_cap(centre, 13.0, 3.0, true, 14), tint.lightened(0.35))
+	pen.outline(outline)
+	pen.facet(_ellipse(centre, Vector2(6.5, 6.5), 0.0, TAU, 16), Hud.INK)
+	pen.facet(_ellipse(centre, Vector2(4.0, 4.0), 0.0, TAU, 16), Hud.CARD)
 
 
 ## `rect` with its corners rounded to `radius`.
