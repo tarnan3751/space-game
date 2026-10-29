@@ -97,6 +97,9 @@ var _roll: float = 0.0
 var _body: Node3D
 var _beam: Node3D
 var _flare: MeshInstance3D
+## Plays the base's sound by its key and a pitch jitter: laser_work at each firing, which its
+## recipe holds to two at once. None over a battle's field.
+var sound: Callable
 
 
 ## Call once, before adding to the tree: `id` seeds the work points, `size` is the footprint's
@@ -164,6 +167,8 @@ func advance(delta: float) -> bool:
 					_beam.visible = true
 					_flare.visible = true
 					_flare.transform = Transform3D(_standing_on(_work_normal), _work)
+					if sound.is_valid():
+						sound.call(&"laser_work", 0.05)
 				else:
 					_begin(Phase.ORBIT)
 		Phase.FIRE:

@@ -186,6 +186,17 @@ func stop(id: int, fade: float = 0.15) -> void:
 	_voice_tweens[voice] = tween
 
 
+## Fades loop `id` to `db` (0 its full level) over `fade` seconds, its fade-in included: a bed
+## ducked under a panel and brought back.
+func set_loop_volume(id: int, db: float, fade: float = 0.15) -> void:
+	var voice := _voice_loop.find(id)
+	if id == 0 or voice < 0:
+		return
+	_kill_fade(voice)
+	_voice_tweens[voice] = create_tween()
+	_voice_tweens[voice].tween_property(_voices[voice], ^"volume_linear", db_to_linear(db), fade)
+
+
 ## Crossfades the music to track `key` over `fade` seconds; &"" fades it out. False when the
 ## track has no file.
 func music(key: StringName, fade: float = 1.0) -> bool:
@@ -291,6 +302,14 @@ func recent_times() -> PackedInt64Array:
 ## How many times `key` has played since boot.
 func play_count(key: StringName) -> int:
 	return _counts.get(key, 0)
+
+
+## Loop `id`'s level now, 0 to 1 (its fade or its duck under way), -1 when it is not sounding.
+func loop_level(id: int) -> float:
+	var voice := _voice_loop.find(id)
+	if id == 0 or voice < 0:
+		return -1.0
+	return _voices[voice].volume_linear
 
 
 ## How many plays are scheduled and waiting.

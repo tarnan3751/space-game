@@ -159,6 +159,8 @@ var _fired_at: float = -INF
 var _kick_reach: float = 0.0
 ## The step of the reveal's fade the bodies show (set_reveal), -1 for none.
 var _reveal_step: int = -1
+## Plays the base's sound by its key and a pitch jitter (BaseView's), handed to its drone.
+var sound: Callable
 
 
 ## Call once, before adding to the tree. `level` picks the model (level 1's while it is 0),
@@ -231,6 +233,7 @@ func show_status(level: int, busy: bool, target_level: int, seconds_left: int) -
 	_label.visible = busy
 	if busy and _drone == null:
 		_drone = ConstructionDrone.new()
+		_drone.sound = sound
 		_drone.setup(building_id, footprint_size, _scaffold if level < 1 else _model)
 		add_child(_drone)
 		_place_label()

@@ -182,6 +182,9 @@ var grid_size: Vector2i = Vector2i.ZERO
 ## The seed the landscape was generated from (setup).
 var scenery_seed: int = SCENERY_SEED
 var views: Dictionary[int, BuildingView] = {}
+## Plays a sound of the base by its key and a pitch jitter, handed to every view it makes for its
+## construction drone's laser (main's _base_sound; none on a battle's field).
+var sound: Callable
 ## Building drawn with a selection tile.
 var selected_id: int = 0
 ## Building currently being dragged; sync() leaves its position alone.
@@ -353,6 +356,7 @@ func sync(state: BaseState) -> void:
 		var view: BuildingView = views.get(id)
 		if view == null:
 			view = BuildingView.new()
+			view.sound = sound
 			view.setup(id, building.type, building.level, state.catalog.size_of(building.type),
 				BuildingModels.tier_of(state.catalog, building.type, maxi(building.level, 1)))
 			add_child(view)

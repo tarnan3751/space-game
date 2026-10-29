@@ -797,6 +797,12 @@ func is_menu_open() -> bool:
 	return _menu_open
 
 
+## Whether a bottom panel is open or sliding open: the build panel or the army panel (main.gd ducks
+## the base's ambience under it).
+func is_panel_open() -> bool:
+	return _menu_open or _army_page != ArmyPage.NONE
+
+
 ## The build panel itself; hidden while closed.
 func build_panel() -> Control:
 	return _menu

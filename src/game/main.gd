@@ -31,8 +31,8 @@ extends Node3D
 ## The sounds (Audio, main.audio) are wired in _wire_audio: the base's events through their
 ## signals, the HUD and the sector map by handing them the node, which their buttons play their
 ## taps on; the attack HUD's buttons through Audio.tap_buttons, and the battle's shots and
-## landings by handing the node to the battle view. main plays the boot's sting and hears the
-## base's completions by counting (_hear_completions).
+## landings by handing the node to the battle view. main plays the boot's sting, hears the base's
+## completions by counting (_hear_completions) and keeps the base's ambience (_set_bed).
 
 const DEFAULT_SAVE_PATH := "user://base.json"
 const SAVE_PATH_ARG := "--save-path="
@@ -43,8 +43,16 @@ const QUIT_FRAMES_ARG := "--quit-frames="
 ## frames is not enough (they can all pass inside one mix headless). As the harness driver waits.
 const QUIT_SETTLE_SECONDS := 0.1
 const SAVE_EVERY_TICKS := 10
+## The base's ambience (base_bed): how far a panel or the sector map ducks it (dB), and how long its
+## fades take (seconds).
+const BED_DUCK_DB := -8.0
+const BED_FADE := 0.6
 ## The HUD's pictures start rendering in idle frames this long after boot.
 const PRERENDER_AFTER := 1.0
+
+## How the base's ambience plays: not at all (in a battle), ducked under a panel or the sector
+## map, or full.
+enum Bed { OFF, DUCKED, FULL }
 
 ## Where this run loads and saves the base.
 var save_path: String = DEFAULT_SAVE_PATH
@@ -81,6 +89,9 @@ var _quitting: bool = false
 ## Where the camera looked at the base, and its zoom, when a battle opened: put back after it.
 var _base_focus: Vector3 = Vector3.ZERO
 var _base_zoom: float = IsoCamera.START_ZOOM_SIZE
+## The base's ambience: how it plays, and its loop's id (0 while it is off).
+var _bed: Bed = Bed.OFF
+var _bed_id: int = 0
 ## Whether loading the save's offline catch-up finished anything (the boot's welcome).
 var _caught_up: bool = false
 ## What the base held at the last change, counted for the completions it hears
@@ -180,7 +191,26 @@ func _wire_audio() -> void:
 	hud.audio = audio
 	sector_map.audio = audio
 	placement.sound = _base_sound
+	base_view.sound = _base_sound
 	base_view.building_finished.connect(func(_id: int) -> void: _base_sound(&"build_done", 0.0))
+
+
+## The base's ambience's loop (Audio.loop), 0 while it is off: for the harness.
+func ambience() -> int:
+	return _bed_id
+
+
+## The base's ambience to `bed`: started (faded in) from the first frame, ducked under a panel or the
+## sector map, stopped while a battle runs in the base's place and started again after it.
+func _set_bed(bed: Bed) -> void:
+	_bed = bed
+	if bed == Bed.OFF:
+		audio.stop(_bed_id, BED_FADE)
+		_bed_id = 0
+		return
+	if _bed_id == 0:
+		_bed_id = audio.loop(&"base_bed", BED_FADE)
+	audio.set_loop_volume(_bed_id, BED_DUCK_DB if bed == Bed.DUCKED else 0.0, BED_FADE)
 
 
 ## Plays the base's sound `key` (its pitch varied up to `pitch_jitter`), `delay` seconds from now
@@ -213,6 +243,9 @@ func _process(delta: float) -> void:
 	if idle != _prerendering:
 		_prerendering = idle
 		hud.prerender(idle)
+	var bed := Bed.OFF if battle != null else (Bed.DUCKED if sector_map.visible or hud.is_panel_open() else Bed.FULL)
+	if bed != _bed:
+		_set_bed(bed)
 	if _dirty:
 		_dirty = false
 		base_view.sync(state)

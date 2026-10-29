@@ -194,6 +194,31 @@ const TABLE := {
 			"vibrato": [5.0, 10.0], "db": -5},
 		{"wave": "sine", "hz": C6, "at": 0.42, "a": 0.004, "d": 0.8, "fm": {"ratio": 2.0, "index": [0.6, 0.0]}, "db": -2}]},
 
+	# The construction drone's laser, one shot a firing (ConstructionDrone): a buzz that swells in
+	# and crackles, two at most at once.
+	"laser_work": {"category": "shot", "seconds": 1.35, "min": 1.0, "max": 1.4, "rms_db": -26.0, "quiet": true, "voices": 2,
+		"cooldown": 0.2, "layers": [
+		{"wave": "triangle", "hz": 110, "a": 0.18, "d": 0.2, "s": 0.8, "len": 1.1, "r": 0.15, "vibrato": [11.0, 30.0],
+			"fm": {"ratio": 1.0, "index": 1.8}, "filter": {"type": "lp", "hz": 1500}},
+		{"wave": "sine", "hz": 220, "a": 0.18, "d": 0.2, "s": 0.8, "len": 1.1, "r": 0.15, "vibrato": [7.0, 20.0], "db": -8},
+		{"wave": "noise", "a": 0.2, "d": 0.2, "s": 0.7, "len": 1.1, "r": 0.15, "ring": {"hz": 23.0},
+			"filter": {"type": "hp", "hz": 3000}, "db": -14}]},
+
+	# The base's bed under everything (main.gd): a soft wind and a faint hum. Its gusts are three
+	# swells of their own, one, two and five a loop, so the loudness never repeats inside it; every
+	# modulation is whole half-cycles of its 20 s, so the loop's seam is the crossfade's alone.
+	"base_bed": {"category": "loop", "seconds": 20.0, "max": 21.0, "loop": true, "quiet": true, "rms_db": -26.0,
+		"layers": [
+		{"wave": "pink", "a": 0.0, "s": 1.0, "len": 20.1, "filter": {"type": "lp", "hz": 600}},
+		{"wave": "pink", "a": 0.0, "s": 1.0, "len": 20.1, "ring": {"hz": 0.025},
+			"filter": {"type": "bp", "hz": 700, "q": 0.8}, "db": 4},
+		{"wave": "pink", "a": 0.0, "s": 1.0, "len": 20.1, "ring": {"hz": 0.05},
+			"filter": {"type": "bp", "hz": 1000, "q": 0.8}, "db": 4},
+		{"wave": "pink", "a": 0.0, "s": 1.0, "len": 20.1, "ring": {"hz": 0.125},
+			"filter": {"type": "bp", "hz": 1500, "q": 1.0}, "db": 3},
+		{"wave": "sine", "hz": 110, "a": 0.0, "s": 1.0, "len": 20.1, "vibrato": [0.1, 6.0], "db": -16},
+		{"wave": "sine", "hz": 165, "a": 0.0, "s": 1.0, "len": 20.1, "vibrato": [0.15, 5.0], "db": -22}]},
+
 	# The battle: shots, impacts and blasts.
 	"laser_fire": {"category": "shot", "seconds": 0.2, "layers": [
 		{"wave": "triangle", "hz": [2200, 380], "glide": 0.14, "a": 0.002, "d": 0.15, "fm": {"ratio": 2.0, "index": [1.0, 0.0]}},
