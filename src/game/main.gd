@@ -22,6 +22,10 @@ extends Node3D
 ## map opens again on the base. The debug build's Practice raid (practice_setup) raids the
 ## template base instead, and its result is never applied, so the save and the real base are
 ## untouched by it.
+##
+## The sounds (Audio, main.audio) are wired in _wire_audio: the base's events through their
+## signals, the HUD's buttons through Audio.tap_buttons, and the battle's shots and landings by
+## handing the node to the battle view.
 
 const DEFAULT_SAVE_PATH := "user://base.json"
 const SAVE_PATH_ARG := "--save-path="
@@ -129,6 +133,7 @@ func _ready() -> void:
 	placement.selection_changed.connect(_refresh_hud)
 	placement.placing_changed.connect(_on_placing_changed)
 	placement.command_failed.connect(hud.show_error)
+	_wire_audio()
 
 	_set_state(_load_or_create())
 
@@ -137,6 +142,26 @@ func _ready() -> void:
 	tick.autostart = true
 	tick.timeout.connect(_on_tick)
 	add_child(tick)
+
+
+## The sounds of the base and its HUD (docs/reference/audio.md, **Hooks**): a building tapped and
+## a construction started (PlacementController), finished (BaseView), every HUD button's tap, and
+## the build panel opening and closing.
+func _wire_audio() -> void:
+	placement.sound = _base_sound
+	base_view.building_finished.connect(func(_id: int) -> void: _base_sound(&"build_done", 0.0))
+	audio.tap_buttons(hud)
+	# The HUD's own handler ran first, so the panel is already open or closed.
+	hud.build_button().pressed.connect(func() -> void: audio.play(&"ui_open" if hud.is_menu_open() else &"ui_close"))
+	hud.close_button().pressed.connect(func() -> void: audio.play(&"ui_close"))
+
+
+## Plays the base's sound `key` (its pitch varied up to `pitch_jitter`), unless a battle runs in the
+## base's place (its view keeps syncing out of the tree, and a construction finishing then is not
+## heard).
+func _base_sound(key: StringName, pitch_jitter: float = 0.06) -> void:
+	if battle == null:
+		audio.play(key, pitch_jitter)
 
 
 ## The one animation clock, set before any view animates (main is their ancestor, so it
@@ -371,6 +396,7 @@ func open_battle(setup: Dictionary, practice: bool, expedition: Dictionary = {})
 		return "a battle is already open"
 	var view := BattleView.new()
 	view.rival = not expedition.is_empty()
+	view.audio = audio
 	var error := view.setup(catalog, setup, camera)
 	if error != "":
 		view.free()
@@ -390,11 +416,18 @@ func open_battle(setup: Dictionary, practice: bool, expedition: Dictionary = {})
 	battle_hud = BattleHud.new()
 	battle_hud.setup(catalog, hud.ui_theme(), hud.preview(), battle)
 	add_child(battle_hud)
+	audio.tap_buttons(battle_hud)
 	_base_focus = camera.focus
 	_base_zoom = camera.size
 	camera.setup(battle.area())
 	battle.finished.connect(_on_battle_finished.bind(practice, expedition))
+	battle.ended.connect(_on_battle_ended)
 	return ""
+
+
+## The battle is over: a fanfare for a victory (a star or more), a fall for a defeat.
+func _on_battle_ended(result: Dictionary) -> void:
+	audio.sting(&"victory" if int(result.get("stars", 0)) > 0 else &"defeat")
 
 
 ## The battle ended and was left: the base comes back. A practice applies nothing; an expedition's

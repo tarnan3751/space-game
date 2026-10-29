@@ -170,6 +170,9 @@ const MAX_SHIELDS := 16
 
 ## Called with (building id, unit id) when a bolt aimed at either arrives.
 var arrived: Callable
+## Plays a weapon's shot and its landing (Sounds.FIRE and LAND, by its type): one play in fire(),
+## a burst's later shots scheduled its burst_gap apart, one in land().
+var audio: Audio
 ## Harness hooks, read by no game code: projectiles started so far, and where the last one started
 ## and its colour (the rig scenario's checks).
 var bolts_fired: int = 0
@@ -1031,6 +1034,11 @@ func setup(walls: int, area: AABB) -> void:
 func fire(weapon: Weapons.Weapon, from: Vector3, to: Vector3, building: int, unit: int, impact: float, now: float,
 		flash_on: bool = true, seconds: float = 0.0) -> void:
 	_count_shot(from, weapon.color)
+	var sound := Sounds.fire_key(weapon.type)
+	if sound != &"":
+		audio.play(sound)
+		for k: int in range(1, weapon.burst):
+			audio.schedule(sound, k * weapon.burst_gap)
 	var distance := from.distance_to(to)
 	match weapon.kind:
 		Weapons.Kind.BOLT, Weapons.Kind.LASER, Weapons.Kind.TRACER, Weapons.Kind.PLASMA, Weapons.Kind.BALL, Weapons.Kind.SHELL:
@@ -1072,6 +1080,9 @@ func fire(weapon: Weapons.Weapon, from: Vector3, to: Vector3, building: int, uni
 ## Where `weapon` lands at `at`, `size` across at least, from `now`: its record's impact and the
 ## glow decal of its light on the ground under it.
 func land(weapon: Weapons.Weapon, at: Vector3, size: float, now: float) -> void:
+	var sound := Sounds.land_key(weapon.type)
+	if sound != &"":
+		audio.play(sound)
 	var r := maxf(size, weapon.impact_size)
 	var c := weapon.color
 	var ground := Vector3(at.x, 0.0, at.z)

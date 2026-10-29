@@ -192,6 +192,8 @@ var field: BaseView
 var input: WorldInput
 var units: BattleUnits
 var effects: BattleEffects
+## Plays the shots and landings (BattleEffects); main gives it before setup().
+var audio: Audio
 
 ## Seconds of battle shown so far, `speed` times as fast as real time, run on after the end.
 var _clock: float = 0.0
@@ -373,6 +375,7 @@ func setup(battle_catalog: Catalog, setup_data: Dictionary, iso_camera: IsoCamer
 		field.walls.body.material_override = MaterialKit.rival()
 
 	effects = BattleEffects.new()
+	effects.audio = audio
 	effects.setup(walls, area)
 	effects.arrived = _on_arrived
 	add_child(effects)

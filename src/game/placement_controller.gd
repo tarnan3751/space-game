@@ -34,6 +34,9 @@ const EDGE_SCROLL_SPEED := 0.6
 var state: BaseState
 var base_view: BaseView
 var camera: IsoCamera
+## Plays a sound of the base by its key (a building tapped, a construction started); main's
+## _base_sound, which stays quiet while a battle runs.
+var sound: Callable
 ## Returns the current unix time in seconds. Injected so a server clock can replace it.
 var clock: Callable
 
@@ -132,6 +135,7 @@ func confirm_place() -> void:
 		command_failed.emit(error)
 		return
 	var new_id := state.last_added_id
+	sound.call(&"build_start")
 	cancel_place()
 	select(new_id)
 
@@ -220,6 +224,8 @@ func upgrade_selected() -> void:
 	var error := state.apply({"op": "upgrade", "id": selected_id}, clock.call())
 	if error != "":
 		command_failed.emit(error)
+	else:
+		sound.call(&"build_start")
 
 
 # --- The army --------------------------------------------------------------------
@@ -292,7 +298,11 @@ func _on_tapped(screen_pos: Vector2) -> void:
 		_set_ghost_cell(cell - Vector2i(half, half))
 		return
 	var building := state.building_at(cell)
-	select(building.id if building != null else 0)
+	var id := building.id if building != null else 0
+	# A tap on the building already selected selects nothing new: no sound.
+	if id != 0 and id != selected_id:
+		sound.call(&"select_building")
+	select(id)
 
 
 func _on_drag_started(screen_pos: Vector2) -> void:

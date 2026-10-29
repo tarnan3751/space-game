@@ -13,6 +13,9 @@ extends Node3D
 ## (the field's marks, wind ripples, rock strata), with chamfered rocks, small ones strewn beside
 ## the curb as rubble, and glowing crystal clusters on it. Each is one mesh with its ink outline.
 
+## Building `id` finished its construction: sync() found its new level and sent its drone off.
+signal building_finished(id: int)
+
 const GROUND_SHADER := preload("res://src/game/ground.gdshader")
 ## The field texture the ground is drawn from, imported as an Image (tools/gen_textures.gd).
 const FIELD_TEXTURE := "res://assets/textures/field.png"
@@ -340,6 +343,7 @@ func sync(state: BaseState) -> void:
 		var drone := views[id].release_drone(self)
 		if drone != null:
 			_leaving[id] = drone
+			building_finished.emit(id)
 		views[id].queue_free()
 		views.erase(id)
 	_stale.clear()

@@ -116,6 +116,32 @@ const TABLE := {
 		{"wave": "pink", "a": 0.0, "s": 1.0, "len": 2.1, "filter": {"type": "lp", "hz": 500}, "db": -14}]},
 }
 
+## The sound a weapon's shot and its landing make, by its type id (Weapons.Weapon.type): read by
+## BattleEffects.fire() and land(). A type with none is silent.
+const FIRE := {
+	"laser_turret": &"laser_fire",
+	"plasma_mortar": &"shell_fire",
+	"missile_battery": &"missile_fire",
+}
+const LAND := {
+	"laser_turret": &"impact_small",
+	"plasma_mortar": &"explosion_medium",
+	"missile_battery": &"explosion_medium",
+}
+
+
+## The key `type`'s shot plays, &"" for none.
+static func fire_key(type: String) -> StringName:
+	var key: StringName = FIRE.get(type, &"")
+	return key
+
+
+## The key `type`'s landing plays, &"" for none.
+static func land_key(type: String) -> StringName:
+	var key: StringName = LAND.get(type, &"")
+	return key
+
+
 ## `key`'s field `name`: the recipe's own, else its category's.
 static func field(key: StringName, name: String) -> Variant:
 	var recipe: Dictionary = TABLE[String(key)]
