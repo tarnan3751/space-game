@@ -89,10 +89,10 @@ const OPAQUE: Array[String] = ["_debris", "_wall_rubble", "_wall_rubble_outline"
 ## The systems' columns in the table, Profile's keys.
 const SYSTEMS: Array[StringName] = [&"building_views", &"battle_view", &"battle_steps", &"sim_step", &"units_draw",
 	&"units_upload", &"deaths", &"aim_defences", &"draw_buildings", &"bars_upload", &"effects_draw", &"fx_flights",
-	&"fx_beams_vortices", &"fx_debris", &"fx_impacts_arcs", &"fx_timed", &"walls_mask"]
+	&"fx_beams_vortices", &"fx_debris", &"fx_impacts_arcs", &"fx_timed", &"walls_mask", &"audio"]
 
 ## Which systems' columns hold which: never sum them.
-const NESTED := "Nested keys: battle_view holds battle_steps (which holds sim_step), units_draw (which holds units_upload), deaths, aim_defences, draw_buildings, bars_upload, effects_draw (which holds every fx_*) and walls_mask; building_views is apart from battle_view."
+const NESTED := "Nested keys: battle_view holds battle_steps (which holds sim_step), units_draw (which holds units_upload), deaths, aim_defences, draw_buildings, bars_upload, effects_draw (which holds every fx_*) and walls_mask; building_views is apart from battle_view; audio (every Audio.play) is counted again inside whatever played it: battle_view's steps and effects in a battle."
 
 var _rows: Array[Dictionary] = []
 ## Every Profile key collected, over the samples and after them.
