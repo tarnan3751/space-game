@@ -84,6 +84,12 @@ Godot logs it as a `SCRIPT ERROR`, which fails the run in `run.sh`.
   is in the past. A run is therefore repeatable to the second whatever the machine's speed.
   The fresh base is advanced to the harness clock once at boot; a new base has no producing
   building, so nothing is paid out by that jump.
+- **The settings and the sounds.** `main.gd` keeps the volumes (`Audio.settings_path`) beside a
+  `--save-path` save, `<out>/settings.cfg`, never in `user://settings.cfg`. Sounds play in every
+  run, on the Dummy audio driver too, so the plays are recorded and checked the same either way;
+  only a rendered run with `--audible` plays them aloud. When the scenario returns, the driver silences
+  them (`Audio.silence()`) and waits `SILENCE_SECONDS` before it quits: a sound still playing
+  at exit is reported as leaked resources.
 - **The engine's own files.** Like any Godot run, a harness run writes the `.godot/` cache
   and any missing `*.uid` files in the tree it runs in. That is why the harness, like the
   gates, is run in a lane's own clone and never in the main tree by anyone but the
@@ -105,6 +111,7 @@ through the game layer as the player would, and read the state through `BaseStat
 | `main.state` | the `BaseState`: `buildings`, `resources`, `capacity()`, `builders_free()`, `seconds_left(id)`, `check_*` |
 | `main.camera`, `main.base_view` | `IsoCamera` and `BaseView`, for cell and screen mapping |
 | `main.sector_map` | the `SectorMap`: `open(state)`, `close()`, `show_field(index)`, `is_open()`, `is_detail_open()`, `detail_index()`, `detail_field()`, `card(index)`, `card_cleared(index)`, `card_lines(index)`, `scan_button()`, `close_button()`, `attack_button()`, `hint_shown()`, `minimap()` (`drawn()`, `walls_drawn()`), `card_thumbnail(index)`, `layouts_done()`, its signals `scan_pressed`, `attack_pressed`, `closed`; `main.open_sector_map()` (`docs/reference/hud.md`, **Sector map**) |
+| `main.audio` | the `Audio` node: `play(key)`, `schedule(key, delay)`, `loop(key)`, `stop(id)`, `music(key)`, `sting(key)`, `set_volume(bus, linear)`, `volume(bus)`, `silence()`; its queries `recent_plays()`, `recent_times()`, `play_count(key)`, `playing_count()`, `scheduled_count()`, `keys()`, `stream(key)`, `current_music()` (`docs/reference/audio.md`) |
 | `main.open_battle(setup, practice, expedition = {})`, `main.practice_setup()`, `main.battle`, `main.battle_hud` | a battle in the base's place and its `BattleView` while it runs: `sim` (read only), `script_commands(list)`, `deploy(unit, cell)`, `select_unit(unit)`, `surrender()`, `leave()`, `speed`, `deploy_unit`, `is_masked(cell)`, `input` (its own `WorldInput`), `field` (its `BaseView`, `deploy_strength()`), `units`, `step_ms()`, `slowest_tick()`, `clock()`, `finished` (`docs/reference/battle-view.md`); and its `BattleHud`'s queries (`docs/reference/hud.md`, **Battle HUD**) |
 
 Helpers on `HarnessScenario`:
@@ -749,6 +756,24 @@ view's `site_height()`, said in the log), to fill no more
 than 70% of the screen, so none runs under the HUD or off the screen; each part again a second
 later where a part turns in it, to compare the two.
 
+`scenarios/sounds.gd` checks the sounds (`docs/reference/audio.md`), headless or rendered (aloud with `--audible`):
+every key in `Sounds.TABLE` loads as a 16-bit 44.1 kHz mono stream inside its category's length
+bounds, looping as its recipe says; SFX, UI and Music send to Master, which has its limiter; every
+one-shot plays once and shows in `recent_plays()`; 100 plays of one key in a frame sound once; a
+flood of every one-shot, 50 ms apart, fills the 24 voices and no more, and a sting still takes one;
+a loop sounds past its file's length and `stop()` frees its voice; a loop fading in, silenced,
+leaves the next sound on its voice at its own level; three plays scheduled 0.1, 0.2 and 0.3 s
+ahead sound in order within 50 ms of their time, and the drain turns off after; a play due soon
+behind one due later is retired when it plays; a missing music track is refused; a volume is kept
+in the run's own `settings.cfg`; idle, no `_process` runs and no voice sounds. Then Build and
+Close tapped (`ui_tap`, `ui_open`, `ui_close`), a building tapped (`select_building`) and tapped
+again (nothing), one placed with the dev cheats and finished a second later (`build_start`,
+`build_done`), another finishing while a practice battle runs (nothing), and that battle at 2x
+against the template base's laser turrets, plasma mortars, missile batteries and Command Center alone, 40
+Rangers and 5 Hover Tanks deployed as near the turrets as the zone allows (in the whole template
+they sit deep inside and seldom fire): the turrets' shots and hits sound, a mortar's or missile's
+landing does, Audio's cost a frame is logged, and the surrender plays one sting.
+
 `scenarios/profile.gd` is the performance profile, to re-run after every change made for cost: the
 Template base idle at camera sizes 44, 24 and 10, again at 44 with the sun's shadow off, the
 sector map open, the training panel open, and the Practice raid on it with the battle scenario's
@@ -773,7 +798,8 @@ since replaced (the merged walls', rebuilt as walls fall) is not kept alive in t
 reads. The log ends with a table, one row a sample, and a note on the nested systems:
 `battle_view` holds `battle_steps` (which holds `sim_step`), `units_draw` (which holds
 `units_upload`), `deaths`, `aim_defences`, `draw_buildings`, `bars_upload`, `effects_draw` (which
-holds every `fx_*`) and `walls_mask`, so the columns are not summed; `building_views` is apart.
+holds every `fx_*`) and `walls_mask`, so the columns are not summed; `building_views` is apart;
+`audio` (every `Audio.play`) is counted again inside whatever played it.
 Each rendered sample checks that the window drew at least 99% of its frames (`frame_post_draw`
 fired between one process and the next), so a window that stops drawing fails the run, and the
 effect lists' member names it reads through `get()` are checked to resolve. Headless it skips the

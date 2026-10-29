@@ -40,7 +40,7 @@ the models' defects fixed and 9.5% of their triangles trimmed unseen. **The UI p
 phone's measure, the drone meter picked from rendered candidates, a theme foundation (type and touch
 floors, colour roles, pill-and-coin meters, card plinths and chips) in one look, skin A, chosen by
 the owner from three rendered, emblems on coins, the attack HUD's ceremony, the sector map's scan
-plates, the army and info panels; sound comes next and is not started.
+plates, the army and info panels. Sound is started: generated effects and the `Audio` node.
 `docs/project_overview.md` holds the roadmap (§2.2), the known limitations (§2.3) and the
 decisions (§3). The numbers in `data/` are the retune's real timers and economy
 (`docs/plans/retune.md`); a debug build's dev cheats make them free and one second at most.
@@ -74,6 +74,7 @@ Run `tools/dump_api.sh` once, then look up exact signatures in `.godot-api/`
 | Run the game (the owner only: it opens the real save) | `$GODOT --path .` (debug build: free one-second builds; `-- --no-cheats` for the real numbers) |
 | Dump engine API | `tools/dump_api.sh` |
 | Regenerate the material kit's textures (after an import) | `$GODOT --headless --path . -s res://tools/gen_textures.gd` |
+| Regenerate the sound effects (after an import; `-- --only=<key,...>` for some) | `$GODOT --headless --path . -s res://tools/gen_sounds.gd` |
 
 **Any Godot run writes files**: the `.godot/` cache, `*.uid` files beside new scripts, and,
 run normally, the save under `user://`. The gate and the harness boot the game on an isolated
@@ -94,6 +95,7 @@ or `data/`.
 | Battle view: the battle scene, driving the sim, the field and its falls, the units' MultiMeshes, the weapons, shots and impacts, deploying, the practice raid | `src/game/battle_view.gd`, `battle_units.gd`, `battle_effects.gd`, `weapons.gd`, `src/game/models/rubble.gd` | `docs/reference/battle-view.md` |
 | Art style: the look, light, colours, the material kit, `LowPolyMesh`, outlines, models, unit models, animation, the construction drone, view states | `src/game/models/`, `unit_models.gd`, `construction_drone.gd`, `src/game/*.gdshader*`, `material_kit.gd`, `surf.gd`, `motion.gd`, `rig.gd`, `low_poly_mesh.gd`, `assets/textures/kit/`, `assets/textures/*.png`, `tools/gen_textures.gd` | `docs/reference/art-style.md` |
 | HUD: the theme and fonts, top bar (meters, drone meter), Build button and build panel, place bar, info panel, toasts, the cards' pictures, the attack HUD, the Expedition button and the sector map | `src/game/hud.gd`, `battle_hud.gd`, `hud_icon.gd`, `drone_ring.gd`, `model_preview.gd`, `sector_map.gd`, `meter.gdshader`, `locked.gdshader`, `format.gd`, `assets/fonts/` | `docs/reference/hud.md` |
+| Audio: the sound identity, the recipes and the generator that renders them, the `Audio` node (voices, buses, cooldowns, loops, music, stings, volume settings), the hooks | `src/game/audio.gd`, `sounds.gd`, `tools/gen_sounds.gd`, `assets/audio/` | `docs/reference/audio.md` |
 | Testing and tools: runner, fixtures, gate, harness, the profile, landing, API dump | `test/`, `tools/`, `src/game/profile.gd` | `docs/reference/testing-tools.md`, `tools/harness/README.md` |
 
 ## Architecture rules
@@ -157,7 +159,8 @@ src/core/        catalog, base_state, building_state, training_queue, base_grid,
 src/game/        main, template_base, iso_camera, world_input, placement_controller, base_view,
                  building_view, construction_drone, building_models, unit_models, wall_mesh, low_poly_mesh, surf,
                  battle_view, battle_units, battle_effects, weapons, battle_hud,
-                 motion, rig, material_kit, hud, hud_icon, drone_ring, sector_map, format, model_preview, profile, toon.gdshader,
+                 motion, rig, material_kit, hud, hud_icon, drone_ring, sector_map, format, model_preview, profile, audio,
+                 sounds, toon.gdshader,
                  toon_move.gdshader, toon_body.gdshaderinc, toon_common.gdshaderinc, effects.gdshaderinc, ink.gdshader,
                  ink_move.gdshader, ink_body.gdshaderinc, holo.gdshader, holo_move.gdshader, holo_body.gdshaderinc,
                  ground.gdshader, terrain.gdshader, field_marks.gdshaderinc, meter.gdshader, locked.gdshader
@@ -168,12 +171,13 @@ src/game/models/ parts (the model being built, shared helpers and surfaces), the
 test/core/       test_*.gd (one file per core area)
 test/support/    TestCase base class, fixtures and fixture JSON
 tools/           run_tests.sh, test_runner.gd, gates.sh, land_series.sh, dump_api.sh,
-                 gen_textures.gd, gen_outposts.gd, sim_battles.gd, sim_matrix.sh
+                 gen_textures.gd, gen_sounds.gd, gen_outposts.gd, sim_battles.gd, sim_matrix.sh
 tools/harness/   driver.gd, scenario.gd, scenarios/, run.sh, README.md (output in out/, gitignored)
 .claude/agents/  scout, researcher, developer, reviewer
 assets/          textures/kit/ (the material kit, generated); textures/field.png and
                  terrain_rock.png (the ground's and the terrain's, generated); fonts/ (the HUD's two
-                 fonts, each with its OFL.txt); real models/audio later
+                 fonts, each with its OFL.txt); audio/sfx/ (the sound effects, generated); real
+                 models and music later
 server/          Nakama TypeScript runtime later (.gdignore keeps Godot out)
 ```
 
@@ -315,6 +319,9 @@ Constraints:
 - The HUD's fonts under `assets/fonts/` are imported resources (each `.ttf` with its `.import`),
   preloaded by `hud.gd`, so they export with it; the `OFL.txt` beside each is not a resource and
   needs the preset's include filter to ship.
+- The sound effects under `assets/audio/sfx/` (each `.wav` with its `.import`, PCM) are loaded by
+  path (`Audio`), and so will the music under `assets/audio/music/` be, so a preset that exports
+  selected resources only must include `assets/audio/`.
 - Commit the `*.uid` files Godot generates next to scripts.
 - A debug export (a debug APK, for example) is a debug build, so it runs with the dev cheats on;
   check balance on a release export or with `--no-cheats`.

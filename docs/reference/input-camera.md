@@ -31,7 +31,12 @@ material kit, `LowPolyMesh`, the shaders, the outlines, the view states, the wal
    **A battle**), `closed` → `_on_sector_map_closed` (the `WorldInput` back in the tree); the
    controller's `selection_changed` refreshes the
    HUD, `placing_changed` calls `hud.refresh_placing` (`_on_placing_changed`; a ghost move
-   updates only the Place button), and `command_failed` shows a toast.
+   updates only the Place button), and `command_failed` shows a toast. Then the sounds
+   (`_wire_audio`, `audio.md`, **Hooks**): the `Audio` node (`audio`, made before the base's view,
+   its volumes kept beside the save when the run has its own) plays the base's sounds through
+   `_base_sound`, quiet while a battle runs, which the controller is given as its `sound` and the
+   view's `building_finished` plays `build_done` through; every HUD button plays `ui_tap`, and
+   Build and the panel's Close play `ui_open` and `ui_close`.
 5. The state is loaded or created (`_load_or_create`) and installed (`_set_state`: disconnects
    the old state's `changed`, connects the new one, hands it to the controller, cancels any
    placement and selection, clears and syncs the view).
@@ -161,7 +166,7 @@ while a drag nears the screen's edge.
 
 | Member | What |
 | --- | --- |
-| `state`, `base_view`, `camera` | Set by `main.gd`. |
+| `state`, `base_view`, `camera`, `sound` | Set by `main.gd`; `sound` plays a base sound by key (`main._base_sound`, quiet while a battle runs). A tap that selects a building not already selected plays `select_building`, and a place or an upgrade applied plays `build_start` (`audio.md`). |
 | `clock: Callable` | Returns the unix time in seconds for every command it applies; `main._now` in the game, the harness's clock under the harness. |
 | `selected_id` | The selected building, `0` for none. `select(id)` updates the view's selection tile and emits `selection_changed`; a change of selection ends a building drag in progress with no move (a second finger can press Close or Reset base). |
 | `placing_type` | The type being placed, `""` when not. `is_placing()`, `ghost_is_valid()`, `ghost_cell()` (the ghost's top-left cell, the brush's while painting). |
@@ -253,7 +258,7 @@ the origin, cell (x, y) on world (x, z).
 | `world_to_cell(point)` | The cell under a ground point (floor). |
 | `footprint_cell_at(point, size)` | The top-left cell of a `size` footprint centred as closely as possible on a point (round). |
 | `area()` | The buildable area as a `Rect2` in world x/z; the camera's bounds. |
-| `sync(state)` | Makes `views` match `state.buildings`: frees views whose building is gone, changed type or has a new finished level (except the `dragging_id` view, which keeps its model until it is dropped), first handing a view's construction drone to the base view (`release_drone`) and, once the views are made, telling it to leave over the new view's site (`site_height()`), creates missing ones, pushes `show_status` to each, and for all but `dragging_id` sets the position, un-lifts, and shows the SELECTED tile on `selected_id`. Last it brings the merged wall mesh up to date (`_sync_walls`, **Walls**). While the state, its `buildings_revision` (`core-economy.md`), `selected_id` and `dragging_id` all stand since the last full pass, a sync only counts the busy buildings' labels down (`show_status`) and returns; it builds no array or dictionary either way. |
+| `sync(state)` | Makes `views` match `state.buildings`: frees views whose building is gone, changed type or has a new finished level (except the `dragging_id` view, which keeps its model until it is dropped), first handing a view's construction drone to the base view (`release_drone`) and, once the views are made, telling it to leave over the new view's site (`site_height()`) and emitting `building_finished(id)` (a view replaced with its drone is a construction finished; `main.gd` plays `build_done`), creates missing ones, pushes `show_status` to each, and for all but `dragging_id` sets the position, un-lifts, and shows the SELECTED tile on `selected_id`. Last it brings the merged wall mesh up to date (`_sync_walls`, **Walls**). While the state, its `buildings_revision` (`core-economy.md`), `selected_id` and `dragging_id` all stand since the last full pass, a sync only counts the busy buildings' labels down (`show_status`) and returns; it builds no array or dictionary either way. |
 | `walls` | The `WallMesh` that draws every finished wall but the dragged one. |
 | `set_grid_highlight(on)`, `is_grid_shown()` | Shows the ground's cell lines (`GRID_LINES_PLACING`) or hides them (`GRID_LINES`, 0). `PlacementController._show_grid` derives it from its own mode: shown while placing (the ghost or the wall brush) or while a building is dragged to move it, hidden otherwise; a selection or the open build panel alone does not show it. |
 | `clear()` | Frees every view (used when the state is replaced). |

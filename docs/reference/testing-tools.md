@@ -111,7 +111,10 @@ the training panel and a full practice raid at two ticks, each sampled for its f
 render monitors and the CPU time a frame of each system `Profile` (`src/game/profile.gd`, a static
 flag only that scenario sets) times, with the triangles and draws by source and the battle's
 alpha-blended fill; a table at the end of its log (`tools/harness/README.md`).
-`scenarios/expedition.gd` lays out the template base's six expedition fields, fights the even
+`scenarios/sounds.gd` checks the sounds (`audio.md`): every key's file, the buses, the cooldown,
+the voice cap, a loop, scheduled plays, the settings file, and the hooks (the HUD's taps, a building
+tapped, placed and finished, a battle's shots, landings and sting), with no work a frame idle and
+`Audio`'s cost a frame in battle (`tools/harness/README.md`). `scenarios/expedition.gd` lays out the template base's six expedition fields, fights the even
 one with the same army and applies the result with the expedition key, then scans, headless
 (`expeditions.md`).
 
@@ -196,6 +199,17 @@ seed, byte-identical run to run:
 `$GODOT --headless --path . -s res://tools/gen_textures.gd`, after an import. The gate does not
 run it; the PNGs are committed. `art-style.md`, **The material kit**, says what each layer holds
 and how to add one, and **Environment** what the field texture holds.
+
+## The sound generator: `tools/gen_sounds.gd`
+
+A headless `SceneTree` script that renders every recipe in `Sounds.TABLE` (`src/game/sounds.gd`)
+to `assets/audio/sfx/<key>.wav`, 44.1 kHz 16-bit mono, writes the `.import` file beside each (PCM,
+the recipe's loop), checks every file and prints a table (key, category, seconds, peak, the
+loudest 50 ms window's RMS, the whole file's RMS, ok or the failed checks), byte-identical run to
+run: `$GODOT --headless --path . -s res://tools/gen_sounds.gd [-- --only=<key,...>]`, after an
+import. It exits 1 when a check fails. The gate does not run it; the WAVs and their `.import`
+files are committed, and the gate's import leaves them as they are. `audio.md`, **The
+generator**, has the recipe format and the checks.
 
 ## Landing: `tools/land_series.sh`
 

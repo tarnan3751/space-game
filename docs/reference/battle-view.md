@@ -22,7 +22,9 @@ placement, takes the base's `BaseView` and `WorldInput` out of the tree, hides t
 battle and its `BattleHud` (`main.battle`, `main.battle_hud`) and bounds the camera to its field.
 When the battle ends the view emits `ended(result)` and the HUD shows its result panel; its Return
 calls `leave()`, which emits `finished(setup, result)` once, and the battle and its HUD are freed
-and the base's view, input and HUD come back. The base keeps running meanwhile:
+and the base's view, input and HUD come back. `main.gd` also hands the view its `Audio` (`audio`,
+passed on to `BattleEffects`), taps the attack HUD's buttons (`Audio.tap_buttons`) and plays
+`victory` (a star or more) or `defeat` on `ended` (`audio.md`, **Hooks**). The base keeps running meanwhile:
 the game's tick advances it and saves it as ever.
 
 A battle is an expedition's (**Expeditions**, below) or the debug build's **Practice raid** (the
@@ -247,7 +249,10 @@ moving part (`UnitModels.MAX_MOVING` is 0); the gunship's rotors are spun by the
 The events of each tick (`BattleEvents`, `battle.md`) become effects by the weapon record of the
 type that made them (**Weapons**), each primitive one MultiMesh of `BattleEffects`, fixed in size
 (`MAX_*`), an ended entry swapped with the last, an entry that starts later (a burst's later
-shots, a death's blast) drawn at no size until then; nothing is allocated a frame. A list hands
+shots, a death's blast) drawn at no size until then; nothing is allocated a frame. Each `fire()` plays
+the type's shot sound (`Sounds.FIRE`; a burst's later shots scheduled `burst_gap` apart, in real
+seconds whatever the battle's speed) and each `land()` its landing's (`Sounds.LAND`), when the type
+has one (`audio.md`, **Hooks**). A list hands
 its buffer over only when what it draws changed: one empty since its last hand-over skips it; the
 lightning arcs, which stand still for their lives (their shader moves them), skip it until one is
 added or ends; the scorch marks, still for their first three quarters, until one is added or ends,
