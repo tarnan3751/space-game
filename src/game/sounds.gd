@@ -459,6 +459,81 @@ const TABLE := {
 		{"wave": "saw", "hz": 140, "a": 0.0, "s": 1.0, "len": 1.1, "vibrato": [2.0, 300.0], "filter": {"type": "lp", "hz": 400},
 			"db": -12}]},
 
+	# The shields (BattleEffects.set_shield): a dome rising, a shot deflected, the dome shattering,
+	# and its hum while any dome is up (BattleView).
+	"shield_up": {"category": "chime", "seconds": 0.45, "min": 0.35, "rms_db": -17.0, "chorus": {"mix": 0.4}, "layers": [
+		{"wave": "sine", "hz": [110, 220], "a": 0.1, "d": 0.3},
+		{"wave": "sine", "hz": [165, 330], "a": 0.1, "d": 0.3, "db": -6},
+		{"wave": "triangle", "hz": [880, 1320], "at": 0.2, "a": 0.02, "d": 0.2, "db": -12}]},
+	"shield_hit": {"category": "impact", "seconds": 0.16, "min": 0.1, "rms_db": -17.0, "priority": 1, "voices": 3, "layers": [
+		{"wave": "sine", "hz": 1760, "a": 0.002, "d": 0.14, "fm": {"ratio": 2.76, "index": [2.0, 0.0]}},
+		{"wave": "sine", "hz": 2640, "a": 0.002, "d": 0.1, "db": -8},
+		{"wave": "noise", "a": 0.001, "d": 0.01, "filter": {"type": "hp", "hz": 5000}, "db": -12}]},
+	"shield_down": {"category": "impact", "seconds": 0.6, "max": 0.65, "chorus": {"mix": 0.3}, "layers": [
+		{"wave": "noise", "a": 0.002, "d": 0.3, "filter": {"type": "hp", "hz": 2000}, "db": -4},
+		{"wave": "sine", "hz": [1800, 300], "a": 0.002, "d": 0.5, "fm": {"ratio": 1.41, "index": [3.0, 0.0]}},
+		{"wave": "triangle", "hz": [900, 150], "a": 0.002, "d": 0.4, "db": -6}]},
+	"shield_hum": {"category": "loop", "seconds": 2.0, "loop": true, "quiet": true, "chorus": {"mix": 0.4}, "layers": [
+		{"wave": "sine", "hz": 110, "a": 0.0, "s": 1.0, "len": 2.1, "vibrato": [0.5, 8.0]},
+		{"wave": "sine", "hz": 165.5, "a": 0.0, "s": 1.0, "len": 2.1, "db": -6, "vibrato": [1.0, 6.0]},
+		{"wave": "pink", "a": 0.0, "s": 1.0, "len": 2.1, "filter": {"type": "lp", "hz": 500}, "db": -14}]},
+
+	# The EMP burst (BattleView._ability_used): its blast, the crackle held while any defence is
+	# out, and a power-up chime as each wakes.
+	"emp_burst": {"category": "explosion", "seconds": 0.9, "echo": {"ms": 100, "feedback": 0.25, "mix": 0.2}, "layers": [
+		{"wave": "square", "pulse": 0.3, "hz": [2200, 90], "glide": 0.5, "a": 0.002, "d": 0.7,
+			"filter": {"type": "lp", "hz": [4000, 600]}, "db": -2},
+		{"wave": "noise", "a": 0.002, "d": 0.7, "filter": {"type": "bp", "hz": 1500, "q": 2.0}, "ring": {"hz": 23}, "db": -4},
+		{"wave": "sine", "hz": [300, 50], "a": 0.002, "d": 0.5}]},
+	"emp_hold": {"category": "loop", "seconds": 2.0, "loop": true, "quiet": true, "layers": [
+		{"wave": "noise", "a": 0.0, "s": 1.0, "len": 2.1, "filter": {"type": "bp", "hz": 2200, "q": 5.0}, "ring": {"hz": 13},
+			"db": -2},
+		{"wave": "sine", "hz": 55, "a": 0.0, "s": 1.0, "len": 2.1, "vibrato": [0.5, 30.0], "db": -4},
+		{"wave": "square", "pulse": 0.1, "hz": 31, "a": 0.0, "s": 1.0, "len": 2.1, "filter": {"type": "lp", "hz": 600}, "db": -14}]},
+	"emp_wake": {"category": "chime", "seconds": 0.38, "min": 0.2, "rms_db": -19.0, "cooldown": 0.08, "layers": [
+		{"wave": "sine", "hz": [300, 900], "glide": 0.15, "a": 0.01, "d": 0.22},
+		{"wave": "triangle", "hz": 1320, "at": 0.12, "a": 0.003, "d": 0.22, "db": -6}]},
+
+	# The gravity well's hum while it holds anything (BattleView._hold).
+	"vortex_hum": {"category": "loop", "seconds": 2.0, "loop": true, "quiet": true, "chorus": {"mix": 0.35}, "layers": [
+		{"wave": "sine", "hz": 80, "a": 0.0, "s": 1.0, "len": 2.1, "vibrato": [1.5, 200.0]},
+		{"wave": "triangle", "hz": 160, "a": 0.0, "s": 1.0, "len": 2.1, "vibrato": [1.5, 200.0],
+			"filter": {"type": "lp", "hz": 600}, "db": -8},
+		{"wave": "pink", "a": 0.0, "s": 1.0, "len": 2.1, "filter": {"type": "bp", "hz": 500, "q": 3.0}, "db": -10}]},
+
+	# The abilities (BattleView._ability_used): the repair swarm's bubbling cast and its buzz for
+	# its seconds; the orbital strike's beeping marker until it lands, its bolt's whine as it falls
+	# from the sky, and its landing, the biggest blast of a battle.
+	"swarm_cast": {"category": "chime", "seconds": 0.45, "min": 0.3, "chorus": {"mix": 0.35}, "layers": [
+		{"wave": "sine", "hz": 880, "a": 0.002, "d": 0.08, "fm": {"ratio": 1.5, "index": [1.5, 0.0]}},
+		{"wave": "sine", "hz": 1175, "at": 0.04, "a": 0.002, "d": 0.08, "fm": {"ratio": 1.5, "index": [1.5, 0.0]}},
+		{"wave": "sine", "hz": 990, "at": 0.08, "a": 0.002, "d": 0.08, "fm": {"ratio": 1.5, "index": [1.5, 0.0]}},
+		{"wave": "sine", "hz": 1320, "at": 0.12, "a": 0.002, "d": 0.08, "fm": {"ratio": 1.5, "index": [1.5, 0.0]}},
+		{"wave": "sine", "hz": 1047, "at": 0.16, "a": 0.002, "d": 0.1, "fm": {"ratio": 1.5, "index": [1.5, 0.0]}},
+		{"wave": "sine", "hz": 1480, "at": 0.2, "a": 0.002, "d": 0.18, "fm": {"ratio": 1.5, "index": [1.5, 0.0]}}]},
+	"swarm_hum": {"category": "loop", "seconds": 2.0, "loop": true, "quiet": true, "layers": [
+		{"wave": "saw", "hz": 220, "a": 0.0, "s": 1.0, "len": 2.1, "vibrato": [9.0, 25.0], "filter": {"type": "lp", "hz": 1200}},
+		{"wave": "saw", "hz": 223, "a": 0.0, "s": 1.0, "len": 2.1, "vibrato": [7.0, 30.0], "filter": {"type": "lp", "hz": 1200}},
+		{"wave": "triangle", "hz": 440, "a": 0.0, "s": 1.0, "len": 2.1, "vibrato": [11.0, 20.0], "db": -8}]},
+	"strike_marker": {"category": "loop", "seconds": 1.0, "loop": true, "quiet": true, "layers": [
+		{"wave": "sine", "hz": [1500, 1200], "a": 0.005, "d": 0.03, "s": 0.8, "len": 0.12, "r": 0.03},
+		{"wave": "triangle", "hz": [3000, 2400], "a": 0.005, "d": 0.03, "s": 0.8, "len": 0.12, "r": 0.03, "db": -14},
+		{"wave": "sine", "hz": [1500, 1200], "at": 0.5, "a": 0.005, "d": 0.03, "s": 0.8, "len": 0.12, "r": 0.03},
+		{"wave": "triangle", "hz": [3000, 2400], "at": 0.5, "a": 0.005, "d": 0.03, "s": 0.8, "len": 0.12, "r": 0.03,
+			"db": -14}]},
+	"strike_bolt": {"category": "impact", "seconds": 0.55, "max": 0.6, "rms_db": -14.0, "layers": [
+		{"wave": "sine", "hz": [300, 2400], "glide": 0.5, "a": 0.45, "d": 0.08},
+		{"wave": "saw", "hz": [300, 2400], "glide": 0.5, "a": 0.45, "d": 0.08, "filter": {"type": "lp", "hz": 3000}, "db": -12},
+		{"wave": "noise", "a": 0.45, "d": 0.08, "filter": {"type": "hp", "hz": [500, 6000]}, "db": -10}]},
+	"strike_land": {"category": "explosion", "seconds": 1.75, "max": 1.8, "rms_db": -11.0, "drive": 0.45, "priority": 4,
+		"voices": 2, "echo": {"ms": 140, "feedback": 0.3, "mix": 0.22}, "layers": [
+		{"wave": "sine", "hz": [75, 26], "glide": 0.7, "a": 0.002, "d": 1.1},
+		{"wave": "noise", "a": 0.001, "d": 1.2, "filter": {"type": "lp", "hz": [9000, 200]}},
+		{"wave": "pink", "a": 0.04, "d": 1.7, "filter": {"type": "lp", "hz": [900, 70]}, "db": -2},
+		{"wave": "triangle", "hz": [1800, 200], "a": 0.001, "d": 0.2, "db": -8},
+		{"wave": "noise", "at": 0.06, "a": 0.01, "d": 0.9, "filter": {"type": "bp", "hz": 2500, "q": 2.0},
+			"ring": {"hz": 19}, "db": -11}]},
+
 	# The battle's end.
 	"victory": {"category": "sting", "seconds": 1.7, "chorus": {"mix": 0.3},
 		"echo": {"ms": 140, "feedback": 0.2, "mix": 0.15}, "layers": [
@@ -482,11 +557,6 @@ const TABLE := {
 		{"wave": "sine", "hz": [165, 124], "sweep": "lin", "glide": 0.7, "at": 0.6, "a": 0.02, "d": 0.3, "s": 0.6,
 			"len": 0.6, "r": 0.25, "db": -8}]},
 
-	# Continuous: a shield generator's dome while it is up (for the battle lane to hook).
-	"shield_hum": {"category": "loop", "seconds": 2.0, "loop": true, "quiet": true, "chorus": {"mix": 0.4}, "layers": [
-		{"wave": "sine", "hz": 110, "a": 0.0, "s": 1.0, "len": 2.1, "vibrato": [0.5, 8.0]},
-		{"wave": "sine", "hz": 165.5, "a": 0.0, "s": 1.0, "len": 2.1, "db": -6, "vibrato": [1.0, 6.0]},
-		{"wave": "pink", "a": 0.0, "s": 1.0, "len": 2.1, "filter": {"type": "lp", "hz": 500}, "db": -14}]},
 }
 
 ## The sound a weapon's shot makes (fire_key()), by its kind (Weapons.Kind), or by its type id where
