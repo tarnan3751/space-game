@@ -47,6 +47,8 @@ var sector_map: SectorMap
 ## The battle running in the base's place and its HUD; null when there is none.
 var battle: BattleView
 var battle_hud: BattleHud
+## Plays the sounds.
+var audio: Audio
 var _ticks: int = 0
 ## What a state change or the tick left to redraw, serviced once at the end of the frame's
 ## _process: the base's view, the ghost and the HUD; and the sector map's cards while it is open.
@@ -72,6 +74,12 @@ func _ready() -> void:
 		catalog.apply_dev_cheats()
 
 	_build_environment()
+
+	audio = Audio.new()
+	# A run with its own save keeps its own settings beside it.
+	if save_path != DEFAULT_SAVE_PATH:
+		audio.settings_path = save_path.get_base_dir().path_join("settings.cfg")
+	add_child(audio)
 
 	base_view = BaseView.new()
 	add_child(base_view)
