@@ -48,7 +48,8 @@ material kit, `LowPolyMesh`, the shaders, the outlines, the view states, the wal
 `_now()` is the device clock (`Time.get_unix_time_from_system()`); the server will own time
 later. `state.changed` → `_on_state_changed`, which only marks the redraw too, the sector map's
 cards with it. The save is written on `NOTIFICATION_WM_CLOSE_REQUEST` and
-`NOTIFICATION_APPLICATION_PAUSED` too.
+`NOTIFICATION_APPLICATION_PAUSED` too; on the close request `main` then quits itself, quietly
+(`main._quit`, `audio.md` **Quitting**).
 
 **One redraw a frame.** Production fires `changed` on most ticks of a producing base, and a
 command fires it once per apply, so the redraw waits for the frame: every frame, `_process`

@@ -73,8 +73,11 @@ non-zero on any failure:
 3. **check-only** — `--check-only -s` on every `.gd` under `src/`, `test/` and `tools/`. Godot
    exits 0 from `--check-only` even on a parse error, so the gate reads the output for
    `SCRIPT ERROR`, `Parse Error` and `Failed to load script`.
-4. **boot** — `scenes/main.tscn` headless for 240 frames (`--quit-after 240`) on an isolated
-   save (`--save-path=` under a temp directory), with no `SCRIPT ERROR` or `ERROR:` line. It
+4. **boot** — `scenes/main.tscn` headless for 240 frames on an isolated save (`--save-path=`
+   under a temp directory), quitting by `main`'s own quiet quit (`--quit-frames=240`: the sounds
+   shut down and 0.1 s waited, the path a window's close takes; it must log
+   `main: quitting after 240 frames`, and `--quit-after 960` is only a backstop against a hang),
+   with no `SCRIPT ERROR` or `ERROR:` line. It
    passes no `--no-cheats` on purpose: it boots with the dev cheats on, as the owner's debug
    runs do, which makes it the automated run of `main.gd`'s real cheat path, and its isolated
    save makes that harmless.

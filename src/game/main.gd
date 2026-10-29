@@ -8,6 +8,11 @@ extends Node3D
 ## A `--save-path=<file>` user argument (after `--` on the command line) replaces the
 ## save file, so the harness and the gates never touch the real one.
 ##
+## main owns quitting: a window's close request saves, silences the sounds and waits
+## QUIT_SETTLE_SECONDS for the mixer to let go of them before it quits, or the engine reports
+## the playing music as leaked at exit. A `--quit-frames=<n>` user argument takes the same quiet
+## path after n frames and says so in the log; the gate's boot uses it instead of `--quit-after`.
+##
 ## A debug build (every run from the editor binary) applies the dev cheats
 ## (Catalog.apply_dev_cheats: every level free and built in one second at most) and the HUD
 ## shows the resources as infinite. A `--no-cheats` user argument keeps the real numbers; the
@@ -30,6 +35,11 @@ extends Node3D
 const DEFAULT_SAVE_PATH := "user://base.json"
 const SAVE_PATH_ARG := "--save-path="
 const NO_CHEATS_ARG := "--no-cheats"
+const QUIT_FRAMES_ARG := "--quit-frames="
+## How long a quit waits after silencing the sounds, frames running: the mixer, on its own thread,
+## lets go of a stopped sound after its next mix, and a frame after that frees it, so a count of
+## frames is not enough (they can all pass inside one mix headless). As the harness driver waits.
+const QUIT_SETTLE_SECONDS := 0.1
 const SAVE_EVERY_TICKS := 10
 ## The HUD's pictures start rendering in idle frames this long after boot.
 const PRERENDER_AFTER := 1.0
@@ -62,6 +72,10 @@ var _sector_dirty: bool = false
 ## in the base's idle frames (Hud.prerender).
 var _booted: float = 0.0
 var _prerendering: bool = false
+## The frames to quit after (--quit-frames, 0 for none), the frames run, and whether a quit is under way.
+var _quit_frames: int = 0
+var _frames: int = 0
+var _quitting: bool = false
 ## Where the camera looked at the base, and its zoom, when a battle opened: put back after it.
 var _base_focus: Vector3 = Vector3.ZERO
 var _base_zoom: float = IsoCamera.START_ZOOM_SIZE
@@ -69,6 +83,8 @@ var _base_zoom: float = IsoCamera.START_ZOOM_SIZE
 
 func _ready() -> void:
 	save_path = _save_path_from_args()
+	get_tree().auto_accept_quit = false
+	_quit_frames = _quit_frames_from_args()
 	catalog = Catalog.load_default()
 	if catalog.load_error != "":
 		push_error("Game data is invalid: " + catalog.load_error)
@@ -169,6 +185,11 @@ func _base_sound(key: StringName, pitch_jitter: float = 0.06) -> void:
 ## frame's state changes and the tick marked is redrawn, once however many there were: a command
 ## applied from input (which runs before _process) is drawn in the same frame.
 func _process(delta: float) -> void:
+	if _quit_frames > 0:
+		_frames += 1
+		if _frames == _quit_frames:
+			print("main: quitting after %d frames" % _frames)
+			_quit()
 	RenderingServer.global_shader_parameter_set(&"anim_time", Motion.tick())
 	if _booted < PRERENDER_AFTER:
 		_booted += delta
@@ -191,6 +212,20 @@ func _process(delta: float) -> void:
 func _notification(what: int) -> void:
 	if what == NOTIFICATION_WM_CLOSE_REQUEST or what == NOTIFICATION_APPLICATION_PAUSED:
 		_save()
+	if what == NOTIFICATION_WM_CLOSE_REQUEST:
+		_quit()
+
+
+## Quits quietly: the sounds shut down and QUIT_SETTLE_SECONDS waited, so nothing playing is
+## left to the engine's exit. Phones never ask to close; the system ends the app.
+func _quit() -> void:
+	if _quitting:
+		return
+	_quitting = true
+	if audio != null:
+		audio.shut_down()
+	await get_tree().create_timer(QUIT_SETTLE_SECONDS).timeout
+	get_tree().quit()
 
 
 ## The local clock. Easy to cheat by changing the device time; the server will own time.
@@ -495,6 +530,13 @@ func _save() -> void:
 		push_warning("Could not save the base: %s" % error_string(FileAccess.get_open_error()))
 		return
 	file.store_string(JSON.stringify(state.to_dict(), "\t"))
+
+
+static func _quit_frames_from_args() -> int:
+	for arg: String in OS.get_cmdline_user_args():
+		if arg.begins_with(QUIT_FRAMES_ARG):
+			return arg.trim_prefix(QUIT_FRAMES_ARG).to_int()
+	return 0
 
 
 static func _save_path_from_args() -> String:

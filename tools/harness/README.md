@@ -87,8 +87,8 @@ Godot logs it as a `SCRIPT ERROR`, which fails the run in `run.sh`.
 - **The settings and the sounds.** `main.gd` keeps the volumes (`Audio.settings_path`) beside a
   `--save-path` save, `<out>/settings.cfg`, never in `user://settings.cfg`. Sounds play in every
   run, on the Dummy audio driver too, so the plays are recorded and checked the same either way;
-  only a rendered run with `--audible` plays them aloud. When the scenario returns, the driver silences
-  them (`Audio.silence()`) and waits `SILENCE_SECONDS` before it quits: a sound still playing
+  only a rendered run with `--audible` plays them aloud. When the scenario returns, the driver shuts
+  them down (`Audio.shut_down()`) and waits `SILENCE_SECONDS` before it quits: a sound still playing
   at exit is reported as leaked resources.
 - **The engine's own files.** Like any Godot run, a harness run writes the `.godot/` cache
   and any missing `*.uid` files in the tree it runs in. That is why the harness, like the
@@ -111,7 +111,7 @@ through the game layer as the player would, and read the state through `BaseStat
 | `main.state` | the `BaseState`: `buildings`, `resources`, `capacity()`, `builders_free()`, `seconds_left(id)`, `check_*` |
 | `main.camera`, `main.base_view` | `IsoCamera` and `BaseView`, for cell and screen mapping |
 | `main.sector_map` | the `SectorMap`: `open(state)`, `close()`, `show_field(index)`, `is_open()`, `is_detail_open()`, `detail_index()`, `detail_field()`, `card(index)`, `card_cleared(index)`, `card_lines(index)`, `scan_button()`, `close_button()`, `attack_button()`, `hint_shown()`, `minimap()` (`drawn()`, `walls_drawn()`), `card_thumbnail(index)`, `layouts_done()`, its signals `scan_pressed`, `attack_pressed`, `closed`; `main.open_sector_map()` (`docs/reference/hud.md`, **Sector map**) |
-| `main.audio` | the `Audio` node: `play(key)`, `schedule(key, delay)`, `loop(key)`, `stop(id)`, `music(key)`, `sting(key)`, `set_volume(bus, linear)`, `volume(bus)`, `silence()`; its queries `recent_plays()`, `recent_times()`, `play_count(key)`, `playing_count()`, `scheduled_count()`, `keys()`, `stream(key)`, `current_music()` (`docs/reference/audio.md`) |
+| `main.audio` | the `Audio` node: `play(key)`, `schedule(key, delay)`, `loop(key)`, `stop(id)`, `music(key)`, `sting(key)`, `set_volume(bus, linear)`, `volume(bus)`, `silence()`, `shut_down()`; its queries `recent_plays()`, `recent_times()`, `play_count(key)`, `playing_count()`, `scheduled_count()`, `keys()`, `stream(key)`, `current_music()` (`docs/reference/audio.md`) |
 | `main.open_battle(setup, practice, expedition = {})`, `main.practice_setup()`, `main.battle`, `main.battle_hud` | a battle in the base's place and its `BattleView` while it runs: `sim` (read only), `script_commands(list)`, `deploy(unit, cell)`, `select_unit(unit)`, `surrender()`, `leave()`, `speed`, `deploy_unit`, `is_masked(cell)`, `input` (its own `WorldInput`), `field` (its `BaseView`, `deploy_strength()`), `units`, `step_ms()`, `slowest_tick()`, `clock()`, `finished` (`docs/reference/battle-view.md`); and its `BattleHud`'s queries (`docs/reference/hud.md`, **Battle HUD**) |
 
 Helpers on `HarnessScenario`:

@@ -76,6 +76,8 @@ var _duck := 1.0
 var _duck_tween: Tween
 var _sting: AudioStreamPlayer
 var _rng := RandomNumberGenerator.new()
+## Set by shut_down(): the game is quitting, and nothing starts again.
+var _shut := false
 
 
 func _ready() -> void:
@@ -123,6 +125,8 @@ func _ready() -> void:
 ## Plays `key` once, its pitch varied up to `pitch_jitter` either way, `volume_db` louder or
 ## softer: whether it played (not dropped by its cooldown or a full pool).
 func play(key: StringName, pitch_jitter: float = 0.06, volume_db: float = 0.0) -> bool:
+	if _shut:
+		return false
 	var started := Time.get_ticks_usec() if Profile.enabled else 0
 	var played := _play(key, pitch_jitter, volume_db)
 	if Profile.enabled:
@@ -133,6 +137,8 @@ func play(key: StringName, pitch_jitter: float = 0.06, volume_db: float = 0.0) -
 ## Plays `key` `delay_seconds` from now, through play() then. With SCHEDULED waiting, the oldest
 ## is dropped.
 func schedule(key: StringName, delay_seconds: float, pitch_jitter: float = 0.06, volume_db: float = 0.0) -> void:
+	if _shut:
+		return
 	if _due_count == SCHEDULED:
 		if not _due_warned:
 			_due_warned = true
@@ -150,6 +156,8 @@ func schedule(key: StringName, delay_seconds: float, pitch_jitter: float = 0.06,
 
 ## Starts `key` looping, fading in over `fade` seconds: an id for stop(), 0 when it could not.
 func loop(key: StringName, fade: float = 0.15) -> int:
+	if _shut:
+		return 0
 	if not _streams.has(key):
 		push_error("Audio: no sound %s" % key)
 		return 0
@@ -181,6 +189,8 @@ func stop(id: int, fade: float = 0.15) -> void:
 ## Crossfades the music to track `key` over `fade` seconds; &"" fades it out. False when the
 ## track has no file.
 func music(key: StringName, fade: float = 1.0) -> bool:
+	if _shut:
+		return false
 	if key == _music_key:
 		return true
 	var stream: AudioStream = null
@@ -212,6 +222,8 @@ func current_music() -> StringName:
 
 ## Plays the fanfare `key` on Music, the music ducked under it: whether it played.
 func sting(key: StringName) -> bool:
+	if _shut:
+		return false
 	if not _streams.has(key):
 		push_error("Audio: no sound %s" % key)
 		return false
@@ -324,6 +336,13 @@ func silence() -> void:
 	_sting.stop()
 	_due_count = 0
 	set_process(false)
+
+
+## silence() for good, before a quit: from now on play, schedule, loop, music and sting do
+## nothing, so no sound starts in the frames the quit waits for the mixer to let go.
+func shut_down() -> void:
+	silence()
+	_shut = true
 
 
 func _exit_tree() -> void:

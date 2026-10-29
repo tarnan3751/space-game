@@ -135,6 +135,7 @@ a missing file is an error, which the gate's boot catches), makes `VOICES` (24)
 | `set_volume(bus, linear)`, `volume(bus)` | A bus's volume, 0 to 1 (0 mutes it), for `Master`, `SFX`, `UI` and `Music`; set is kept at once in `settings_path`. |
 | `tap_buttons(root)` | Every `BaseButton` under `root` plays `ui_tap` (pitch varied 3%) when pressed, connected once however often it is asked. |
 | `silence()` | Stops every sound (loops, music, stings), ends every fade and the duck, and drops the scheduled plays. |
+| `shut_down()` | `silence()` for good, before a quit: every later `play`, `schedule`, `loop`, `music` and `sting` returns at once (**Quitting**). |
 
 **Settings.** The volumes live in a `ConfigFile` at `settings_path`, section `volume`, one key a
 bus; read at boot, written on every `set_volume`; never in the save. It is `user://settings.cfg`,
@@ -148,7 +149,15 @@ sets nothing for audio: the mix rate is the device's, the iOS session category t
 
 **Quitting.** When `Audio` leaves the tree it silences everything. The mixer lets go of a stopped
 sound a mix later, so a run that quits right after a sound played reports it as leaked resources at
-exit; the harness driver silences and waits `SILENCE_SECONDS` (0.1 s) before it quits.
+exit; the harness driver shuts the sounds down and waits `SILENCE_SECONDS` (0.1 s) before it
+quits, and `main` owns every other quit (`auto_accept_quit` off): a window's close request (after
+the save) and the gate's boot (`--quit-frames`) shut down and wait `QUIT_SETTLE_SECONDS` (0.1 s)
+before `quit()`: a count of frames is not enough, since headless they can all pass inside one mix.
+`shut_down()` is `silence()` for good: after it `play`, `schedule`, `loop`, `music` and `sting`
+return at once, so a shot or a finished building in those frames starts nothing to leak. Phones
+mostly do not close through the window manager (the system ends the app, and nothing is reported),
+but Android's back button quits the engine directly (`SceneTree.quit_on_go_back`, on by default),
+skipping `main`'s quit, so a sound playing then is reported as leaked in logcat.
 
 ## Hooks
 

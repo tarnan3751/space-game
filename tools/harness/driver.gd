@@ -115,8 +115,8 @@ func _run(scenario_path: String) -> void:
 	say("harness: run %s" % scenario_name)
 	create_timer(timeout_seconds).timeout.connect(_on_timeout)
 	await scenario.run(_main)
-	# Quiet before quitting: a sound still playing at exit is reported as a leak (Audio.silence).
-	_main.audio.silence()
+	# Quiet before quitting: a sound still playing at exit is reported as a leak (Audio.shut_down).
+	_main.audio.shut_down()
 	await create_timer(SILENCE_SECONDS).timeout
 	_finish()
 

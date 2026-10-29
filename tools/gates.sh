@@ -4,8 +4,8 @@
 #   1. import       $GODOT --headless --import   (registers class_name scripts, refreshes .godot/)
 #   2. tests        tools/run_tests.sh
 #   3. check-only   $GODOT --check-only on every .gd under src/, test/ and tools/
-#   4. boot         scenes/main.tscn headless for 240 frames on an isolated save, with no
-#                   SCRIPT ERROR or ERROR line
+#   4. boot         scenes/main.tscn headless for 240 frames on an isolated save, quitting by
+#                   main's own quiet quit (--quit-frames), with no SCRIPT ERROR or ERROR line
 # Prints one line per gate, the failing gate's output in full, and exits non-zero when
 # any gate fails. The main scene boot uses --save-path, so the real save is never read.
 # Set GODOT to the engine binary; it falls back to `godot` on PATH, then the macOS app.
@@ -82,10 +82,13 @@ else
 fi
 
 # 4. Headless boot of the main scene --------------------------------------------------
-"$GODOT" --headless --path . --quit-after "$BOOT_FRAMES" -- \
-  "--save-path=$scratch/boot-save.json" >"$scratch/boot.txt" 2>&1
+# main quits itself after BOOT_FRAMES (--quit-frames), through the game's own quit; --quit-after
+# is only a backstop so a boot that never quits cannot hang the gate, and fails it.
+"$GODOT" --headless --path . --quit-after "$((BOOT_FRAMES * 4))" -- \
+  "--save-path=$scratch/boot-save.json" "--quit-frames=$BOOT_FRAMES" >"$scratch/boot.txt" 2>&1
 boot_status=$?
-if [ $boot_status -eq 0 ] && ! has_errors "$scratch/boot.txt"; then
+if [ $boot_status -eq 0 ] && ! has_errors "$scratch/boot.txt" \
+    && grep -q "^main: quitting after $BOOT_FRAMES frames" "$scratch/boot.txt"; then
   report boot ok "$BOOT_FRAMES frames, no errors"
 else
   report boot FAILED "exit $boot_status" "$scratch/boot.txt"
